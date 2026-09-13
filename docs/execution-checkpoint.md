@@ -5,9 +5,9 @@ This file is the persistent implementation-status overlay for the hash-verified 
 - Updated: 2026-09-14
 - Definition: D01–D30 LOCKED and hash verified
 - Active release: R0 — Foundation
-- Last completed ticket: R0-005 — Deployment skeleton
-- Active ticket: R0-007 — Migration and database convention framework
-- Next dependency-satisfied candidate: R0-008 after R0-007
+- Last completed ticket: R0-013 — Deny-by-default authorization framework
+- Active ticket: R0-008 — Core identity/User persistence
+- Next dependency-satisfied candidate: R0-009 after R0-008
 - Human gate: none
 
 ## Ticket state overlay
@@ -20,7 +20,11 @@ This file is the persistent implementation-status overlay for the hash-verified 
 | R0-004 | DONE   | Frozen install, quality, HIGH/CRITICAL audit and immutable-pinned Gitleaks workflow                      |
 | R0-005 | DONE   | Environment-isolated OCI/Kustomize skeleton, TLS path and protected staging workflow validated           |
 | R0-006 | DONE   | PostGIS Compose/migration, least-privilege roles, DB query boundary and safe health tests passed         |
-| R0-007 | ACTIVE | Migration tooling and database conventions in progress                                                   |
+| R0-007 | DONE   | Checksum/advisory-lock migration runner; clean PostGIS CI, repeat run and all security gates passed      |
+| R0-008 | ACTIVE | Core User identity persistence in progress                                                               |
+| R0-013 | DONE   | Server-only fail-closed evaluator, public allowlist and 20 positive/negative policy tests passed         |
+| R0-016 | DONE   | Separate container contract, opaque server keys, authorized private grants and revocation tests passed   |
+| R0-021 | DONE   | Retry/terminal queue port, safe telemetry, 10 queue tests and 2 independently deployable worker tests    |
 
 ## Durable decisions
 

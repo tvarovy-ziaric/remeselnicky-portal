@@ -130,6 +130,9 @@ importers:
       '@portal/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@portal/queue':
+        specifier: workspace:*
+        version: link:../../packages/queue
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -137,6 +140,22 @@ importers:
       tsx:
         specifier: 'catalog:'
         version: 4.23.13
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 3.2.7(@types/node@26.5.1)(tsx@4.23.13)
+
+  packages/authorization:
+    dependencies:
+      '@portal/domain':
+        specifier: workspace:*
+        version: link:../domain
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.5.1
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -194,6 +213,30 @@ importers:
 
   packages/domain:
     devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 3.2.7(@types/node@26.5.1)(tsx@4.23.13)
+
+  packages/queue:
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.5.1
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 3.2.7(@types/node@26.5.1)(tsx@4.23.13)
+
+  packages/storage:
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.5.1
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
