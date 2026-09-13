@@ -5,3 +5,6 @@ export type EntityId = string;
 export const domainContract = Object.freeze({
   entityIdRepresentation: "opaque-string",
 } as const);
+
+export { isUserAccountState, USER_ACCOUNT_STATES } from "./user.js";
+export type { User, UserAccountState, UserId } from "./user.js";

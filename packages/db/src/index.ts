@@ -1,6 +1,15 @@
 import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
+import * as schema from "./schema/index.js";
+
+export {
+  USER_ACCOUNT_STATE_VALUES,
+  userAccountStateEnum,
+  users,
+} from "./schema/index.js";
+export type { NewUserRecord, UserRecord } from "./schema/index.js";
+
 export {
   createPostgresMigrationStore,
   loadMigrations,
@@ -27,7 +36,7 @@ export interface DatabaseClient extends DatabaseHealthProbe {
    * Typed query entry point. Domain schemas are intentionally added by later
    * migration tickets rather than by the foundation package.
    */
-  readonly query: PostgresJsDatabase;
+  readonly query: PostgresJsDatabase<typeof schema>;
   close(): Promise<void>;
 }
 
@@ -64,7 +73,7 @@ export function createDatabase(
     max: options.maxConnections ?? 10,
     prepare: true,
   });
-  const query = drizzle(sql);
+  const query = drizzle(sql, { schema });
   const health = createDatabaseHealthProbe(async () => {
     await sql`select 1 as health`;
   });
