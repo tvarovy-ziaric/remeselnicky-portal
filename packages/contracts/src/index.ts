@@ -1,5 +1,19 @@
 import type { EntityId } from "@portal/domain";
 
+export { AUTH_API_PATHS, AUTH_INPUT_LIMITS } from "./auth.js";
+export type {
+  AuthAcceptedResponse,
+  AuthCsrfResponse,
+  AuthErrorCode,
+  AuthErrorResponse,
+  AuthLoginRequest,
+  AuthPasswordResetConfirmRequest,
+  AuthPasswordResetRequest,
+  AuthRegisterRequest,
+  AuthSessionResponse,
+  AuthUserResponse,
+} from "./auth.js";
+
 /** Minimal transport-safe reference shared by API producers and consumers. */
 export interface ApiResourceReference {
   readonly id: EntityId;

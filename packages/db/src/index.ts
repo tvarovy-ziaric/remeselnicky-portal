@@ -1,14 +1,50 @@
 import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
+import {
+  createAuthRepository,
+  type AuthRepository,
+} from "./auth-repository.js";
 import * as schema from "./schema/index.js";
 
 export {
+  authCredentials,
+  authRateLimitBuckets,
+  authSessions,
+  passwordResetTokens,
   USER_ACCOUNT_STATE_VALUES,
   userAccountStateEnum,
   users,
 } from "./schema/index.js";
-export type { NewUserRecord, UserRecord } from "./schema/index.js";
+export type {
+  AuthCredentialRecord,
+  AuthRateLimitBucketRecord,
+  AuthSessionJsonValue,
+  AuthSessionPayload,
+  AuthSessionRecord,
+  NewAuthCredentialRecord,
+  NewAuthSessionRecord,
+  NewPasswordResetTokenRecord,
+  NewUserRecord,
+  PasswordResetTokenRecord,
+  UserRecord,
+} from "./schema/index.js";
+
+export { createAuthRepository } from "./auth-repository.js";
+export type {
+  AuthCredential,
+  AuthRepository,
+  AuthUser,
+  ConsumePasswordResetResult,
+  ConsumeRateLimitInput,
+  CreatePasswordResetInput,
+  PasswordResetRecord,
+  PersistedAuthSession,
+  RateLimitResult,
+  RegisterAuthUserInput,
+  RegisterAuthUserResult,
+  SaveAuthSessionInput,
+} from "./auth-repository.js";
 
 export {
   createPostgresMigrationStore,
@@ -37,6 +73,7 @@ export interface DatabaseClient extends DatabaseHealthProbe {
    * migration tickets rather than by the foundation package.
    */
   readonly query: PostgresJsDatabase<typeof schema>;
+  readonly auth: AuthRepository;
   close(): Promise<void>;
 }
 
@@ -74,11 +111,13 @@ export function createDatabase(
     prepare: true,
   });
   const query = drizzle(sql, { schema });
+  const auth = createAuthRepository(sql);
   const health = createDatabaseHealthProbe(async () => {
     await sql`select 1 as health`;
   });
 
   return Object.freeze({
+    auth,
     query,
     ping(): Promise<void> {
       return health.ping();

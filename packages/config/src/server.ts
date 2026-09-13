@@ -13,14 +13,46 @@ const portSchema = z
     message: "must be an integer between 1 and 65535",
   });
 
+function boundedIntegerEnvironmentValue(
+  defaultValue: number,
+  minimum: number,
+  maximum: number,
+) {
+  return z
+    .string()
+    .regex(/^\d+$/, `must be an integer between ${minimum} and ${maximum}`)
+    .transform(Number)
+    .refine((value) => value >= minimum && value <= maximum, {
+      message: `must be an integer between ${minimum} and ${maximum}`,
+    })
+    .optional()
+    .transform((value) => value ?? defaultValue);
+}
+
 const serverEnvironmentSchema = z
   .object({
     APP_ENV: deploymentEnvironmentSchema,
     APP_ORIGIN: z.string().url(),
+    AUTH_RATE_LIMIT_MAX: boundedIntegerEnvironmentValue(10, 1, 100),
+    AUTH_RATE_LIMIT_WINDOW_SECONDS: boundedIntegerEnvironmentValue(
+      900,
+      60,
+      3_600,
+    ),
     DATABASE_URL: z.string().min(1),
+    PASSWORD_RESET_TTL_SECONDS: boundedIntegerEnvironmentValue(
+      3_600,
+      300,
+      86_400,
+    ),
     PORT: portSchema.optional(),
     RELEASE_REVISION: z.string().trim().min(1),
     SESSION_SECRET: z.string().min(32),
+    SESSION_TTL_SECONDS: boundedIntegerEnvironmentValue(
+      604_800,
+      300,
+      2_592_000,
+    ),
   })
   .superRefine((environment, context) => {
     const databaseUrl = parseUrl(environment.DATABASE_URL);
@@ -104,8 +136,19 @@ export interface ServerSecrets {
   readonly sessionSecret: string;
 }
 
+export interface AuthServerConfig {
+  readonly cookieName: string;
+  readonly cookieSecure: boolean;
+  readonly passwordResetTtlMs: number;
+  readonly rateLimitMax: number;
+  readonly rateLimitWindowMs: number;
+  readonly sessionTtlMs: number;
+  readonly trustProxyHops: number;
+}
+
 export interface ServerConfig {
   readonly appOrigin: string;
+  readonly auth: AuthServerConfig;
   readonly environment: DeploymentEnvironment;
   readonly observability: ObservabilityContext;
   readonly port: number | undefined;
@@ -143,6 +186,18 @@ export function parseServerConfig(
 
   return Object.freeze({
     appOrigin: result.data.APP_ORIGIN,
+    auth: Object.freeze({
+      cookieName:
+        result.data.APP_ENV === "production"
+          ? "__Host-portal.sid"
+          : "portal.sid",
+      cookieSecure: result.data.APP_ENV !== "development",
+      passwordResetTtlMs: result.data.PASSWORD_RESET_TTL_SECONDS * 1_000,
+      rateLimitMax: result.data.AUTH_RATE_LIMIT_MAX,
+      rateLimitWindowMs: result.data.AUTH_RATE_LIMIT_WINDOW_SECONDS * 1_000,
+      sessionTtlMs: result.data.SESSION_TTL_SECONDS * 1_000,
+      trustProxyHops: result.data.APP_ENV === "development" ? 0 : 1,
+    }),
     environment: result.data.APP_ENV,
     observability,
     port: result.data.PORT,

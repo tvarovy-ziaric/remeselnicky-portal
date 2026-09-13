@@ -23,7 +23,61 @@ describe("server configuration", () => {
       environment: "production",
       releaseRevision: "git-a1b2c3d4",
     });
+    expect(config.auth).toEqual({
+      cookieName: "__Host-portal.sid",
+      cookieSecure: true,
+      passwordResetTtlMs: 3_600_000,
+      rateLimitMax: 10,
+      rateLimitWindowMs: 900_000,
+      sessionTtlMs: 604_800_000,
+      trustProxyHops: 1,
+    });
     expect(config.secrets.databaseUrl).toBe(productionEnvironment.DATABASE_URL);
+  });
+
+  it("supports bounded auth timing overrides without exposing secrets", () => {
+    const config = parseServerConfig({
+      ...productionEnvironment,
+      AUTH_RATE_LIMIT_MAX: "5",
+      AUTH_RATE_LIMIT_WINDOW_SECONDS: "120",
+      PASSWORD_RESET_TTL_SECONDS: "900",
+      SESSION_TTL_SECONDS: "86400",
+    });
+
+    expect(config.auth).toMatchObject({
+      passwordResetTtlMs: 900_000,
+      rateLimitMax: 5,
+      rateLimitWindowMs: 120_000,
+      sessionTtlMs: 86_400_000,
+    });
+  });
+
+  it.each([
+    ["AUTH_RATE_LIMIT_MAX", "0"],
+    ["AUTH_RATE_LIMIT_WINDOW_SECONDS", "59"],
+    ["PASSWORD_RESET_TTL_SECONDS", "86401"],
+    ["SESSION_TTL_SECONDS", "not-a-number"],
+  ])("rejects unsafe auth setting %s", (field, value) => {
+    expect(() =>
+      parseServerConfig({ ...productionEnvironment, [field]: value }),
+    ).toThrow(ConfigurationError);
+  });
+
+  it("uses non-secure development cookies without trusting a proxy", () => {
+    const config = parseServerConfig({
+      ...productionEnvironment,
+      APP_ENV: "development",
+      APP_ORIGIN: "http://portal.localhost",
+      DATABASE_URL: "postgresql://portal:password@localhost/portal",
+      RELEASE_REVISION: "local-development",
+      SESSION_SECRET: "development-session-secret-at-least-32-characters",
+    });
+
+    expect(config.auth).toMatchObject({
+      cookieName: "portal.sid",
+      cookieSecure: false,
+      trustProxyHops: 0,
+    });
   });
 
   it("fails production startup when a required secret is absent", () => {

@@ -6,9 +6,11 @@ describe("public configuration", () => {
   it("returns only explicitly public deployment context", () => {
     const config = parsePublicConfig({
       DATABASE_URL: "postgresql://private.example/portal",
+      PASSWORD_RESET_TTL_SECONDS: "3600",
       NEXT_PUBLIC_APP_ENV: "staging",
       NEXT_PUBLIC_RELEASE_REVISION: "release-123",
       SESSION_SECRET: "must-not-cross-the-public-boundary",
+      SESSION_TTL_SECONDS: "604800",
     });
 
     expect(config).toEqual({
