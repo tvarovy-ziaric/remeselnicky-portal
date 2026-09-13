@@ -9,11 +9,15 @@
   },
   "scripts": {
     "build": "turbo run build",
+    "check": "pnpm format:check && pnpm typecheck && pnpm lint && pnpm test && pnpm build",
+    "check:boundaries": "node scripts/verify-import-boundaries.mjs",
     "dev": "turbo run dev --parallel",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "lint": "turbo run lint",
-    "test": "turbo run test",
+    "lint": "eslint . --max-warnings=0 && pnpm check:boundaries",
+    "lint:workspaces": "turbo run lint",
+    "test": "turbo run test && pnpm test:boundaries",
+    "test:boundaries": "node --test scripts/verify-import-boundaries.test.mjs",
     "typecheck": "turbo run typecheck"
   },
   "devDependencies": {

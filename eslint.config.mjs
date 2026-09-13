@@ -40,13 +40,17 @@ export default tseslint.config(
         {
           patterns: [
             {
-              group: ["@portal/db", "@portal/db/*"],
+              group: ["@portal/config/server", "@portal/db", "@portal/db/*"],
               message:
-                "The browser-facing web package must use server APIs, not the database package.",
+                "Browser-facing code cannot import server-only packages.",
             },
           ],
         },
       ],
     },
+  },
+  {
+    files: ["**/*.{js,mjs,cjs}"],
+    extends: [tseslint.configs.disableTypeChecked],
   },
 );
