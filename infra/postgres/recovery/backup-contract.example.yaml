@@ -1,0 +1,71 @@
+version: 1
+status: provisioning-required
+
+# Provider-neutral contract. The selected infrastructure provider must map every
+# required capability to a concrete control before the environment is approved.
+environments:
+  staging:
+    isolatedFrom: [development, production]
+    database:
+      automaticBackups:
+        enabled: true
+        providerManaged: true
+        schedule: daily
+        pointInTimeRecovery: preferred-when-supported
+        encryptedAtRest: true
+        retentionPolicyReference: required-before-real-users
+      access:
+        applicationPrincipal: forbidden
+        dedicatedRecoveryPrincipal: required
+        audited: true
+      monitoring:
+        backupSuccess: required
+        backupAge: required
+        scheduleAdherence: required
+    restoreRehearsal:
+      dataClass: synthetic-or-anonymized
+      targetEnvironmentMarker: staging
+      targetDatabasePrefix: portal_restore_verify_
+      evidenceRetentionPolicyReference: required-before-real-users
+
+  production:
+    isolatedFrom: [development, staging]
+    database:
+      automaticBackups:
+        enabled: true
+        providerManaged: true
+        schedule: daily
+        pointInTimeRecovery: preferred-when-supported
+        encryptedAtRest: true
+        retentionPolicyReference: required-before-real-users
+      access:
+        applicationPrincipal: forbidden
+        dedicatedRecoveryPrincipal: required
+        audited: true
+      monitoring:
+        backupSuccess: required
+        backupAge: required
+        scheduleAdherence: required
+    recovery:
+      restoreIntoExistingDatabase: forbidden
+      isolatedTargetEnvironmentMarker: recovery
+      deletionStateReapplication: required-before-promotion
+      promotionRequiresIncidentOwnerApproval: true
+
+media:
+  provider: selection-requires-human-gate
+  policyDocument: docs/recovery/backup-and-media-recovery-policy.md
+  criticalPrivateObjects:
+    recoverable: required
+    encryptedAtRest: true
+    publicAccess: forbidden
+  criticalPublicDerivatives:
+    rebuildFromPrivateCanonicalWhenAvailable: preferred
+    otherwiseRecoverable: required
+  inventoryAndIntegrity:
+    objectInventory: required
+    checksumOrProviderIntegrityEvidence: required
+    missingObjectDetection: required
+  deletion:
+    normalRotationMustExpireDeletedObjects: required
+    restoreMustReapplyDeletionState: required
