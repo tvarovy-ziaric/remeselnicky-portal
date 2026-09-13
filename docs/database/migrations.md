@@ -32,7 +32,10 @@ use transaction control inside the body. PostgreSQL operations that cannot run
 inside a transaction require a reviewed runner enhancement and recovery plan,
 not an ad-hoc manual step.
 
-The normal release path is roll-forward only. Before merge, migrations must run
+All pending migrations and their ledger rows run in one database transaction
+under a transaction-scoped advisory lock. A failure rolls back the pending
+batch and releases the lock. The normal release path is roll-forward only.
+Before merge, migrations must run
 from an empty PostGIS database and again on a current schema to prove both clean
 installation and idempotent runner behavior. Production execution must use a
 database role that can change the application schema but is not the runtime

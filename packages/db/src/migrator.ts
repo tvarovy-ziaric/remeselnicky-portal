@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
-import postgres, { type Sql } from "postgres";
+import postgres, { type Sql, type TransactionSql } from "postgres";
 
 const MIGRATION_FILE = /^(\d{4})_([a-z][a-z0-9_]*)\.sql$/;
 const MIGRATION_LOCK_ID = 7_246_771_036;
@@ -133,18 +133,18 @@ export interface PostgresMigrationStoreOptions {
 }
 
 /**
- * Creates the production migration adapter. The advisory lock and all migration
- * work share one reserved connection; every migration plus its ledger entry is
- * committed atomically.
+ * Creates the production migration adapter. A transaction-scoped advisory lock
+ * and all pending migrations share one transaction, so schema changes and
+ * ledger entries either commit together or roll back together.
  */
 export function createPostgresMigrationStore(
   sql: Sql,
   options: PostgresMigrationStoreOptions = {},
 ): MigrationStore {
   const lockId = options.lockId ?? MIGRATION_LOCK_ID;
-  let lockedConnection: Awaited<ReturnType<Sql["reserve"]>> | undefined;
+  let lockedConnection: TransactionSql | undefined;
 
-  function connection(): Awaited<ReturnType<Sql["reserve"]>> {
+  function connection(): TransactionSql {
     if (lockedConnection === undefined) {
       throw new Error("Migration store must be used inside withLock().");
     }
@@ -159,19 +159,16 @@ export function createPostgresMigrationStore(
         );
       }
 
-      const reserved = await sql.reserve();
-      lockedConnection = reserved;
-      try {
-        await reserved`SELECT pg_advisory_lock(${lockId})`;
-        return await operation();
-      } finally {
+      const result = await sql.begin(async (transaction) => {
+        lockedConnection = transaction;
         try {
-          await reserved`SELECT pg_advisory_unlock(${lockId})`;
+          await transaction`SELECT pg_advisory_xact_lock(${lockId})`;
+          return { value: await operation() };
         } finally {
           lockedConnection = undefined;
-          reserved.release();
         }
-      }
+      });
+      return result.value;
     },
 
     async prepare(): Promise<void> {
@@ -195,13 +192,12 @@ export function createPostgresMigrationStore(
     },
 
     async apply(migration: Migration): Promise<void> {
-      await connection().begin(async (transaction) => {
-        await transaction.unsafe(stripOuterTransaction(migration.sql));
-        await transaction`
-          INSERT INTO portal_schema_migrations (version, name, checksum)
-          VALUES (${migration.version}, ${migration.name}, ${migration.checksum})
-        `;
-      });
+      const transaction = connection();
+      await transaction.unsafe(stripOuterTransaction(migration.sql));
+      await transaction`
+        INSERT INTO portal_schema_migrations (version, name, checksum)
+        VALUES (${migration.version}, ${migration.name}, ${migration.checksum})
+      `;
     },
   });
 }
