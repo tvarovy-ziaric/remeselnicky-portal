@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: portal-production
+resources:
+  - ../../base
+  - namespace.yaml
+  - ingress.yaml
+configMapGenerator:
+  - name: portal-runtime-config
+    literals:
+      - APP_ENV=production
+      - APP_ORIGIN=https://portal.invalid
+      - NEXT_PUBLIC_APP_ENV=production
+      - NEXT_PUBLIC_RELEASE_REVISION=release-revision
+      - PORT=3001
+      - RELEASE_REVISION=release-revision
+generatorOptions:
+  disableNameSuffixHash: true
+commonAnnotations:
+  portal.remeselnicky.dev/release-revision: release-revision
+patches:
+  - path: replicas.yaml

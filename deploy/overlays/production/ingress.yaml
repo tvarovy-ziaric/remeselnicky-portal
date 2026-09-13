@@ -1,0 +1,31 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: portal
+spec:
+  tls:
+    - hosts:
+        - portal.invalid
+        - api.portal.invalid
+      secretName: portal-tls
+  rules:
+    - host: portal.invalid
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: portal-web
+                port:
+                  name: http
+    - host: api.portal.invalid
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: portal-api
+                port:
+                  name: http
