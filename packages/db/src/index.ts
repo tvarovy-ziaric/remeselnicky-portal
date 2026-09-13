@@ -5,6 +5,10 @@ import {
   createAuthRepository,
   type AuthRepository,
 } from "./auth-repository.js";
+import {
+  createMediaRepository,
+  type MediaRepository,
+} from "./media-repository.js";
 import * as schema from "./schema/index.js";
 
 export {
@@ -15,6 +19,22 @@ export {
   USER_ACCOUNT_STATE_VALUES,
   userAccountStateEnum,
   users,
+} from "./schema/index.js";
+export {
+  MEDIA_ASSET_STATUS_VALUES,
+  MEDIA_KIND_VALUES,
+  MEDIA_PROVENANCE_ENTITY_TYPE_VALUES,
+  MEDIA_STORAGE_AREA_VALUES,
+  MEDIA_STORAGE_ROLE_VALUES,
+  MEDIA_UPLOAD_PURPOSE_VALUES,
+  mediaAssetStatusEnum,
+  mediaAssetStorageObjects,
+  mediaAssets,
+  mediaKindEnum,
+  mediaProvenanceEntityTypeEnum,
+  mediaStorageAreaEnum,
+  mediaStorageRoleEnum,
+  mediaUploadPurposeEnum,
 } from "./schema/index.js";
 export type {
   AuthCredentialRecord,
@@ -28,6 +48,12 @@ export type {
   NewUserRecord,
   PasswordResetTokenRecord,
   UserRecord,
+} from "./schema/index.js";
+export type {
+  MediaAssetRecord,
+  MediaAssetStorageObjectRecord,
+  NewMediaAssetRecord,
+  NewMediaAssetStorageObjectRecord,
 } from "./schema/index.js";
 
 export { createAuthRepository } from "./auth-repository.js";
@@ -45,6 +71,13 @@ export type {
   RegisterAuthUserResult,
   SaveAuthSessionInput,
 } from "./auth-repository.js";
+export { createMediaRepository } from "./media-repository.js";
+export type {
+  CreateProcessingMediaAssetInput,
+  MediaRepository,
+  MediaProcessingTransitionResult,
+  ProcessingMediaAsset,
+} from "./media-repository.js";
 
 export {
   createPostgresMigrationStore,
@@ -74,6 +107,7 @@ export interface DatabaseClient extends DatabaseHealthProbe {
    */
   readonly query: PostgresJsDatabase<typeof schema>;
   readonly auth: AuthRepository;
+  readonly media: MediaRepository;
   close(): Promise<void>;
 }
 
@@ -112,12 +146,14 @@ export function createDatabase(
   });
   const query = drizzle(sql, { schema });
   const auth = createAuthRepository(sql);
+  const media = createMediaRepository(sql);
   const health = createDatabaseHealthProbe(async () => {
     await sql`select 1 as health`;
   });
 
   return Object.freeze({
     auth,
+    media,
     query,
     ping(): Promise<void> {
       return health.ping();

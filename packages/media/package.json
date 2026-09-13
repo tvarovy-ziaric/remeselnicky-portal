@@ -1,11 +1,10 @@
 {
-  "name": "@portal/db",
+  "name": "@portal/media",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "files": [
-    "dist",
-    "migrations"
+    "dist"
   ],
   "exports": {
     ".": {
@@ -16,17 +15,15 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint .",
-    "migrate": "pnpm build && node dist/migrate-cli.js",
     "test": "vitest run",
-    "test:integration": "vitest run test/migration.integration.test.ts",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@portal/media": "workspace:*",
-    "drizzle-orm": "0.45.2",
-    "postgres": "3.4.9"
+    "@portal/authorization": "workspace:*",
+    "@portal/storage": "workspace:*"
   },
   "devDependencies": {
+    "@portal/domain": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

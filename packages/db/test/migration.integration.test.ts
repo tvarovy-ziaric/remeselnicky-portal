@@ -5,7 +5,11 @@ import postgres from "postgres";
 import { describe, expect, it } from "vitest";
 
 import { migratePostgres } from "../src/migrator.js";
-import { createAuthRepository } from "../src/index.js";
+import {
+  createAuthRepository,
+  createMediaRepository,
+  type CreateProcessingMediaAssetInput,
+} from "../src/index.js";
 
 const testDatabaseUrl = process.env["TEST_DATABASE_URL"];
 const migrationsDirectory = fileURLToPath(
@@ -29,6 +33,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
           "0000_enable_postgis.sql",
           "0001_create_users.sql",
           "0002_authentication.sql",
+          "0003_media_assets.sql",
         ],
         alreadyApplied: 0,
       });
@@ -37,7 +42,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         testDatabaseUrl,
         migrationsDirectory,
       );
-      expect(secondRun).toEqual({ applied: [], alreadyApplied: 3 });
+      expect(secondRun).toEqual({ applied: [], alreadyApplied: 4 });
 
       const sql = postgres(testDatabaseUrl, { max: 5 });
       try {
@@ -83,7 +88,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         `;
 
         expect(postgis?.extversion).toMatch(/^3\./);
-        expect(ledger?.count).toBe(3);
+        expect(ledger?.count).toBe(4);
         expect(created).toMatchObject({ account_state: "ACTIVE" });
         expect(created?.id).toMatch(
           /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
@@ -273,6 +278,166 @@ describe.skipIf(testDatabaseUrl === undefined)(
         ).toEqual([1, 2, 3, 4]);
         expect(rateResults.filter(({ allowed }) => allowed)).toHaveLength(3);
 
+        const media = createMediaRepository(sql);
+        const mediaObjectKey = privateMediaKey(randomUUID());
+        const mediaAsset = await media.createProcessingAsset({
+          byteSize: 3,
+          declaredContentType: "image/jpeg",
+          displayFilename: "portfolio.jpg",
+          kind: "IMAGE",
+          ownerUserId: registration.user.id,
+          provenanceEntityId: randomUUID(),
+          provenanceEntityRevision: 1,
+          provenanceEntityType: "PORTFOLIO_PROJECT",
+          purpose: "PORTFOLIO_IMAGE",
+          storageObject: {
+            area: "private",
+            key: mediaObjectKey,
+          },
+          uploaderUserId: registration.user.id,
+        });
+        expect(mediaAsset).toMatchObject({
+          byteSize: 3,
+          declaredContentType: "image/jpeg",
+          displayFilename: "portfolio.jpg",
+          kind: "IMAGE",
+          ownerUserId: registration.user.id,
+          provenanceEntityRevision: 1,
+          provenanceEntityType: "PORTFOLIO_PROJECT",
+          purpose: "PORTFOLIO_IMAGE",
+          status: "PROCESSING",
+          storageObject: { area: "private", key: mediaObjectKey },
+          uploaderUserId: registration.user.id,
+        });
+        const [storedMediaObject] = await sql<
+          { mediaAssetId: string; role: string; storageArea: string }[]
+        >`
+          SELECT
+            media_asset_id AS "mediaAssetId",
+            role,
+            storage_area AS "storageArea"
+          FROM media_asset_storage_objects
+          WHERE media_asset_id = ${mediaAsset.id}
+        `;
+        expect(storedMediaObject).toEqual({
+          mediaAssetId: mediaAsset.id,
+          role: "ORIGINAL_UPLOAD",
+          storageArea: "private",
+        });
+        await expect(
+          media.recordMediaProcessingSucceeded(mediaAsset.id),
+        ).resolves.toMatchObject({
+          assetId: mediaAsset.id,
+          rejectionCode: null,
+          status: "READY",
+          transition: "UPDATED",
+        });
+        await expect(
+          media.recordMediaProcessingRejected({
+            assetId: mediaAsset.id,
+            rejectionCode: "MALWARE_DETECTED",
+          }),
+        ).resolves.toEqual({ transition: "NOT_PROCESSING" });
+
+        const rejectedAsset = await media.createProcessingAsset({
+          byteSize: 4,
+          declaredContentType: "application/pdf",
+          displayFilename: "evidence.pdf",
+          kind: "DOCUMENT",
+          ownerUserId: registration.user.id,
+          provenanceEntityId: null,
+          provenanceEntityRevision: null,
+          provenanceEntityType: null,
+          purpose: "CHAT_DOCUMENT",
+          storageObject: {
+            area: "private",
+            key: privateMediaKey(randomUUID()),
+          },
+          uploaderUserId: registration.user.id,
+        });
+        await expect(
+          media.recordMediaProcessingRejected({
+            assetId: rejectedAsset.id,
+            rejectionCode: "SIGNATURE_MISMATCH",
+          }),
+        ).resolves.toMatchObject({
+          assetId: rejectedAsset.id,
+          rejectionCode: "SIGNATURE_MISMATCH",
+          status: "REJECTED",
+          transition: "UPDATED",
+        });
+        await expect(
+          media.recordMediaProcessingSucceeded(rejectedAsset.id),
+        ).resolves.toEqual({ transition: "NOT_PROCESSING" });
+        await expect(
+          media.recordMediaProcessingSucceeded("../../another-asset"),
+        ).resolves.toEqual({ transition: "NOT_PROCESSING" });
+        await expect(
+          media.recordMediaProcessingRejected({
+            assetId: randomUUID(),
+            rejectionCode: "not safe/details.pdf",
+          }),
+        ).rejects.toThrow(/stable safe identifier/u);
+
+        await expect(
+          media.createProcessingAsset({
+            byteSize: 1,
+            declaredContentType: "image/png",
+            displayFilename: null,
+            kind: "IMAGE",
+            ownerUserId: registration.user.id,
+            provenanceEntityId: null,
+            provenanceEntityRevision: null,
+            provenanceEntityType: null,
+            purpose: "PROFILE_IMAGE",
+            storageObject: {
+              area: "public-derivative",
+              key: `public-derivative/2026/09/${randomUUID()}` as CreateProcessingMediaAssetInput["storageObject"]["key"],
+            },
+            uploaderUserId: registration.user.id,
+          }),
+        ).rejects.toThrow(/private processing storage/u);
+        await expect(
+          sql`
+            INSERT INTO media_assets (
+              owner_user_id,
+              uploaded_by_user_id,
+              kind,
+              purpose,
+              declared_content_type,
+              display_filename,
+              byte_size
+            ) VALUES (
+              ${registration.user.id},
+              ${registration.user.id},
+              'IMAGE',
+              'PROFILE_IMAGE',
+              'image/png',
+              '../../unsafe.png',
+              1
+            )
+          `,
+        ).rejects.toThrow(/media_assets_display_filename_bounded/u);
+        await expect(
+          sql`
+            INSERT INTO media_asset_storage_objects (
+              media_asset_id,
+              role,
+              storage_area,
+              storage_key,
+              content_type,
+              byte_size
+            ) VALUES (
+              ${mediaAsset.id},
+              'CANONICAL',
+              'private',
+              '../../guessable-client-path',
+              'image/webp',
+              1
+            )
+          `,
+        ).rejects.toThrow(/media_asset_storage_objects_key_matches_area/u);
+
         await expect(
           sql`
             INSERT INTO auth_sessions (
@@ -329,4 +494,10 @@ describe.skipIf(testDatabaseUrl === undefined)(
 
 function digest(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
+}
+
+function privateMediaKey(
+  uuid: string,
+): CreateProcessingMediaAssetInput["storageObject"]["key"] {
+  return `private/2026/09/${uuid}` as CreateProcessingMediaAssetInput["storageObject"]["key"];
 }
