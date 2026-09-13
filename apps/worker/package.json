@@ -22,7 +22,8 @@
   "dependencies": {
     "@portal/config": "workspace:*",
     "@portal/contracts": "workspace:*",
-    "@portal/domain": "workspace:*"
+    "@portal/domain": "workspace:*",
+    "@portal/queue": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",
