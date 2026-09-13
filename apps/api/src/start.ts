@@ -1,13 +1,10 @@
+import { loadServerConfig } from "@portal/config/server";
+
 import { buildApi } from "./app.js";
 
 const defaultPort = 3_001;
-const configuredPort = process.env.PORT;
-const port =
-  configuredPort === undefined ? defaultPort : Number(configuredPort);
-
-if (!Number.isInteger(port) || port < 1 || port > 65_535) {
-  throw new Error("PORT must be an integer between 1 and 65535");
-}
+const config = loadServerConfig();
+const port = config.port ?? defaultPort;
 
 const app = buildApi();
 

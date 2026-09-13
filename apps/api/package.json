@@ -19,6 +19,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@portal/config": "workspace:*",
     "@portal/contracts": "workspace:*",
     "fastify": "5.12.4"
   },
