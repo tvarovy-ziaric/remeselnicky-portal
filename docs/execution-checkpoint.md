@@ -5,9 +5,9 @@ This file is the persistent implementation-status overlay for the hash-verified 
 - Updated: 2026-09-14
 - Definition: D01–D30 LOCKED and hash verified
 - Active release: R0 — Foundation
-- Last completed ticket: R0-015 — Domain command/state guard primitives
-- Active ticket: R0-009 — Authentication/session baseline
-- Next dependency-satisfied candidate: R0-017 — MediaAsset model and controlled upload flow
+- Last completed ticket: R0-009 — Authentication/session baseline
+- Active tickets: R0-017 — MediaAsset model; R0-026 — structured logging; R0-028 — recovery baseline
+- Next dependency-satisfied candidate: R0-010 — Email verification
 - Human gate: none
 
 ## Ticket state overlay
@@ -22,6 +22,7 @@ This file is the persistent implementation-status overlay for the hash-verified 
 | R0-006 | DONE  | PostGIS Compose/migration, least-privilege roles, DB query boundary and safe health tests passed         |
 | R0-007 | DONE  | Checksum/advisory-lock migration runner; clean PostGIS CI, repeat run and all security gates passed      |
 | R0-008 | DONE  | User state/schema constraints and clean PostGIS migration/repeat-run CI passed                           |
+| R0-009 | DONE  | Auth/session/reset negative suite plus clean PostGIS and all CI security gates passed in run 34790087883 |
 | R0-013 | DONE  | Server-only fail-closed evaluator, public allowlist and 20 positive/negative policy tests passed         |
 | R0-014 | DONE  | Server-only allowlist projections and 7 public/private/context/admin negative tests passed               |
 | R0-015 | DONE  | Transaction/idempotency/outbox command pattern and 16 race/fail-closed tests passed                      |
