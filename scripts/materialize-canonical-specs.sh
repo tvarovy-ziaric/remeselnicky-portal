@@ -4,7 +4,6 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SOURCE_DIR="$ROOT_DIR/docs/_source"
 
-ROADMAP_GZ="$SOURCE_DIR/ROADMAP.md.gz"
 BACKLOG_GZ="$SOURCE_DIR/IMPLEMENTATION_BACKLOG.md.gz"
 ROADMAP_OUT="$ROOT_DIR/ROADMAP.md"
 BACKLOG_OUT="$ROOT_DIR/IMPLEMENTATION_BACKLOG.md"
@@ -38,17 +37,41 @@ verify_hash() {
   fi
 }
 
-for file in "$ROADMAP_GZ" "$BACKLOG_GZ"; do
-  if [[ ! -f "$file" ]]; then
-    echo "ERROR: missing canonical source bundle: $file" >&2
+decode_base64_file() {
+  local file="$1"
+  if base64 --decode "$file" >/dev/null 2>&1; then
+    base64 --decode "$file"
+  elif base64 -D "$file" >/dev/null 2>&1; then
+    base64 -D "$file"
+  else
+    echo "ERROR: unable to decode base64 source part: $file" >&2
     exit 1
   fi
+}
+
+if [[ ! -f "$BACKLOG_GZ" ]]; then
+  echo "ERROR: missing canonical backlog bundle: $BACKLOG_GZ" >&2
+  exit 1
+fi
+
+ROADMAP_TMP_GZ="$(mktemp "${TMPDIR:-/tmp}/remeselnicky-roadmap.XXXXXX")"
+trap 'rm -f "$ROADMAP_TMP_GZ"' EXIT
+: > "$ROADMAP_TMP_GZ"
+
+for suffix in {00..12}; do
+  part="$SOURCE_DIR/roadmap.b64.part-$suffix"
+  if [[ ! -f "$part" ]]; then
+    echo "ERROR: missing canonical roadmap source part: $part" >&2
+    exit 1
+  fi
+  decode_base64_file "$part" >> "$ROADMAP_TMP_GZ"
 done
 
-verify_hash "$ROADMAP_GZ" "$ROADMAP_GZ_SHA"
+# The split transport must reconstruct the exact original canonical gzip.
+verify_hash "$ROADMAP_TMP_GZ" "$ROADMAP_GZ_SHA"
 verify_hash "$BACKLOG_GZ" "$BACKLOG_GZ_SHA"
 
-gzip -dc "$ROADMAP_GZ" > "$ROADMAP_OUT"
+gzip -dc "$ROADMAP_TMP_GZ" > "$ROADMAP_OUT"
 gzip -dc "$BACKLOG_GZ" > "$BACKLOG_OUT"
 
 verify_hash "$ROADMAP_OUT" "$ROADMAP_SHA"
