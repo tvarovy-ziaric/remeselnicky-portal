@@ -23,6 +23,7 @@
     "@portal/config": "workspace:*",
     "@portal/contracts": "workspace:*",
     "@portal/domain": "workspace:*",
+    "@portal/observability": "workspace:*",
     "@portal/queue": "workspace:*"
   },
   "devDependencies": {

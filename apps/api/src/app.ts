@@ -6,10 +6,15 @@ import {
   registerAuthModule,
   type AuthModuleDependencies,
 } from "./auth/index.js";
+import {
+  registerApiObservability,
+  type ApiObservabilityDependencies,
+} from "./observability.js";
 
 export interface ApiDependencies {
   readonly auth?: AuthModuleDependencies;
   readonly database: DatabaseHealthProbe;
+  readonly observability?: ApiObservabilityDependencies;
 }
 
 export function buildApi(dependencies: ApiDependencies): FastifyInstance {
@@ -21,6 +26,8 @@ export function buildApi(dependencies: ApiDependencies): FastifyInstance {
         ? false
         : (_address: string, hop: number) => hop < trustProxyHops,
   });
+
+  registerApiObservability(app, dependencies.observability);
 
   if (dependencies.auth !== undefined) {
     registerAuthModule(app, dependencies.auth);

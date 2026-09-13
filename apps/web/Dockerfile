@@ -20,6 +20,7 @@ COPY packages/config/package.json packages/config/package.json
 COPY packages/contracts/package.json packages/contracts/package.json
 COPY packages/db/package.json packages/db/package.json
 COPY packages/domain/package.json packages/domain/package.json
+COPY packages/observability/package.json packages/observability/package.json
 COPY packages/testing/package.json packages/testing/package.json
 RUN pnpm install --frozen-lockfile
 

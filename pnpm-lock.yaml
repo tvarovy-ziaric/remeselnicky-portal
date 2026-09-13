@@ -86,6 +86,9 @@ importers:
       '@portal/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@portal/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
       argon2:
         specifier: 0.45.1
         version: 0.45.1
@@ -108,9 +111,15 @@ importers:
 
   apps/web:
     dependencies:
+      '@portal/config':
+        specifier: workspace:*
+        version: link:../../packages/config
       '@portal/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@portal/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
       next:
         specifier: 16.3.5
         version: 16.3.5(@types/node@26.5.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -151,6 +160,9 @@ importers:
       '@portal/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@portal/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
       '@portal/queue':
         specifier: workspace:*
         version: link:../../packages/queue
@@ -227,6 +239,9 @@ importers:
 
   packages/db:
     dependencies:
+      '@portal/media':
+        specifier: workspace:*
+        version: link:../media
       drizzle-orm:
         specifier: 0.45.2
         version: 0.45.2(postgres@3.4.9)
@@ -246,6 +261,40 @@ importers:
 
   packages/domain:
     devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 3.2.7(@types/node@26.5.1)(tsx@4.23.13)
+
+  packages/media:
+    dependencies:
+      '@portal/authorization':
+        specifier: workspace:*
+        version: link:../authorization
+      '@portal/storage':
+        specifier: workspace:*
+        version: link:../storage
+    devDependencies:
+      '@portal/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.5.1
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 3.2.7(@types/node@26.5.1)(tsx@4.23.13)
+
+  packages/observability:
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.5.1
       typescript:
         specifier: 'catalog:'
         version: 5.9.3

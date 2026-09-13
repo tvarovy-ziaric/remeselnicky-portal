@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 import { appInfo } from "../app-info";
+import { FrontendErrorTracking } from "../telemetry-client";
 import "./styles.css";
 
 export const metadata: Metadata = {
@@ -14,7 +15,9 @@ export default function RootLayout({
 }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="sk">
-      <body>{children}</body>
+      <body>
+        <FrontendErrorTracking>{children}</FrontendErrorTracking>
+      </body>
     </html>
   );
 }

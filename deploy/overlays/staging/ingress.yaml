@@ -12,6 +12,13 @@ spec:
     - host: staging.portal.invalid
       http:
         paths:
+          - path: /v1/observability/frontend-errors
+            pathType: Exact
+            backend:
+              service:
+                name: portal-api
+                port:
+                  name: http
           - path: /
             pathType: Prefix
             backend:
