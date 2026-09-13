@@ -5,9 +5,9 @@ This file is the persistent implementation-status overlay for the hash-verified 
 - Updated: 2026-09-14
 - Definition: D01–D30 LOCKED and hash verified
 - Active release: R0 — Foundation
-- Last completed ticket: R0-009 — Authentication/session baseline
-- Active tickets: R0-017 — MediaAsset model; R0-026 — structured logging; R0-028 — recovery baseline
-- Next dependency-satisfied candidate: R0-010 — Email verification
+- Last completed ticket: R0-028 — Backup and recovery baseline
+- Active tickets: R0-010 — Email verification; R0-018 — image canonicalization; R0-027 — metrics and alerts
+- Next dependency-satisfied candidate: R0-011 — Password policy and account recovery hardening
 - Human gate: none
 
 ## Ticket state overlay
@@ -27,7 +27,10 @@ This file is the persistent implementation-status overlay for the hash-verified 
 | R0-014 | DONE  | Server-only allowlist projections and 7 public/private/context/admin negative tests passed               |
 | R0-015 | DONE  | Transaction/idempotency/outbox command pattern and 16 race/fail-closed tests passed                      |
 | R0-016 | DONE  | Separate container contract, opaque server keys, authorized private grants and revocation tests passed   |
+| R0-017 | DONE  | Controlled private upload, MediaAsset constraints/transitions and clean PostGIS CI passed in 34790961597 |
 | R0-021 | DONE  | Retry/terminal queue port, safe telemetry, 10 queue tests and 2 independently deployable worker tests    |
+| R0-026 | DONE  | Privacy-safe API/web/worker telemetry, redaction/rate-limit negatives and CI 34790961597 passed          |
+| R0-028 | DONE  | Guarded restore verifier, 12 negative tests and all CI gates passed in run 34790630564                   |
 
 ## Durable decisions
 
