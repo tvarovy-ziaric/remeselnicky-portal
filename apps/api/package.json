@@ -21,6 +21,7 @@
   "dependencies": {
     "@portal/config": "workspace:*",
     "@portal/contracts": "workspace:*",
+    "@portal/db": "workspace:*",
     "fastify": "5.12.4"
   },
   "devDependencies": {

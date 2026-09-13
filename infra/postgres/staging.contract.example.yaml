@@ -1,0 +1,26 @@
+version: 1
+database:
+  engine: postgresql
+  engineMajor: 17
+  extensions:
+    postgis:
+      majorMinor: "3.5"
+      migration: packages/db/migrations/0000_enable_postgis.sql
+  network:
+    publicAccess: false
+    tlsMode: verify-full
+  principals:
+    migrationOwner:
+      credentialSecretReference: required
+      runtimeUse: forbidden
+    application:
+      credentialSecretReference: required
+      superuser: false
+      createDatabase: false
+      createRole: false
+  isolation:
+    shareWithDevelopment: false
+    shareWithProduction: false
+application:
+  databaseUrlSecretReference: required
+  healthQuery: SELECT 1
