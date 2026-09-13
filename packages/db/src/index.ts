@@ -1,6 +1,23 @@
 import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
+export {
+  createPostgresMigrationStore,
+  loadMigrations,
+  migratePostgres,
+  MigrationValidationError,
+  nodeMigrationFileSystem,
+  runMigrations,
+} from "./migrator.js";
+export type {
+  AppliedMigration,
+  Migration,
+  MigrationFileSystem,
+  MigrationRunResult,
+  MigrationStore,
+  PostgresMigrationStoreOptions,
+} from "./migrator.js";
+
 export interface DatabaseHealthProbe {
   ping(): Promise<void>;
 }

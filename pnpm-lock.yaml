@@ -182,6 +182,9 @@ importers:
         specifier: 3.4.9
         version: 3.4.9
     devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.5.1
       typescript:
         specifier: 'catalog:'
         version: 5.9.3

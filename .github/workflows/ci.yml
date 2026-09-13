@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - "codex/**"
   workflow_dispatch: {}
 
 permissions:
@@ -72,6 +73,50 @@ jobs:
 
       - name: Audit dependencies
         run: pnpm audit --audit-level=high
+
+  database-migrations:
+    name: Clean PostgreSQL/PostGIS migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgis/postgis:17-3.5-alpine
+        env:
+          POSTGRES_DB: portal_test
+          POSTGRES_PASSWORD: portal_test_password
+          POSTGRES_USER: portal_owner
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready --username=portal_owner --dbname=portal_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://portal_owner:portal_test_password@127.0.0.1:5432/portal_test
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@f520eceda224fe1a4aed5a2a27a194379a409996 # v6
+        with:
+          version: 11.19.0
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply and verify migrations on a clean database
+        run: pnpm --filter @portal/db test:integration
 
   secret-scan:
     name: Repository secret scan
