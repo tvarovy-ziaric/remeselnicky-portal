@@ -1,0 +1,14 @@
+.env
+.env.*
+!.env.example
+.next/
+.pnpm-store/
+.turbo/
+coverage/
+dist/
+node_modules/
+*.tsbuildinfo
+
+# Canonical readable files are materialized from hash-verified bundles.
+/IMPLEMENTATION_BACKLOG.md
+/ROADMAP.md

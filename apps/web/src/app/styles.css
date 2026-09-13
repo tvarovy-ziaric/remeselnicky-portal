@@ -1,0 +1,62 @@
+:root {
+  color-scheme: light;
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  background: #f6f4ee;
+  color: #1f2923;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+}
+
+main {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 2rem;
+}
+
+section {
+  width: min(100%, 42rem);
+  padding: clamp(2rem, 7vw, 5rem);
+  border: 1px solid #d8d4c8;
+  border-radius: 1.5rem;
+  background: #fffdf7;
+  box-shadow: 0 1.5rem 4rem rgb(39 51 43 / 8%);
+}
+
+.eyebrow,
+.contract {
+  color: #55705f;
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 0.75rem 0;
+  font-size: clamp(2.25rem, 8vw, 4.5rem);
+  line-height: 1;
+}
+
+p {
+  line-height: 1.6;
+}
+
+.contract {
+  margin-top: 2rem;
+  text-transform: none;
+}
