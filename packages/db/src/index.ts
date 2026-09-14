@@ -69,10 +69,14 @@ import { createPublicCraftsmanProfileRepository } from "./public-craftsman-profi
 import { createCraftsmanSearchReadModelRepository } from "./craftsman-search-read-model-repository.js";
 import { createCraftsmanDistanceRepository } from "./craftsman-distance-repository.js";
 import { createCraftsmanServiceAreaMatchRepository } from "./craftsman-service-area-match-repository.js";
+import { createCraftsmanAvailabilityMatchRepository } from "./craftsman-availability-match-repository.js";
+import { createCraftsmanTrustEvidenceRepository } from "./craftsman-trust-evidence-repository.js";
 import type {
+  CraftsmanAvailabilityMatchPersistence,
   CraftsmanDistancePersistence,
   CraftsmanSearchReadModelPersistence,
   CraftsmanServiceAreaMatchPersistence,
+  CraftsmanTrustEvidencePersistence,
   PublicCraftsmanProfilePersistence,
 } from "@portal/domain";
 import { createTaxonomyAutocompleteRepository } from "./taxonomy-autocomplete-repository.js";
@@ -475,10 +479,14 @@ export type { PublicCraftsmanProfilePersistence } from "@portal/domain";
 export { createCraftsmanSearchReadModelRepository } from "./craftsman-search-read-model-repository.js";
 export { createCraftsmanDistanceRepository } from "./craftsman-distance-repository.js";
 export { createCraftsmanServiceAreaMatchRepository } from "./craftsman-service-area-match-repository.js";
+export { createCraftsmanAvailabilityMatchRepository } from "./craftsman-availability-match-repository.js";
+export { createCraftsmanTrustEvidenceRepository } from "./craftsman-trust-evidence-repository.js";
 export type {
+  CraftsmanAvailabilityMatchPersistence,
   CraftsmanDistancePersistence,
   CraftsmanSearchReadModelPersistence,
   CraftsmanServiceAreaMatchPersistence,
+  CraftsmanTrustEvidencePersistence,
 } from "@portal/domain";
 export { createTaxonomyAutocompleteRepository } from "./taxonomy-autocomplete-repository.js";
 export { createCredentialQualificationRepository } from "./credential-qualification-repository.js";
@@ -487,6 +495,8 @@ export type {
   TaxonomyAutocompletePersistence,
 } from "@portal/search";
 export {
+  CRAFTSMAN_AVAILABILITY_MATCH_FUNCTION,
+  CRAFTSMAN_AVAILABILITY_MATCH_RESULT_COLUMNS,
   CRAFTSMAN_SEARCH_READ_MODEL_VIEWS,
   CRAFTSMAN_SERVICE_AREA_MATCH_FUNCTION,
   CRAFTSMAN_SERVICE_AREA_MATCH_RESULT_COLUMNS,
@@ -684,6 +694,8 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly craftsmanSearch: CraftsmanSearchReadModelPersistence;
   readonly craftsmanDistances: CraftsmanDistancePersistence;
   readonly craftsmanServiceAreaMatches: CraftsmanServiceAreaMatchPersistence;
+  readonly craftsmanAvailabilityMatches: CraftsmanAvailabilityMatchPersistence;
+  readonly craftsmanTrustEvidence: CraftsmanTrustEvidencePersistence;
   readonly taxonomyAutocomplete: TaxonomyAutocompletePersistence;
   readonly credentialQualifications: CredentialQualificationPolicyPersistence;
   readonly credentialClaims: CredentialClaimRepository;
@@ -756,6 +768,9 @@ export function createDatabase(
   const craftsmanDistances = createCraftsmanDistanceRepository(sql);
   const craftsmanServiceAreaMatches =
     createCraftsmanServiceAreaMatchRepository(sql);
+  const craftsmanAvailabilityMatches =
+    createCraftsmanAvailabilityMatchRepository(sql);
+  const craftsmanTrustEvidence = createCraftsmanTrustEvidenceRepository(sql);
   const taxonomyAutocomplete = createTaxonomyAutocompleteRepository(sql);
   const credentialQualifications = createCredentialQualificationRepository(sql);
   const credentialClaims = createCredentialClaimRepository(sql);
@@ -795,6 +810,8 @@ export function createDatabase(
     craftsmanSearch,
     craftsmanDistances,
     craftsmanServiceAreaMatches,
+    craftsmanAvailabilityMatches,
+    craftsmanTrustEvidence,
     taxonomyAutocomplete,
     credentialQualifications,
     credentialClaims,

@@ -65,3 +65,15 @@ export type {
   TaxonomyEvidenceSupport,
   TaxonomyRelevanceFacts,
 } from "./taxonomy-relevance.js";
+export {
+  AVAILABILITY_SEARCH_MATCH_KINDS,
+  AvailabilitySearchIntegrityError,
+  composeAvailabilityRelevance,
+} from "./availability-relevance.js";
+export type {
+  AvailabilityComposedCandidate,
+  AvailabilitySearchCandidate,
+  AvailabilitySearchFact,
+  AvailabilitySearchMatchKind,
+  AvailabilitySearchRelevance,
+} from "./availability-relevance.js";

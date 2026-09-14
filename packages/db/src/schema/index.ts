@@ -372,3 +372,7 @@ export {
   CRAFTSMAN_SERVICE_AREA_MATCH_RESULT_COLUMNS,
 } from "./craftsman-service-area-match.js";
 export * from "./credential-qualification.js";
+export {
+  CRAFTSMAN_AVAILABILITY_MATCH_FUNCTION,
+  CRAFTSMAN_AVAILABILITY_MATCH_RESULT_COLUMNS,
+} from "./craftsman-availability-match.js";

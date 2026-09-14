@@ -248,6 +248,20 @@ export type {
   ReplaceCraftsmanAvailabilityBlockInput,
   ReplaceCraftsmanAvailabilityBlockResult,
 } from "./craftsman-availability.js";
+export {
+  assertCraftsmanAvailabilityMatchQuery,
+  CRAFTSMAN_AVAILABILITY_MATCH_KINDS,
+  CRAFTSMAN_AVAILABILITY_MATCH_MAX_RESULTS,
+  createCraftsmanAvailabilityMatch,
+  CraftsmanAvailabilityMatchValidationError,
+} from "./craftsman-availability-match.js";
+export type {
+  CraftsmanAvailabilityMatch,
+  CraftsmanAvailabilityMatchKind,
+  CraftsmanAvailabilityMatchPersistence,
+  CraftsmanAvailabilityMatchQuery,
+  CraftsmanAvailabilityMatchValues,
+} from "./craftsman-availability-match.js";
 export type {
   AddIndicativePricingEntryInput,
   AddIndicativePricingEntryResult,
@@ -396,3 +410,23 @@ export type {
   SearchableCraftsmanSpecialization,
   SearchCraftsmanCandidatesInput,
 } from "./craftsman-search-read-model.js";
+export {
+  CraftsmanTrustEvidenceValidationError,
+  normalizeTrustEvidenceProfileIds,
+  serializeCraftsmanTrustEvidence,
+  TRUST_EVIDENCE_MAX_PROFILE_IDS,
+} from "./craftsman-trust-evidence.js";
+export type {
+  CraftsmanTrustEvidenceCandidate,
+  CraftsmanTrustEvidencePersistence,
+  CraftsmanTrustEvidenceSummary,
+  InsufficientEvidenceConfidence,
+  ProfessionTrustEvidence,
+  ProfessionTrustEvidenceCandidate,
+  TrustEvidenceConfidence,
+  TrustEvidenceConfidenceCandidate,
+  TrustEvidenceQuality,
+  TrustEvidenceQualityCandidate,
+  TrustEvidenceVolume,
+  TrustEvidenceVolumeCandidate,
+} from "./craftsman-trust-evidence.js";
