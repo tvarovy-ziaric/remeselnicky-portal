@@ -114,7 +114,7 @@ export function createEmailVerificationRepository(
 
         await transaction`
           UPDATE email_verification_tokens
-          SET invalidated_at = CURRENT_TIMESTAMP
+          SET invalidated_at = clock_timestamp()
           WHERE user_id = ${input.userId}
             AND consumed_at IS NULL
             AND invalidated_at IS NULL

@@ -90,7 +90,7 @@ export function createPhoneVerificationRepository(
     }) {
       await sql`
         UPDATE phone_verification_challenges
-        SET invalidated_at = CURRENT_TIMESTAMP
+        SET invalidated_at = clock_timestamp()
         WHERE id = ${input.challengeId}
           AND user_id = ${input.userId}
           AND consumed_at IS NULL
@@ -122,7 +122,7 @@ export function createPhoneVerificationRepository(
 
         await transaction`
           UPDATE phone_verification_challenges
-          SET invalidated_at = CURRENT_TIMESTAMP
+          SET invalidated_at = clock_timestamp()
           WHERE user_id = ${input.userId}
             AND consumed_at IS NULL
             AND invalidated_at IS NULL

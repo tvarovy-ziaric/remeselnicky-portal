@@ -309,7 +309,7 @@ export function createAuthRepository(sql: Sql): AuthRepository {
     async revokeSession(sessionIdHash: string): Promise<boolean> {
       const rows = await sql<{ readonly sessionIdHash: string }[]>`
         UPDATE auth_sessions
-        SET revoked_at = CURRENT_TIMESTAMP
+        SET revoked_at = clock_timestamp()
         WHERE session_id_hash = ${sessionIdHash}
           AND revoked_at IS NULL
         RETURNING session_id_hash AS "sessionIdHash"
@@ -321,7 +321,7 @@ export function createAuthRepository(sql: Sql): AuthRepository {
       const [result] = await sql<CountRow[]>`
         WITH revoked AS (
           UPDATE auth_sessions
-          SET revoked_at = CURRENT_TIMESTAMP
+          SET revoked_at = clock_timestamp()
           WHERE user_id = ${userId}
             AND revoked_at IS NULL
           RETURNING 1
@@ -347,7 +347,7 @@ export function createAuthRepository(sql: Sql): AuthRepository {
 
         await transaction`
           UPDATE password_reset_tokens
-          SET invalidated_at = CURRENT_TIMESTAMP
+          SET invalidated_at = clock_timestamp()
           WHERE user_id = ${input.userId}
             AND consumed_at IS NULL
             AND invalidated_at IS NULL
@@ -412,7 +412,7 @@ export function createAuthRepository(sql: Sql): AuthRepository {
         const [revoked] = await transaction<CountRow[]>`
           WITH revoked_sessions AS (
             UPDATE auth_sessions
-            SET revoked_at = CURRENT_TIMESTAMP
+            SET revoked_at = clock_timestamp()
             WHERE user_id = ${consumed.userId}
               AND revoked_at IS NULL
             RETURNING 1
