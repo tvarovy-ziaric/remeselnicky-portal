@@ -6,8 +6,8 @@ This file is the persistent implementation-status overlay for the hash-verified 
 - Definition: D01–D30 LOCKED and hash verified
 - Active release: R2 — Discovery
 - Last completed ticket: R1-019 — R1 authorization/privacy/E2E suite
-- Active tickets: none; R2 discovery implementation is ready to start
-- Next dependency-satisfied candidates: R2-001 — approved-PUBLIC search model; R2-002 — profession/service query and taxonomy autocomplete
+- Active tickets: R2-001 — approved-PUBLIC search model; R2-002 — profession/service query and taxonomy autocomplete; R2-003 — PostGIS distance query
+- Next dependency-satisfied candidate: R2-004 — service-radius/outside-radius matching semantics, after the core search and distance contracts stabilize
 - Human gate: canonical Slovak profession/skill/location content still requires expert/legal/source review before activation; this does not block private supply-side implementation
 - Integrated verification: CI run 34830163326 passed quality, dependency audit, secret scan, clean PostgreSQL/PostGIS migrations and the live R1 authorization/privacy matrix
 
@@ -67,6 +67,9 @@ This file is the persistent implementation-status overlay for the hash-verified 
 | R1-017 | DONE     | Owner-managed featured-project history, deterministic ordering and hard maximum of three passed              |
 | R1-018 | DONE     | Self-declared project/photo publication, public derivative and revoke/visibility intersections passed        |
 | R1-019 | DONE     | Live public/private/admin matrix, exact command outcomes, two-way races and leakage negatives passed         |
+| R2-001 | ACTIVE   | Approved-PUBLIC search index/query model                                                                     |
+| R2-002 | ACTIVE   | Profession/service query and governed taxonomy autocomplete                                                  |
+| R2-003 | ACTIVE   | Privacy-safe PostGIS distance query                                                                          |
 
 All DONE rows above are covered by CI run `34830163326` unless a more specific earlier run is referenced in history. The run applied migrations `0000`–`0028` twice and passed the complete live PostgreSQL/PostGIS integration suite, including the R1 supply-side authorization/privacy matrix.
 
