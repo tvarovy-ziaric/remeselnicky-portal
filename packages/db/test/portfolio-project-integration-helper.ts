@@ -40,10 +40,19 @@ export async function runPortfolioProjectIntegrationAssertions(
     WHERE municipality.is_active AND district.is_active
     ORDER BY municipality.code LIMIT 1
   `;
+  await sql`
+    INSERT INTO location_districts (
+      code, region_code, name_sk, source_reference, source_revision
+    )
+    SELECT 'TEST:DISTRICT_PORTFOLIO_OTHER', district.region_code,
+      'Iný testovací okres', 'test-fixture:R1-013', 'synthetic-v1'
+    FROM location_districts district
+    WHERE district.code = ${location?.districtCode ?? ""}
+    ON CONFLICT (code) DO NOTHING
+  `;
   const [otherDistrict] = await sql<{ readonly code: string }[]>`
     SELECT code FROM location_districts
-    WHERE is_active AND code <> ${location?.districtCode ?? ""}
-    ORDER BY code LIMIT 1
+    WHERE is_active AND code = 'TEST:DISTRICT_PORTFOLIO_OTHER'
   `;
   if (
     taxonomy === undefined ||
