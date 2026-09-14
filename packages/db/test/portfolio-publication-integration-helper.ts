@@ -83,7 +83,8 @@ export async function runPortfolioPublicationIntegrationAssertions(
       media_asset_id, role, storage_area, storage_key, content_type,
       byte_size, content_sha256
     )
-    SELECT DISTINCT item.media_asset_id, 'THUMBNAIL', 'private',
+    SELECT DISTINCT item.media_asset_id,
+      'THUMBNAIL'::media_storage_role, 'private'::media_storage_area,
       'private/2026/09/' || gen_random_uuid()::text, 'image/webp',
       canonical.byte_size, canonical.content_sha256
     FROM portfolio_photo_revisions revision
