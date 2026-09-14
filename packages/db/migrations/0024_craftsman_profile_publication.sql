@@ -178,13 +178,13 @@ CREATE TABLE craftsman_profile_publication_commands (
        audit_reason_is_safe(rejection_user_facing_reason)
        AND rejection_user_facing_reason !~* '(https?://|www\.)'
        AND rejection_user_facing_reason !~* '[^[:space:]@]+@[^[:space:]@]+\.[[:alpha:]]{2,}'
-       AND rejection_user_facing_reason !~ E'\+?[0-9]([[:space:]().-]*[0-9]){6,}'
+       AND rejection_user_facing_reason !~* '(^|[^0-9])(\+|00)?[0-9]([[:space:]()./-]*[0-9]){6,}([^0-9]|$)'
      ))
     AND (command_rejection_user_facing_reason IS NULL OR (
        audit_reason_is_safe(command_rejection_user_facing_reason)
        AND command_rejection_user_facing_reason !~* '(https?://|www\.)'
        AND command_rejection_user_facing_reason !~* '[^[:space:]@]+@[^[:space:]@]+\.[[:alpha:]]{2,}'
-       AND command_rejection_user_facing_reason !~ E'\+?[0-9]([[:space:]().-]*[0-9]){6,}'
+       AND command_rejection_user_facing_reason !~* '(^|[^0-9])(\+|00)?[0-9]([[:space:]()./-]*[0-9]){6,}([^0-9]|$)'
      ))
   ),
   CONSTRAINT craftsman_profile_publication_commands_input_shape CHECK (

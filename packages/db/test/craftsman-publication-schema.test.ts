@@ -94,6 +94,7 @@ describe("craftsman profile publication schema", () => {
       "craftsman_profile_publication_commands_input_shape",
     );
     expect(migration).toContain("profile-service:identity-change");
+    expect(migration).not.toMatch(/!~ E'\\\+\?/u);
   });
 
   it("exposes only an authoritative boundary, not public profile data", () => {
