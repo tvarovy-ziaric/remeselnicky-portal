@@ -108,17 +108,23 @@ describe("credential claim repository", () => {
   });
 
   it("locks the full live authorization chain for an admin queue read", async () => {
-    const sql = scriptedSql([[{ valid: true }], [claimRow()], []]);
+    const sql = scriptedSql([
+      [{ role: "ADMIN" }],
+      [{ valid: true }],
+      [claimRow()],
+      [],
+    ]);
     await expect(
       createCredentialClaimRepository(sql).listPendingAuthorized({
         actor: privilegedActor(),
         privilegedSessionIdHash: "a".repeat(64),
       }),
     ).resolves.toHaveLength(1);
-    expect(sql.queries[0]).toMatch(
-      /FOR UPDATE OF privileged, base, actor, factor, role/u,
+    expect(sql.queries[0]).toMatch(/FROM admin_role_grants[\s\S]*FOR UPDATE/u);
+    expect(sql.queries[1]).toMatch(
+      /FOR UPDATE OF privileged, base, actor, factor/u,
     );
-    expect(sql.queries[1]).toMatch(/claim\.state = 'PENDING'/u);
+    expect(sql.queries[2]).toMatch(/claim\.state = 'PENDING'/u);
   });
 
   it("mints trusted credential upload provenance only from current owned pending state", async () => {
@@ -180,7 +186,13 @@ describe("credential claim repository", () => {
   });
 
   it("fails required approval when no current READY private evidence remains", async () => {
-    const sql = scriptedSql([[{ valid: true }], [claimRow()], [], []]);
+    const sql = scriptedSql([
+      [{ role: "ADMIN" }],
+      [{ valid: true }],
+      [claimRow()],
+      [],
+      [],
+    ]);
     await expect(
       createCredentialClaimRepository(sql).reviewAuthorized({
         actor: privilegedActor(),
@@ -203,6 +215,7 @@ describe("credential claim repository", () => {
       state: "APPROVED",
     });
     const sql = scriptedSql([
+      [{ role: "ADMIN" }],
       [{ valid: true }],
       [claimRow({ evidenceRequirement: "OPTIONAL" })],
       [],
@@ -252,7 +265,13 @@ describe("credential claim repository", () => {
         actorUserId: adminUserId,
       }),
     };
-    const sql = scriptedSql([[{ valid: true }], [claimRow()], [replay], []]);
+    const sql = scriptedSql([
+      [{ role: "ADMIN" }],
+      [{ valid: true }],
+      [claimRow()],
+      [replay],
+      [],
+    ]);
     const result = await createCredentialClaimRepository(sql).reviewAuthorized({
       actor,
       command,
@@ -298,7 +317,12 @@ describe("credential claim repository", () => {
       { ...baseReplay, actorUserId },
       { ...baseReplay, payloadFingerprint: "f".repeat(64) },
     ]) {
-      const sql = scriptedSql([[{ valid: true }], [claimRow()], [replay]]);
+      const sql = scriptedSql([
+        [{ role: "ADMIN" }],
+        [{ valid: true }],
+        [claimRow()],
+        [replay],
+      ]);
       await expect(
         createCredentialClaimRepository(sql).reviewAuthorized({
           actor: privilegedActor(),

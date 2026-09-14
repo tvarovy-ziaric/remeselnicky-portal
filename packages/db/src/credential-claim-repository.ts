@@ -610,6 +610,17 @@ async function privilegedSessionValid(
   sql: TransactionSql,
   input: AuthorizedQueueInput,
 ): Promise<boolean> {
+  const [role] = await sql<{ readonly role: "ADMIN" | "SUPER_ADMIN" }[]>`
+    SELECT role
+    FROM admin_role_grants
+    WHERE user_id = ${input.actor.userId}
+      AND revoked_at IS NULL AND role IN ('ADMIN', 'SUPER_ADMIN')
+    ORDER BY role
+    LIMIT 1
+    FOR UPDATE
+  `;
+  if (role === undefined) return false;
+
   const [row] = await sql<{ readonly valid: boolean }[]>`
     SELECT true AS valid
     FROM admin_privileged_sessions privileged
@@ -619,15 +630,12 @@ async function privilegedSessionValid(
     JOIN users actor ON actor.id = privileged.user_id AND actor.account_state = 'ACTIVE'
     JOIN admin_mfa_factors factor ON factor.id = privileged.mfa_factor_id
       AND factor.user_id = privileged.user_id AND factor.revoked_at IS NULL
-    JOIN admin_role_grants role ON role.user_id = privileged.user_id
-      AND role.revoked_at IS NULL AND role.role IN ('ADMIN', 'SUPER_ADMIN')
     WHERE privileged.session_id_hash = ${input.privilegedSessionIdHash}
       AND privileged.user_id = ${input.actor.userId} AND privileged.revoked_at IS NULL
       AND privileged.expires_at > clock_timestamp()
       AND privileged.mfa_authenticated_at >= clock_timestamp() - interval '15 minutes'
-    ORDER BY role.role
     LIMIT 1
-    FOR UPDATE OF privileged, base, actor, factor, role
+    FOR UPDATE OF privileged, base, actor, factor
   `;
   return row?.valid === true;
 }
