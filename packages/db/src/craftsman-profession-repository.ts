@@ -300,19 +300,10 @@ export function createCraftsmanProfessionRepository(
       readonly craftsmanProfileId: CraftsmanProfileId;
     }) {
       assertCraftsmanProfessionListInput(input);
-      const [owned] = await sql<OwnedProfileRow[]>`
-        SELECT
-          profile.owner_user_id AS "ownerUserId",
-          owner.account_state AS "accountState"
-        FROM craftsman_profiles profile
-        JOIN users owner ON owner.id = profile.owner_user_id
-        WHERE profile.id = ${input.craftsmanProfileId}
-          AND profile.owner_user_id = ${input.actorUserId}
-      `;
-      if (owned?.accountState !== "ACTIVE") return Object.freeze([]);
       const rows = await selectCurrentProfessions(
         sql,
         input.craftsmanProfileId,
+        input.actorUserId,
       );
       return freezeProfessions(rows);
     },
@@ -461,20 +452,20 @@ async function getProfessionOrThrow(
 ): Promise<CraftsmanProfession> {
   const [row] = await sql<CurrentProfessionRow[]>`
     SELECT
-      id,
-      craftsman_profile_id AS "craftsmanProfileId",
-      taxonomy_release_id AS "taxonomyReleaseId",
-      profession_code AS "professionCode",
-      state,
-      declared_level AS "declaredLevel",
-      declared_level_revision AS "declaredLevelRevision",
-      declared_level_changed_at AS "declaredLevelChangedAt",
-      evidence_supported_level AS "evidenceSupportedLevel",
-      evidence_supported_at AS "evidenceSupportedAt",
-      created_at AS "createdAt",
-      deactivated_at AS "deactivatedAt"
-    FROM current_craftsman_professions
-    WHERE id = ${id}
+      current.id,
+      current.craftsman_profile_id AS "craftsmanProfileId",
+      current.taxonomy_release_id AS "taxonomyReleaseId",
+      current.profession_code AS "professionCode",
+      current.state,
+      current.declared_level AS "declaredLevel",
+      current.declared_level_revision AS "declaredLevelRevision",
+      current.declared_level_changed_at AS "declaredLevelChangedAt",
+      current.evidence_supported_level AS "evidenceSupportedLevel",
+      current.evidence_supported_at AS "evidenceSupportedAt",
+      current.created_at AS "createdAt",
+      current.deactivated_at AS "deactivatedAt"
+    FROM current_craftsman_professions current
+    WHERE current.id = ${id}
   `;
   if (row === undefined) {
     throw new Error("Committed craftsman profession projection is missing.");
@@ -485,24 +476,30 @@ async function getProfessionOrThrow(
 async function selectCurrentProfessions(
   sql: Sql,
   profileId: CraftsmanProfileId,
+  actorUserId: UserId,
 ): Promise<readonly CurrentProfessionRow[]> {
   return sql<CurrentProfessionRow[]>`
     SELECT
-      id,
-      craftsman_profile_id AS "craftsmanProfileId",
-      taxonomy_release_id AS "taxonomyReleaseId",
-      profession_code AS "professionCode",
-      state,
-      declared_level AS "declaredLevel",
-      declared_level_revision AS "declaredLevelRevision",
-      declared_level_changed_at AS "declaredLevelChangedAt",
-      evidence_supported_level AS "evidenceSupportedLevel",
-      evidence_supported_at AS "evidenceSupportedAt",
-      created_at AS "createdAt",
-      deactivated_at AS "deactivatedAt"
-    FROM current_craftsman_professions
-    WHERE craftsman_profile_id = ${profileId}
-    ORDER BY created_at, id
+      current.id,
+      current.craftsman_profile_id AS "craftsmanProfileId",
+      current.taxonomy_release_id AS "taxonomyReleaseId",
+      current.profession_code AS "professionCode",
+      current.state,
+      current.declared_level AS "declaredLevel",
+      current.declared_level_revision AS "declaredLevelRevision",
+      current.declared_level_changed_at AS "declaredLevelChangedAt",
+      current.evidence_supported_level AS "evidenceSupportedLevel",
+      current.evidence_supported_at AS "evidenceSupportedAt",
+      current.created_at AS "createdAt",
+      current.deactivated_at AS "deactivatedAt"
+    FROM current_craftsman_professions current
+    JOIN craftsman_profiles profile
+      ON profile.id = current.craftsman_profile_id
+    JOIN users owner ON owner.id = profile.owner_user_id
+    WHERE current.craftsman_profile_id = ${profileId}
+      AND profile.owner_user_id = ${actorUserId}
+      AND owner.account_state = 'ACTIVE'
+    ORDER BY current.created_at, current.id
   `;
 }
 

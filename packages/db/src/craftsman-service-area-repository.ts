@@ -100,6 +100,8 @@ export function createCraftsmanServiceAreaRepository(
         const current = await selectRevision(
           transaction,
           input.craftsmanProfileId,
+          undefined,
+          input.actorUserId,
         );
         const currentRevision = current?.revision ?? 0;
         if (input.expectedRevision !== currentRevision) {
@@ -188,18 +190,12 @@ export function createCraftsmanServiceAreaRepository(
       readonly craftsmanProfileId: CraftsmanProfileId;
     }): Promise<CraftsmanServiceArea | null> {
       assertCraftsmanServiceAreaReadInput(input);
-      const [owned] = await sql<OwnedProfileRow[]>`
-        SELECT
-          profile.owner_user_id AS "ownerUserId",
-          owner.account_state AS "accountState"
-        FROM craftsman_profiles profile
-        JOIN users owner ON owner.id = profile.owner_user_id
-        WHERE profile.id = ${input.craftsmanProfileId}
-          AND profile.owner_user_id = ${input.actorUserId}
-          AND owner.account_state = 'ACTIVE'
-      `;
-      if (owned === undefined) return null;
-      return selectRevision(sql, input.craftsmanProfileId);
+      return selectRevision(
+        sql,
+        input.craftsmanProfileId,
+        undefined,
+        input.actorUserId,
+      );
     },
   });
 }
@@ -293,7 +289,11 @@ async function selectRevision(
   sql: Sql | TransactionSql,
   craftsmanProfileId: CraftsmanProfileId,
   revision?: number,
+  actorUserId?: UserId,
 ): Promise<CraftsmanServiceArea | null> {
+  if (revision === undefined && actorUserId === undefined) {
+    throw new Error("Current service-area read requires active owner scope.");
+  }
   const rows =
     revision === undefined
       ? await sql<ServiceAreaRow[]>`
@@ -313,9 +313,14 @@ async function selectRevision(
             ARRAY[]::text[]
           ) AS "extraMunicipalityCodes"
         FROM current_craftsman_service_areas current
+        JOIN craftsman_profiles profile
+          ON profile.id = current.craftsman_profile_id
+        JOIN users owner ON owner.id = profile.owner_user_id
         LEFT JOIN craftsman_service_area_extra_municipalities extra
           ON extra.service_area_revision_id = current.id
         WHERE current.craftsman_profile_id = ${craftsmanProfileId}
+          AND profile.owner_user_id = ${actorUserId ?? null}
+          AND owner.account_state = 'ACTIVE'
         GROUP BY current.id, current.craftsman_profile_id, current.revision,
           current.base_municipality_code, current.normal_radius_meters,
           current.maximum_radius_meters, current.travel_fee_policy,

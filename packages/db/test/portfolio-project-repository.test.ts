@@ -105,6 +105,27 @@ describe("portfolio project repository", () => {
       /FROM portfolio_project_revisions revision[\s\S]*revision\.command_id/u,
     );
   });
+
+  it("fuses active-owner authorization into the private project list", async () => {
+    const sql = scriptedSql([[projectRow()]]);
+    await expect(
+      createPortfolioProjectRepository(sql).listOwned({
+        actorUserId,
+        craftsmanProfileId,
+      }),
+    ).resolves.toHaveLength(1);
+    expect(sql.queries).toHaveLength(1);
+    expect(sql.queries[0]).toMatch(
+      /FROM current_portfolio_projects project[\s\S]*JOIN users owner[\s\S]*profile\.owner_user_id[\s\S]*owner\.account_state = 'ACTIVE'/u,
+    );
+
+    await expect(
+      createPortfolioProjectRepository(scriptedSql([[]])).listOwned({
+        actorUserId,
+        craftsmanProfileId,
+      }),
+    ).resolves.toEqual([]);
+  });
 });
 
 interface ScriptedSql extends Sql {

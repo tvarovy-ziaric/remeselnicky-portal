@@ -166,14 +166,23 @@ describe("craftsman experience repository", () => {
   });
 
   it("keeps reads private to the active owner", async () => {
-    const sql = scriptedSql([[ownedProfile()], [experienceRow()]]);
+    const sql = scriptedSql([[experienceRow()]]);
     await expect(
       createCraftsmanExperienceRepository(sql).findOwned({
         actorUserId,
         craftsmanProfileId,
       }),
     ).resolves.toMatchObject({ workingSinceYear: 2012 });
-    expect(sql.queries[0]).toMatch(/owner\.account_state = 'ACTIVE'/u);
+    expect(sql.queries).toHaveLength(1);
+    expect(sql.queries[0]).toMatch(
+      /FROM current_craftsman_experience current[\s\S]*JOIN users owner[\s\S]*profile\.owner_user_id[\s\S]*owner\.account_state = 'ACTIVE'/u,
+    );
+    await expect(
+      createCraftsmanExperienceRepository(scriptedSql([[]])).findOwned({
+        actorUserId,
+        craftsmanProfileId,
+      }),
+    ).resolves.toBeNull();
   });
 });
 

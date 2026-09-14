@@ -328,29 +328,27 @@ export function createCraftsmanCapabilityRepository(
       readonly craftsmanProfileId: CraftsmanProfileId;
     }) {
       assertCraftsmanCapabilityListInput(input);
-      const [owned] = await sql<OwnedProfileRow[]>`
-        SELECT profile.owner_user_id AS "ownerUserId",
-          owner.account_state AS "accountState"
-        FROM craftsman_profiles profile JOIN users owner ON owner.id = profile.owner_user_id
-        WHERE profile.id = ${input.craftsmanProfileId}
-          AND profile.owner_user_id = ${input.actorUserId}
-      `;
-      if (owned?.accountState !== "ACTIVE") {
+      return sql.begin(async (transaction) => {
+        if (!(await lockOwnedProfile(transaction, input))) {
+          return Object.freeze({
+            skills: Object.freeze([]),
+            specializations: Object.freeze([]),
+          });
+        }
+        const specializations = await selectSpecializations(
+          transaction,
+          input.craftsmanProfileId,
+        );
+        const skills = await selectSkills(
+          transaction,
+          input.craftsmanProfileId,
+        );
         return Object.freeze({
-          skills: Object.freeze([]),
-          specializations: Object.freeze([]),
+          skills: Object.freeze(skills.map(freezeSkill)),
+          specializations: Object.freeze(
+            specializations.map(freezeSpecialization),
+          ),
         });
-      }
-      const specializations = await selectSpecializations(
-        sql,
-        input.craftsmanProfileId,
-      );
-      const skills = await selectSkills(sql, input.craftsmanProfileId);
-      return Object.freeze({
-        skills: Object.freeze(skills.map(freezeSkill)),
-        specializations: Object.freeze(
-          specializations.map(freezeSpecialization),
-        ),
       });
     },
   });
@@ -677,7 +675,7 @@ async function getSkill(
   return row;
 }
 async function selectSkills(
-  sql: Sql,
+  sql: Sql | TransactionSql,
   profileId: CraftsmanProfileId,
 ): Promise<readonly SkillRow[]> {
   return sql<SkillRow[]>`
@@ -691,7 +689,7 @@ async function selectSkills(
   FROM current_craftsman_skills WHERE craftsman_profile_id = ${profileId} ORDER BY created_at, id`;
 }
 async function selectSpecializations(
-  sql: Sql,
+  sql: Sql | TransactionSql,
   profileId: CraftsmanProfileId,
 ): Promise<readonly SpecializationRow[]> {
   return sql<SpecializationRow[]>`

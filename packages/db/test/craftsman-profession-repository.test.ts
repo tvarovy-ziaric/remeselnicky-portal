@@ -165,6 +165,29 @@ describe("craftsman profession repository", () => {
     expect(statements).toMatch(/deactivation_command_id/u);
     expect(statements).not.toMatch(/DELETE FROM craftsman_professions/u);
   });
+
+  it("fuses active-owner authorization into the private list query", async () => {
+    const sql = scriptedSql([[professionRow()]]);
+    await expect(
+      createCraftsmanProfessionRepository(sql).listOwned({
+        actorUserId: ownerUserId,
+        craftsmanProfileId,
+      }),
+    ).resolves.toHaveLength(1);
+    expect(sql.queries).toHaveLength(1);
+    expect(sql.queries[0]).toMatch(
+      /FROM current_craftsman_professions current[\s\S]*JOIN users owner[\s\S]*profile\.owner_user_id[\s\S]*owner\.account_state = 'ACTIVE'/u,
+    );
+
+    const suspended = scriptedSql([[]]);
+    await expect(
+      createCraftsmanProfessionRepository(suspended).listOwned({
+        actorUserId: ownerUserId,
+        craftsmanProfileId,
+      }),
+    ).resolves.toEqual([]);
+    expect(suspended.queries).toHaveLength(1);
+  });
 });
 
 interface ScriptedSql extends Sql {

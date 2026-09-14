@@ -122,6 +122,27 @@ describe("craftsman service-area repository", () => {
       /INSERT INTO craftsman_service_area_revisions/u,
     );
   });
+
+  it("fuses active-owner authorization into the private revision read", async () => {
+    const sql = scriptedSql([[serviceAreaRow()]]);
+    await expect(
+      createCraftsmanServiceAreaRepository(sql).findOwned({
+        actorUserId: ownerUserId,
+        craftsmanProfileId: profileId,
+      }),
+    ).resolves.toMatchObject({ revision: 1 });
+    expect(sql.queries).toHaveLength(1);
+    expect(sql.queries[0]).toMatch(
+      /FROM current_craftsman_service_areas current[\s\S]*JOIN users owner[\s\S]*profile\.owner_user_id[\s\S]*owner\.account_state = 'ACTIVE'/u,
+    );
+
+    await expect(
+      createCraftsmanServiceAreaRepository(scriptedSql([[]])).findOwned({
+        actorUserId: ownerUserId,
+        craftsmanProfileId: profileId,
+      }),
+    ).resolves.toBeNull();
+  });
 });
 
 interface ScriptedSql extends Sql {

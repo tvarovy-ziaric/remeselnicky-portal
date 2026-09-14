@@ -243,16 +243,10 @@ export function createPortfolioProjectRepository(
       readonly includeArchived?: boolean;
     }) {
       assertPortfolioProjectListInput(input);
-      const [owned] = await sql<OwnedProfileRow[]>`
-        SELECT profile.owner_user_id AS "ownerUserId", owner.account_state AS "accountState"
-        FROM craftsman_profiles profile JOIN users owner ON owner.id = profile.owner_user_id
-        WHERE profile.id = ${input.craftsmanProfileId}
-          AND profile.owner_user_id = ${input.actorUserId}
-      `;
-      if (owned?.accountState !== "ACTIVE") return Object.freeze([]);
       const rows = await selectProjects(
         sql,
         input.craftsmanProfileId,
+        input.actorUserId,
         input.includeArchived ?? false,
       );
       return Object.freeze(rows.map(freezeProject));
@@ -654,22 +648,37 @@ async function selectProjectRows(
 async function selectProjects(
   sql: Sql,
   profileId: CraftsmanProfileId,
+  actorUserId: UserId,
   includeArchived: boolean,
 ): Promise<readonly PortfolioRow[]> {
   return sql<PortfolioRow[]>`
-    SELECT id, craftsman_profile_id AS "craftsmanProfileId", author_user_id AS "authorUserId",
-      provenance_kind AS "provenanceKind", evidence_status AS "evidenceStatus", record_state AS "recordState",
-      title, short_description AS "shortDescription", contribution,
-      materials_and_technologies AS "materialsAndTechnologies", problem, solution,
-      duration_value AS "durationValue", duration_unit AS "durationUnit",
-      indicative_price_min_cents AS "indicativePriceMinCents",
-      indicative_price_max_cents AS "indicativePriceMaxCents", currency,
-      municipality_code AS "municipalityCode", district_code AS "districtCode",
-      profession_ids AS "professionIds", skill_ids AS "skillIds",
-      specialization_ids AS "specializationIds", revision,
-      created_at AS "createdAt", updated_at AS "updatedAt"
-    FROM current_portfolio_projects WHERE craftsman_profile_id = ${profileId}
-      AND (${includeArchived} OR record_state <> 'ARCHIVED') ORDER BY updated_at DESC, id`;
+    SELECT project.id, project.craftsman_profile_id AS "craftsmanProfileId",
+      project.author_user_id AS "authorUserId",
+      project.provenance_kind AS "provenanceKind",
+      project.evidence_status AS "evidenceStatus",
+      project.record_state AS "recordState", project.title,
+      project.short_description AS "shortDescription", project.contribution,
+      project.materials_and_technologies AS "materialsAndTechnologies",
+      project.problem, project.solution,
+      project.duration_value AS "durationValue",
+      project.duration_unit AS "durationUnit",
+      project.indicative_price_min_cents AS "indicativePriceMinCents",
+      project.indicative_price_max_cents AS "indicativePriceMaxCents",
+      project.currency, project.municipality_code AS "municipalityCode",
+      project.district_code AS "districtCode",
+      project.profession_ids AS "professionIds",
+      project.skill_ids AS "skillIds",
+      project.specialization_ids AS "specializationIds", project.revision,
+      project.created_at AS "createdAt", project.updated_at AS "updatedAt"
+    FROM current_portfolio_projects project
+    JOIN craftsman_profiles profile
+      ON profile.id = project.craftsman_profile_id
+    JOIN users owner ON owner.id = profile.owner_user_id
+    WHERE project.craftsman_profile_id = ${profileId}
+      AND profile.owner_user_id = ${actorUserId}
+      AND owner.account_state = 'ACTIVE'
+      AND (${includeArchived} OR project.record_state <> 'ARCHIVED')
+    ORDER BY project.updated_at DESC, project.id`;
 }
 
 function freezeProject(row: PortfolioRow): PortfolioProject {

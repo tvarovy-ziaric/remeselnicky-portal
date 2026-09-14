@@ -240,36 +240,30 @@ export function createIndicativePricingRepository(
       readonly includeArchived?: boolean;
     }) {
       assertIndicativePricingListInput(input);
-      const [owned] = await sql<OwnedProfileRow[]>`
-        SELECT
-          profile.owner_user_id AS "ownerUserId",
-          owner.account_state AS "accountState"
-        FROM craftsman_profiles profile
-        JOIN users owner ON owner.id = profile.owner_user_id
-        WHERE profile.id = ${input.craftsmanProfileId}
-          AND profile.owner_user_id = ${input.actorUserId}
-      `;
-      if (owned?.accountState !== "ACTIVE") return Object.freeze([]);
-
       const rows = await sql<PricingEntryRow[]>`
         SELECT
-          id,
-          craftsman_profile_id AS "craftsmanProfileId",
-          craftsman_profession_id AS "craftsmanProfessionId",
-          service_name AS "serviceName",
-          price_mode AS "priceMode",
-          amount_cents AS "amountCents",
-          currency,
-          note,
-          state,
-          revision,
-          created_at AS "createdAt",
-          updated_at AS "updatedAt",
-          archived_at AS "archivedAt"
-        FROM indicative_pricing_entries
-        WHERE craftsman_profile_id = ${input.craftsmanProfileId}
-          AND (${input.includeArchived ?? false} OR state = 'ACTIVE')
-        ORDER BY created_at, id
+          entry.id,
+          entry.craftsman_profile_id AS "craftsmanProfileId",
+          entry.craftsman_profession_id AS "craftsmanProfessionId",
+          entry.service_name AS "serviceName",
+          entry.price_mode AS "priceMode",
+          entry.amount_cents AS "amountCents",
+          entry.currency,
+          entry.note,
+          entry.state,
+          entry.revision,
+          entry.created_at AS "createdAt",
+          entry.updated_at AS "updatedAt",
+          entry.archived_at AS "archivedAt"
+        FROM indicative_pricing_entries entry
+        JOIN craftsman_profiles profile
+          ON profile.id = entry.craftsman_profile_id
+        JOIN users owner ON owner.id = profile.owner_user_id
+        WHERE entry.craftsman_profile_id = ${input.craftsmanProfileId}
+          AND profile.owner_user_id = ${input.actorUserId}
+          AND owner.account_state = 'ACTIVE'
+          AND (${input.includeArchived ?? false} OR entry.state = 'ACTIVE')
+        ORDER BY entry.created_at, entry.id
       `;
       return freezeEntries(rows);
     },

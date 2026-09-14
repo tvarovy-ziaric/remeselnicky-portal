@@ -152,15 +152,26 @@ describe("indicative pricing repository", () => {
   });
 
   it("lists only through active owner scope in deterministic order", async () => {
-    const sql = scriptedSql([[ownedProfile()], [entryRow()]]);
+    const sql = scriptedSql([[entryRow()]]);
     await expect(
       createIndicativePricingRepository(sql).listOwned({
         actorUserId,
         craftsmanProfileId,
       }),
     ).resolves.toHaveLength(1);
-    expect(sql.queries[1]).toMatch(/state = 'ACTIVE'/u);
-    expect(sql.queries[1]).toMatch(/ORDER BY created_at, id/u);
+    expect(sql.queries).toHaveLength(1);
+    expect(sql.queries[0]).toMatch(
+      /FROM indicative_pricing_entries entry[\s\S]*JOIN users owner[\s\S]*owner\.account_state = 'ACTIVE'/u,
+    );
+    expect(sql.queries[0]).toMatch(/entry\.state = 'ACTIVE'/u);
+    expect(sql.queries[0]).toMatch(/ORDER BY entry\.created_at, entry\.id/u);
+
+    await expect(
+      createIndicativePricingRepository(scriptedSql([[]])).listOwned({
+        actorUserId,
+        craftsmanProfileId,
+      }),
+    ).resolves.toEqual([]);
   });
 });
 
