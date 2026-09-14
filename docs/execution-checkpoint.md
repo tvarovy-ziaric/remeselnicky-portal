@@ -6,8 +6,8 @@ This file is the persistent implementation-status overlay for the hash-verified 
 - Definition: D01–D30 LOCKED and hash verified
 - Active release: R1 — Supply side
 - Last completed ticket: R1-014 — Portfolio media/photos/phase tags/max-15
-- Active tickets: R1-011 — public CraftsmanProfile projection/page; R1-016 — portfolio collaborators; R1-017 — featured projects max-3
-- Next dependency-satisfied candidate: R1-018 — property-photo consent/publication hooks
+- Active tickets: R1-011 — public CraftsmanProfile projection/page; R1-016 — portfolio collaborators; R1-017 — featured projects max-3; R1-018 — property-photo consent/publication hooks
+- Next dependency-satisfied candidate: R1-019 — R1 authorization/privacy/E2E suite
 - Human gate: canonical Slovak profession/skill/location content still requires expert/legal/source review before activation; this does not block private supply-side implementation
 - Integrated verification: CI run 34821341674 passed quality, dependency audit, secret scan and clean PostgreSQL/PostGIS migrations
 
@@ -65,7 +65,7 @@ This file is the persistent implementation-status overlay for the hash-verified 
 | R1-015 | DEFERRED | Job-linked provenance hooks are completed with R4 Job integration                                            |
 | R1-016 | ACTIVE   | Portfolio collaborator role/contribution and confirmation model                                              |
 | R1-017 | ACTIVE   | Owner-managed featured-project history with a hard maximum of three                                          |
-| R1-018 | READY    | Property-photo consent/publication hooks                                                                     |
+| R1-018 | ACTIVE   | Property-photo consent/publication hooks                                                                     |
 
 All DONE rows above are covered by CI run `34821341674` unless a more specific earlier run is referenced in history. The run applied migrations `0000`–`0025` twice and passed the complete live PostgreSQL/PostGIS integration suite.
 
