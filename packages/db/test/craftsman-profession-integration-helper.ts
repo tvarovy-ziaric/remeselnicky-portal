@@ -170,9 +170,8 @@ export async function runCraftsmanProfessionIntegrationAssertions(
       UPDATE users
       SET
         account_state = 'SUSPENDED',
-        account_state_changed_at = changed.at,
-        updated_at = changed.at
-      FROM (SELECT clock_timestamp() AS at) changed
+        account_state_changed_at = clock_timestamp(),
+        updated_at = clock_timestamp()
       WHERE users.id = ${raceOwner.id}
     `,
   ]);
