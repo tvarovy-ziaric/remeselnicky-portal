@@ -529,6 +529,16 @@ async function lockOwnedCurrent(
       FOR UPDATE
     `;
     if (projects.length !== 1) return null;
+  } else {
+    // Keep the same project -> collaboration-head lock order as the author
+    // path. The command FK reads the project too, so deferring this lock until
+    // INSERT can deadlock a concurrent author command.
+    const projects = await transaction`
+      SELECT id FROM portfolio_projects
+      WHERE id = ${identity.portfolioProjectId}
+      FOR UPDATE
+    `;
+    if (projects.length !== 1) return null;
   }
 
   const rows = await transaction<CollaborationRow[]>`

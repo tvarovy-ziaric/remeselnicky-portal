@@ -80,6 +80,7 @@ describe("portfolio collaboration repository", () => {
     const sql = scriptedSql([
       [identity()],
       [{ id: collaboratorProfile }],
+      [{ id: projectId }],
       [row()],
       [],
       [],

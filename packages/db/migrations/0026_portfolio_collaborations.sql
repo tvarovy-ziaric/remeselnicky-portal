@@ -321,6 +321,7 @@ RETURNS trigger
 LANGUAGE plpgsql
 AS $$
 DECLARE current portfolio_collaborations%ROWTYPE;
+DECLARE locked_project_id uuid;
 BEGIN
   SELECT * INTO current
   FROM portfolio_collaborations
@@ -337,6 +338,16 @@ BEGIN
     PERFORM lock_portfolio_collaboration_collaborator(
       current.collaborator_profile_id, NEW.actor_user_id
     );
+    -- Match the author path before taking the shared collaboration-head lock.
+    -- The command FK also reads this project; taking it later can deadlock an
+    -- author command that already owns the project and is waiting for the head.
+    SELECT id INTO locked_project_id
+    FROM portfolio_projects
+    WHERE id = current.portfolio_project_id
+    FOR UPDATE;
+    IF locked_project_id IS NULL THEN
+      RAISE EXCEPTION 'portfolio collaboration project unavailable';
+    END IF;
   END IF;
   SELECT * INTO current
   FROM portfolio_collaborations
