@@ -130,7 +130,7 @@ export async function runCustomerShortlistIntegrationAssertions(
     INSERT INTO users DEFAULT VALUES RETURNING id
   `;
   const [suspendedOwner] = await sql<{ readonly id: UserId }[]>`
-    INSERT INTO users (account_state) VALUES ('SUSPENDED') RETURNING id
+    INSERT INTO users DEFAULT VALUES RETURNING id
   `;
   if (hiddenOwner === undefined || suspendedOwner === undefined)
     throw new Error("Expected negative users.");
@@ -140,6 +140,15 @@ export async function runCustomerShortlistIntegrationAssertions(
       VALUES (${owner.id}, 'INDIVIDUAL') RETURNING id
     `;
     if (profile === undefined) throw new Error("Expected negative target.");
+    if (owner.id === suspendedOwner.id) {
+      await sql`
+        UPDATE users
+        SET account_state = 'SUSPENDED',
+          account_state_changed_at = clock_timestamp(),
+          updated_at = clock_timestamp()
+        WHERE id = ${owner.id}
+      `;
+    }
     const commandId = randomUUID();
     const fingerprint = createHash("sha256")
       .update(
