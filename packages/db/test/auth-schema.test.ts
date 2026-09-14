@@ -7,7 +7,9 @@ import {
   authRateLimitBuckets,
   authSessions,
   createAuthRepository,
+  emailVerificationTokens,
   passwordResetTokens,
+  phoneVerificationChallenges,
   type NewAuthCredentialRecord,
   type NewAuthSessionRecord,
 } from "../src/index.js";
@@ -34,6 +36,9 @@ describe("authentication persistence schema", () => {
       "user_id",
       "normalized_email",
       "password_hash",
+      "email_verified_at",
+      "normalized_phone",
+      "phone_verified_at",
       "adult_attested_at",
       "password_changed_at",
       "created_at",
@@ -99,5 +104,51 @@ describe("authentication persistence schema", () => {
       "expires_at",
       "attempt_count",
     ]);
+  });
+
+  it("stores email-verification challenges as terminal-state digests", () => {
+    const config = getTableConfig(emailVerificationTokens);
+    expect(config.columns.map(({ name }) => name)).toEqual([
+      "id",
+      "user_id",
+      "token_digest",
+      "created_at",
+      "expires_at",
+      "consumed_at",
+      "invalidated_at",
+    ]);
+    expect(
+      config.indexes.find(
+        ({ config: index }) =>
+          index.name === "email_verification_tokens_live_user_idx",
+      )?.config.unique,
+    ).toBe(true);
+    expect(config.columns.some(({ name }) => name === "token")).toBe(false);
+  });
+
+  it("stores phone challenges with salted digests and bounded attempts", () => {
+    const config = getTableConfig(phoneVerificationChallenges);
+    expect(config.columns.map(({ name }) => name)).toEqual([
+      "id",
+      "user_id",
+      "normalized_phone",
+      "otp_digest",
+      "otp_salt",
+      "attempt_count",
+      "max_attempts",
+      "created_at",
+      "expires_at",
+      "consumed_at",
+      "invalidated_at",
+    ]);
+    expect(
+      config.indexes.find(
+        ({ config: index }) =>
+          index.name === "phone_verification_challenges_live_user_idx",
+      )?.config.unique,
+    ).toBe(true);
+    expect(
+      config.columns.some(({ name }) => name === "otp" || name === "phone"),
+    ).toBe(false);
   });
 });

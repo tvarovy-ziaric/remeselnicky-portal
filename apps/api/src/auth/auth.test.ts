@@ -8,6 +8,14 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { buildApi } from "../app.js";
 import { createAuthPersistence } from "./db-adapter.js";
+import type {
+  EmailVerificationPersistence,
+  EmailVerificationTokenService,
+} from "./email-verification.js";
+import type {
+  PhoneOtpCrypto,
+  PhoneVerificationPersistence,
+} from "./phone-verification.js";
 import { createArgon2PasswordHasher } from "./password.js";
 import { createPostgresRateLimitStoreConstructor } from "./rate-limit-store.js";
 import { createPostgresSessionStore } from "./session-store.js";
@@ -26,6 +34,11 @@ const USER_ID = "0198ddec-56bd-7f4c-8752-1daa51fd9921" as UserId;
 const PASSWORD = "Correct horse battery staple";
 const NEW_PASSWORD = "New correct horse battery staple";
 const RESET_TOKEN = "abcdefghijklmnopqrstuvwxyzABCDEFGH123456789";
+const VERIFICATION_TOKENS = [
+  "email-verification-token-aaaaaaaaaaaaaaaaaaaa",
+  "email-verification-token-bbbbbbbbbbbbbbbbbbbb",
+  "email-verification-token-cccccccccccccccccccc",
+] as const;
 const NOW = new Date("2026-09-14T10:00:00.000Z");
 
 const openApps: ReturnType<typeof buildApi>[] = [];
@@ -292,6 +305,336 @@ describe("authentication HTTP boundary", () => {
     ).toBe(200);
   });
 
+  it("verifies email once and exposes only server-authoritative state", async () => {
+    const fixture = createFixture({ eligible: true, emailVerification: true });
+    const registered = await register(fixture);
+    expect(registered.response.json()).toMatchObject({
+      user: { emailVerified: false },
+    });
+    expect(fixture.emailDeliveries).toEqual([
+      {
+        normalizedEmail: "person@example.com",
+        token: VERIFICATION_TOKENS[0],
+      },
+    ]);
+    expect(fixture.emailVerificationPersistence.digests()).toEqual([
+      createHash("sha256").update(VERIFICATION_TOKENS[0]).digest("hex"),
+    ]);
+
+    const verificationSession = await csrf(fixture.app);
+    const verified = await confirmEmailVerification(
+      fixture,
+      verificationSession,
+      VERIFICATION_TOKENS[0],
+    );
+    expect(verified.statusCode).toBe(204);
+    expect(verified.body).not.toContain(VERIFICATION_TOKENS[0]);
+
+    const authenticatedSession = await fixture.app.inject({
+      headers: { cookie: registered.cookie },
+      method: "GET",
+      url: AUTH_API_PATHS.session,
+    });
+    expect(authenticatedSession.json()).toMatchObject({
+      user: { emailVerified: true },
+    });
+    const verifiedSessionCsrf = authenticatedSession.json<{
+      csrfToken: string;
+    }>().csrfToken;
+    const postVerificationResend = await fixture.app.inject({
+      headers: {
+        cookie: registered.cookie,
+        "x-csrf-token": verifiedSessionCsrf,
+      },
+      method: "POST",
+      url: AUTH_API_PATHS.emailVerificationResend,
+    });
+    expect(postVerificationResend.statusCode).toBe(202);
+    expect(postVerificationResend.json()).toEqual({ accepted: true });
+    expect(fixture.emailDeliveries).toHaveLength(1);
+
+    const replaySession = await csrf(fixture.app);
+    const replay = await confirmEmailVerification(
+      fixture,
+      replaySession,
+      VERIFICATION_TOKENS[0],
+    );
+    const tamperedSession = await csrf(fixture.app);
+    const tampered = await confirmEmailVerification(
+      fixture,
+      tamperedSession,
+      `${VERIFICATION_TOKENS[0].slice(0, -1)}x`,
+    );
+    expect(replay.statusCode).toBe(400);
+    expect(replay.body).toBe(tampered.body);
+    expect(replay.json()).toEqual({
+      code: "INVALID_OR_EXPIRED_VERIFICATION",
+    });
+  });
+
+  it("sends and consumes a phone OTP once with server-authoritative state", async () => {
+    const fixture = createFixture({ eligible: true, phoneVerification: true });
+    const registered = await register(fixture);
+    expect(registered.response.json()).toMatchObject({
+      user: { phoneVerified: false },
+    });
+    const authenticated = await fixture.app.inject({
+      headers: { cookie: registered.cookie },
+      method: "GET",
+      url: AUTH_API_PATHS.session,
+    });
+    const token = authenticated.json<{ csrfToken: string }>().csrfToken;
+
+    const sent = await fixture.app.inject({
+      headers: {
+        cookie: registered.cookie,
+        "x-csrf-token": token,
+      },
+      method: "POST",
+      payload: { phone: "+421 901 234 567" },
+      url: AUTH_API_PATHS.phoneVerificationSend,
+    });
+    expect(sent.statusCode).toBe(202);
+    const challengeId = sent.json<{ challengeId: string }>().challengeId;
+    expect(challengeId).toMatch(/^[0-9a-f-]{36}$/u);
+    expect(fixture.phoneDeliveries).toEqual([
+      { normalizedPhone: "+421901234567", otp: "730981" },
+    ]);
+    expect(fixture.phoneVerificationPersistence.serialized()).not.toContain(
+      "730981",
+    );
+
+    const verified = await fixture.app.inject({
+      headers: {
+        cookie: registered.cookie,
+        "x-csrf-token": token,
+      },
+      method: "POST",
+      payload: { challengeId, otp: "730981" },
+      url: AUTH_API_PATHS.phoneVerificationVerify,
+    });
+    expect(verified.statusCode).toBe(204);
+    const replay = await fixture.app.inject({
+      headers: {
+        cookie: registered.cookie,
+        "x-csrf-token": token,
+      },
+      method: "POST",
+      payload: { challengeId, otp: "730981" },
+      url: AUTH_API_PATHS.phoneVerificationVerify,
+    });
+    const unknown = await fixture.app.inject({
+      headers: {
+        cookie: registered.cookie,
+        "x-csrf-token": token,
+      },
+      method: "POST",
+      payload: {
+        challengeId: "0198ddec-56bd-7f4c-8752-1daa51fd9999",
+        otp: "000000",
+      },
+      url: AUTH_API_PATHS.phoneVerificationVerify,
+    });
+    expect(replay.statusCode).toBe(400);
+    expect(unknown.statusCode).toBe(400);
+    expect(replay.body).toBe(unknown.body);
+    expect(replay.json()).toEqual({
+      code: "INVALID_OR_EXPIRED_VERIFICATION",
+    });
+
+    const refreshed = await fixture.app.inject({
+      headers: { cookie: registered.cookie },
+      method: "GET",
+      url: AUTH_API_PATHS.session,
+    });
+    expect(refreshed.json()).toMatchObject({
+      user: { phoneVerified: true },
+    });
+  });
+
+  it("fails phone delivery closed and enforces shared resend buckets", async () => {
+    const unavailable = createFixture({
+      eligible: true,
+      phoneVerification: true,
+      phoneVerificationDelivery: false,
+    });
+    const unavailableRegistration = await register(unavailable);
+    const unavailableSession = await unavailable.app.inject({
+      headers: { cookie: unavailableRegistration.cookie },
+      method: "GET",
+      url: AUTH_API_PATHS.session,
+    });
+    const unavailableResponse = await unavailable.app.inject({
+      headers: {
+        cookie: unavailableRegistration.cookie,
+        "x-csrf-token": unavailableSession.json<{ csrfToken: string }>()
+          .csrfToken,
+      },
+      method: "POST",
+      payload: { phone: "+421901234567" },
+      url: AUTH_API_PATHS.phoneVerificationSend,
+    });
+    expect(unavailableResponse.statusCode).toBe(503);
+    expect(unavailable.phoneVerificationPersistence.serialized()).toBe("[]");
+
+    const limited = createFixture({
+      config: { phoneOtpResendLimit: 1 },
+      eligible: true,
+      phoneVerification: true,
+    });
+    const limitedRegistration = await register(limited);
+    const limitedSession = await limited.app.inject({
+      headers: { cookie: limitedRegistration.cookie },
+      method: "GET",
+      url: AUTH_API_PATHS.session,
+    });
+    const headers = {
+      cookie: limitedRegistration.cookie,
+      "x-csrf-token": limitedSession.json<{ csrfToken: string }>().csrfToken,
+    };
+    const first = await limited.app.inject({
+      headers,
+      method: "POST",
+      payload: { phone: "+421901234567" },
+      url: AUTH_API_PATHS.phoneVerificationSend,
+    });
+    const second = await limited.app.inject({
+      headers,
+      method: "POST",
+      payload: { phone: "+421 901 234 567" },
+      url: AUTH_API_PATHS.phoneVerificationSend,
+    });
+    expect(first.statusCode).toBe(202);
+    expect(second.statusCode).toBe(429);
+    expect(limited.phoneDeliveries).toHaveLength(1);
+    expect(
+      limited.persistence.rateCalls.some((call) =>
+        call.startsWith("phone-otp-send:user:"),
+      ),
+    ).toBe(true);
+    expect(
+      limited.persistence.rateCalls.some((call) =>
+        call.startsWith("phone-otp-send:ip:"),
+      ),
+    ).toBe(true);
+    expect(
+      limited.persistence.rateCalls.some((call) =>
+        call.startsWith("phone-otp-send:phone:"),
+      ),
+    ).toBe(true);
+  });
+
+  it("expires email-verification tokens and blocks suspended accounts", async () => {
+    const expiredFixture = createFixture({
+      eligible: true,
+      emailVerification: true,
+    });
+    await register(expiredFixture);
+    expiredFixture.advance(24 * 60 * 60 * 1_000 + 1);
+    const expiredSession = await csrf(expiredFixture.app);
+    expect(
+      await confirmEmailVerification(
+        expiredFixture,
+        expiredSession,
+        VERIFICATION_TOKENS[0],
+      ),
+    ).toMatchObject({ statusCode: 400 });
+
+    const suspendedFixture = createFixture({
+      eligible: true,
+      emailVerification: true,
+    });
+    const suspendedRegistration = await register(suspendedFixture);
+    suspendedFixture.persistence.setAccountState(USER_ID, "SUSPENDED");
+    const csrfToken = suspendedRegistration.response.json<{
+      csrfToken: string;
+    }>().csrfToken;
+    expect(
+      await suspendedFixture.app.inject({
+        headers: {
+          cookie: suspendedRegistration.cookie,
+          "x-csrf-token": csrfToken,
+        },
+        method: "POST",
+        url: AUTH_API_PATHS.emailVerificationResend,
+      }),
+    ).toMatchObject({ statusCode: 403 });
+    const confirmSession = await csrf(suspendedFixture.app);
+    expect(
+      await confirmEmailVerification(
+        suspendedFixture,
+        confirmSession,
+        VERIFICATION_TOKENS[0],
+      ),
+    ).toMatchObject({ statusCode: 400 });
+  });
+
+  it("rate-limits resend by account and supersedes the prior token", async () => {
+    const fixture = createFixture({
+      eligible: true,
+      emailVerification: true,
+      verificationResendLimit: 1,
+    });
+    const registered = await register(fixture);
+    const csrfToken = registered.response.json<{ csrfToken: string }>()
+      .csrfToken;
+    const resend = () =>
+      fixture.app.inject({
+        headers: {
+          cookie: registered.cookie,
+          "x-csrf-token": csrfToken,
+        },
+        method: "POST",
+        url: AUTH_API_PATHS.emailVerificationResend,
+      });
+
+    const first = await resend();
+    const second = await resend();
+    expect(first.statusCode).toBe(202);
+    expect(first.json()).toEqual({ accepted: true });
+    expect(second.statusCode).toBe(429);
+    expect(fixture.emailDeliveries).toHaveLength(2);
+
+    const staleSession = await csrf(fixture.app);
+    expect(
+      await confirmEmailVerification(
+        fixture,
+        staleSession,
+        VERIFICATION_TOKENS[0],
+      ),
+    ).toMatchObject({ statusCode: 400 });
+    const liveSession = await csrf(fixture.app);
+    expect(
+      await confirmEmailVerification(
+        fixture,
+        liveSession,
+        VERIFICATION_TOKENS[1],
+      ),
+    ).toMatchObject({ statusCode: 204 });
+  });
+
+  it("fails resend closed without creating an undeliverable token", async () => {
+    const fixture = createFixture({
+      eligible: true,
+      emailVerification: true,
+      emailVerificationDelivery: false,
+    });
+    const registered = await register(fixture);
+    const csrfToken = registered.response.json<{ csrfToken: string }>()
+      .csrfToken;
+    const response = await fixture.app.inject({
+      headers: {
+        cookie: registered.cookie,
+        "x-csrf-token": csrfToken,
+      },
+      method: "POST",
+      url: AUTH_API_PATHS.emailVerificationResend,
+    });
+
+    expect(response.statusCode).toBe(503);
+    expect(fixture.emailVerificationPersistence.digests()).toEqual([]);
+  });
+
   it("rejects expired reset tokens and allows only one concurrent consumer", async () => {
     const fixture = createFixture({ eligible: true });
     await register(fixture);
@@ -485,8 +828,12 @@ interface Fixture {
   readonly app: ReturnType<typeof buildApi>;
   readonly clock: () => Date;
   readonly deliveries: { normalizedEmail: string; token: string }[];
+  readonly emailDeliveries: { normalizedEmail: string; token: string }[];
+  readonly emailVerificationPersistence: MemoryEmailVerificationPersistence;
   readonly hasher: FakeHasher;
   readonly persistence: MemoryAuthPersistence;
+  readonly phoneDeliveries: { normalizedPhone: string; otp: string }[];
+  readonly phoneVerificationPersistence: MemoryPhoneVerificationPersistence;
   advance(milliseconds: number): void;
   rewind(): void;
 }
@@ -495,20 +842,35 @@ function createFixture(
   options: {
     readonly config?: Partial<AuthRuntimeConfig>;
     readonly delivery?: boolean;
+    readonly emailVerification?: boolean;
+    readonly emailVerificationDelivery?: boolean;
     readonly eligible?: boolean;
+    readonly phoneVerification?: boolean;
+    readonly phoneVerificationDelivery?: boolean;
+    readonly verificationResendLimit?: number;
   } = {},
 ): Fixture {
   let now = NOW;
+  const clock = () => now;
   const persistence = new MemoryAuthPersistence();
   const hasher = new FakeHasher();
   const deliveries: { normalizedEmail: string; token: string }[] = [];
+  const emailDeliveries: { normalizedEmail: string; token: string }[] = [];
+  const phoneDeliveries: { normalizedPhone: string; otp: string }[] = [];
+  const emailVerificationPersistence = new MemoryEmailVerificationPersistence(
+    persistence,
+    clock,
+  );
+  const phoneVerificationPersistence = new MemoryPhoneVerificationPersistence(
+    persistence,
+    clock,
+  );
   const eligibility: RegistrationEligibilityPort | undefined =
     options.eligible === undefined
       ? undefined
       : {
           isEligible: () => Promise.resolve(options.eligible === true),
         };
-  const clock = () => now;
   const config: AuthRuntimeConfig = {
     appOrigin: "https://portal.example",
     cookieName: "portal.sid",
@@ -525,6 +887,27 @@ function createFixture(
     digest: (token) => createHash("sha256").update(token).digest("hex"),
     generate: () => RESET_TOKEN,
   };
+  let verificationTokenIndex = 0;
+  const verificationTokens: EmailVerificationTokenService = {
+    digest: (token) => createHash("sha256").update(token).digest("hex"),
+    generate: () => {
+      const token = VERIFICATION_TOKENS[verificationTokenIndex];
+      verificationTokenIndex += 1;
+      if (token === undefined) throw new Error("Verification token exhausted");
+      return token;
+    },
+  };
+  let phoneSaltIndex = 0;
+  const phoneCrypto: PhoneOtpCrypto = {
+    digest: ({ otp, salt }) =>
+      createHash("sha256").update(`${salt}\0${otp}`).digest("hex"),
+    generateOtp: () => "730981",
+    generateSalt: () =>
+      createHash("sha256")
+        .update(`phone-salt-${phoneSaltIndex++}`)
+        .digest("hex")
+        .slice(0, 32),
+  };
   const app = buildApi({
     auth: {
       clock,
@@ -540,8 +923,49 @@ function createFixture(
             },
           }),
       ...(eligibility === undefined ? {} : { eligibility }),
+      ...(options.emailVerification === true
+        ? {
+            emailVerification: {
+              ...(options.emailVerificationDelivery === false
+                ? {}
+                : {
+                    delivery: {
+                      deliver(input: {
+                        normalizedEmail: string;
+                        token: string;
+                      }) {
+                        emailDeliveries.push(input);
+                        return Promise.resolve();
+                      },
+                    },
+                  }),
+              persistence: emailVerificationPersistence,
+              resendLimit: options.verificationResendLimit ?? 10,
+              tokenTtlMs: 24 * 60 * 60 * 1_000,
+              tokens: verificationTokens,
+            },
+          }
+        : {}),
       hasher,
       persistence,
+      ...(options.phoneVerification === true
+        ? {
+            phoneVerification: {
+              crypto: phoneCrypto,
+              ...(options.phoneVerificationDelivery === false
+                ? {}
+                : {
+                    delivery: {
+                      deliver(input: { normalizedPhone: string; otp: string }) {
+                        phoneDeliveries.push(input);
+                        return Promise.resolve();
+                      },
+                    },
+                  }),
+              persistence: phoneVerificationPersistence,
+            },
+          }
+        : {}),
       tokens,
     },
     database: { ping: () => Promise.resolve() },
@@ -554,8 +978,12 @@ function createFixture(
     app,
     clock,
     deliveries,
+    emailDeliveries,
+    emailVerificationPersistence,
     hasher,
     persistence,
+    phoneDeliveries,
+    phoneVerificationPersistence,
     rewind() {
       now = NOW;
     },
@@ -699,8 +1127,10 @@ class MemoryAuthPersistence implements AuthPersistence {
     const credential: AuthCredential = {
       accountState: "ACTIVE",
       adultAttestedAt: NOW,
+      emailVerifiedAt: null,
       id: USER_ID,
       passwordHash: input.passwordHash,
+      phoneVerifiedAt: null,
     };
     this.credentials.set(input.normalizedEmail, credential);
     return Promise.resolve({ status: "CREATED", user: credential });
@@ -727,6 +1157,38 @@ class MemoryAuthPersistence implements AuthPersistence {
     }
   }
 
+  public markEmailVerified(userId: UserId, verifiedAt: Date): boolean {
+    for (const [email, credential] of this.credentials) {
+      if (credential.id === userId) {
+        this.credentials.set(email, {
+          ...credential,
+          emailVerifiedAt: credential.emailVerifiedAt ?? verifiedAt,
+        });
+        return true;
+      }
+    }
+    return false;
+  }
+
+  public markPhoneVerified(userId: UserId, verifiedAt: Date): boolean {
+    for (const [email, credential] of this.credentials) {
+      if (credential.id === userId) {
+        this.credentials.set(email, {
+          ...credential,
+          phoneVerifiedAt: credential.phoneVerifiedAt ?? verifiedAt,
+        });
+        return true;
+      }
+    }
+    return false;
+  }
+
+  public verificationTarget(userId: UserId): AuthCredential | undefined {
+    return [...this.credentials.values()].find(
+      (credential) => credential.id === userId,
+    );
+  }
+
   public tamperAuthenticatedSessionBinding(): void {
     for (const [id, session] of this.sessions) {
       if (session.userId !== undefined) {
@@ -734,7 +1196,7 @@ class MemoryAuthPersistence implements AuthPersistence {
           ...session,
           payload: {
             ...session.payload,
-            authUserId: "0198ddec-56bd-7f4c-8752-1daa51fd9999",
+            authUserId: `${USER_ID.slice(0, -4)}9999`,
           },
         });
       }
@@ -744,6 +1206,187 @@ class MemoryAuthPersistence implements AuthPersistence {
   public writeSession(session: StoredSession): Promise<void> {
     this.sessions.set(session.id, session);
     return Promise.resolve();
+  }
+}
+
+class MemoryEmailVerificationPersistence implements EmailVerificationPersistence {
+  private readonly records = new Map<
+    string,
+    { expiresAt: Date; invalidated: boolean; used: boolean; userId: UserId }
+  >();
+
+  public constructor(
+    private readonly auth: MemoryAuthPersistence,
+    private readonly clock: () => Date,
+  ) {}
+
+  public consume(tokenDigest: string): Promise<"INVALID" | "VERIFIED"> {
+    const record = this.records.get(tokenDigest);
+    const target =
+      record === undefined
+        ? undefined
+        : this.auth.verificationTarget(record.userId);
+    if (
+      record === undefined ||
+      record.invalidated ||
+      record.used ||
+      record.expiresAt.valueOf() <= this.clock().valueOf() ||
+      target?.accountState !== "ACTIVE"
+    ) {
+      return Promise.resolve("INVALID");
+    }
+    record.used = true;
+    return Promise.resolve(
+      this.auth.markEmailVerified(record.userId, this.clock())
+        ? "VERIFIED"
+        : "INVALID",
+    );
+  }
+
+  public digests(): string[] {
+    return [...this.records.keys()];
+  }
+
+  public issue(input: {
+    expiresAt: Date;
+    tokenDigest: string;
+    userId: UserId;
+  }): Promise<
+    { normalizedEmail: string; status: "ISSUED" } | { status: "NOT_ELIGIBLE" }
+  > {
+    const target = this.auth.verificationTarget(input.userId);
+    if (
+      target === undefined ||
+      target.accountState !== "ACTIVE" ||
+      target.emailVerifiedAt !== null
+    ) {
+      return Promise.resolve({ status: "NOT_ELIGIBLE" });
+    }
+    for (const record of this.records.values()) {
+      if (record.userId === input.userId && !record.used) {
+        record.invalidated = true;
+      }
+    }
+    this.records.set(input.tokenDigest, {
+      ...input,
+      invalidated: false,
+      used: false,
+    });
+    return Promise.resolve({
+      normalizedEmail: "person@example.com",
+      status: "ISSUED",
+    });
+  }
+}
+
+class MemoryPhoneVerificationPersistence implements PhoneVerificationPersistence {
+  private readonly records = new Map<
+    string,
+    {
+      attempts: number;
+      expiresAt: Date;
+      invalidated: boolean;
+      maxAttempts: number;
+      normalizedPhone: string;
+      otpDigest: string;
+      otpSalt: string;
+      used: boolean;
+      userId: UserId;
+    }
+  >();
+
+  public constructor(
+    private readonly auth: MemoryAuthPersistence,
+    private readonly clock: () => Date,
+  ) {}
+
+  public findDigestMaterial(input: {
+    challengeId: string;
+    userId: UserId;
+  }): Promise<{ otpSalt: string } | null> {
+    const record = this.live(input);
+    return Promise.resolve(
+      record === null ? null : { otpSalt: record.otpSalt },
+    );
+  }
+
+  public invalidate(input: {
+    challengeId: string;
+    userId: UserId;
+  }): Promise<void> {
+    const record = this.records.get(input.challengeId);
+    if (record?.userId === input.userId && !record.used) {
+      record.invalidated = true;
+    }
+    return Promise.resolve();
+  }
+
+  public issue(input: {
+    challengeId: string;
+    expiresAt: Date;
+    maxAttempts: number;
+    normalizedPhone: string;
+    otpDigest: string;
+    otpSalt: string;
+    userId: UserId;
+  }): Promise<"ISSUED" | "NOT_ELIGIBLE"> {
+    const target = this.auth.verificationTarget(input.userId);
+    if (target?.accountState !== "ACTIVE" || target.phoneVerifiedAt !== null) {
+      return Promise.resolve("NOT_ELIGIBLE");
+    }
+    for (const record of this.records.values()) {
+      if (record.userId === input.userId && !record.used) {
+        record.invalidated = true;
+      }
+    }
+    this.records.set(input.challengeId, {
+      ...input,
+      attempts: 0,
+      invalidated: false,
+      used: false,
+    });
+    return Promise.resolve("ISSUED");
+  }
+
+  public serialized(): string {
+    return JSON.stringify([...this.records.values()]);
+  }
+
+  public verifyAttempt(input: {
+    challengeId: string;
+    otpDigest: string;
+    userId: UserId;
+  }): Promise<"INVALID" | "VERIFIED"> {
+    const record = this.live(input);
+    if (record === null) return Promise.resolve("INVALID");
+    record.attempts += 1;
+    if (record.otpDigest !== input.otpDigest) {
+      if (record.attempts >= record.maxAttempts) record.invalidated = true;
+      return Promise.resolve("INVALID");
+    }
+    record.used = true;
+    return Promise.resolve(
+      this.auth.markPhoneVerified(input.userId, this.clock())
+        ? "VERIFIED"
+        : "INVALID",
+    );
+  }
+
+  private live(input: { challengeId: string; userId: UserId }) {
+    const record = this.records.get(input.challengeId);
+    const target = this.auth.verificationTarget(input.userId);
+    if (
+      record === undefined ||
+      record.userId !== input.userId ||
+      target?.accountState !== "ACTIVE" ||
+      record.invalidated ||
+      record.used ||
+      record.attempts >= record.maxAttempts ||
+      record.expiresAt.valueOf() <= this.clock().valueOf()
+    ) {
+      return null;
+    }
+    return record;
   }
 }
 
@@ -807,6 +1450,19 @@ async function confirmReset(
     method: "POST",
     payload: { newPassword: NEW_PASSWORD, token },
     url: AUTH_API_PATHS.passwordReset,
+  });
+}
+
+async function confirmEmailVerification(
+  fixture: Fixture,
+  session: { cookie: string; token: string },
+  token: string,
+) {
+  return fixture.app.inject({
+    headers: { cookie: session.cookie, "x-csrf-token": session.token },
+    method: "POST",
+    payload: { token },
+    url: AUTH_API_PATHS.emailVerification,
   });
 }
 

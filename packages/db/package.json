@@ -22,7 +22,15 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@portal/admin-auth": "workspace:*",
+    "@portal/audit": "workspace:*",
+    "@portal/commands": "workspace:*",
+    "@portal/domain": "workspace:*",
     "@portal/media": "workspace:*",
+    "@portal/notifications": "workspace:*",
+    "@portal/outbox": "workspace:*",
+    "@portal/taxonomy": "workspace:*",
+    "@portal/privacy": "workspace:*",
     "drizzle-orm": "0.45.2",
     "postgres": "3.4.9"
   },

@@ -100,6 +100,19 @@ export const mediaAssets = pgTable(
     provenanceEntityId: uuid("provenance_entity_id"),
     provenanceEntityRevision: integer("provenance_entity_revision"),
     rejectionCode: text("rejection_code"),
+    capturedAt: timestamp("captured_at", { mode: "date", withTimezone: true }),
+    canonicalWidth: integer("canonical_width"),
+    canonicalHeight: integer("canonical_height"),
+    documentPageCount: integer("document_page_count"),
+    documentContentSha256: char("document_content_sha256", { length: 64 }),
+    malwareScanVerdict: text("malware_scan_verdict"),
+    malwareScannedAt: timestamp("malware_scanned_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
+    malwareScannerEngine: text("malware_scanner_engine"),
+    malwareScannerEngineVersion: text("malware_scanner_engine_version"),
+    malwareSignatureVersion: text("malware_signature_version"),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .notNull()
       .defaultNow(),

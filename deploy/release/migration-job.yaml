@@ -1,0 +1,56 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: portal-migrate-release-revision
+  labels:
+    app.kubernetes.io/name: portal-migrate
+    app.kubernetes.io/part-of: remeselnicky-portal
+  annotations:
+    portal.remeselnicky.dev/release-revision: release-revision
+spec:
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: portal-migrate
+        app.kubernetes.io/part-of: remeselnicky-portal
+      annotations:
+        portal.remeselnicky.dev/release-revision: release-revision
+    spec:
+      restartPolicy: Never
+      serviceAccountName: portal-api
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: migrate
+          image: registry.invalid/remeselnicky-portal/api:release-revision
+          imagePullPolicy: IfNotPresent
+          command: ["node", "packages/db/dist/migrate-cli.js"]
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: portal-runtime-secrets
+                  key: DATABASE_URL
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

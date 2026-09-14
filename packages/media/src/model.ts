@@ -171,5 +171,90 @@ export interface MediaAssetProcessingRepository {
   }): Promise<MediaProcessingTransitionResult>;
 }
 
+export interface ImageProcessingAssetSource {
+  readonly declaredContentType: string;
+  readonly id: string;
+  readonly kind: MediaKind;
+  readonly originalStorageObject: StoredObjectReference;
+  readonly status: MediaAssetStatus;
+}
+
+export interface DocumentProcessingAssetSource {
+  readonly declaredContentType: string;
+  readonly id: string;
+  readonly kind: MediaKind;
+  readonly originalStorageObject: StoredObjectReference;
+  readonly status: MediaAssetStatus;
+}
+
+export interface StoredDocumentCanonical {
+  readonly byteSize: number;
+  readonly contentSha256: string;
+  readonly contentType: "application/pdf";
+  readonly role: "CANONICAL";
+  readonly storageObject: StoredObjectReference;
+}
+
+export interface CleanDocumentScanEvidence {
+  readonly assurance: "ACTIVE";
+  readonly contentSha256: string;
+  readonly engine: string;
+  readonly engineVersion: string;
+  readonly scannedAt: Date;
+  readonly signatureVersion: string;
+  readonly verdict: "CLEAN";
+}
+
+export interface CompleteDocumentProcessingInput {
+  readonly assetId: string;
+  readonly canonical: StoredDocumentCanonical;
+  readonly pageCount: number;
+  readonly scan: CleanDocumentScanEvidence;
+}
+
+export type DocumentProcessingCompletionResult =
+  | Readonly<{ transition: "UPDATED" }>
+  | Readonly<{ transition: "ALREADY_READY" }>
+  | Readonly<{ transition: "NOT_PROCESSING" }>;
+
+export interface DocumentProcessingRepository extends MediaAssetProcessingRepository {
+  completeDocumentProcessing(
+    input: CompleteDocumentProcessingInput,
+  ): Promise<DocumentProcessingCompletionResult>;
+  findDocumentProcessingSource(
+    assetId: string,
+  ): Promise<DocumentProcessingAssetSource | null>;
+}
+
+export interface StoredImageDerivative {
+  readonly byteSize: number;
+  readonly contentSha256: string;
+  readonly contentType: "image/webp";
+  readonly role: "CANONICAL" | "THUMBNAIL";
+  readonly storageObject: StoredObjectReference;
+}
+
+export interface CompleteImageProcessingInput {
+  readonly assetId: string;
+  readonly canonicalHeight: number;
+  readonly canonicalWidth: number;
+  readonly capturedAt: Date | null;
+  readonly derivatives: readonly [StoredImageDerivative, StoredImageDerivative];
+}
+
+export type ImageProcessingCompletionResult =
+  | Readonly<{ transition: "UPDATED" }>
+  | Readonly<{ transition: "ALREADY_READY" }>
+  | Readonly<{ transition: "NOT_PROCESSING" }>;
+
+export interface ImageProcessingRepository extends MediaAssetProcessingRepository {
+  completeImageProcessing(
+    input: CompleteImageProcessingInput,
+  ): Promise<ImageProcessingCompletionResult>;
+  findImageProcessingSource(
+    assetId: string,
+  ): Promise<ImageProcessingAssetSource | null>;
+}
+
 export interface MediaAssetRepository
   extends MediaAssetUploadRepository, MediaAssetProcessingRepository {}

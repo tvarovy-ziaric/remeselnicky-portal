@@ -11,15 +11,25 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./postgres": {
+      "types": "./dist/postgres.d.ts",
+      "node": "./dist/postgres.js"
     }
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint .",
+    "seed:synthetic": "pnpm build && node dist/seed-cli.js",
     "test": "vitest run",
+    "test:integration": "vitest run test/isolated-postgres.integration.test.ts",
     "typecheck": "tsc -p tsconfig.json"
   },
+  "dependencies": {
+    "postgres": "3.4.9"
+  },
   "devDependencies": {
+    "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

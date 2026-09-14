@@ -1,14 +1,26 @@
 import type { EntityId } from "@portal/domain";
 
-export { AUTH_API_PATHS, AUTH_INPUT_LIMITS } from "./auth.js";
+export {
+  ADMIN_AUTH_API_PATHS,
+  AUTH_API_PATHS,
+  AUTH_INPUT_LIMITS,
+} from "./auth.js";
 export type {
+  AdminMfaChallengeRequest,
+  AdminMfaChallengeResponse,
+  AdminMfaVerifyRequest,
+  AdminSessionResponse,
   AuthAcceptedResponse,
   AuthCsrfResponse,
+  AuthEmailVerificationRequest,
   AuthErrorCode,
   AuthErrorResponse,
   AuthLoginRequest,
   AuthPasswordResetConfirmRequest,
   AuthPasswordResetRequest,
+  AuthPhoneVerificationSendRequest,
+  AuthPhoneVerificationSendResponse,
+  AuthPhoneVerificationVerifyRequest,
   AuthRegisterRequest,
   AuthSessionResponse,
   AuthUserResponse,

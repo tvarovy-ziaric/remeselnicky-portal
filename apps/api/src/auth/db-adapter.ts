@@ -113,7 +113,9 @@ function authUser(user: DatabaseAuthUser): AuthUser {
   return {
     accountState: user.accountState,
     adultAttestedAt: user.adultAttestedAt,
+    emailVerifiedAt: user.emailVerifiedAt,
     id: user.id as UserId,
+    phoneVerifiedAt: user.phoneVerifiedAt,
   };
 }
 

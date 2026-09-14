@@ -24,6 +24,18 @@ const repository = readFileSync(
   fileURLToPath(new URL("../src/media-repository.ts", import.meta.url)),
   "utf8",
 );
+const imageMigration = readFileSync(
+  fileURLToPath(
+    new URL("../migrations/0005_image_canonicalization.sql", import.meta.url),
+  ),
+  "utf8",
+);
+const documentMigration = readFileSync(
+  fileURLToPath(
+    new URL("../migrations/0008_document_validation.sql", import.meta.url),
+  ),
+  "utf8",
+);
 
 describe("media asset schema", () => {
   it("exports the locked status, type, purpose and provenance vocabulary", () => {
@@ -65,7 +77,42 @@ describe("media asset schema", () => {
     expect(repository).toMatch(/input\.storageObject\.area !== "private"/u);
     expect(repository).toMatch(/recordMediaProcessingSucceeded/u);
     expect(repository).toMatch(/recordMediaProcessingRejected/u);
-    expect(repository.match(/AND status = 'PROCESSING'/gu)).toHaveLength(2);
+    expect(
+      repository.match(/AND status = 'PROCESSING'/gu)?.length ?? 0,
+    ).toBeGreaterThanOrEqual(4);
+    expect(repository).toMatch(/completeImageProcessing/u);
+    expect(repository).toMatch(/completeDocumentProcessing/u);
+    expect(repository).toMatch(/findDocumentProcessingSource/u);
+    expect(repository).toMatch(/FOR UPDATE/u);
+    expect(repository).toMatch(/'CANONICAL'/u);
+    expect(repository).toMatch(/"THUMBNAIL"/u);
+    expect(repository).toMatch(/kind = 'DOCUMENT'/u);
     expect(repository).not.toMatch(/\$\{[^}]*originalFilename/gu);
+  });
+
+  it("requires bounded canonical dimensions before an image becomes READY", () => {
+    expect(imageMigration).toMatch(/media_assets_image_dimensions_consistent/u);
+    expect(imageMigration).toMatch(/canonical_width BETWEEN 1 AND 2560/u);
+    expect(imageMigration).toMatch(/media_assets_captured_at_consistent/u);
+    expect(imageMigration).toMatch(
+      /media_asset_storage_objects_private_source_and_canonical/u,
+    );
+    expect(imageMigration).not.toMatch(/\b(?:BEGIN|COMMIT)\b/iu);
+  });
+
+  it("requires clean hash-bound scan evidence and a private canonical PDF before READY", () => {
+    expect(documentMigration).toMatch(
+      /media_assets_ready_document_evidence_complete/u,
+    );
+    expect(documentMigration).toMatch(/malware_scan_verdict = 'CLEAN'/u);
+    expect(documentMigration).toMatch(
+      /media_assets_ready_document_canonical_guard/u,
+    );
+    expect(documentMigration).toMatch(
+      /object\.content_sha256 = NEW\.document_content_sha256/u,
+    );
+    expect(documentMigration).toMatch(/object\.storage_area = 'private'/u);
+    expect(documentMigration).not.toMatch(/^\s*BEGIN\s*;/iu);
+    expect(documentMigration).not.toMatch(/COMMIT\s*;\s*$/iu);
   });
 });

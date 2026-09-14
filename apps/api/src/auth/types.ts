@@ -3,6 +3,8 @@ import type { UserAccountState, UserId } from "@portal/domain";
 export interface AuthUser {
   readonly accountState: UserAccountState;
   readonly adultAttestedAt: Date;
+  readonly emailVerifiedAt: Date | null;
+  readonly phoneVerifiedAt: Date | null;
   readonly id: UserId;
 }
 
@@ -85,6 +87,11 @@ export interface AuthRuntimeConfig {
   readonly cookieName: string;
   readonly cookieSecure: boolean;
   readonly passwordResetTtlMs: number;
+  readonly phoneOtpMaxAttempts?: number;
+  readonly phoneOtpResendLimit?: number;
+  readonly phoneOtpTtlMs?: number;
+  readonly phoneOtpVerifyLimit?: number;
+  readonly phoneOtpWindowMs?: number;
   readonly rateLimitMax: number;
   readonly rateLimitWindowMs: number;
   readonly sessionSecret: string;

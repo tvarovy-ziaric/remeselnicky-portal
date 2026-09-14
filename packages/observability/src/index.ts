@@ -8,6 +8,17 @@ export {
   createStructuredLogger,
   type StructuredLoggerOptions,
 } from "./logger.js";
+export {
+  createPortalMetrics,
+  type PortalMetrics,
+  type QueueMetricEvent,
+  type QueueMetricSnapshot,
+} from "./metrics.js";
+export {
+  createMonitoringServer,
+  type MonitoringServer,
+  type MonitoringServerOptions,
+} from "./monitoring-server.js";
 export { redactTelemetryValue, sanitizeTelemetryString } from "./redaction.js";
 export type {
   CentralErrorTracker,

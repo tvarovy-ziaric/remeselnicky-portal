@@ -1,0 +1,141 @@
+name: Deploy production
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_revision:
+        description: Full Git SHA approved as the D30 release candidate
+        required: true
+        type: string
+      release_evidence:
+        description: Immutable issue/document reference containing completed D30 evidence
+        required: true
+        type: string
+      go_no_go:
+        description: Type D30 PRODUCTION GO to confirm the explicit decision
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: production
+    env:
+      D30_APPROVAL: ${{ inputs.go_no_go }}
+      IMAGE_PREFIX: ${{ vars.PRODUCTION_IMAGE_PREFIX }}
+      KUBE_CONFIG_PRODUCTION_B64: ${{ secrets.KUBE_CONFIG_PRODUCTION_B64 }}
+      REGISTRY_HOST: ${{ secrets.REGISTRY_HOST }}
+      REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+      REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+      RELEASE_EVIDENCE: ${{ inputs.release_evidence }}
+      RELEASE_REVISION: ${{ inputs.release_revision }}
+    steps:
+      - name: Check out approved release revision
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.release_revision }}
+          persist-credentials: false
+
+      - name: Enforce manual D30 go-no-go contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$D30_APPROVAL" == 'D30 PRODUCTION GO' ]]
+          [[ "$RELEASE_REVISION" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$RELEASE_EVIDENCE" =~ ^[A-Za-z0-9][A-Za-z0-9._:/#-]{7,199}$ ]]
+          [[ "$IMAGE_PREFIX" =~ ^[a-z0-9][a-z0-9._:/-]+$ ]]
+          [[ "$REGISTRY_HOST" =~ ^[a-z0-9][a-z0-9.-]*(:[0-9]{1,5})?$ ]]
+          [[ "$IMAGE_PREFIX" == "$REGISTRY_HOST/"* ]]
+          test -n "$REGISTRY_USERNAME"
+          test -n "$REGISTRY_PASSWORD"
+          test -n "$KUBE_CONFIG_PRODUCTION_B64"
+          git merge-base --is-ancestor "$RELEASE_REVISION" origin/main
+          node deploy/scripts/validate.mjs
+          {
+            echo "### D30 production approval"
+            echo "Revision: \`$RELEASE_REVISION\`"
+            echo "Evidence: \`$RELEASE_EVIDENCE\`"
+            echo "Deployment remains subject to the protected production environment reviewer."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build and push production revision images
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' "$REGISTRY_PASSWORD" | docker login "$REGISTRY_HOST" --username "$REGISTRY_USERNAME" --password-stdin
+          for service in web api worker; do
+            build_args=(--build-arg "RELEASE_REVISION=$RELEASE_REVISION")
+            if [[ "$service" == "web" ]]; then
+              build_args+=(--build-arg "DEPLOYMENT_ENV=production")
+            fi
+            docker build \
+              "${build_args[@]}" \
+              --file "apps/$service/Dockerfile" \
+              --tag "$IMAGE_PREFIX/$service:$RELEASE_REVISION" .
+            docker push "$IMAGE_PREFIX/$service:$RELEASE_REVISION"
+            digest="$(docker buildx imagetools inspect "$IMAGE_PREFIX/$service:$RELEASE_REVISION" --format '{{json .Manifest.Digest}}' | tr -d '"')"
+            [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+            variable="${service^^}_IMAGE"
+            printf '%s=%s/%s@%s\n' "$variable" "$IMAGE_PREFIX" "$service" "$digest" >> "$GITHUB_ENV"
+          done
+          docker logout "$REGISTRY_HOST"
+
+      - name: Render immutable production manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          kubectl kustomize deploy/overlays/production > "$RUNNER_TEMP/production.yaml"
+          node deploy/scripts/release-manifest.mjs \
+            --input "$RUNNER_TEMP/production.yaml" \
+            --output "$RUNNER_TEMP/production-rendered.yaml" \
+            --required-images web,api,worker
+          node deploy/scripts/release-manifest.mjs \
+            --input deploy/release/migration-job.yaml \
+            --output "$RUNNER_TEMP/production-migration.yaml" \
+            --required-images api
+
+      - name: Deploy migration and approved production release
+        shell: bash
+        run: |
+          set -euo pipefail
+          export KUBECONFIG="$RUNNER_TEMP/kubeconfig"
+          printf '%s' "$KUBE_CONFIG_PRODUCTION_B64" | base64 --decode > "$KUBECONFIG"
+          chmod 600 "$KUBECONFIG"
+          kubectl -n portal-production get secret portal-runtime-secrets >/dev/null
+          kubectl -n portal-production get secret portal-tls >/dev/null
+          kubectl -n portal-production apply -f deploy/base/service-accounts.yaml
+          kubectl -n portal-production apply -f "$RUNNER_TEMP/production-migration.yaml"
+          kubectl -n portal-production wait \
+            --for=condition=complete \
+            "job/portal-migrate-$RELEASE_REVISION" \
+            --timeout=180s
+          {
+            echo "### Production rollback baseline before $RELEASE_REVISION"
+            kubectl -n portal-production get deployments \
+              -l app.kubernetes.io/part-of=remeselnicky-portal \
+              -o custom-columns='NAME:.metadata.name,REVISION:.metadata.annotations.portal\.remeselnicky\.dev/release-revision,IMAGE:.spec.template.spec.containers[0].image'
+          } >> "$GITHUB_STEP_SUMMARY"
+          kubectl apply -f "$RUNNER_TEMP/production-rendered.yaml"
+          kubectl -n portal-production rollout status deployment/portal-api --timeout=180s
+          kubectl -n portal-production rollout status deployment/portal-web --timeout=180s
+          kubectl -n portal-production port-forward service/portal-api 18081:3001 >"$RUNNER_TEMP/api-port-forward.log" 2>&1 &
+          API_FORWARD_PID=$!
+          kubectl -n portal-production port-forward service/portal-api 19464:9464 >"$RUNNER_TEMP/metrics-port-forward.log" 2>&1 &
+          METRICS_FORWARD_PID=$!
+          kubectl -n portal-production port-forward service/portal-web 18080:3000 >"$RUNNER_TEMP/web-port-forward.log" 2>&1 &
+          WEB_FORWARD_PID=$!
+          trap 'kill "$API_FORWARD_PID" "$METRICS_FORWARD_PID" "$WEB_FORWARD_PID" 2>/dev/null || true' EXIT
+          SMOKE_API_URL=http://127.0.0.1:18081 \
+          SMOKE_METRICS_URL=http://127.0.0.1:19464 \
+          SMOKE_WEB_URL=http://127.0.0.1:18080 \
+          EXPECTED_RELEASE_REVISION="$RELEASE_REVISION" \
+            node deploy/scripts/smoke-release.mjs

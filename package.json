@@ -16,9 +16,10 @@
     "format:check": "prettier --check .",
     "lint": "eslint . --max-warnings=0 && pnpm check:boundaries",
     "lint:workspaces": "turbo run lint",
-    "test": "turbo run test && pnpm test:boundaries && pnpm test:recovery",
+    "test": "turbo run test && pnpm test:boundaries && pnpm test:recovery && pnpm test:release",
     "test:boundaries": "node --test scripts/verify-import-boundaries.test.mjs",
     "test:recovery": "node --test infra/postgres/recovery/verify-restore.test.mjs",
+    "test:release": "node deploy/scripts/validate.mjs && node --test deploy/scripts/*.test.mjs",
     "typecheck": "turbo run typecheck"
   },
   "devDependencies": {

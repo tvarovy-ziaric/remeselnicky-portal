@@ -116,7 +116,9 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Apply and verify migrations on a clean database
-        run: pnpm --filter @portal/db test:integration
+        run: |
+          pnpm --filter @portal/testing test:integration
+          pnpm --filter @portal/db test:integration
 
   secret-scan:
     name: Repository secret scan

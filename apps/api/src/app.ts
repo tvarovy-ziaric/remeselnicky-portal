@@ -27,7 +27,7 @@ export function buildApi(dependencies: ApiDependencies): FastifyInstance {
         : (_address: string, hop: number) => hop < trustProxyHops,
   });
 
-  registerApiObservability(app, dependencies.observability);
+  const metrics = registerApiObservability(app, dependencies.observability);
 
   if (dependencies.auth !== undefined) {
     registerAuthModule(app, dependencies.auth);
@@ -42,14 +42,21 @@ export function buildApi(dependencies: ApiDependencies): FastifyInstance {
   app.get("/health/live", () => ({ status: "ok" }));
 
   app.get("/health/ready", async (_request, reply) => {
+    const startedAt = performance.now();
     try {
       await dependencies.database.ping();
+      recordDatabaseProbe(metrics, "available", performance.now() - startedAt);
 
       return {
         checks: { database: "available" },
         status: "ready",
       };
     } catch {
+      recordDatabaseProbe(
+        metrics,
+        "unavailable",
+        performance.now() - startedAt,
+      );
       return reply.code(503).send({
         checks: { database: "unavailable" },
         status: "not_ready",
@@ -58,4 +65,16 @@ export function buildApi(dependencies: ApiDependencies): FastifyInstance {
   });
 
   return app;
+}
+
+function recordDatabaseProbe(
+  metrics: ReturnType<typeof registerApiObservability>,
+  result: "available" | "unavailable",
+  durationMs: number,
+): void {
+  try {
+    metrics.recordDatabaseProbe({ durationMs, result });
+  } catch {
+    // Health checks reflect the dependency, never telemetry availability.
+  }
 }

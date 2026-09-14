@@ -8,7 +8,9 @@ export {
   authCredentials,
   authRateLimitBuckets,
   authSessions,
+  emailVerificationTokens,
   passwordResetTokens,
+  phoneVerificationChallenges,
 } from "./auth.js";
 export type {
   AuthCredentialRecord,
@@ -16,10 +18,14 @@ export type {
   AuthSessionJsonValue,
   AuthSessionPayload,
   AuthSessionRecord,
+  EmailVerificationTokenRecord,
   NewAuthCredentialRecord,
+  NewEmailVerificationTokenRecord,
   NewAuthSessionRecord,
   NewPasswordResetTokenRecord,
+  NewPhoneVerificationChallengeRecord,
   PasswordResetTokenRecord,
+  PhoneVerificationChallengeRecord,
 } from "./auth.js";
 export {
   MEDIA_ASSET_STATUS_VALUES,
@@ -43,3 +49,97 @@ export type {
   NewMediaAssetRecord,
   NewMediaAssetStorageObjectRecord,
 } from "./media.js";
+export {
+  domainOutboxEvents,
+  OUTBOX_EVENT_STATUS_VALUES,
+  outboxConsumerEffects,
+  outboxEventStatusEnum,
+} from "./outbox.js";
+export {
+  adminMfaChallenges,
+  adminMfaFactorKindEnum,
+  adminMfaFactors,
+  adminMfaPurposeEnum,
+  adminPrivilegedSessions,
+  adminRoleChangeEvents,
+  adminRoleEnum,
+  adminRoleGrants,
+} from "./admin-auth.js";
+export type {
+  AdminMfaChallengeRecord,
+  AdminMfaFactorRecord,
+  AdminPrivilegedSessionRecord,
+  AdminRoleChangeEventRecord,
+  AdminRoleGrantRecord,
+} from "./admin-auth.js";
+export type {
+  DomainOutboxEventRecord,
+  NewDomainOutboxEventRecord,
+  OutboxConsumerEffectRecord,
+} from "./outbox.js";
+export {
+  NOTIFICATION_CHANNEL_VALUES,
+  NOTIFICATION_DELIVERY_STATE_VALUES,
+  NOTIFICATION_PRIORITY_VALUES,
+  notificationChannelEnum,
+  notificationDeliveries,
+  notificationDeliveryStateEnum,
+  notificationPriorityEnum,
+  notifications,
+} from "./notifications.js";
+export type {
+  NewNotificationDeliveryRecord,
+  NewNotificationRecord,
+  NotificationDeliveryRecord,
+  NotificationRecord,
+} from "./notifications.js";
+export {
+  auditActorKindEnum,
+  auditEventCategoryEnum,
+  auditEvents,
+  auditSensitiveAccessPurposeEnum,
+} from "./audit.js";
+export type { AuditEventRecord, NewAuditEventRecord } from "./audit.js";
+export {
+  privacyConsentActionEnum,
+  privacyConsentEvents,
+  privacyConsentPurposes,
+  privacyOptionalConsentPurposeEnum,
+  privacyPolicyKindEnum,
+  privacyPolicyVersions,
+  privacyRequestCases,
+  privacyRequestEvents,
+  privacyRequestStateEnum,
+  privacyRequestTypeEnum,
+  privacyRetentionCategoryEnum,
+  privacyRetentionLaunchStateEnum,
+  privacyRetentionPolicyVersions,
+  privacyReviewStateEnum,
+} from "./privacy.js";
+export {
+  professionTaxonomyActivationEvents,
+  professionTaxonomyReleases,
+  taxonomyAliases,
+  taxonomyAliasKindEnum,
+  taxonomyAliasTargetKindEnum,
+  taxonomyCapabilityCriteria,
+  taxonomyCapabilityLevelEnum,
+  taxonomyContentClassEnum,
+  taxonomyEntryStateEnum,
+  taxonomyProfessions,
+  taxonomyReviewStateEnum,
+  taxonomySpecializations,
+} from "./taxonomy.js";
+export type {
+  ProfessionTaxonomyReleaseRecord,
+  TaxonomyProfessionRecord,
+  TaxonomySpecializationRecord,
+} from "./taxonomy.js";
+export type {
+  PrivacyConsentEventRecord,
+  PrivacyConsentPurposeRecord,
+  PrivacyPolicyVersionRecord,
+  PrivacyRequestCaseRecord,
+  PrivacyRequestEventRecord,
+  PrivacyRetentionPolicyVersionRecord,
+} from "./privacy.js";

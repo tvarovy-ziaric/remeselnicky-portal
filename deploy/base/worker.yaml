@@ -6,8 +6,8 @@ metadata:
     app.kubernetes.io/name: portal-worker
     app.kubernetes.io/part-of: remeselnicky-portal
 spec:
-  # The current bootstrap worker is one-shot. A queue-worker ticket must add its
-  # durable run loop and probes before an overlay scales this above zero.
+  # Keep this bootstrap adapter at zero until a durable production queue is
+  # configured. The worker loop and internal probes are already deployable.
   replicas: 0
   selector:
     matchLabels:
@@ -41,6 +41,20 @@ spec:
                 secretKeyRef:
                   name: portal-runtime-secrets
                   key: SESSION_SECRET
+          ports:
+            - name: monitoring
+              containerPort: 9465
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: monitoring
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: monitoring
+            initialDelaySeconds: 10
+            periodSeconds: 20
           resources:
             requests:
               cpu: 50m
@@ -59,3 +73,18 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: portal-worker
+  labels:
+    app.kubernetes.io/name: portal-worker
+    app.kubernetes.io/part-of: remeselnicky-portal
+spec:
+  selector:
+    app.kubernetes.io/name: portal-worker
+  ports:
+    - name: monitoring
+      port: 9465
+      targetPort: monitoring

@@ -37,10 +37,18 @@ limit drops the signal without changing application behavior. The server attache
 its own deployment context before the central transport receives an admitted
 signal.
 
+## Metrics and health
+
+R0-027 extends this boundary with bounded-cardinality HTTP, database and queue
+metrics plus internal scrape/worker-health endpoints. The metric contract,
+cluster resources, staging critical-channel procedure and runbook links are in
+[`metrics-and-alerting.md`](metrics-and-alerting.md).
+
 ## Later integration
 
 An external collector, retention settings, source-map upload and operational
 access require infrastructure/provider configuration. Those can implement the
 existing transport port; they must preserve the same minimization rules and keep
-source maps private. Metrics, dashboards and actionable alerts are owned by
-R0-027.
+source maps private. Selecting an external alert receiver is likewise deferred
+to the account/credential gate; R0-027 provides the provider-neutral staging
+contract without committing a receiver URL.

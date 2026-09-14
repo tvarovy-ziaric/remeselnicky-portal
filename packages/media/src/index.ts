@@ -7,7 +7,16 @@ export {
   isServerMediaProvenance,
 } from "./model.js";
 export type {
+  CleanDocumentScanEvidence,
+  CompleteDocumentProcessingInput,
   CreateProcessingMediaAssetInput,
+  CompleteImageProcessingInput,
+  DocumentProcessingAssetSource,
+  DocumentProcessingCompletionResult,
+  DocumentProcessingRepository,
+  ImageProcessingAssetSource,
+  ImageProcessingCompletionResult,
+  ImageProcessingRepository,
   MediaAssetRepository,
   MediaAssetProcessingRepository,
   MediaAssetUploadRepository,
@@ -18,6 +27,8 @@ export type {
   MediaProcessingTransitionResult,
   ProcessingMediaAsset,
   ServerMediaProvenance,
+  StoredImageDerivative,
+  StoredDocumentCanonical,
 } from "./model.js";
 export { authorizeMediaUpload } from "./policy.js";
 export {
@@ -31,3 +42,53 @@ export type {
   MediaUploadRejectionCode,
   OrphanedPrivateObjectObserver,
 } from "./upload.js";
+export {
+  IMAGE_CANONICALIZATION_JOB_NAME,
+  IMAGE_PROCESSING_LIMITS,
+  IMAGE_RUNTIME_CAPABILITIES,
+  ImageProcessingRejectedError,
+  canonicalizeImage,
+  createImageCanonicalizationQueueHandler,
+  detectImageSignature,
+} from "./image-processing.js";
+export {
+  asStorageObjectKey,
+  createPrivateMediaDeliveryService,
+  createPublicPortfolioDeliveryService,
+  createServerMediaEntityAccess,
+  PRIVATE_MEDIA_ACCESS_GRANTS,
+  PRIVATE_MEDIA_DOWNLOAD_PATH,
+  PUBLIC_PORTFOLIO_MEDIA_PATH,
+} from "./delivery.js";
+export type {
+  MediaEntityAccessResolver,
+  PrivateMediaAccessGrant,
+  PrivateMediaDeliveryRepository,
+  PrivateMediaDeliverySnapshot,
+  PrivateMediaEndpointResponse,
+  PublicPortfolioDeliveryRepository,
+  PublicPortfolioDerivativeSnapshot,
+  ServerMediaEntityAccess,
+} from "./delivery.js";
+export {
+  DOCUMENT_PROCESSING_LIMITS,
+  DOCUMENT_VALIDATION_JOB_NAME,
+  DocumentProcessingRejectedError,
+  createDocumentValidationQueueHandler,
+  validatePdfDocument,
+} from "./document-processing.js";
+export type {
+  ActiveMalwareScanner,
+  DocumentProcessingEnvironment,
+  DocumentProcessingRejectionCode,
+  DocumentValidationJob,
+  MalwareScanner,
+  MalwareScanVerdict,
+  TestOnlyBypassMalwareScanner,
+  ValidatedPdfDocument,
+} from "./document-processing.js";
+export type {
+  CanonicalizedImage,
+  ImageCanonicalizationJob,
+  ImageProcessingRejectionCode,
+} from "./image-processing.js";

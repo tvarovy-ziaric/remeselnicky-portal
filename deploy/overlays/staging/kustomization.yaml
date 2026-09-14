@@ -5,6 +5,7 @@ resources:
   - ../../base
   - namespace.yaml
   - ingress.yaml
+  - ../../observability/monitoring.yaml
 configMapGenerator:
   - name: portal-runtime-config
     literals:

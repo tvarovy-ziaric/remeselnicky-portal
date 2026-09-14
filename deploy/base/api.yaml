@@ -42,6 +42,8 @@ spec:
           ports:
             - name: http
               containerPort: 3001
+            - name: metrics
+              containerPort: 9464
           readinessProbe:
             httpGet:
               path: /health/ready
@@ -76,6 +78,9 @@ apiVersion: v1
 kind: Service
 metadata:
   name: portal-api
+  labels:
+    app.kubernetes.io/name: portal-api
+    app.kubernetes.io/part-of: remeselnicky-portal
 spec:
   selector:
     app.kubernetes.io/name: portal-api
@@ -83,3 +88,6 @@ spec:
     - name: http
       port: 3001
       targetPort: http
+    - name: metrics
+      port: 9464
+      targetPort: metrics

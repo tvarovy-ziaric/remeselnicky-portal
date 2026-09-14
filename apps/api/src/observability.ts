@@ -4,9 +4,11 @@ import {
   createCentralErrorTracker,
   createLoggerErrorTransport,
   createStructuredLogger,
+  createPortalMetrics,
   sanitizeTelemetryString,
   type CentralErrorTracker,
   type ObservabilityEnvironment,
+  type PortalMetrics,
   type StructuredLogger,
 } from "@portal/observability";
 import type { FastifyInstance, FastifyRequest } from "fastify";
@@ -26,6 +28,7 @@ export interface ApiObservabilityDependencies {
   readonly errorTracker?: CentralErrorTracker;
   readonly frontendErrorAdmission?: FrontendErrorAdmission;
   readonly logger?: StructuredLogger;
+  readonly metrics?: PortalMetrics;
 }
 
 export interface FrontendErrorAdmission {
@@ -91,7 +94,7 @@ interface FrontendErrorBody {
 export function registerApiObservability(
   app: FastifyInstance,
   dependencies?: ApiObservabilityDependencies,
-): void {
+): PortalMetrics {
   const context = dependencies?.context ?? {
     environment: "development",
     releaseRevision: "test",
@@ -112,6 +115,9 @@ export function registerApiObservability(
       transport: createLoggerErrorTransport(logger),
     });
   const createCorrelationId = dependencies?.createCorrelationId ?? randomUUID;
+  const metrics =
+    dependencies?.metrics ??
+    createPortalMetrics({ ...context, service: "api" });
   const requests = new WeakMap<FastifyRequest, RequestTelemetryState>();
 
   app.addHook("onRequest", (request, reply, done) => {
@@ -139,20 +145,31 @@ export function registerApiObservability(
 
   app.addHook("onResponse", (request, reply, done) => {
     const state = requests.get(request);
+    const durationMs =
+      state === undefined
+        ? 0
+        : Math.max(
+            0,
+            Math.round((performance.now() - state.startedAt) * 100) / 100,
+          );
     logger.info("http_request_completed", {
       ...(state === undefined ? {} : { correlationId: state.correlationId }),
-      durationMs:
-        state === undefined
-          ? undefined
-          : Math.max(
-              0,
-              Math.round((performance.now() - state.startedAt) * 100) / 100,
-            ),
+      durationMs,
       method: request.method,
       requestId: request.id,
       route: request.routeOptions.url ?? "unmatched",
       statusCode: reply.statusCode,
     });
+    try {
+      metrics.recordHttp({
+        durationMs,
+        method: request.method,
+        route: request.routeOptions.url,
+        statusCode: reply.statusCode,
+      });
+    } catch {
+      // Metrics are best effort and cannot change an HTTP outcome.
+    }
     requests.delete(request);
     done();
   });
@@ -202,6 +219,8 @@ export function registerApiObservability(
     }
     void reply.code(500).send({ code: "INTERNAL_ERROR" });
   });
+
+  return metrics;
 }
 
 const frontendErrorFields = new Set([

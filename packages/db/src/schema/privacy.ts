@@ -1,0 +1,233 @@
+import { sql } from "drizzle-orm";
+import {
+  boolean,
+  check,
+  char,
+  index,
+  integer,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  unique,
+  uuid,
+} from "drizzle-orm/pg-core";
+
+import {
+  CONSENT_ACTION_VALUES,
+  OPTIONAL_CONSENT_PURPOSE_VALUES,
+  PRIVACY_POLICY_KIND_VALUES,
+  PRIVACY_REQUEST_STATE_VALUES,
+  PRIVACY_REQUEST_TYPE_VALUES,
+  PRIVACY_REVIEW_STATE_VALUES,
+  RETENTION_CATEGORY_VALUES,
+  RETENTION_LAUNCH_STATE_VALUES,
+} from "@portal/privacy";
+
+import { users } from "./user.js";
+
+export const privacyPolicyKindEnum = pgEnum(
+  "privacy_policy_kind",
+  PRIVACY_POLICY_KIND_VALUES,
+);
+export const privacyReviewStateEnum = pgEnum(
+  "privacy_review_state",
+  PRIVACY_REVIEW_STATE_VALUES,
+);
+export const privacyOptionalConsentPurposeEnum = pgEnum(
+  "privacy_optional_consent_purpose",
+  OPTIONAL_CONSENT_PURPOSE_VALUES,
+);
+export const privacyConsentActionEnum = pgEnum(
+  "privacy_consent_action",
+  CONSENT_ACTION_VALUES,
+);
+export const privacyRetentionCategoryEnum = pgEnum(
+  "privacy_retention_category",
+  RETENTION_CATEGORY_VALUES,
+);
+export const privacyRetentionLaunchStateEnum = pgEnum(
+  "privacy_retention_launch_state",
+  RETENTION_LAUNCH_STATE_VALUES,
+);
+export const privacyRequestTypeEnum = pgEnum(
+  "privacy_request_type",
+  PRIVACY_REQUEST_TYPE_VALUES,
+);
+export const privacyRequestStateEnum = pgEnum(
+  "privacy_request_state",
+  PRIVACY_REQUEST_STATE_VALUES,
+);
+
+export const privacyPolicyVersions = pgTable(
+  "privacy_policy_versions",
+  {
+    policyVersionId: uuid("policy_version_id").primaryKey(),
+    policyKind: privacyPolicyKindEnum("policy_kind").notNull(),
+    optionalConsentPurpose: privacyOptionalConsentPurposeEnum(
+      "optional_consent_purpose",
+    ),
+    versionLabel: text("version_label").notNull(),
+    contentSha256: char("content_sha256", { length: 64 }).notNull(),
+    reviewState: privacyReviewStateEnum("review_state").notNull(),
+    effectiveAt: timestamp("effective_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
+    supersedesPolicyVersionId: uuid("supersedes_policy_version_id"),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    unique("privacy_policy_versions_kind_label_unique").on(
+      table.policyKind,
+      table.versionLabel,
+    ),
+    check(
+      "privacy_policy_versions_hash_safe",
+      sql`${table.contentSha256} ~ '^[0-9a-f]{64}$'`,
+    ),
+  ],
+);
+
+export const privacyConsentPurposes = pgTable("privacy_consent_purposes", {
+  purpose: privacyOptionalConsentPurposeEnum("purpose").primaryKey(),
+  purposeCode: text("purpose_code").notNull().unique(),
+  isGenuinelyOptional: boolean("is_genuinely_optional").notNull().default(true),
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const privacyConsentEvents = pgTable(
+  "privacy_consent_events",
+  {
+    eventId: uuid("event_id").primaryKey(),
+    correlationId: uuid("correlation_id").notNull(),
+    subjectUserId: uuid("subject_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    purpose: privacyOptionalConsentPurposeEnum("purpose").notNull(),
+    action: privacyConsentActionEnum("action").notNull(),
+    policyVersionId: uuid("policy_version_id")
+      .notNull()
+      .references(() => privacyPolicyVersions.policyVersionId, {
+        onDelete: "restrict",
+      }),
+    revision: integer("revision").notNull(),
+    occurredAt: timestamp("occurred_at", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    unique("privacy_consent_events_subject_purpose_revision_unique").on(
+      table.subjectUserId,
+      table.purpose,
+      table.revision,
+    ),
+    index("privacy_consent_events_current_idx").on(
+      table.subjectUserId,
+      table.purpose,
+      table.revision,
+    ),
+  ],
+);
+
+export const privacyRetentionPolicyVersions = pgTable(
+  "privacy_retention_policy_versions",
+  {
+    policyVersionId: uuid("policy_version_id").primaryKey(),
+    category: privacyRetentionCategoryEnum("category").notNull(),
+    version: integer("version").notNull(),
+    durationDays: integer("duration_days"),
+    legalReviewState: privacyReviewStateEnum("legal_review_state")
+      .notNull()
+      .default("UNRESOLVED"),
+    launchState: privacyRetentionLaunchStateEnum("launch_state")
+      .notNull()
+      .default("BLOCKED"),
+    rationaleCode: text("rationale_code").notNull(),
+    supersedesPolicyVersionId: uuid("supersedes_policy_version_id"),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    unique("privacy_retention_policy_category_version_unique").on(
+      table.category,
+      table.version,
+    ),
+    index("privacy_retention_policy_current_idx").on(
+      table.category,
+      table.version,
+    ),
+  ],
+);
+
+export const privacyRequestCases = pgTable(
+  "privacy_request_cases",
+  {
+    caseId: uuid("case_id").primaryKey(),
+    subjectUserId: uuid("subject_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    requestType: privacyRequestTypeEnum("request_type").notNull(),
+    receivedAt: timestamp("received_at", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("privacy_request_cases_subject_idx").on(
+      table.subjectUserId,
+      table.receivedAt,
+      table.caseId,
+    ),
+  ],
+);
+
+export const privacyRequestEvents = pgTable(
+  "privacy_request_events",
+  {
+    eventId: uuid("event_id").primaryKey(),
+    correlationId: uuid("correlation_id").notNull(),
+    caseId: uuid("case_id")
+      .notNull()
+      .references(() => privacyRequestCases.caseId, { onDelete: "restrict" }),
+    actorUserId: uuid("actor_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    revision: integer("revision").notNull(),
+    state: privacyRequestStateEnum("state").notNull(),
+    deadlineAt: timestamp("deadline_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
+    actionCode: text("action_code"),
+    occurredAt: timestamp("occurred_at", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    unique("privacy_request_events_case_revision_unique").on(
+      table.caseId,
+      table.revision,
+    ),
+    index("privacy_request_events_current_idx").on(
+      table.caseId,
+      table.revision,
+    ),
+  ],
+);
+
+export type PrivacyPolicyVersionRecord =
+  typeof privacyPolicyVersions.$inferSelect;
+export type PrivacyConsentPurposeRecord =
+  typeof privacyConsentPurposes.$inferSelect;
+export type PrivacyConsentEventRecord =
+  typeof privacyConsentEvents.$inferSelect;
+export type PrivacyRetentionPolicyVersionRecord =
+  typeof privacyRetentionPolicyVersions.$inferSelect;
+export type PrivacyRequestCaseRecord = typeof privacyRequestCases.$inferSelect;
+export type PrivacyRequestEventRecord =
+  typeof privacyRequestEvents.$inferSelect;

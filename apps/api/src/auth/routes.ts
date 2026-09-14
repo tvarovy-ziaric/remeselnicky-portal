@@ -1,3 +1,5 @@
+import { createHash, createHmac } from "node:crypto";
+
 import fastifyCookie from "@fastify/cookie";
 import fastifyCors from "@fastify/cors";
 import fastifyCsrfProtection from "@fastify/csrf-protection";
@@ -8,16 +10,40 @@ import fastifySession from "@fastify/session";
 import {
   AUTH_API_PATHS,
   AUTH_INPUT_LIMITS,
+  type AuthEmailVerificationRequest,
   type AuthLoginRequest,
   type AuthPasswordResetConfirmRequest,
   type AuthPasswordResetRequest,
+  type AuthPhoneVerificationSendRequest,
+  type AuthPhoneVerificationVerifyRequest,
   type AuthRegisterRequest,
   type AuthSessionResponse,
 } from "@portal/contracts";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
+import {
+  registerAdminAuthRoutes,
+  type AdminAuthRouteDependencies,
+} from "../admin-auth/index.js";
 import { createSessionGuard } from "./guard.js";
+import {
+  createEmailVerificationService,
+  InvalidEmailVerificationTokenError,
+  type EmailVerificationDeliveryPort,
+  type EmailVerificationPersistence,
+  type EmailVerificationTokenService,
+} from "./email-verification.js";
 import { createPostgresRateLimitStoreConstructor } from "./rate-limit-store.js";
+import {
+  createPhoneOtpCrypto,
+  createPhoneVerificationService,
+  InvalidPhoneVerificationInputError,
+  normalizeAndValidatePhone,
+  PhoneVerificationDeliveryUnavailableError,
+  type PhoneOtpCrypto,
+  type PhoneVerificationDeliveryPort,
+  type PhoneVerificationPersistence,
+} from "./phone-verification.js";
 import {
   AuthInputError,
   createAuthService,
@@ -35,15 +61,42 @@ import type {
 } from "./types.js";
 
 export interface AuthModuleDependencies {
+  readonly adminAccess?: Pick<AdminAuthRouteDependencies, "service">;
   readonly clock?: () => Date;
   readonly config: AuthRuntimeConfig;
   readonly delivery?: PasswordResetDeliveryPort;
+  readonly emailVerification?: {
+    readonly delivery?: EmailVerificationDeliveryPort;
+    readonly persistence: EmailVerificationPersistence;
+    readonly resendLimit?: number;
+    readonly resendWindowMs?: number;
+    readonly tokenTtlMs?: number;
+    readonly tokens?: EmailVerificationTokenService;
+  };
   readonly eligibility?: RegistrationEligibilityPort;
   readonly hasher?: PasswordHasher;
   readonly persistence: AuthPersistence;
+  readonly phoneVerification?: {
+    readonly crypto?: PhoneOtpCrypto;
+    readonly delivery?: PhoneVerificationDeliveryPort;
+    readonly persistence: PhoneVerificationPersistence;
+  };
   readonly rateLimitStore?: FastifyRateLimitStoreCtor;
   readonly tokens?: ResetTokenService;
 }
+
+const emailVerificationDefaults = Object.freeze({
+  resendLimit: 3,
+  resendWindowMs: 15 * 60 * 1_000,
+  tokenTtlMs: 24 * 60 * 60 * 1_000,
+});
+const phoneVerificationDefaults = Object.freeze({
+  maxAttempts: 5,
+  resendLimit: 3,
+  ttlMs: 10 * 60 * 1_000,
+  verifyLimit: 10,
+  windowMs: 15 * 60 * 1_000,
+});
 
 const denyRegistration: RegistrationEligibilityPort = Object.freeze({
   isEligible: () => Promise.resolve(false),
@@ -140,6 +193,50 @@ async function configureAuthModule(
       : { tokens: dependencies.tokens }),
   });
   const guard = createSessionGuard(dependencies.persistence);
+  if (dependencies.adminAccess !== undefined) {
+    registerAdminAuthRoutes(app, {
+      config,
+      guard,
+      persistence: dependencies.persistence,
+      service: dependencies.adminAccess.service,
+    });
+  }
+  const emailVerification =
+    dependencies.emailVerification === undefined
+      ? undefined
+      : createEmailVerificationService({
+          ...(dependencies.clock === undefined
+            ? {}
+            : { clock: dependencies.clock }),
+          delivery:
+            dependencies.emailVerification.delivery ??
+            unavailableEmailVerificationDelivery,
+          persistence: dependencies.emailVerification.persistence,
+          tokenTtlMs:
+            dependencies.emailVerification.tokenTtlMs ??
+            emailVerificationDefaults.tokenTtlMs,
+          ...(dependencies.emailVerification.tokens === undefined
+            ? {}
+            : { tokens: dependencies.emailVerification.tokens }),
+        });
+  const phoneVerification =
+    dependencies.phoneVerification === undefined
+      ? undefined
+      : createPhoneVerificationService({
+          ...(dependencies.clock === undefined
+            ? {}
+            : { clock: dependencies.clock }),
+          crypto:
+            dependencies.phoneVerification.crypto ??
+            createPhoneOtpCrypto({ pepper: config.sessionSecret }),
+          delivery:
+            dependencies.phoneVerification.delivery ??
+            unavailablePhoneVerificationDelivery,
+          maxAttempts:
+            config.phoneOtpMaxAttempts ?? phoneVerificationDefaults.maxAttempts,
+          persistence: dependencies.phoneVerification.persistence,
+          ttlMs: config.phoneOtpTtlMs ?? phoneVerificationDefaults.ttlMs,
+        });
   const rateLimit = {
     config: {
       rateLimit: {
@@ -181,6 +278,12 @@ async function configureAuthModule(
       }
       await request.session.regenerate();
       request.session.set("authUserId", result.user.id);
+      if (
+        emailVerification !== undefined &&
+        dependencies.emailVerification?.delivery !== undefined
+      ) {
+        await emailVerification.request(result.user.id);
+      }
       return reply
         .code(201)
         .send(sessionResponse(result.user, reply.generateCsrf()));
@@ -268,6 +371,191 @@ async function configureAuthModule(
     },
   );
 
+  if (emailVerification !== undefined) {
+    app.post<{ Body: AuthEmailVerificationRequest }>(
+      AUTH_API_PATHS.emailVerification,
+      {
+        ...rateLimit,
+        onRequest: csrfProtection(app),
+        preHandler: identityRateLimit,
+        schema: { body: emailVerificationSchema },
+      },
+      async (request, reply) => {
+        try {
+          const result = await emailVerification.confirm(request.body.token);
+          if (result === "INVALID") {
+            return reply
+              .code(400)
+              .send({ code: "INVALID_OR_EXPIRED_VERIFICATION" });
+          }
+        } catch (error: unknown) {
+          if (error instanceof InvalidEmailVerificationTokenError) {
+            return reply
+              .code(400)
+              .send({ code: "INVALID_OR_EXPIRED_VERIFICATION" });
+          }
+          throw error;
+        }
+        return reply.code(204).send();
+      },
+    );
+
+    app.post(
+      AUTH_API_PATHS.emailVerificationResend,
+      {
+        ...rateLimit,
+        onRequest: csrfProtection(app),
+      },
+      async (request, reply) => {
+        const actor = await guard.evaluate(request);
+        if (actor.status === "AUTHENTICATION_REQUIRED") {
+          return reply.code(401).send({ code: "AUTHENTICATION_REQUIRED" });
+        }
+        if (actor.status === "ACCOUNT_NOT_ACTIVE") {
+          return reply.code(403).send({ code: "ACCOUNT_NOT_ACTIVE" });
+        }
+        if (dependencies.emailVerification?.delivery === undefined) {
+          return reply.code(503).send({ code: "INTERNAL_ERROR" });
+        }
+
+        const resendLimit =
+          dependencies.emailVerification.resendLimit ??
+          emailVerificationDefaults.resendLimit;
+        const resendWindowMs =
+          dependencies.emailVerification.resendWindowMs ??
+          emailVerificationDefaults.resendWindowMs;
+        const now = dependencies.clock?.() ?? new Date();
+        const consumed = await dependencies.persistence.consumeRateLimit({
+          keyDigest: createHash("sha256")
+            .update(`email-verification-resend\u0000${actor.user.id}`, "utf8")
+            .digest("hex"),
+          limit: resendLimit,
+          now,
+          scope: "email-verification-resend:user",
+          timeWindowMs: resendWindowMs,
+        });
+        if (consumed.current > resendLimit) {
+          return reply.code(429).send({ code: "RATE_LIMITED" });
+        }
+
+        await emailVerification.request(actor.user.id);
+        return reply.code(202).send({ accepted: true });
+      },
+    );
+  }
+
+  if (phoneVerification !== undefined) {
+    app.post<{ Body: AuthPhoneVerificationSendRequest }>(
+      AUTH_API_PATHS.phoneVerificationSend,
+      {
+        ...rateLimit,
+        onRequest: csrfProtection(app),
+        schema: { body: phoneVerificationSendSchema },
+      },
+      async (request, reply) => {
+        const actor = await guard.evaluate(request);
+        if (actor.status === "AUTHENTICATION_REQUIRED") {
+          return reply.code(401).send({ code: "AUTHENTICATION_REQUIRED" });
+        }
+        if (actor.status === "ACCOUNT_NOT_ACTIVE") {
+          return reply.code(403).send({ code: "ACCOUNT_NOT_ACTIVE" });
+        }
+        if (dependencies.phoneVerification?.delivery === undefined) {
+          return reply.code(503).send({ code: "INTERNAL_ERROR" });
+        }
+
+        let normalizedPhone: string;
+        try {
+          normalizedPhone = normalizeAndValidatePhone(request.body.phone);
+        } catch (error: unknown) {
+          if (error instanceof InvalidPhoneVerificationInputError) {
+            return reply.code(400).send({ code: "INVALID_REQUEST" });
+          }
+          throw error;
+        }
+        const limited = await consumePhoneVerificationRateLimits({
+          clock: dependencies.clock ?? (() => new Date()),
+          config,
+          ip: request.ip,
+          persistence: dependencies.persistence,
+          phone: normalizedPhone,
+          purpose: "send",
+          userId: actor.user.id,
+        });
+        if (limited) {
+          return reply.code(429).send({ code: "RATE_LIMITED" });
+        }
+
+        try {
+          const result = await phoneVerification.request({
+            normalizedPhone,
+            userId: actor.user.id,
+          });
+          return reply.code(202).send(result);
+        } catch (error: unknown) {
+          if (error instanceof InvalidPhoneVerificationInputError) {
+            return reply.code(400).send({ code: "INVALID_REQUEST" });
+          }
+          if (error instanceof PhoneVerificationDeliveryUnavailableError) {
+            return reply.code(503).send({ code: "INTERNAL_ERROR" });
+          }
+          throw error;
+        }
+      },
+    );
+
+    app.post<{ Body: AuthPhoneVerificationVerifyRequest }>(
+      AUTH_API_PATHS.phoneVerificationVerify,
+      {
+        ...rateLimit,
+        onRequest: csrfProtection(app),
+        schema: { body: phoneVerificationVerifySchema },
+      },
+      async (request, reply) => {
+        const actor = await guard.evaluate(request);
+        if (actor.status === "AUTHENTICATION_REQUIRED") {
+          return reply.code(401).send({ code: "AUTHENTICATION_REQUIRED" });
+        }
+        if (actor.status === "ACCOUNT_NOT_ACTIVE") {
+          return reply.code(403).send({ code: "ACCOUNT_NOT_ACTIVE" });
+        }
+
+        const limited = await consumePhoneVerificationRateLimits({
+          clock: dependencies.clock ?? (() => new Date()),
+          config,
+          ip: request.ip,
+          persistence: dependencies.persistence,
+          purpose: "verify",
+          userId: actor.user.id,
+        });
+        if (limited) {
+          return reply.code(429).send({ code: "RATE_LIMITED" });
+        }
+
+        try {
+          const result = await phoneVerification.verify({
+            challengeId: request.body.challengeId,
+            otp: request.body.otp,
+            userId: actor.user.id,
+          });
+          if (result === "INVALID") {
+            return reply
+              .code(400)
+              .send({ code: "INVALID_OR_EXPIRED_VERIFICATION" });
+          }
+          return reply.code(204).send();
+        } catch (error: unknown) {
+          if (error instanceof InvalidPhoneVerificationInputError) {
+            return reply
+              .code(400)
+              .send({ code: "INVALID_OR_EXPIRED_VERIFICATION" });
+          }
+          throw error;
+        }
+      },
+    );
+  }
+
   app.setErrorHandler((error: unknown, _request, reply) => {
     const details =
       typeof error === "object" && error !== null
@@ -277,7 +565,11 @@ async function configureAuthModule(
             readonly validation?: unknown;
           })
         : {};
-    if (error instanceof AuthInputError || details.validation !== undefined) {
+    if (
+      error instanceof AuthInputError ||
+      error instanceof InvalidPhoneVerificationInputError ||
+      details.validation !== undefined
+    ) {
       void reply.code(400).send({ code: "INVALID_REQUEST" });
       return;
     }
@@ -302,7 +594,9 @@ function sessionResponse(
     user: {
       accountState: user.accountState,
       adultAttestedAt: user.adultAttestedAt.toISOString(),
+      emailVerified: user.emailVerifiedAt !== null,
       id: user.id,
+      phoneVerified: user.phoneVerifiedAt !== null,
     },
   };
 }
@@ -400,4 +694,102 @@ const resetSchema = {
   required: ["newPassword", "token"],
   type: "object",
 } as const;
-import { createHash } from "node:crypto";
+const emailVerificationSchema = {
+  additionalProperties: false,
+  properties: {
+    token: {
+      maxLength: AUTH_INPUT_LIMITS.verificationTokenMaximumLength,
+      minLength: 32,
+      type: "string",
+    },
+  },
+  required: ["token"],
+  type: "object",
+} as const;
+const phoneVerificationSendSchema = {
+  additionalProperties: false,
+  properties: {
+    phone: {
+      maxLength: AUTH_INPUT_LIMITS.phoneMaximumLength,
+      minLength: 8,
+      type: "string",
+    },
+  },
+  required: ["phone"],
+  type: "object",
+} as const;
+const phoneVerificationVerifySchema = {
+  additionalProperties: false,
+  properties: {
+    challengeId: {
+      maxLength: 36,
+      minLength: 36,
+      pattern:
+        "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+      type: "string",
+    },
+    otp: {
+      maxLength: AUTH_INPUT_LIMITS.phoneOtpLength,
+      minLength: AUTH_INPUT_LIMITS.phoneOtpLength,
+      pattern: "^[0-9]{6}$",
+      type: "string",
+    },
+  },
+  required: ["challengeId", "otp"],
+  type: "object",
+} as const;
+const unavailableEmailVerificationDelivery: EmailVerificationDeliveryPort =
+  Object.freeze({
+    deliver: () =>
+      Promise.reject(new Error("Email-verification delivery is unavailable")),
+  });
+const unavailablePhoneVerificationDelivery: PhoneVerificationDeliveryPort =
+  Object.freeze({
+    deliver: () =>
+      Promise.reject(new Error("Phone-verification delivery is unavailable")),
+  });
+
+async function consumePhoneVerificationRateLimits(input: {
+  readonly clock: () => Date;
+  readonly config: AuthRuntimeConfig;
+  readonly ip: string;
+  readonly persistence: AuthPersistence;
+  readonly phone?: string;
+  readonly purpose: "send" | "verify";
+  readonly userId: string;
+}): Promise<boolean> {
+  const now = input.clock();
+  const windowMs =
+    input.config.phoneOtpWindowMs ?? phoneVerificationDefaults.windowMs;
+  const baseLimit =
+    input.purpose === "send"
+      ? (input.config.phoneOtpResendLimit ??
+        phoneVerificationDefaults.resendLimit)
+      : (input.config.phoneOtpVerifyLimit ??
+        phoneVerificationDefaults.verifyLimit);
+  const identities = [
+    { limit: baseLimit, name: "user", value: input.userId },
+    { limit: baseLimit * 4, name: "ip", value: input.ip },
+    ...(input.phone === undefined
+      ? []
+      : [{ limit: baseLimit, name: "phone", value: input.phone }]),
+  ] as const;
+
+  let limited = false;
+  for (const identity of identities) {
+    const consumed = await input.persistence.consumeRateLimit({
+      keyDigest: createHmac("sha256", input.config.sessionSecret)
+        .update(
+          `portal-phone-rate-v1\0${input.purpose}\0${identity.name}\0${identity.value}`,
+          "utf8",
+        )
+        .digest("hex"),
+      limit: identity.limit,
+      now,
+      scope: `phone-otp-${input.purpose}:${identity.name}`,
+      timeWindowMs: windowMs,
+    });
+    limited ||= consumed.current > identity.limit;
+  }
+  return limited;
+}

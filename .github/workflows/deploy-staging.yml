@@ -40,8 +40,9 @@ jobs:
           set -euo pipefail
           node deploy/scripts/validate.mjs
           [[ "$RELEASE_REVISION" =~ ^[0-9a-f]{40}$ ]]
-          [[ "$IMAGE_PREFIX" =~ ^[A-Za-z0-9][A-Za-z0-9._/:@-]+$ ]]
-          test -n "$REGISTRY_HOST"
+          [[ "$IMAGE_PREFIX" =~ ^[a-z0-9][a-z0-9._:/-]+$ ]]
+          [[ "$REGISTRY_HOST" =~ ^[a-z0-9][a-z0-9.-]*(:[0-9]{1,5})?$ ]]
+          [[ "$IMAGE_PREFIX" == "$REGISTRY_HOST/"* ]]
           test -n "$REGISTRY_USERNAME"
           test -n "$REGISTRY_PASSWORD"
           test -n "$KUBE_CONFIG_STAGING_B64"
@@ -61,6 +62,10 @@ jobs:
               --file "apps/$service/Dockerfile" \
               --tag "$IMAGE_PREFIX/$service:$RELEASE_REVISION" .
             docker push "$IMAGE_PREFIX/$service:$RELEASE_REVISION"
+            digest="$(docker buildx imagetools inspect "$IMAGE_PREFIX/$service:$RELEASE_REVISION" --format '{{json .Manifest.Digest}}' | tr -d '"')"
+            [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+            variable="${service^^}_IMAGE"
+            printf '%s=%s/%s@%s\n' "$variable" "$IMAGE_PREFIX" "$service" "$digest" >> "$GITHUB_ENV"
           done
           docker logout "$REGISTRY_HOST"
 
@@ -69,13 +74,16 @@ jobs:
         run: |
           set -euo pipefail
           kubectl kustomize deploy/overlays/staging > "$RUNNER_TEMP/staging.yaml"
-          sed -i \
-            -e "s#registry.invalid/remeselnicky-portal#$IMAGE_PREFIX#g" \
-            -e "s#release-revision#$RELEASE_REVISION#g" \
-            "$RUNNER_TEMP/staging.yaml"
-          ! grep -Eq 'registry\.invalid|release-revision|kind: Secret' "$RUNNER_TEMP/staging.yaml"
+          node deploy/scripts/release-manifest.mjs \
+            --input "$RUNNER_TEMP/staging.yaml" \
+            --output "$RUNNER_TEMP/staging-rendered.yaml" \
+            --required-images web,api,worker
+          node deploy/scripts/release-manifest.mjs \
+            --input deploy/release/migration-job.yaml \
+            --output "$RUNNER_TEMP/staging-migration.yaml" \
+            --required-images api
 
-      - name: Deploy and smoke-test staging
+      - name: Deploy migration and release candidate to staging
         shell: bash
         run: |
           set -euo pipefail
@@ -84,15 +92,30 @@ jobs:
           chmod 600 "$KUBECONFIG"
           kubectl -n portal-staging get secret portal-runtime-secrets >/dev/null
           kubectl -n portal-staging get secret portal-tls >/dev/null
-          kubectl apply -f "$RUNNER_TEMP/staging.yaml"
+          kubectl -n portal-staging apply -f deploy/base/service-accounts.yaml
+          kubectl -n portal-staging apply -f "$RUNNER_TEMP/staging-migration.yaml"
+          kubectl -n portal-staging wait \
+            --for=condition=complete \
+            "job/portal-migrate-$RELEASE_REVISION" \
+            --timeout=180s
+          {
+            echo "### Staging rollback baseline before $RELEASE_REVISION"
+            kubectl -n portal-staging get deployments \
+              -l app.kubernetes.io/part-of=remeselnicky-portal \
+              -o custom-columns='NAME:.metadata.name,REVISION:.metadata.annotations.portal\.remeselnicky\.dev/release-revision,IMAGE:.spec.template.spec.containers[0].image'
+          } >> "$GITHUB_STEP_SUMMARY"
+          kubectl apply -f "$RUNNER_TEMP/staging-rendered.yaml"
           kubectl -n portal-staging rollout status deployment/portal-api --timeout=180s
           kubectl -n portal-staging rollout status deployment/portal-web --timeout=180s
           kubectl -n portal-staging port-forward service/portal-api 18081:3001 >"$RUNNER_TEMP/api-port-forward.log" 2>&1 &
           API_FORWARD_PID=$!
+          kubectl -n portal-staging port-forward service/portal-api 19464:9464 >"$RUNNER_TEMP/metrics-port-forward.log" 2>&1 &
+          METRICS_FORWARD_PID=$!
           kubectl -n portal-staging port-forward service/portal-web 18080:3000 >"$RUNNER_TEMP/web-port-forward.log" 2>&1 &
           WEB_FORWARD_PID=$!
-          trap 'kill "$API_FORWARD_PID" "$WEB_FORWARD_PID" 2>/dev/null || true' EXIT
-          sleep 3
-          curl --fail --silent --show-error http://127.0.0.1:18081/health/live >/dev/null
-          curl --fail --silent --show-error http://127.0.0.1:18081/health/ready >/dev/null
-          curl --fail --silent --show-error http://127.0.0.1:18080/ >/dev/null
+          trap 'kill "$API_FORWARD_PID" "$METRICS_FORWARD_PID" "$WEB_FORWARD_PID" 2>/dev/null || true' EXIT
+          SMOKE_API_URL=http://127.0.0.1:18081 \
+          SMOKE_METRICS_URL=http://127.0.0.1:19464 \
+          SMOKE_WEB_URL=http://127.0.0.1:18080 \
+          EXPECTED_RELEASE_REVISION="$RELEASE_REVISION" \
+            node deploy/scripts/smoke-release.mjs

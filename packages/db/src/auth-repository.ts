@@ -13,6 +13,8 @@ export interface AuthUser {
   readonly id: string;
   readonly accountState: UserRecord["accountState"];
   readonly adultAttestedAt: Date;
+  readonly emailVerifiedAt: Date | null;
+  readonly phoneVerifiedAt: Date | null;
 }
 
 export interface AuthCredential extends AuthUser {
@@ -97,6 +99,8 @@ interface AuthUserRow {
   readonly id: string;
   readonly accountState: UserRecord["accountState"];
   readonly adultAttestedAt: Date;
+  readonly emailVerifiedAt: Date | null;
+  readonly phoneVerifiedAt: Date | null;
 }
 
 interface AuthCredentialRow extends AuthUserRow {
@@ -165,12 +169,18 @@ export function createAuthRepository(sql: Sql): AuthRepository {
                 ${input.normalizedEmail},
                 ${input.passwordHash}
               FROM inserted_user
-              RETURNING user_id, adult_attested_at
+              RETURNING
+                user_id,
+                adult_attested_at,
+                email_verified_at,
+                phone_verified_at
             )
             SELECT
               inserted_user.id,
               inserted_user.account_state AS "accountState",
-              inserted_credential.adult_attested_at AS "adultAttestedAt"
+              inserted_credential.adult_attested_at AS "adultAttestedAt",
+              inserted_credential.email_verified_at AS "emailVerifiedAt",
+              inserted_credential.phone_verified_at AS "phoneVerifiedAt"
             FROM inserted_user
             JOIN inserted_credential
               ON inserted_credential.user_id = inserted_user.id
@@ -204,6 +214,8 @@ export function createAuthRepository(sql: Sql): AuthRepository {
           auth_credentials.normalized_email AS "normalizedEmail",
           auth_credentials.password_hash AS "passwordHash",
           auth_credentials.adult_attested_at AS "adultAttestedAt",
+          auth_credentials.email_verified_at AS "emailVerifiedAt",
+          auth_credentials.phone_verified_at AS "phoneVerifiedAt",
           auth_credentials.password_changed_at AS "passwordChangedAt"
         FROM auth_credentials
         JOIN users ON users.id = auth_credentials.user_id
@@ -217,7 +229,9 @@ export function createAuthRepository(sql: Sql): AuthRepository {
         SELECT
           users.id,
           users.account_state AS "accountState",
-          auth_credentials.adult_attested_at AS "adultAttestedAt"
+          auth_credentials.adult_attested_at AS "adultAttestedAt",
+          auth_credentials.email_verified_at AS "emailVerifiedAt",
+          auth_credentials.phone_verified_at AS "phoneVerifiedAt"
         FROM users
         JOIN auth_credentials ON auth_credentials.user_id = users.id
         WHERE users.id = ${userId}

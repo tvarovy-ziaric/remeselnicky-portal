@@ -13,18 +13,28 @@ registry, ingress, certificate, database, or secret-management vendor.
 - Supply `portal-tls` in staging and production. Configure the cluster's
   default Ingress class to redirect or reject plaintext HTTP. Replace the
   reserved `.invalid` hosts with environment-specific DNS names before use.
-- Grant CI's staging Kubernetes identity namespace-scoped deployment rights
-  only. It does not need production access.
+- Staging and production clusters must provide Prometheus Operator-compatible
+  `ServiceMonitor`, `PrometheusRule` and `AlertmanagerConfig` CRDs. Supply the
+  namespace-local Secret `portal-critical-alert-channel` with key `webhook-url`
+  through the approved secret manager; the value must not enter Git or rendered
+  release evidence.
+- Grant the staging and production GitHub environments separate,
+  namespace-scoped Kubernetes identities. The staging identity must have no
+  production access; the production identity is released only after a required
+  environment review.
 - Treat `release-revision` and `registry.invalid/remeselnicky-portal` as render
-  placeholders. Every image tag, OCI revision label, runtime config value, and
-  deployment annotation must receive the same immutable Git revision.
+  placeholders. Release workflows resolve pushed images to immutable SHA-256
+  digests. OCI revision labels, runtime config and deployment annotations must
+  all receive the same full Git revision.
 - Build the web image with `DEPLOYMENT_ENV=development|staging|production` for
   its target overlay because `NEXT_PUBLIC_*` values are embedded at build time.
   The staging workflow supplies `staging`; a production go/no-go build must
   explicitly supply `production`.
 
-The worker is intentionally at zero replicas until its durable queue run loop
-exists; the current bootstrap worker exits after one status record.
+The worker remains at zero replicas until a durable production queue adapter is
+configured. Its long-running loop and internal monitoring endpoints are ready;
+when enabled, scrape and health traffic uses service port `9465`. API metrics use
+internal service port `9464`. Neither monitoring port is exposed by Ingress.
 
 ## Staging CI contract
 
@@ -36,18 +46,20 @@ dispatch. Configure the protected `staging` GitHub environment with:
 - secret `KUBE_CONFIG_STAGING_B64`, containing a base64 kubeconfig for the
   namespace-scoped deployment identity.
 
-The workflow builds and pushes revision-tagged OCI images, renders staging,
-checks that placeholders are gone, deploys, waits for rollouts, and runs web/API
-smoke checks through authenticated Kubernetes port forwarding.
+The workflow builds and pushes revision-tagged OCI images, resolves their
+registry digests, renders staging, runs the migration Job, waits for rollouts,
+and checks public web, auth, database readiness and release metrics through
+authenticated Kubernetes port forwarding.
 
 ## Production protection
 
-There is no CI production deployment path. Production requires an explicit
-D30 human go/no-go after required test, security/privacy, backup/restore, and
-observability gates pass. At that point render the production overlay with the
-approved immutable images/revision, review the manifest, and apply it using a
-separate least-privilege production identity. Production credentials must not
-be present in the staging GitHub environment.
+The production workflow is manual-only and bound to the protected `production`
+environment. Configure variable `PRODUCTION_IMAGE_PREFIX` plus environment-only
+secrets `REGISTRY_HOST`, `REGISTRY_USERNAME`, `REGISTRY_PASSWORD` and
+`KUBE_CONFIG_PRODUCTION_B64`. Required reviewers must verify the D30 evidence
+reference and explicit go/no-go before secrets are released. Production
+credentials must not be present in the staging GitHub environment. See
+`docs/release/release-and-rollback.md` for the approval and rollback procedure.
 
 Run static validation with:
 

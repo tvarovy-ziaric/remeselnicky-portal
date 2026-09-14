@@ -21,6 +21,19 @@ COPY packages/db/package.json packages/db/package.json
 COPY packages/domain/package.json packages/domain/package.json
 COPY packages/observability/package.json packages/observability/package.json
 COPY packages/testing/package.json packages/testing/package.json
+COPY packages/admin-auth/package.json packages/admin-auth/package.json
+COPY packages/analytics/package.json packages/analytics/package.json
+COPY packages/audit/package.json packages/audit/package.json
+COPY packages/authorization/package.json packages/authorization/package.json
+COPY packages/commands/package.json packages/commands/package.json
+COPY packages/media/package.json packages/media/package.json
+COPY packages/notifications/package.json packages/notifications/package.json
+COPY packages/outbox/package.json packages/outbox/package.json
+COPY packages/privacy/package.json packages/privacy/package.json
+COPY packages/projections/package.json packages/projections/package.json
+COPY packages/queue/package.json packages/queue/package.json
+COPY packages/storage/package.json packages/storage/package.json
+COPY packages/taxonomy/package.json packages/taxonomy/package.json
 RUN pnpm install --frozen-lockfile
 
 FROM dependencies AS build

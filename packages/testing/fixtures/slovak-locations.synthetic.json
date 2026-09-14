@@ -1,0 +1,22 @@
+{
+  "dataClass": "synthetic",
+  "schemaVersion": 1,
+  "locations": [
+    {
+      "code": "SK:TEST_WEST",
+      "countryCode": "SK",
+      "displayName": "Syntetická slovenská lokalita západ",
+      "kind": "SYNTHETIC_TEST_AREA",
+      "parentCode": null,
+      "synthetic": true
+    },
+    {
+      "code": "SK:TEST_EAST",
+      "countryCode": "SK",
+      "displayName": "Syntetická slovenská lokalita východ",
+      "kind": "SYNTHETIC_TEST_AREA",
+      "parentCode": null,
+      "synthetic": true
+    }
+  ]
+}

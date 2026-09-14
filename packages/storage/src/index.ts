@@ -33,8 +33,17 @@ export interface ObjectStorageAdapter {
     readonly contentType: string;
     readonly key: StorageObjectKey;
   }): Promise<void>;
+  readPrivate(input: {
+    readonly container: string;
+    readonly key: StorageObjectKey;
+    /** Adapter must reject before returning a body larger than this bound. */
+    readonly maximumBytes: number;
+  }): Promise<Uint8Array>;
   issuePrivateDownload(input: {
     readonly container: string;
+    readonly contentDisposition: string;
+    readonly contentType: string;
+    /** The adapter must bind and cryptographically enforce this expiry. */
     readonly expiresAt: Date;
     readonly key: StorageObjectKey;
   }): Promise<URL>;
@@ -57,8 +66,14 @@ export interface ObjectStorageService {
     readonly body: Uint8Array;
     readonly contentType: string;
   }): Promise<StoredObjectReference & { readonly url: URL }>;
+  readPrivateForProcessing(input: {
+    readonly maximumBytes: number;
+    readonly object: StoredObjectReference;
+  }): Promise<Uint8Array>;
   createPrivateDownload(input: {
     readonly authorizationGranted: boolean;
+    readonly contentDisposition?: "attachment" | "inline";
+    readonly contentType?: string;
     readonly object: StoredObjectReference;
     readonly ttlSeconds?: number;
   }): Promise<PrivateDownloadGrant>;
@@ -66,6 +81,11 @@ export interface ObjectStorageService {
 }
 
 const maximumPrivateDownloadTtlSeconds = 300;
+const safePrivateDownloadContentTypes = new Set([
+  "application/octet-stream",
+  "application/pdf",
+  "image/webp",
+]);
 
 export function defineStorageTopology(input: StorageTopology): StorageTopology {
   const privateContainer = input.privateContainer.trim();
@@ -153,6 +173,31 @@ export function createObjectStorageService(input: {
       return { area: storageAreas.publicDerivative, key, url };
     },
 
+    async readPrivateForProcessing(readInput) {
+      if (readInput.object.area !== storageAreas.private) {
+        throw new Error("Only private objects may enter server processing");
+      }
+      if (
+        !Number.isSafeInteger(readInput.maximumBytes) ||
+        readInput.maximumBytes < 1
+      ) {
+        throw new Error("A positive processing byte limit is required");
+      }
+      const body = await input.adapter.readPrivate({
+        container: input.topology.privateContainer,
+        key: readInput.object.key,
+        maximumBytes: readInput.maximumBytes,
+      });
+      if (
+        !(body instanceof Uint8Array) ||
+        body.byteLength === 0 ||
+        body.byteLength > readInput.maximumBytes
+      ) {
+        throw new Error("Private object violates the processing byte boundary");
+      }
+      return body;
+    },
+
     async createPrivateDownload(downloadInput) {
       if (!downloadInput.authorizationGranted) {
         throw new Error("Private object access denied");
@@ -173,9 +218,31 @@ export function createObjectStorageService(input: {
         );
       }
 
+      const contentType =
+        downloadInput.contentType ?? "application/octet-stream";
+      if (!safePrivateDownloadContentTypes.has(contentType)) {
+        throw new Error("Private download content type is not allowlisted");
+      }
+      const disposition = downloadInput.contentDisposition ?? "attachment";
+      if (disposition !== "attachment" && disposition !== "inline") {
+        throw new Error("Private download disposition is invalid");
+      }
+      if (disposition === "inline" && contentType !== "image/webp") {
+        throw new Error("Only canonical images may be rendered inline");
+      }
+      const safeFilename =
+        contentType === "application/pdf"
+          ? "portal-document.pdf"
+          : contentType === "image/webp"
+            ? "portal-image.webp"
+            : "portal-file.bin";
+      const contentDisposition = `${disposition}; filename="${safeFilename}"`;
+
       const expiresAt = new Date(now().valueOf() + ttlSeconds * 1_000);
       const url = await input.adapter.issuePrivateDownload({
         container: input.topology.privateContainer,
+        contentDisposition,
+        contentType,
         expiresAt,
         key: downloadInput.object.key,
       });

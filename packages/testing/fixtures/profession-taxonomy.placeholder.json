@@ -1,0 +1,18 @@
+{
+  "dataClass": "synthetic",
+  "schemaVersion": 1,
+  "professions": [
+    {
+      "code": "TEST:PROFESSION_A",
+      "displayName": "Syntetické remeslo A",
+      "placeholder": true,
+      "synthetic": true
+    },
+    {
+      "code": "TEST:PROFESSION_B",
+      "displayName": "Syntetické remeslo B",
+      "placeholder": true,
+      "synthetic": true
+    }
+  ]
+}

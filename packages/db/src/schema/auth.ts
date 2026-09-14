@@ -39,6 +39,9 @@ export const authCredentials = pgTable(
       .references(() => users.id, { onDelete: "restrict" }),
     normalizedEmail: text("normalized_email").notNull(),
     passwordHash: text("password_hash").notNull(),
+    emailVerifiedAt: timestampWithTimezone("email_verified_at"),
+    normalizedPhone: text("normalized_phone"),
+    phoneVerifiedAt: timestampWithTimezone("phone_verified_at"),
     adultAttestedAt: timestampWithTimezone("adult_attested_at")
       .notNull()
       .defaultNow(),
@@ -60,6 +63,19 @@ export const authCredentials = pgTable(
     check(
       "auth_credentials_password_hash_bounded",
       sql`length(${table.passwordHash}) BETWEEN 20 AND 1024`,
+    ),
+    check(
+      "auth_credentials_email_verified_after_creation",
+      sql`${table.emailVerifiedAt} IS NULL OR ${table.emailVerifiedAt} >= ${table.createdAt}`,
+    ),
+    check(
+      "auth_credentials_phone_verification_complete",
+      sql`(${table.normalizedPhone} IS NULL AND ${table.phoneVerifiedAt} IS NULL)
+        OR (
+          ${table.normalizedPhone} ~ '^\+[1-9][0-9]{7,14}$'
+          AND ${table.phoneVerifiedAt} IS NOT NULL
+          AND ${table.phoneVerifiedAt} >= ${table.createdAt}
+        )`,
     ),
     check(
       "auth_credentials_timestamps_ordered",
@@ -143,6 +159,99 @@ export const passwordResetTokens = pgTable(
   ],
 );
 
+export const emailVerificationTokens = pgTable(
+  "email_verification_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    tokenDigest: char("token_digest", { length: 64 }).notNull(),
+    createdAt: timestampWithTimezone("created_at").notNull().defaultNow(),
+    expiresAt: timestampWithTimezone("expires_at").notNull(),
+    consumedAt: timestampWithTimezone("consumed_at"),
+    invalidatedAt: timestampWithTimezone("invalidated_at"),
+  },
+  (table) => [
+    unique("email_verification_tokens_digest_unique").on(table.tokenDigest),
+    check(
+      "email_verification_tokens_digest_is_sha256",
+      sql`${table.tokenDigest} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "email_verification_tokens_timestamps_ordered",
+      sql`${table.expiresAt} > ${table.createdAt}
+        AND (${table.consumedAt} IS NULL OR ${table.consumedAt} >= ${table.createdAt})
+        AND (${table.invalidatedAt} IS NULL OR ${table.invalidatedAt} >= ${table.createdAt})`,
+    ),
+    check(
+      "email_verification_tokens_one_terminal_state",
+      sql`num_nonnulls(${table.consumedAt}, ${table.invalidatedAt}) <= 1`,
+    ),
+    uniqueIndex("email_verification_tokens_live_user_idx")
+      .on(table.userId)
+      .where(
+        sql`${table.consumedAt} IS NULL AND ${table.invalidatedAt} IS NULL`,
+      ),
+    index("email_verification_tokens_expiry_idx").on(table.expiresAt),
+  ],
+);
+
+export const phoneVerificationChallenges = pgTable(
+  "phone_verification_challenges",
+  {
+    id: uuid("id").primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    normalizedPhone: text("normalized_phone").notNull(),
+    otpDigest: char("otp_digest", { length: 64 }).notNull(),
+    otpSalt: char("otp_salt", { length: 32 }).notNull(),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    maxAttempts: integer("max_attempts").notNull(),
+    createdAt: timestampWithTimezone("created_at").notNull().defaultNow(),
+    expiresAt: timestampWithTimezone("expires_at").notNull(),
+    consumedAt: timestampWithTimezone("consumed_at"),
+    invalidatedAt: timestampWithTimezone("invalidated_at"),
+  },
+  (table) => [
+    check(
+      "phone_verification_challenges_phone_is_e164",
+      sql`${table.normalizedPhone} ~ '^\+[1-9][0-9]{7,14}$'`,
+    ),
+    check(
+      "phone_verification_challenges_digest_is_hmac_sha256",
+      sql`${table.otpDigest} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "phone_verification_challenges_salt_is_128_bit_hex",
+      sql`${table.otpSalt} ~ '^[0-9a-f]{32}$'`,
+    ),
+    check(
+      "phone_verification_challenges_attempts_bounded",
+      sql`${table.maxAttempts} BETWEEN 1 AND 20
+        AND ${table.attemptCount} BETWEEN 0 AND ${table.maxAttempts}`,
+    ),
+    check(
+      "phone_verification_challenges_timestamps_ordered",
+      sql`${table.expiresAt} > ${table.createdAt}
+        AND (${table.consumedAt} IS NULL OR ${table.consumedAt} >= ${table.createdAt})
+        AND (${table.invalidatedAt} IS NULL OR ${table.invalidatedAt} >= ${table.createdAt})`,
+    ),
+    check(
+      "phone_verification_challenges_one_terminal_state",
+      sql`num_nonnulls(${table.consumedAt}, ${table.invalidatedAt}) <= 1`,
+    ),
+    uniqueIndex("phone_verification_challenges_live_user_idx")
+      .on(table.userId)
+      .where(
+        sql`${table.consumedAt} IS NULL AND ${table.invalidatedAt} IS NULL`,
+      ),
+    uniqueIndex("phone_verification_challenges_salt_idx").on(table.otpSalt),
+    index("phone_verification_challenges_expiry_idx").on(table.expiresAt),
+  ],
+);
+
 export const authRateLimitBuckets = pgTable(
   "auth_rate_limit_buckets",
   {
@@ -181,5 +290,13 @@ export type NewAuthSessionRecord = typeof authSessions.$inferInsert;
 export type PasswordResetTokenRecord = typeof passwordResetTokens.$inferSelect;
 export type NewPasswordResetTokenRecord =
   typeof passwordResetTokens.$inferInsert;
+export type EmailVerificationTokenRecord =
+  typeof emailVerificationTokens.$inferSelect;
+export type NewEmailVerificationTokenRecord =
+  typeof emailVerificationTokens.$inferInsert;
 export type AuthRateLimitBucketRecord =
   typeof authRateLimitBuckets.$inferSelect;
+export type PhoneVerificationChallengeRecord =
+  typeof phoneVerificationChallenges.$inferSelect;
+export type NewPhoneVerificationChallengeRecord =
+  typeof phoneVerificationChallenges.$inferInsert;

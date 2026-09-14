@@ -1,0 +1,98 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: portal-api
+  labels:
+    app.kubernetes.io/part-of: remeselnicky-portal
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: portal-api
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: portal-worker
+  labels:
+    app.kubernetes.io/part-of: remeselnicky-portal
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: portal-worker
+  endpoints:
+    - port: monitoring
+      path: /metrics
+      interval: 30s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: portal-operational-alerts
+  labels:
+    app.kubernetes.io/part-of: remeselnicky-portal
+spec:
+  groups:
+    - name: portal.availability
+      rules:
+        - alert: PortalApiUnavailable
+          expr: absent(up{service="portal-api"}) or up{service="portal-api"} == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: Portal API metrics target is unavailable
+            runbook: docs/runbooks/api-or-database-unavailable.md
+        - alert: PortalDatabaseUnavailable
+          expr: max_over_time(portal_database_available{service="api"}[2m]) == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: Portal API readiness cannot reach PostgreSQL
+            runbook: docs/runbooks/api-or-database-unavailable.md
+    - name: portal.queue
+      rules:
+        - alert: PortalQueueTerminalFailure
+          expr: increase(portal_queue_jobs_total{outcome="terminal_failure"}[5m]) > 0
+          labels:
+            severity: critical
+          annotations:
+            summary: A queued operation reached terminal failure
+            runbook: docs/runbooks/queue-terminal-failure.md
+        - alert: PortalQueueLag
+          expr: portal_queue_oldest_pending_age_seconds > 300
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: Queue processing is delayed
+            runbook: docs/runbooks/queue-terminal-failure.md
+---
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: portal-critical-alert-channel
+  labels:
+    app.kubernetes.io/part-of: remeselnicky-portal
+spec:
+  route:
+    receiver: portal-critical-webhook
+    groupBy: [alertname, namespace]
+    groupWait: 30s
+    groupInterval: 5m
+    repeatInterval: 2h
+    matchers:
+      - name: severity
+        value: critical
+  receivers:
+    - name: portal-critical-webhook
+      webhookConfigs:
+        - urlSecret:
+            name: portal-critical-alert-channel
+            key: webhook-url
+          sendResolved: true
+          maxAlerts: 10

@@ -16,6 +16,7 @@ function createAdapter(): {
   issuePrivateDownload: ReturnType<typeof vi.fn>;
   publishDerivative: ReturnType<typeof vi.fn>;
   put: ReturnType<typeof vi.fn>;
+  readPrivate: ReturnType<typeof vi.fn>;
   revokeDerivative: ReturnType<typeof vi.fn>;
 } {
   const issuePrivateDownload = vi.fn(({ key }: { readonly key: string }) =>
@@ -25,6 +26,7 @@ function createAdapter(): {
     Promise.resolve(new URL(`https://cdn.invalid/${key}`)),
   );
   const put = vi.fn(() => Promise.resolve());
+  const readPrivate = vi.fn(() => Promise.resolve(new Uint8Array([1, 2, 3])));
   const revokeDerivative = vi.fn(() => Promise.resolve());
 
   return {
@@ -32,11 +34,13 @@ function createAdapter(): {
       issuePrivateDownload,
       publishDerivative,
       put,
+      readPrivate,
       revokeDerivative,
     },
     issuePrivateDownload,
     publishDerivative,
     put,
+    readPrivate,
     revokeDerivative,
   };
 }
@@ -152,8 +156,50 @@ describe("object storage service", () => {
     ).rejects.toThrow(/between 1 and 300/u);
   });
 
+  it("reads only bounded private objects for trusted processing", async () => {
+    const { adapter, readPrivate } = createAdapter();
+    const service = createObjectStorageService({
+      adapter,
+      now: () => fixedNow,
+      topology,
+      uuid: () => fixedUuid,
+    });
+    const object = await service.storePrivate({
+      body: new Uint8Array([1]),
+      contentType: "image/jpeg",
+    });
+
+    await expect(
+      service.readPrivateForProcessing({ maximumBytes: 10, object }),
+    ).resolves.toEqual(new Uint8Array([1, 2, 3]));
+    expect(readPrivate).toHaveBeenCalledWith({
+      container: "portal-private",
+      key: object.key,
+      maximumBytes: 10,
+    });
+
+    const publicObject = await service.storePublicDerivative({
+      body: new Uint8Array([1]),
+      contentType: "image/webp",
+    });
+    await expect(
+      service.readPrivateForProcessing({
+        maximumBytes: 10,
+        object: publicObject,
+      }),
+    ).rejects.toThrow(/Only private/u);
+
+    readPrivate.mockResolvedValueOnce(new Uint8Array(11));
+    await expect(
+      service.readPrivateForProcessing({ maximumBytes: 10, object }),
+    ).rejects.toThrow(/byte boundary/u);
+    await expect(
+      service.readPrivateForProcessing({ maximumBytes: 0, object }),
+    ).rejects.toThrow(/positive processing byte limit/u);
+  });
+
   it("uses a short-lived private grant and a separately revocable public path", async () => {
-    const { adapter, revokeDerivative } = createAdapter();
+    const { adapter, issuePrivateDownload, revokeDerivative } = createAdapter();
     const service = createObjectStorageService({
       adapter,
       now: () => fixedNow,
@@ -166,6 +212,8 @@ describe("object storage service", () => {
     });
     const grant = await service.createPrivateDownload({
       authorizationGranted: true,
+      contentDisposition: "inline",
+      contentType: "image/webp",
       object: privateObject,
     });
     const derivative = await service.storePublicDerivative({
@@ -174,6 +222,13 @@ describe("object storage service", () => {
     });
 
     expect(grant.expiresAt).toEqual(new Date("2026-09-14T12:01:00.000Z"));
+    expect(issuePrivateDownload).toHaveBeenCalledWith({
+      container: "portal-private",
+      contentDisposition: 'inline; filename="portal-image.webp"',
+      contentType: "image/webp",
+      expiresAt: new Date("2026-09-14T12:01:00.000Z"),
+      key: privateObject.key,
+    });
     expect(derivative.area).toBe(storageAreas.publicDerivative);
     await service.revokePublicDerivative(derivative);
     expect(revokeDerivative).toHaveBeenCalledWith({
@@ -208,5 +263,43 @@ describe("object storage service", () => {
     await expect(service.revokePublicDerivative(privateObject)).rejects.toThrow(
       /Only public/u,
     );
+  });
+
+  it("does not let active or spoofed response content reach a download", async () => {
+    const { adapter, issuePrivateDownload } = createAdapter();
+    const service = createObjectStorageService({
+      adapter,
+      now: () => fixedNow,
+      topology,
+      uuid: () => fixedUuid,
+    });
+    const object = await service.storePrivate({
+      body: new Uint8Array([1]),
+      contentType: "application/pdf",
+    });
+
+    await expect(
+      service.createPrivateDownload({
+        authorizationGranted: true,
+        contentType: "text/html",
+        object,
+      }),
+    ).rejects.toThrow(/not allowlisted/u);
+    await expect(
+      service.createPrivateDownload({
+        authorizationGranted: true,
+        contentDisposition: "attachment\r\nX-Injected: yes" as "attachment",
+        object,
+      }),
+    ).rejects.toThrow(/disposition/u);
+    await expect(
+      service.createPrivateDownload({
+        authorizationGranted: true,
+        contentDisposition: "inline",
+        contentType: "application/pdf",
+        object,
+      }),
+    ).rejects.toThrow(/canonical images/u);
+    expect(issuePrivateDownload).not.toHaveBeenCalled();
   });
 });

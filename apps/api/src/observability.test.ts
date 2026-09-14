@@ -1,5 +1,6 @@
 import {
   createCentralErrorTracker,
+  createPortalMetrics,
   createStructuredLogger,
   type TrackedError,
 } from "@portal/observability";
@@ -22,6 +23,56 @@ afterEach(async () => {
 });
 
 describe("API observability boundary", () => {
+  it("records bounded HTTP and database health metrics without changing responses", async () => {
+    const metrics = createPortalMetrics({ ...context, service: "api" });
+    const app = buildApi({
+      database: { ping: () => Promise.resolve() },
+      observability: {
+        appOrigin: "https://portal.example",
+        context,
+        metrics,
+      },
+    });
+    openApps.push(app);
+
+    const response = await app.inject({ method: "GET", url: "/health/ready" });
+
+    expect(response.statusCode).toBe(200);
+    const output = metrics.render();
+    expect(output).toContain('route="/health/ready"');
+    expect(output).toContain("portal_database_available");
+    expect(output).not.toMatch(/user_?id=/iu);
+    expect(output).not.toMatch(/job_?id=/iu);
+  });
+
+  it("keeps HTTP and readiness outcomes unchanged when metrics fail", async () => {
+    const fail = () => {
+      throw new Error("collector unavailable");
+    };
+    const app = buildApi({
+      database: { ping: () => Promise.resolve() },
+      observability: {
+        appOrigin: "https://portal.example",
+        context,
+        metrics: {
+          contentType: "text/plain; version=0.0.4; charset=utf-8",
+          recordDatabaseProbe: fail,
+          recordHttp: fail,
+          recordQueueEvent: fail,
+          render: () => "",
+          setQueueSnapshot: fail,
+          setWorkerReady: fail,
+        },
+      },
+    });
+    openApps.push(app);
+
+    const response = await app.inject({ method: "GET", url: "/health/ready" });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ status: "ready" });
+  });
+
   it("propagates a safe correlation ID and logs bounded request context", async () => {
     const output: string[] = [];
     const logger = createStructuredLogger({

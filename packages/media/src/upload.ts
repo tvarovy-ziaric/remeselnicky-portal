@@ -76,7 +76,10 @@ export interface ControlledMediaUploadService {
 export interface OrphanedPrivateObjectObserver {
   recordOrphanedPrivateObject(
     input: Readonly<{
-      reason: "METADATA_PERSISTENCE_FAILED";
+      reason:
+        | "DERIVATIVE_PERSISTENCE_FAILED"
+        | "METADATA_PERSISTENCE_FAILED"
+        | "PARTIAL_DERIVATIVE_STORAGE";
       storageObject: Awaited<ReturnType<ObjectStorageService["storePrivate"]>>;
     }>,
   ): Promise<void> | void;

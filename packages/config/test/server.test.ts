@@ -10,7 +10,7 @@ const productionEnvironment = {
     "postgresql://portal:strong-database-password@db.example/portal?sslmode=require",
   PORT: "3001",
   RELEASE_REVISION: "git-a1b2c3d4",
-  SESSION_SECRET: "b0532e6824294ba2ae7689048218f71f8da9e6cc5121ab33",
+  SESSION_SECRET: "s".repeat(48),
 } as const;
 
 describe("server configuration", () => {
@@ -18,6 +18,11 @@ describe("server configuration", () => {
     const config = parseServerConfig(productionEnvironment);
 
     expect(config.environment).toBe("production");
+    expect(config.adminAccess).toEqual({
+      challengeTtlMs: 120_000,
+      privilegedSessionTtlMs: 1_800_000,
+      reauthenticationMaxAgeMs: 300_000,
+    });
     expect(config.port).toBe(3_001);
     expect(config.observability).toEqual({
       environment: "production",
@@ -27,6 +32,11 @@ describe("server configuration", () => {
       cookieName: "__Host-portal.sid",
       cookieSecure: true,
       passwordResetTtlMs: 3_600_000,
+      phoneOtpMaxAttempts: 5,
+      phoneOtpResendLimit: 3,
+      phoneOtpTtlMs: 600_000,
+      phoneOtpVerifyLimit: 10,
+      phoneOtpWindowMs: 900_000,
       rateLimitMax: 10,
       rateLimitWindowMs: 900_000,
       sessionTtlMs: 604_800_000,
@@ -41,21 +51,47 @@ describe("server configuration", () => {
       AUTH_RATE_LIMIT_MAX: "5",
       AUTH_RATE_LIMIT_WINDOW_SECONDS: "120",
       PASSWORD_RESET_TTL_SECONDS: "900",
+      PHONE_OTP_MAX_ATTEMPTS: "4",
+      PHONE_OTP_RESEND_LIMIT: "2",
+      PHONE_OTP_TTL_SECONDS: "300",
+      PHONE_OTP_VERIFY_LIMIT: "8",
+      PHONE_OTP_WINDOW_SECONDS: "600",
       SESSION_TTL_SECONDS: "86400",
+      ADMIN_MFA_CHALLENGE_TTL_SECONDS: "180",
+      ADMIN_PRIVILEGED_SESSION_TTL_SECONDS: "3600",
+      ADMIN_REAUTH_MAX_AGE_SECONDS: "600",
     });
 
     expect(config.auth).toMatchObject({
       passwordResetTtlMs: 900_000,
+      phoneOtpMaxAttempts: 4,
+      phoneOtpResendLimit: 2,
+      phoneOtpTtlMs: 300_000,
+      phoneOtpVerifyLimit: 8,
+      phoneOtpWindowMs: 600_000,
       rateLimitMax: 5,
       rateLimitWindowMs: 120_000,
       sessionTtlMs: 86_400_000,
     });
+    expect(config.adminAccess).toEqual({
+      challengeTtlMs: 180_000,
+      privilegedSessionTtlMs: 3_600_000,
+      reauthenticationMaxAgeMs: 600_000,
+    });
   });
 
   it.each([
+    ["ADMIN_MFA_CHALLENGE_TTL_SECONDS", "59"],
+    ["ADMIN_PRIVILEGED_SESSION_TTL_SECONDS", "43201"],
+    ["ADMIN_REAUTH_MAX_AGE_SECONDS", "29"],
     ["AUTH_RATE_LIMIT_MAX", "0"],
     ["AUTH_RATE_LIMIT_WINDOW_SECONDS", "59"],
     ["PASSWORD_RESET_TTL_SECONDS", "86401"],
+    ["PHONE_OTP_MAX_ATTEMPTS", "21"],
+    ["PHONE_OTP_RESEND_LIMIT", "0"],
+    ["PHONE_OTP_TTL_SECONDS", "59"],
+    ["PHONE_OTP_VERIFY_LIMIT", "101"],
+    ["PHONE_OTP_WINDOW_SECONDS", "3601"],
     ["SESSION_TTL_SECONDS", "not-a-number"],
   ])("rejects unsafe auth setting %s", (field, value) => {
     expect(() =>
@@ -78,6 +114,16 @@ describe("server configuration", () => {
       cookieSecure: false,
       trustProxyHops: 0,
     });
+  });
+
+  it("rejects admin reauthentication windows longer than privileged sessions", () => {
+    expect(() =>
+      parseServerConfig({
+        ...productionEnvironment,
+        ADMIN_PRIVILEGED_SESSION_TTL_SECONDS: "300",
+        ADMIN_REAUTH_MAX_AGE_SECONDS: "301",
+      }),
+    ).toThrow(/ADMIN_REAUTH_MAX_AGE_SECONDS/);
   });
 
   it("fails production startup when a required secret is absent", () => {

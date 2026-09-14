@@ -1,21 +1,116 @@
 import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
+import { createAdminAccessRepository } from "./admin-auth-repository.js";
+import type { AdminAccessRepository } from "@portal/admin-auth";
+import { createAuditRepository } from "./audit-repository.js";
+import type { AuditRepository } from "@portal/audit";
 import {
   createAuthRepository,
   type AuthRepository,
 } from "./auth-repository.js";
 import {
+  createEmailVerificationRepository,
+  type EmailVerificationRepository,
+} from "./email-verification-repository.js";
+import {
   createMediaRepository,
   type MediaRepository,
 } from "./media-repository.js";
+import { createPrivateMediaDeliveryRepository } from "./media-delivery-repository.js";
+import type { PrivateMediaDeliveryRepository } from "@portal/media";
+import {
+  createPhoneVerificationRepository,
+  type PhoneVerificationRepository,
+} from "./phone-verification-repository.js";
+import {
+  createOutboxRepository,
+  type OutboxRepository,
+} from "./outbox-repository.js";
+import {
+  createNotificationRepository,
+  type NotificationRepository,
+} from "./notification-repository.js";
+import { createProfessionTaxonomyRepository } from "./taxonomy-repository.js";
+import type { ProfessionTaxonomyPersistence } from "@portal/taxonomy";
+import { createPrivacyRepository } from "./privacy-repository.js";
+import type { PrivacyRepository } from "@portal/privacy";
 import * as schema from "./schema/index.js";
 
+export {
+  adminMfaChallenges,
+  adminMfaFactorKindEnum,
+  adminMfaFactors,
+  adminMfaPurposeEnum,
+  adminPrivilegedSessions,
+  adminRoleChangeEvents,
+  adminRoleEnum,
+  adminRoleGrants,
+} from "./schema/index.js";
+export {
+  auditActorKindEnum,
+  auditEventCategoryEnum,
+  auditEvents,
+  auditSensitiveAccessPurposeEnum,
+} from "./schema/index.js";
+export type { AuditEventRecord, NewAuditEventRecord } from "./schema/index.js";
+export {
+  privacyConsentActionEnum,
+  privacyConsentEvents,
+  privacyConsentPurposes,
+  privacyOptionalConsentPurposeEnum,
+  privacyPolicyKindEnum,
+  privacyPolicyVersions,
+  privacyRequestCases,
+  privacyRequestEvents,
+  privacyRequestStateEnum,
+  privacyRequestTypeEnum,
+  privacyRetentionCategoryEnum,
+  privacyRetentionLaunchStateEnum,
+  privacyRetentionPolicyVersions,
+  privacyReviewStateEnum,
+} from "./schema/index.js";
+export type {
+  PrivacyConsentEventRecord,
+  PrivacyConsentPurposeRecord,
+  PrivacyPolicyVersionRecord,
+  PrivacyRequestCaseRecord,
+  PrivacyRequestEventRecord,
+  PrivacyRetentionPolicyVersionRecord,
+} from "./schema/index.js";
+export {
+  professionTaxonomyActivationEvents,
+  professionTaxonomyReleases,
+  taxonomyAliases,
+  taxonomyAliasKindEnum,
+  taxonomyAliasTargetKindEnum,
+  taxonomyCapabilityCriteria,
+  taxonomyCapabilityLevelEnum,
+  taxonomyContentClassEnum,
+  taxonomyEntryStateEnum,
+  taxonomyProfessions,
+  taxonomyReviewStateEnum,
+  taxonomySpecializations,
+} from "./schema/index.js";
+export type {
+  ProfessionTaxonomyReleaseRecord,
+  TaxonomyProfessionRecord,
+  TaxonomySpecializationRecord,
+} from "./schema/index.js";
+export type {
+  AdminMfaChallengeRecord,
+  AdminMfaFactorRecord,
+  AdminPrivilegedSessionRecord,
+  AdminRoleChangeEventRecord,
+  AdminRoleGrantRecord,
+} from "./schema/index.js";
 export {
   authCredentials,
   authRateLimitBuckets,
   authSessions,
+  emailVerificationTokens,
   passwordResetTokens,
+  phoneVerificationChallenges,
   USER_ACCOUNT_STATE_VALUES,
   userAccountStateEnum,
   users,
@@ -42,11 +137,15 @@ export type {
   AuthSessionJsonValue,
   AuthSessionPayload,
   AuthSessionRecord,
+  EmailVerificationTokenRecord,
   NewAuthCredentialRecord,
+  NewEmailVerificationTokenRecord,
   NewAuthSessionRecord,
   NewPasswordResetTokenRecord,
+  NewPhoneVerificationChallengeRecord,
   NewUserRecord,
   PasswordResetTokenRecord,
+  PhoneVerificationChallengeRecord,
   UserRecord,
 } from "./schema/index.js";
 export type {
@@ -55,8 +154,41 @@ export type {
   NewMediaAssetRecord,
   NewMediaAssetStorageObjectRecord,
 } from "./schema/index.js";
+export {
+  domainOutboxEvents,
+  OUTBOX_EVENT_STATUS_VALUES,
+  outboxConsumerEffects,
+  outboxEventStatusEnum,
+} from "./schema/index.js";
+export type {
+  DomainOutboxEventRecord,
+  NewDomainOutboxEventRecord,
+  OutboxConsumerEffectRecord,
+} from "./schema/index.js";
+export {
+  NOTIFICATION_CHANNEL_VALUES,
+  NOTIFICATION_DELIVERY_STATE_VALUES,
+  NOTIFICATION_PRIORITY_VALUES,
+  notificationChannelEnum,
+  notificationDeliveries,
+  notificationDeliveryStateEnum,
+  notificationPriorityEnum,
+  notifications,
+} from "./schema/index.js";
+export type {
+  NewNotificationDeliveryRecord,
+  NewNotificationRecord,
+  NotificationDeliveryRecord,
+  NotificationRecord,
+} from "./schema/index.js";
 
 export { createAuthRepository } from "./auth-repository.js";
+export { createAdminAccessRepository } from "./admin-auth-repository.js";
+export type { AdminAccessRepository } from "@portal/admin-auth";
+export { createAuditRepository } from "./audit-repository.js";
+export type { AuditRepository } from "@portal/audit";
+export { createPrivacyRepository } from "./privacy-repository.js";
+export type { PrivacyRepository } from "@portal/privacy";
 export type {
   AuthCredential,
   AuthRepository,
@@ -71,13 +203,44 @@ export type {
   RegisterAuthUserResult,
   SaveAuthSessionInput,
 } from "./auth-repository.js";
+export { createEmailVerificationRepository } from "./email-verification-repository.js";
+export type {
+  ConsumeEmailVerificationResult,
+  EmailVerificationRepository,
+  IssueEmailVerificationInput,
+  IssueEmailVerificationResult,
+} from "./email-verification-repository.js";
+export { createPhoneVerificationRepository } from "./phone-verification-repository.js";
+export type {
+  IssuePhoneVerificationInput,
+  IssuePhoneVerificationResult,
+  PhoneVerificationDigestMaterial,
+  PhoneVerificationRepository,
+  VerifyPhoneOtpResult,
+} from "./phone-verification-repository.js";
 export { createMediaRepository } from "./media-repository.js";
+export { createPrivateMediaDeliveryRepository } from "./media-delivery-repository.js";
+export type { PrivateMediaDeliveryRepository } from "@portal/media";
 export type {
   CreateProcessingMediaAssetInput,
   MediaRepository,
   MediaProcessingTransitionResult,
   ProcessingMediaAsset,
 } from "./media-repository.js";
+export { createOutboxRepository } from "./outbox-repository.js";
+export type {
+  OutboxBacklogSnapshot,
+  OutboxDatabaseTransaction,
+  OutboxRepository,
+} from "./outbox-repository.js";
+export { createNotificationRepository } from "./notification-repository.js";
+export type {
+  NotificationDeliverySnapshot,
+  NotificationListOptions,
+  NotificationRepository,
+} from "./notification-repository.js";
+export { createProfessionTaxonomyRepository } from "./taxonomy-repository.js";
+export type { ProfessionTaxonomyPersistence } from "@portal/taxonomy";
 
 export {
   createPostgresMigrationStore,
@@ -107,7 +270,16 @@ export interface DatabaseClient extends DatabaseHealthProbe {
    */
   readonly query: PostgresJsDatabase<typeof schema>;
   readonly auth: AuthRepository;
+  readonly adminAccess: AdminAccessRepository;
+  readonly audit: AuditRepository;
+  readonly emailVerification: EmailVerificationRepository;
   readonly media: MediaRepository;
+  readonly privateMediaDelivery: PrivateMediaDeliveryRepository;
+  readonly notifications: NotificationRepository;
+  readonly outbox: OutboxRepository;
+  readonly phoneVerification: PhoneVerificationRepository;
+  readonly professionTaxonomy: ProfessionTaxonomyPersistence;
+  readonly privacy: PrivacyRepository;
   close(): Promise<void>;
 }
 
@@ -146,14 +318,32 @@ export function createDatabase(
   });
   const query = drizzle(sql, { schema });
   const auth = createAuthRepository(sql);
+  const adminAccess = createAdminAccessRepository(sql);
+  const audit = createAuditRepository(sql);
+  const emailVerification = createEmailVerificationRepository(sql);
   const media = createMediaRepository(sql);
+  const privateMediaDelivery = createPrivateMediaDeliveryRepository(sql);
+  const notifications = createNotificationRepository(sql);
+  const outbox = createOutboxRepository(sql);
+  const phoneVerification = createPhoneVerificationRepository(sql);
+  const professionTaxonomy = createProfessionTaxonomyRepository(sql);
+  const privacy = createPrivacyRepository(sql);
   const health = createDatabaseHealthProbe(async () => {
     await sql`select 1 as health`;
   });
 
   return Object.freeze({
+    adminAccess,
+    audit,
     auth,
+    emailVerification,
     media,
+    privateMediaDelivery,
+    notifications,
+    outbox,
+    phoneVerification,
+    professionTaxonomy,
+    privacy,
     query,
     ping(): Promise<void> {
       return health.ping();
