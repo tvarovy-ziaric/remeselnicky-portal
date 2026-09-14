@@ -596,7 +596,8 @@ async function runAdminRevocationRaces(
         WHERE user_id = ${fixture.adminId} AND revoked_at IS NULL FOR UPDATE
       `;
       return transaction`
-        UPDATE admin_role_grants SET revoked_at = clock_timestamp()
+        UPDATE admin_role_grants SET revoked_at = clock_timestamp(),
+          revoked_by_user_id = ${fixture.adminId}
         WHERE user_id = ${fixture.adminId} AND revoked_at IS NULL
       `;
     }),
