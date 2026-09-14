@@ -1,6 +1,7 @@
 import type {
   PublicCraftsmanProfile,
   PublicCraftsmanProfilePersistence,
+  PortfolioProjectId,
 } from "@portal/domain";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -21,6 +22,16 @@ describe("public craftsman profile route", () => {
       exactHomeAddress: "Tajná 12",
       rawCompletenessPercent: 100,
       credentialEvidence: { storageKey: "private/key", sha256: "a".repeat(64) },
+      portfolio: profile().portfolio.map((project) => ({
+        ...project,
+        customerName: "Neverejný zákazník",
+        exactAddress: "Tajná 12",
+        photos: project.photos.map((photo) => ({
+          ...photo,
+          storageKey: "private/photo.webp",
+          sha256: "b".repeat(64),
+        })),
+      })),
     } as unknown as PublicCraftsmanProfile;
     const app = apiWith(repository(leaked));
     const response = await app.inject({
@@ -33,10 +44,10 @@ describe("public craftsman profile route", () => {
     expect(response.headers["x-robots-tag"]).toBe("index, follow");
     expect(response.json()).toMatchObject({
       identity: { primaryName: "Majster Jano" },
-      portfolio: [],
+      portfolio: [{ projectId: "83000000-0000-4000-8000-000000000002" }],
     });
     expect(response.body).not.toMatch(
-      /owner@example|Tajná|completeness|storageKey|sha256|private\/key/iu,
+      /owner@example|Tajná|Neverejný|completeness|storageKey|sha256|private\/key/iu,
     );
   });
 
@@ -117,7 +128,43 @@ function profile(): PublicCraftsmanProfile {
       verifiedWorkCount: 0,
     },
     callToAction: { kind: "PLATFORM_JOB_REQUEST" },
-    portfolio: [],
+    portfolio: [
+      {
+        projectId: "83000000-0000-4000-8000-000000000002" as PortfolioProjectId,
+        title: "Dubová knižnica",
+        shortDescription: "Výroba knižnice na mieru.",
+        provenance: {
+          kind: "SELF_DECLARED",
+          evidenceStatus: "UNVERIFIED",
+        },
+        contribution: null,
+        materialsAndTechnologies: "Masívny dub",
+        problem: null,
+        solution: null,
+        duration: { value: 2, unit: "WEEKS" },
+        indicativePrice: {
+          currency: "EUR",
+          minCents: 120_000,
+          maxCents: 150_000,
+        },
+        approximateLocation: {
+          municipalityCode: "SK0101528595",
+          districtCode: "SK0101",
+        },
+        professions: [{ code: "PROF:CARPENTER", label: "Stolár" }],
+        skills: [],
+        specializations: [],
+        photos: [
+          {
+            mediaAssetId: "83000000-0000-4000-8000-000000000003",
+            phase: "AFTER",
+            displayOrder: 1,
+            width: 1200,
+            height: 900,
+          },
+        ],
+      },
+    ],
     skills: [],
     specializations: [],
     indicativePricing: [],

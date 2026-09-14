@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   R1_OWNER_ACTIONS,
   R1_OWNER_BOUNDARY_ACTORS,
+  R1_OWNER_COMMAND_ACCEPTED_OUTCOMES,
   R1_OWNER_SURFACES,
   R1_PORTFOLIO_DELIVERY_SCENARIOS,
   R1_PRIVILEGED_REVIEW_ACTORS,
@@ -89,6 +90,30 @@ describe("R1 supply-side authorization/privacy matrix", () => {
           : 404;
     await expect(verifyR1SupplySideMatrix(adapter)).rejects.toThrow(/404/u);
   });
+
+  it("rejects unknown, stale and invalid owner-command outcomes", async () => {
+    for (const outcome of ["UNKNOWN", "STALE_REVISION", "INVALID_INPUT"]) {
+      const adapter = mutableAdapter();
+      adapter.ownerCommandOutcome = () => outcome;
+      await expect(verifyR1SupplySideMatrix(adapter)).rejects.toThrow(
+        /unaccepted outcome/u,
+      );
+    }
+  });
+
+  it("rejects race evidence that does not contain exactly two attempts", async () => {
+    const adapter = mutableAdapter();
+    adapter.raceOutcomes = ["APPLIED"];
+    await expect(verifyR1SupplySideMatrix(adapter)).rejects.toThrow(/race/u);
+  });
+
+  it("requires a real authorized outcome for positive privileged probes", async () => {
+    const adapter = mutableAdapter();
+    adapter.reviewOutcome = () => "APPLIED";
+    await expect(verifyR1SupplySideMatrix(adapter)).rejects.toThrow(
+      /AUTHORIZED authorizer result/u,
+    );
+  });
 });
 
 interface MutableAdapter extends R1SupplySideMatrixAdapter {
@@ -96,8 +121,11 @@ interface MutableAdapter extends R1SupplySideMatrixAdapter {
   publicBody: unknown;
   publicStatus: (scenario: string) => number;
   raceEffectCount: number;
+  raceOutcomes: string[];
   reviewDecision: (actor: string) => boolean;
+  reviewOutcome: (actor: string) => string;
   ownerDecision: (actor: string) => boolean;
+  ownerCommandOutcome: (surface: string) => string;
 }
 
 function validAdapter(): R1SupplySideMatrixAdapter {
@@ -112,9 +140,28 @@ function mutableAdapter(): MutableAdapter {
     publicBody: publicProfileBody(),
     publicStatus: (scenario) => (scenario === "PUBLIC_APPROVED" ? 200 : 404),
     raceEffectCount: 1,
+    raceOutcomes: ["APPLIED", "DEDUPLICATED"],
     reviewDecision: (actor) => actor === "MFA_CAPABILITY_ACTOR",
-    probeOwnerBoundary({ actor }) {
-      return Promise.resolve({ allowed: adapter.ownerDecision(actor) });
+    reviewOutcome: (actor) =>
+      actor === "MFA_CAPABILITY_ACTOR"
+        ? "AUTHORIZED"
+        : "AUTHENTICATION_REQUIRED",
+    ownerCommandOutcome: (surface) =>
+      R1_OWNER_COMMAND_ACCEPTED_OUTCOMES[
+        surface as keyof typeof R1_OWNER_COMMAND_ACCEPTED_OUTCOMES
+      ][0],
+    probeOwnerBoundary({ action, actor, surface }) {
+      const allowed = adapter.ownerDecision(actor);
+      return Promise.resolve({
+        allowed,
+        outcome:
+          action === "OWNER_COMMAND" && allowed
+            ? adapter.ownerCommandOutcome(surface)
+            : allowed
+              ? "FOUND"
+              : "NOT_FOUND",
+        payload: allowed ? undefined : { code: "NOT_FOUND" },
+      });
     },
     probePortfolioDelivery(scenario) {
       return Promise.resolve({
@@ -122,7 +169,12 @@ function mutableAdapter(): MutableAdapter {
       });
     },
     probePrivilegedReview({ actor }) {
-      return Promise.resolve({ allowed: adapter.reviewDecision(actor) });
+      const allowed = adapter.reviewDecision(actor);
+      return Promise.resolve({
+        allowed,
+        outcome: adapter.reviewOutcome(actor),
+        payload: allowed ? undefined : { status: "AUTHORIZATION_DENIED" },
+      });
     },
     readPublicProfile(scenario) {
       const publicProfile = scenario === "PUBLIC_APPROVED";
@@ -143,7 +195,10 @@ function mutableAdapter(): MutableAdapter {
         },
         idempotency: {
           effectCount: adapter.raceEffectCount,
-          outcomes: ["APPLIED", "DEDUPLICATED"],
+          outcomes: adapter.raceOutcomes as [
+            "APPLIED" | "DEDUPLICATED" | "DENIED",
+            "APPLIED" | "DEDUPLICATED" | "DENIED",
+          ],
           retryOutcome: "DEDUPLICATED",
         },
       });

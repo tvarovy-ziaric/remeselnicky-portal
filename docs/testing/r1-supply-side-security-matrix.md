@@ -25,18 +25,39 @@ never treated as private-data or review authority.
 - competing revision commands have one applied effect and one stale result;
   identical idempotent commands have one effect and deterministic replay.
 
+Owner-command success is not inferred from “anything other than denial”. Each
+surface declares its accepted real repository outcome. Commands deliberately
+change fixture state and require `APPLIED` (or `UPDATED` for the profile), except
+the one-photo reorder and already-public visibility commands, whose only valid
+fixture result is the documented `UNCHANGED`. Stale, invalid and unknown
+statuses fail the suite.
+
 The public payload is checked against the explicit R1 profile field allowlist.
-Every returned proof is also scanned for fixture markers and forbidden field
-families, including email, phone, home/exact address or coordinates, storage
-keys, content hashes, credential evidence, session provenance and internal
-review/risk metadata. Probe adapters should return only bounded proof metadata,
-not private owner payloads.
+Actual public/portfolio DTOs and denial DTOs are scanned for fixture markers and
+forbidden field families, including email, phone, home/exact address or
+coordinates, storage keys, content hashes, credential evidence, session
+provenance and internal review/risk metadata. Authorized owner/admin DTOs remain
+server-private and are not incorrectly required to satisfy a public allowlist;
+their probes return only the real bounded repository/authorizer status needed as
+evidence.
 
 Here, `SUSPENDED` is not an unrelated suspended account. Owner probes suspend
 the actual profile owner around the operation and restore it in `finally`;
 privileged probes do the same to the actual MFA/capability reviewer while
 reusing that reviewer's real privileged session. This proves that account-state
 revocation overrides authority which would otherwise be valid.
+
+Positive review probes call the real DB-backed admin authorizer with a recent
+MFA session and the exact profile- or credential-review capability. Role-only
+fixtures intentionally have no privileged session and therefore expect
+`AUTHENTICATION_REQUIRED`, not a fabricated capability result. The current role
+model grants both review capabilities together to `ADMIN`, so it cannot create
+a live admin session missing only one of those two review capabilities.
+
+Both race axes release exactly two operations through
+`runConcurrentAttempts`' synchronized barrier. The evidence type is a two-item
+tuple and the verifier also rejects malformed runtime adapters whose result
+length is not exactly two.
 
 ## PostgreSQL adapter
 

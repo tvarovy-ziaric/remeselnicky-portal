@@ -71,6 +71,49 @@ interface CredentialRow {
   readonly professionCode: string;
 }
 
+interface PortfolioProjectRow {
+  readonly contribution: string | null;
+  readonly districtCode: string | null;
+  readonly durationUnit: "DAYS" | "WEEKS" | "MONTHS" | null;
+  readonly durationValue: number | null;
+  readonly indicativePriceMaxCents: number | string | null;
+  readonly indicativePriceMinCents: number | string | null;
+  readonly materialsAndTechnologies: string | null;
+  readonly municipalityCode: string | null;
+  readonly problem: string | null;
+  readonly projectId: string;
+  readonly shortDescription: string;
+  readonly solution: string | null;
+  readonly title: string;
+}
+
+interface PortfolioPhotoRow {
+  readonly canonicalHeight: number;
+  readonly canonicalWidth: number;
+  readonly displayOrder: number;
+  readonly mediaAssetId: string;
+  readonly phase: "BEFORE" | "PROGRESS" | "AFTER" | "OTHER";
+  readonly projectId: string;
+}
+
+interface PortfolioProfessionRow {
+  readonly code: string;
+  readonly label: string;
+  readonly projectId: string;
+}
+
+interface PortfolioSkillRow {
+  readonly canonicalCode: string | null;
+  readonly label: string;
+  readonly projectId: string;
+}
+
+interface PortfolioSpecializationRow {
+  readonly code: string;
+  readonly label: string;
+  readonly projectId: string;
+}
+
 export function createPublicCraftsmanProfileRepository(
   sql: Sql,
 ): PublicCraftsmanProfilePersistence {
@@ -227,6 +270,88 @@ async function findInSnapshot(
       AND (claim.expires_on IS NULL OR claim.expires_on >= CURRENT_DATE)
     ORDER BY claim.created_at, claim.id
   `;
+  const portfolioProjects = await sql<PortfolioProjectRow[]>`
+    SELECT project.portfolio_project_id AS "projectId", project.title,
+      project.short_description AS "shortDescription", project.contribution,
+      project.materials_and_technologies AS "materialsAndTechnologies",
+      project.problem, project.solution, project.duration_value AS "durationValue",
+      project.duration_unit AS "durationUnit",
+      project.indicative_price_min_cents AS "indicativePriceMinCents",
+      project.indicative_price_max_cents AS "indicativePriceMaxCents",
+      project.municipality_code AS "municipalityCode",
+      project.district_code AS "districtCode"
+    FROM current_public_portfolio_projects project
+    LEFT JOIN current_featured_project_candidates featured
+      ON featured.craftsman_profile_id = project.craftsman_profile_id
+      AND featured.portfolio_project_id = project.portfolio_project_id
+    WHERE project.craftsman_profile_id = ${profileId}
+      AND project.provenance_kind = 'SELF_DECLARED'
+      AND project.evidence_status = 'UNVERIFIED'
+    ORDER BY CASE WHEN featured.portfolio_project_id IS NULL THEN 1 ELSE 0 END,
+      featured.position NULLS LAST, project.portfolio_project_id
+  `;
+  const portfolioPhotos = await sql<PortfolioPhotoRow[]>`
+    SELECT photo.portfolio_project_id AS "projectId",
+      photo.media_asset_id AS "mediaAssetId", photo.phase,
+      photo.display_order AS "displayOrder",
+      photo.canonical_width AS "canonicalWidth",
+      photo.canonical_height AS "canonicalHeight"
+    FROM current_public_portfolio_project_photos photo
+    WHERE photo.craftsman_profile_id = ${profileId}
+    ORDER BY photo.portfolio_project_id, photo.display_order, photo.media_asset_id
+  `;
+  const portfolioProfessions = await sql<PortfolioProfessionRow[]>`
+    SELECT public_project.portfolio_project_id AS "projectId",
+      profession.profession_code AS code, taxonomy.label_sk AS label
+    FROM current_public_portfolio_projects public_project
+    JOIN portfolio_projects project ON project.id = public_project.portfolio_project_id
+    JOIN current_craftsman_professions profession
+      ON profession.id = ANY(project.profession_ids)
+      AND profession.craftsman_profile_id = public_project.craftsman_profile_id
+      AND profession.state = 'ACTIVE'
+    JOIN taxonomy_professions taxonomy
+      ON taxonomy.release_id = profession.taxonomy_release_id
+      AND taxonomy.profession_code = profession.profession_code
+    WHERE public_project.craftsman_profile_id = ${profileId}
+    ORDER BY public_project.portfolio_project_id,
+      array_position(project.profession_ids, profession.id), profession.id
+  `;
+  const portfolioSkills = await sql<PortfolioSkillRow[]>`
+    SELECT public_project.portfolio_project_id AS "projectId",
+      COALESCE(skill.mapped_canonical_skill_code,
+        CASE WHEN skill.identity_kind = 'CANONICAL'
+          THEN skill.canonical_skill_code END) AS "canonicalCode",
+      CASE WHEN skill.identity_kind = 'CANONICAL'
+        THEN catalog.label_sk ELSE skill.retained_custom_text END AS label
+    FROM current_public_portfolio_projects public_project
+    JOIN portfolio_projects project ON project.id = public_project.portfolio_project_id
+    JOIN current_craftsman_skills skill
+      ON skill.id = ANY(project.skill_ids)
+      AND skill.craftsman_profile_id = public_project.craftsman_profile_id
+      AND skill.state = 'ACTIVE'
+    LEFT JOIN skill_catalog_skills catalog
+      ON catalog.release_id = skill.skill_catalog_release_id
+      AND catalog.skill_code = skill.canonical_skill_code
+    WHERE public_project.craftsman_profile_id = ${profileId}
+    ORDER BY public_project.portfolio_project_id,
+      array_position(project.skill_ids, skill.id), skill.id
+  `;
+  const portfolioSpecializations = await sql<PortfolioSpecializationRow[]>`
+    SELECT public_project.portfolio_project_id AS "projectId",
+      specialization.specialization_code AS code, taxonomy.label_sk AS label
+    FROM current_public_portfolio_projects public_project
+    JOIN portfolio_projects project ON project.id = public_project.portfolio_project_id
+    JOIN current_craftsman_specializations specialization
+      ON specialization.id = ANY(project.specialization_ids)
+      AND specialization.craftsman_profile_id = public_project.craftsman_profile_id
+      AND specialization.state = 'ACTIVE'
+    JOIN taxonomy_specializations taxonomy
+      ON taxonomy.release_id = specialization.taxonomy_release_id
+      AND taxonomy.specialization_code = specialization.specialization_code
+    WHERE public_project.craftsman_profile_id = ${profileId}
+    ORDER BY public_project.portfolio_project_id,
+      array_position(project.specialization_ids, specialization.id), specialization.id
+  `;
 
   const candidate: PublicCraftsmanProfileCandidate = {
     profileId,
@@ -261,6 +386,54 @@ async function findInSnapshot(
       reviewCount: 0,
       verifiedWorkCount: 0,
     },
+    portfolio: portfolioProjects.map((project) => ({
+      projectId: project.projectId,
+      title: project.title,
+      shortDescription: project.shortDescription,
+      provenance: { kind: "SELF_DECLARED", evidenceStatus: "UNVERIFIED" },
+      contribution: project.contribution,
+      materialsAndTechnologies: project.materialsAndTechnologies,
+      problem: project.problem,
+      solution: project.solution,
+      duration:
+        project.durationValue === null || project.durationUnit === null
+          ? null
+          : { value: project.durationValue, unit: project.durationUnit },
+      indicativePrice:
+        project.indicativePriceMinCents === null ||
+        project.indicativePriceMaxCents === null
+          ? null
+          : {
+              currency: "EUR",
+              minCents: safeInteger(project.indicativePriceMinCents),
+              maxCents: safeInteger(project.indicativePriceMaxCents),
+            },
+      approximateLocation:
+        project.municipalityCode === null || project.districtCode === null
+          ? null
+          : {
+              municipalityCode: project.municipalityCode,
+              districtCode: project.districtCode,
+            },
+      professions: portfolioProfessions
+        .filter(({ projectId }) => projectId === project.projectId)
+        .map(({ code, label }) => ({ code, label })),
+      skills: portfolioSkills
+        .filter(({ projectId }) => projectId === project.projectId)
+        .map(({ canonicalCode, label }) => ({ canonicalCode, label })),
+      specializations: portfolioSpecializations
+        .filter(({ projectId }) => projectId === project.projectId)
+        .map(({ code, label }) => ({ code, label })),
+      photos: portfolioPhotos
+        .filter(({ projectId }) => projectId === project.projectId)
+        .map((photo) => ({
+          mediaAssetId: photo.mediaAssetId,
+          phase: photo.phase,
+          displayOrder: photo.displayOrder,
+          width: photo.canonicalWidth,
+          height: photo.canonicalHeight,
+        })),
+    })),
     skills: skills.map((skill) => ({
       canonicalCode: skill.canonicalCode,
       declared: { label: skill.label, source: "SELF_DECLARED" },

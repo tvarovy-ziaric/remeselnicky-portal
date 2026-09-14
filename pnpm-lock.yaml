@@ -89,6 +89,9 @@ importers:
       '@portal/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@portal/media':
+        specifier: workspace:*
+        version: link:../../packages/media
       '@portal/observability':
         specifier: workspace:*
         version: link:../../packages/observability

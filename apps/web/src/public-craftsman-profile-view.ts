@@ -46,3 +46,31 @@ export function formatEurCents(amountCents: number): string {
     style: "currency",
   }).format(amountCents / 100);
 }
+
+export function formatIndicativeEurRange(
+  minCents: number,
+  maxCents: number,
+): string {
+  return minCents === maxCents
+    ? formatEurCents(minCents)
+    : `${formatEurCents(minCents)} – ${formatEurCents(maxCents)}`;
+}
+
+export function portfolioDurationUnitLabel(unit: string): string {
+  return { DAYS: "dní", MONTHS: "mesiacov", WEEKS: "týždňov" }[unit] ?? unit;
+}
+
+export function portfolioPhotoPhaseLabel(phase: string): string {
+  return (
+    {
+      AFTER: "po realizácii",
+      BEFORE: "pred realizáciou",
+      OTHER: "ďalší záber",
+      PROGRESS: "priebeh realizácie",
+    }[phase] ?? phase
+  );
+}
+
+export function publicPortfolioMediaPath(mediaAssetId: string): string {
+  return `/v1/public/media/${encodeURIComponent(mediaAssetId)}`;
+}

@@ -41,20 +41,33 @@ or domain, exact-address labels, postal-code shape, control characters, and
 secret markers. An unsafe legacy value makes the entire profile unavailable;
 it is never partially redacted into ambiguous public content.
 
+Public portfolio projects come only from the current `PUBLIC`,
+`SELF_DECLARED`/`UNVERIFIED` 0028 projection. Each project exposes allowlisted
+text, optional duration and non-contractual EUR-cent range, coarse municipality
+and district codes, current safe profession/skill/specialization labels, and
+ordered public photo metadata with the opaque media asset ID used by the
+separately authorized public delivery path. Current featured candidates sort
+first in their explicit order (maximum three); remaining public projects use a
+stable project-ID order. Candidate presence never makes a project public.
+
 The contract has no field for email, phone, home/exact address, coordinates,
 company registration number, verification references, raw completeness,
 credential evidence, media storage keys or hashes, reviewers/reasons, internal
-admin state, or risk data. Runtime extra properties are discarded by the
-serializer at the DB and API boundaries.
+admin state, customer identity/consent records, public storage URLs, or risk
+data. Runtime extra properties are discarded by the serializer at the DB and
+API boundaries. A missing photo, stale project/publication revision, hidden
+profile or project, revoked public object, unsafe project text, or missing
+catalog label fails closed.
 
 ## Deliberate fail-closed areas
 
-`portfolio` is currently always an empty list. R1-011 does not infer public
-eligibility from project ownership or a media asset id. It can be wired later to
-the independently moderated, consent-aware public project/photo view without
-changing profile eligibility. Precise R1-006 availability blocks remain private
-because their migration explicitly requires a later privacy-reviewed public
-aggregation and defines no overlap precedence.
+Job-linked/customer-property portfolio provenance remains absent until its
+immutable JobParticipant and consent bindings exist. R1 publishes only the
+off-platform `SELF_DECLARED` path and labels it `UNVERIFIED`; it never infers
+consent or verification from ownership, featured state, or a media asset ID.
+Precise R1-006 availability blocks remain private because their migration
+explicitly requires a later privacy-reviewed public aggregation and defines no
+overlap precedence.
 
 ## HTTP and web rendering
 
@@ -64,5 +77,7 @@ responses are `noindex, nofollow`. The Next.js page is
 `/remeselnici/:profileId`, fetches the route with `cache: "no-store"`, and
 re-applies the serializer. Its metadata is `index, follow` only when an eligible
 projection is present; all absence states use `noindex, nofollow` and the Next.js
-404 boundary. `PORTAL_API_ORIGIN` selects the internal API origin and must be a
-credential-free HTTP(S) origin with no path, query, or fragment.
+404 boundary. Portfolio cards render the provenance label, allowlisted details,
+and ordered photo links through `/v1/public/media/:mediaAssetId`; they never
+embed a storage URL. `PORTAL_API_ORIGIN` selects the internal API origin and must
+be a credential-free HTTP(S) origin with no path, query, or fragment.

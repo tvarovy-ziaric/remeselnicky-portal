@@ -1,5 +1,6 @@
 import { loadServerConfig } from "@portal/config/server";
 import { createDatabase } from "@portal/db";
+import { createPublicPortfolioDeliveryResolver } from "@portal/media";
 import {
   createCentralErrorTracker,
   createLoggerErrorTransport,
@@ -60,6 +61,11 @@ const app = buildApi({
   },
   database,
   publicCraftsmanProfiles: { profiles: database.publicCraftsmanProfiles },
+  publicPortfolioMedia: {
+    delivery: createPublicPortfolioDeliveryResolver({
+      repository: database.publicPortfolioDelivery,
+    }),
+  },
   observability: {
     appOrigin: config.appOrigin,
     context: config.observability,

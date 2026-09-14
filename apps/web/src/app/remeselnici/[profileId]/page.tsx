@@ -4,8 +4,12 @@ import { notFound } from "next/navigation";
 import { loadPublicCraftsmanProfile } from "../../../public-craftsman-profile-client";
 import {
   formatEurCents,
+  formatIndicativeEurRange,
+  portfolioDurationUnitLabel,
+  portfolioPhotoPhaseLabel,
   priceModeLabel,
   proficiencyLabel,
+  publicPortfolioMediaPath,
   publicProfileMetadata,
 } from "../../../public-craftsman-profile-view";
 
@@ -115,6 +119,88 @@ export default async function PublicCraftsmanProfilePage({
             className="profile-section"
           >
             <h2 id="portfolio-title">Realizácie</h2>
+            <ul className="profile-list">
+              {profile.portfolio.map((project) => (
+                <li key={project.projectId}>
+                  <strong>{project.title}</strong>
+                  <span>{project.shortDescription}</span>
+                  <span>
+                    Deklarované remeselníkom · bez nezávislého overenia
+                  </span>
+                  {project.contribution === null ? null : (
+                    <span>Podiel na realizácii: {project.contribution}</span>
+                  )}
+                  {project.materialsAndTechnologies === null ? null : (
+                    <span>
+                      Materiály a technológie:{" "}
+                      {project.materialsAndTechnologies}
+                    </span>
+                  )}
+                  {project.problem === null ? null : (
+                    <span>Východiskový problém: {project.problem}</span>
+                  )}
+                  {project.solution === null ? null : (
+                    <span>Riešenie: {project.solution}</span>
+                  )}
+                  {project.duration === null ? null : (
+                    <span>
+                      Približné trvanie: {project.duration.value}{" "}
+                      {portfolioDurationUnitLabel(project.duration.unit)}
+                    </span>
+                  )}
+                  {project.indicativePrice === null ? null : (
+                    <span>
+                      Nezáväzná orientačná cena:{" "}
+                      {formatIndicativeEurRange(
+                        project.indicativePrice.minCents,
+                        project.indicativePrice.maxCents,
+                      )}
+                    </span>
+                  )}
+                  {project.approximateLocation === null ? null : (
+                    <span>
+                      Približná lokalita:{" "}
+                      {project.approximateLocation.municipalityCode} /{" "}
+                      {project.approximateLocation.districtCode}
+                    </span>
+                  )}
+                  {project.professions.length === 0 ? null : (
+                    <span>
+                      Profesie:{" "}
+                      {project.professions.map(({ label }) => label).join(", ")}
+                    </span>
+                  )}
+                  {project.skills.length === 0 ? null : (
+                    <span>
+                      Zručnosti:{" "}
+                      {project.skills.map(({ label }) => label).join(", ")}
+                    </span>
+                  )}
+                  {project.specializations.length === 0 ? null : (
+                    <span>
+                      Špecializácie:{" "}
+                      {project.specializations
+                        .map(({ label }) => label)
+                        .join(", ")}
+                    </span>
+                  )}
+                  <ul className="portfolio-photo-list">
+                    {project.photos.map((photo) => (
+                      <li
+                        data-media-asset-id={photo.mediaAssetId}
+                        key={photo.mediaAssetId}
+                      >
+                        <a href={publicPortfolioMediaPath(photo.mediaAssetId)}>
+                          Fotografia {photo.displayOrder}:{" "}
+                          {portfolioPhotoPhaseLabel(photo.phase)} ({photo.width}{" "}
+                          × {photo.height} px)
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ul>
           </section>
         )}
 

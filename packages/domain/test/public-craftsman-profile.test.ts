@@ -1,4 +1,4 @@
-import type { CraftsmanProfileId } from "../src/index.js";
+import type { CraftsmanProfileId, PortfolioProjectId } from "../src/index.js";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -6,6 +6,7 @@ import {
   PUBLIC_CRAFTSMAN_PROFILE_FIELDS,
   serializePublicCraftsmanProfile,
   type PublicCraftsmanProfileCandidate,
+  type PublicPortfolioProject,
 } from "../src/public-craftsman-profile.js";
 
 const profileId = "81000000-0000-4000-8000-000000000001" as CraftsmanProfileId;
@@ -37,6 +38,21 @@ describe("public craftsman profile", () => {
           reviewReason: "internal",
         },
       ],
+      portfolio: [
+        {
+          ...validPortfolioProject(),
+          exactAddress: "Tajná 12",
+          customerName: "Neverejný zákazník",
+          photos: [
+            {
+              ...validPortfolioProject().photos[0]!,
+              storageKey: "private/photo.webp",
+              sha256: "b".repeat(64),
+              publicUrl: "https://internal.example.test/photo",
+            },
+          ],
+        },
+      ],
     } as unknown as PublicCraftsmanProfileCandidate;
 
     const serialized = serializePublicCraftsmanProfile(candidate);
@@ -44,7 +60,7 @@ describe("public craftsman profile", () => {
       PUBLIC_CRAFTSMAN_PROFILE_FIELDS,
     );
     expect(JSON.stringify(serialized)).not.toMatch(
-      /owner@example|421900|Tajná|12345678|completeness|risk|storage|sha256|reviewer|reason|secret:identity/iu,
+      /owner@example|421900|Tajná|Neverejný|12345678|completeness|risk|storage|sha256|publicUrl|reviewer|reason|secret:identity/iu,
     );
   });
 
@@ -76,6 +92,36 @@ describe("public craftsman profile", () => {
         ],
       }),
     ).not.toBeNull();
+  });
+
+  it("fails closed for unsafe project text and malformed public photos", () => {
+    expect(
+      serializePublicCraftsmanProfile({
+        ...validCandidate(),
+        portfolio: [
+          {
+            ...validPortfolioProject(),
+            problem: "Kontakt na zákazníka +421 900 123 456",
+          },
+        ],
+      }),
+    ).toBeNull();
+    expect(
+      serializePublicCraftsmanProfile({
+        ...validCandidate(),
+        portfolio: [
+          {
+            ...validPortfolioProject(),
+            photos: [
+              {
+                ...validPortfolioProject().photos[0]!,
+                displayOrder: 2,
+              },
+            ],
+          },
+        ],
+      }),
+    ).toBeNull();
   });
 
   it("validates opaque public profile identifiers", () => {
@@ -113,6 +159,7 @@ function validCandidate(): PublicCraftsmanProfileCandidate {
       reviewCount: 0,
       verifiedWorkCount: 0,
     },
+    portfolio: [validPortfolioProject()],
     skills: [
       {
         canonicalCode: "SKILL:FURNITURE",
@@ -139,6 +186,49 @@ function validCandidate(): PublicCraftsmanProfileCandidate {
         expiresOn: null,
         professionCode: "PROF:CARPENTER",
         verification: "ADMIN_APPROVED",
+      },
+    ],
+  };
+}
+
+function validPortfolioProject(): PublicPortfolioProject {
+  return {
+    projectId: "81000000-0000-4000-8000-000000000002" as PortfolioProjectId,
+    title: "Dubová knižnica",
+    shortDescription: "Výroba knižnice na mieru.",
+    provenance: {
+      kind: "SELF_DECLARED",
+      evidenceStatus: "UNVERIFIED",
+    },
+    contribution: "Návrh a realizácia",
+    materialsAndTechnologies: "Masívny dub",
+    problem: "Nevyužitý priestor",
+    solution: "Knižnica na celú výšku miestnosti",
+    duration: { value: 2, unit: "WEEKS" },
+    indicativePrice: {
+      currency: "EUR",
+      minCents: 120_000,
+      maxCents: 150_000,
+    },
+    approximateLocation: {
+      municipalityCode: "SK0101528595",
+      districtCode: "SK0101",
+    },
+    professions: [{ code: "PROF:CARPENTER", label: "Stolár" }],
+    skills: [
+      {
+        canonicalCode: "SKILL:FURNITURE",
+        label: "Výroba nábytku",
+      },
+    ],
+    specializations: [],
+    photos: [
+      {
+        mediaAssetId: "81000000-0000-4000-8000-000000000003",
+        phase: "AFTER",
+        displayOrder: 1,
+        width: 1200,
+        height: 900,
       },
     ],
   };

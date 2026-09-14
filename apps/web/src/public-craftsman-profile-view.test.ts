@@ -3,8 +3,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   formatEurCents,
+  formatIndicativeEurRange,
+  portfolioDurationUnitLabel,
+  portfolioPhotoPhaseLabel,
   priceModeLabel,
   publicProfileMetadata,
+  publicPortfolioMediaPath,
 } from "./public-craftsman-profile-view";
 
 describe("public craftsman profile view", () => {
@@ -23,6 +27,12 @@ describe("public craftsman profile view", () => {
   it("formats exact EUR cents and locked price modes", () => {
     expect(formatEurCents(12_345)).toContain("123,45");
     expect(priceModeLabel("PER_SQUARE_METER")).toBe("za m²");
+    expect(formatIndicativeEurRange(10_000, 20_000)).toContain("–");
+    expect(portfolioDurationUnitLabel("WEEKS")).toBe("týždňov");
+    expect(portfolioPhotoPhaseLabel("AFTER")).toBe("po realizácii");
+    expect(
+      publicPortfolioMediaPath("84000000-0000-4000-8000-000000000003"),
+    ).toBe("/v1/public/media/84000000-0000-4000-8000-000000000003");
   });
 });
 

@@ -20,6 +20,8 @@ import {
   type StoredPortfolioPublicDerivative,
 } from "@portal/media";
 import {
+  R1_OWNER_COMMAND_ACCEPTED_OUTCOMES,
+  runConcurrentAttempts,
   verifyR1SupplySideMatrix,
   type R1BoundaryProbeResult,
   type R1CommandRaceEvidence,
@@ -91,10 +93,7 @@ interface MatrixFixture {
   readonly professionId: CraftsmanProfessionId;
   readonly profileId: CraftsmanProfileId;
   publicationRevision: number;
-  readonly publicResponses: ReadonlyMap<
-    R1PublicProfileScenario,
-    TestHttpResponse
-  >;
+  readonly publicResponses: Map<R1PublicProfileScenario, TestHttpResponse>;
   readonly taxonomy: TaxonomyFixture;
 }
 
@@ -107,14 +106,13 @@ export async function runR1SupplySideIntegrationAssertions(
 ): Promise<void> {
   const fixture = await createMatrixFixture(sql);
   const portfolioEvidence = await createPortfolioEvidence(sql, fixture);
-  const privilegedEvidence = createPrivilegedEvidence();
   const adapter: R1SupplySideMatrixAdapter = {
     forbiddenMarkers: fixture.forbiddenMarkers,
     probeOwnerBoundary: (input) => probeOwnerBoundary(sql, fixture, input),
     probePortfolioDelivery: (scenario) =>
       Promise.resolve(portfolioEvidence.get(scenario) ?? { allowed: false }),
     probePrivilegedReview: (input) =>
-      probePrivilegedReview(sql, fixture, privilegedEvidence, input),
+      probePrivilegedReview(sql, fixture, input),
     readPublicProfile: (scenario) =>
       Promise.resolve(required(fixture.publicResponses, scenario)),
     runCommandRaces: () => runCommandRaces(sql),
@@ -382,10 +380,6 @@ async function createMatrixFixture(sql: Sql): Promise<MatrixFixture> {
     expectedRevision: 2,
     visibility: "PUBLIC",
   });
-  publicResponses.set(
-    "PUBLIC_APPROVED",
-    response(await publicProfiles.findPublic(profileId)),
-  );
   await publication.setModeration({
     actorSessionIdDigest: admin.sessionDigest,
     actorUserId: admin.userId,
@@ -571,7 +565,11 @@ async function probeOwnerRead(
         null;
       break;
   }
-  return { allowed, payload: { status: allowed ? "ALLOWED" : "DENIED" } };
+  return {
+    allowed,
+    outcome: allowed ? "FOUND" : "NOT_FOUND",
+    payload: allowed ? undefined : null,
+  };
 }
 
 async function probeOwnerCommand(
@@ -586,7 +584,7 @@ async function probeOwnerCommand(
     case "PROFILE":
       status = (
         await createCraftsmanProfileRepository(sql).replacePrivateDraft({
-          about: "Syntetický profil pre autorizačnú a privacy maticu.",
+          about: "Syntetický profil po úspešnom owner príkaze.",
           actorUserId,
           expectedRevision: 1,
           nickname: "Majster Ján",
@@ -604,7 +602,7 @@ async function probeOwnerCommand(
           commandId,
           craftsmanProfessionId: fixture.professionId,
           craftsmanProfileId: fixture.profileId,
-          declaredLevel: "ADVANCED",
+          declaredLevel: "MASTER",
           expectedDeclaredLevelRevision: 1,
         })
       ).status;
@@ -632,7 +630,7 @@ async function probeOwnerCommand(
           expectedRevision: 1,
           extraMunicipalityCodes: [],
           maximumRadiusKm: null,
-          normalRadiusKm: 25,
+          normalRadiusKm: 26,
           travelFeePolicy: null,
           travelFeeThresholdKm: null,
         })
@@ -658,7 +656,7 @@ async function probeOwnerCommand(
           commandId,
           craftsmanProfileId: fixture.profileId,
           expectedRevision: 1,
-          workingSinceYear: 2015,
+          workingSinceYear: 2014,
         })
       ).status;
       break;
@@ -666,7 +664,7 @@ async function probeOwnerCommand(
       status = (
         await createCraftsmanAvailabilityRepository(sql).replace({
           actorUserId,
-          availability: "AVAILABLE",
+          availability: "BUSY",
           blockId: fixture.availabilityBlockId,
           commandId,
           craftsmanProfileId: fixture.profileId,
@@ -735,7 +733,7 @@ async function probeOwnerCommand(
           actorUserId,
           collaborationId: fixture.collaborationId,
           commandId,
-          contribution: "Syntetická spolupráca na montáži",
+          contribution: "Aktualizovaná syntetická spolupráca na montáži",
           expectedRevision: 1,
           portfolioProjectId: fixture.portfolioProjectId,
           role: "Spolupracovník",
@@ -744,12 +742,12 @@ async function probeOwnerCommand(
       break;
     case "FEATURED_PROJECTS":
       status = (
-        await createFeaturedProjectRepository(sql).reorder({
+        await createFeaturedProjectRepository(sql).pin({
           actorUserId,
           commandId,
           craftsmanProfileId: fixture.profileId,
           expectedRevision: 0,
-          orderedPortfolioProjectIds: [],
+          portfolioProjectId: fixture.portfolioProjectId,
         })
       ).status;
       break;
@@ -765,52 +763,33 @@ async function probeOwnerCommand(
       ).status;
       break;
   }
+  const accepted: readonly string[] =
+    R1_OWNER_COMMAND_ACCEPTED_OUTCOMES[surface];
   return {
-    allowed: !deniedStatus(status),
-    payload: { status: deniedStatus(status) ? "DENIED" : "ALLOWED" },
+    allowed: accepted.includes(status),
+    outcome: status,
+    payload: { status },
   };
-}
-
-function deniedStatus(status: string): boolean {
-  return [
-    "ADMIN_AUTHORIZATION_REQUIRED",
-    "AUTHORIZATION_DENIED",
-    "COLLABORATION_UNAVAILABLE",
-    "NOT_FOUND",
-    "OWNER_NOT_ACTIVE",
-    "PROFILE_UNAVAILABLE",
-  ].includes(status);
-}
-
-function createPrivilegedEvidence(): ReadonlyMap<
-  R1PrivilegedReviewSurface,
-  boolean
-> {
-  const evidence = new Map<R1PrivilegedReviewSurface, boolean>();
-  // The profile approval and required-evidence credential approval in fixture
-  // creation are the exact capability+MFA positive paths.
-  evidence.set("PROFILE_REVIEW", true);
-  evidence.set("CREDENTIAL_REVIEW", true);
-  return evidence;
 }
 
 async function probePrivilegedReview(
   sql: Sql,
   fixture: MatrixFixture,
-  positive: ReadonlyMap<R1PrivilegedReviewSurface, boolean>,
   input: {
     readonly actor: R1PrivilegedReviewActor;
     readonly surface: R1PrivilegedReviewSurface;
   },
 ): Promise<R1BoundaryProbeResult> {
   if (input.actor === "MFA_CAPABILITY_ACTOR") {
-    return { allowed: positive.get(input.surface) === true };
+    return authorizePrivilegedReview(sql, input.surface, {
+      actorUserId: fixture.admin.userId,
+      privilegedSessionId: fixture.admin.rawSessionId,
+    });
   }
   if (input.actor === "SUSPENDED") {
     await setAccountState(sql, fixture.admin.userId, "SUSPENDED");
     try {
-      return await runPrivilegedReviewAttempt(sql, fixture, input.surface, {
-        actorSessionIdDigest: fixture.admin.sessionDigest,
+      return await authorizePrivilegedReview(sql, input.surface, {
         actorUserId: fixture.admin.userId,
         privilegedSessionId: fixture.admin.rawSessionId,
       });
@@ -819,54 +798,38 @@ async function probePrivilegedReview(
     }
   }
   const actorUserId = reviewActorId(fixture, input.actor);
-  return runPrivilegedReviewAttempt(sql, fixture, input.surface, {
-    actorSessionIdDigest: "f".repeat(64),
+  // ADMIN and SUPER_ADMIN are deliberately role-only fixtures. The current
+  // role model bundles both review capabilities into ADMIN, so it cannot create
+  // a live review session lacking just one of them; missing session and exact
+  // capability are reported distinctly by the real authorizer.
+  return authorizePrivilegedReview(sql, input.surface, {
     actorUserId,
     privilegedSessionId: `missing-${randomUUID()}`,
   });
 }
 
-async function runPrivilegedReviewAttempt(
+async function authorizePrivilegedReview(
   sql: Sql,
-  fixture: MatrixFixture,
   surface: R1PrivilegedReviewSurface,
   authority: {
-    readonly actorSessionIdDigest: string;
     readonly actorUserId: UserId;
     readonly privilegedSessionId: string;
   },
 ): Promise<R1BoundaryProbeResult> {
-  let status: string;
-  if (surface === "PROFILE_REVIEW") {
-    status = (
-      await createCraftsmanPublicationRepository(sql).approve({
-        actorSessionIdDigest: authority.actorSessionIdDigest,
-        actorUserId: authority.actorUserId,
-        commandId: randomUUID(),
-        correlationId: randomUUID(),
-        craftsmanProfileId: fixture.profileId,
-        expectedRevision: fixture.publicationRevision,
-        reason: "Unauthorized R1 matrix review attempt.",
-      })
-    ).status;
-  } else {
-    status = (
-      await createCredentialReviewService({
-        adminAccess: adminService(sql),
-        repository: createCredentialClaimRepository(sql),
-      }).review({
-        actorUserId: authority.actorUserId,
-        command: {
-          claimId: fixture.credentialClaimId,
-          commandId: randomUUID(),
-          decision: "APPROVE",
-          expectedRevision: 2,
-        },
-        privilegedSessionId: authority.privilegedSessionId,
-      })
-    ).status;
-  }
-  return { allowed: !deniedStatus(status), payload: { status: "DENIED" } };
+  const authorization = await adminService(sql).authorize({
+    capability:
+      surface === "PROFILE_REVIEW"
+        ? "admin.profiles.review"
+        : "admin.credentials.review",
+    requireRecentMfa: true,
+    sessionId: authority.privilegedSessionId,
+    userId: authority.actorUserId,
+  });
+  return {
+    allowed: authorization.status === "AUTHORIZED",
+    outcome: authorization.status,
+    payload: { status: authorization.status },
+  };
 }
 
 function reviewActorId(
@@ -1035,21 +998,40 @@ async function createPortfolioEvidence(
     expectedRevision: 6,
     visibility: "PUBLIC",
   });
-  const hidden = await publication.hide(portfolioCommand(fixture, 1));
-  if (hidden.status !== "APPLIED") {
-    throw new Error("R1 matrix portfolio hide was not applied.");
-  }
+  const projects = createPortfolioProjectRepository(sql);
+  await expect(
+    projects.hide({
+      actorUserId: fixture.ownerId,
+      commandId: randomUUID(),
+      craftsmanProfileId: fixture.profileId,
+      expectedRevision: 1,
+      portfolioProjectId: fixture.portfolioProjectId,
+    }),
+  ).resolves.toMatchObject({ status: "APPLIED" });
   evidence.set(
     "PROJECT_HIDDEN",
     deliveryResult(await delivery.loadPublicPortfolioDerivative(mediaAssetId)),
   );
+  await expect(
+    projects.restoreDraft({
+      actorUserId: fixture.ownerId,
+      commandId: randomUUID(),
+      craftsmanProfileId: fixture.profileId,
+      expectedRevision: 2,
+      portfolioProjectId: fixture.portfolioProjectId,
+    }),
+  ).resolves.toMatchObject({ status: "APPLIED" });
+  const hidden = await publication.hide(portfolioCommand(fixture, 1, 3));
+  if (hidden.status !== "APPLIED") {
+    throw new Error("R1 matrix portfolio hide was not applied.");
+  }
   for (const pending of hidden.pendingRevocations) {
     await publication.markPublicDerivativeRevoked({
       objectId: pending.objectId,
       publicationRevision: pending.publicationRevision,
     });
   }
-  const secondCommand = portfolioCommand(fixture, 2);
+  const secondCommand = portfolioCommand(fixture, 2, 3);
   const secondPrepared = await publication.preparePublish(secondCommand);
   if (secondPrepared.status !== "READY") {
     throw new Error("R1 matrix portfolio republish was not ready.");
@@ -1059,9 +1041,72 @@ async function createPortfolioEvidence(
     command: secondCommand,
     derivatives: secondDerivatives,
   });
+  const publicProfile = await createPublicCraftsmanProfileRepository(
+    sql,
+  ).findPublic(fixture.profileId);
+  await expect(
+    Promise.resolve(publicProfile?.portfolio),
+  ).resolves.toMatchObject([
+    {
+      photos: [{ mediaAssetId, phase: "AFTER" }],
+      projectId: fixture.portfolioProjectId,
+      provenance: {
+        evidenceStatus: "UNVERIFIED",
+        kind: "SELF_DECLARED",
+      },
+    },
+  ]);
+  fixture.publicResponses.set("PUBLIC_APPROVED", response(publicProfile));
+
+  const mismatchedProjectId = randomUUID() as PortfolioProjectId;
+  await expect(
+    projects.create({
+      actorUserId: fixture.ownerId,
+      commandId: randomUUID(),
+      contribution: null,
+      craftsmanProfileId: fixture.profileId,
+      districtCode: null,
+      durationUnit: null,
+      durationValue: null,
+      indicativePriceMaxCents: null,
+      indicativePriceMinCents: null,
+      materialsAndTechnologies: null,
+      municipalityCode: null,
+      portfolioProjectId: mismatchedProjectId,
+      problem: null,
+      professionIds: [fixture.professionId],
+      shortDescription: "Iný existujúci súkromný zdroj",
+      skillIds: [],
+      solution: null,
+      specializationIds: [],
+      title: "Iný súkromný projekt",
+    }),
+  ).resolves.toMatchObject({ status: "APPLIED" });
+  const mismatchedMediaAssetId = randomUUID();
+  await sql`
+    INSERT INTO media_assets (
+      id, owner_user_id, uploaded_by_user_id, kind, purpose, status,
+      declared_content_type, byte_size, provenance_entity_type,
+      provenance_entity_id, provenance_entity_revision, ready_at,
+      status_changed_at, updated_at, canonical_width, canonical_height
+    ) VALUES (${mismatchedMediaAssetId}, ${fixture.ownerId}, ${fixture.ownerId},
+      'IMAGE', 'PORTFOLIO_IMAGE', 'READY', 'image/jpeg', 100,
+      'PORTFOLIO_PROJECT', ${mismatchedProjectId}, 1, CURRENT_TIMESTAMP,
+      CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 800, 600)
+  `;
+  await sql`
+    INSERT INTO media_asset_storage_objects (
+      media_asset_id, role, storage_area, storage_key, content_type,
+      byte_size, content_sha256
+    ) VALUES (${mismatchedMediaAssetId}, 'CANONICAL', 'private',
+      ${`private/2026/09/${randomUUID()}`}, 'image/webp', 80,
+      ${digest(`mismatched-source:${randomUUID()}`)})
+  `;
   evidence.set(
     "SOURCE_MISMATCH",
-    deliveryResult(await delivery.loadPublicPortfolioDerivative(randomUUID())),
+    deliveryResult(
+      await delivery.loadPublicPortfolioDerivative(mismatchedMediaAssetId),
+    ),
   );
   await sql`
     UPDATE media_asset_storage_objects SET revoked_at = clock_timestamp()
@@ -1099,13 +1144,14 @@ function deliveryResult(
 function portfolioCommand(
   fixture: MatrixFixture,
   expectedPublicationRevision: number,
+  expectedProjectRevision = 1,
 ): PortfolioPublicationCommandInput {
   return {
     actorUserId: fixture.ownerId,
     commandId: randomUUID(),
     craftsmanProfileId: fixture.profileId,
     expectedPhotoSetRevision: 1,
-    expectedProjectRevision: 1,
+    expectedProjectRevision,
     expectedPublicationRevision,
     portfolioProjectId: fixture.portfolioProjectId,
   };
@@ -1143,22 +1189,18 @@ async function runCommandRaces(sql: Sql): Promise<R1CommandRaceEvidence> {
   const firstProfile = await createBareProfile(sql, ownerId);
   const experience = createCraftsmanExperienceRepository(sql);
   const commandId = randomUUID();
-  const idempotent = await Promise.all([
-    experience.replaceOwnedDraft({
-      actorUserId: ownerId,
-      commandId,
-      craftsmanProfileId: firstProfile,
-      expectedRevision: 0,
-      workingSinceYear: 2010,
-    }),
-    experience.replaceOwnedDraft({
-      actorUserId: ownerId,
-      commandId,
-      craftsmanProfileId: firstProfile,
-      expectedRevision: 0,
-      workingSinceYear: 2010,
-    }),
-  ]);
+  const idempotent = await runConcurrentAttempts({
+    attemptCount: 2,
+    idempotencyKey: commandId,
+    run: () =>
+      experience.replaceOwnedDraft({
+        actorUserId: ownerId,
+        commandId,
+        craftsmanProfileId: firstProfile,
+        expectedRevision: 0,
+        workingSinceYear: 2010,
+      }),
+  });
   const retry = await experience.replaceOwnedDraft({
     actorUserId: ownerId,
     commandId,
@@ -1168,22 +1210,20 @@ async function runCommandRaces(sql: Sql): Promise<R1CommandRaceEvidence> {
   });
   const secondOwner = await createUser(sql);
   const secondProfile = await createBareProfile(sql, secondOwner);
-  const cas = await Promise.all([
-    experience.replaceOwnedDraft({
-      actorUserId: secondOwner,
-      commandId: randomUUID(),
-      craftsmanProfileId: secondProfile,
-      expectedRevision: 0,
-      workingSinceYear: 2011,
-    }),
-    experience.replaceOwnedDraft({
-      actorUserId: secondOwner,
-      commandId: randomUUID(),
-      craftsmanProfileId: secondProfile,
-      expectedRevision: 0,
-      workingSinceYear: 2012,
-    }),
-  ]);
+  const casCommandIds = [randomUUID(), randomUUID()] as const;
+  const casYears = [2011, 2012] as const;
+  const cas = await runConcurrentAttempts({
+    attemptCount: 2,
+    idempotencyKey: `r1-cas/${randomUUID()}`,
+    run: ({ attemptIndex }) =>
+      experience.replaceOwnedDraft({
+        actorUserId: secondOwner,
+        commandId: casCommandIds[attemptIndex]!,
+        craftsmanProfileId: secondProfile,
+        expectedRevision: 0,
+        workingSinceYear: casYears[attemptIndex]!,
+      }),
+  });
   const [idempotentCount] = await sql<{ readonly count: number }[]>`
     SELECT count(*)::integer AS count FROM craftsman_experience_revisions
     WHERE craftsman_profile_id = ${firstProfile}
@@ -1195,14 +1235,29 @@ async function runCommandRaces(sql: Sql): Promise<R1CommandRaceEvidence> {
   return {
     cas: {
       effectCount: casCount?.count ?? -1,
-      outcomes: cas.map(({ status }) => raceStatus(status)),
+      outcomes: exactPair(cas.map(({ status }) => raceStatus(status))),
     },
     idempotency: {
       effectCount: idempotentCount?.count ?? -1,
-      outcomes: idempotent.map(({ status }) => idempotentStatus(status)),
+      outcomes: exactPair(
+        idempotent.map(({ status }) => idempotentStatus(status)),
+      ),
       retryOutcome: idempotentStatus(retry.status),
     },
   };
+}
+
+function exactPair<Value>(values: readonly Value[]): readonly [Value, Value] {
+  if (
+    values.length !== 2 ||
+    values[0] === undefined ||
+    values[1] === undefined
+  ) {
+    throw new Error(
+      "R1 synchronized race did not return exactly two outcomes.",
+    );
+  }
+  return [values[0], values[1]];
 }
 
 function raceStatus(status: string): "APPLIED" | "STALE_REVISION" | "DENIED" {

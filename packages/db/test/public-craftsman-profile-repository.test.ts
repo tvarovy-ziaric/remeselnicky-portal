@@ -5,6 +5,8 @@ import { describe, expect, it, vi } from "vitest";
 import { createPublicCraftsmanProfileRepository } from "../src/public-craftsman-profile-repository.js";
 
 const profileId = "82000000-0000-4000-8000-000000000001" as CraftsmanProfileId;
+const portfolioProjectId = "82000000-0000-4000-8000-000000000002";
+const mediaAssetId = "82000000-0000-4000-8000-000000000003";
 
 describe("public craftsman profile repository", () => {
   it("rejects malformed identifiers without opening a database snapshot", async () => {
@@ -36,7 +38,23 @@ describe("public craftsman profile repository", () => {
         primaryName: "Majster Jano",
         secondaryName: "Ján Remeselný",
       },
-      portfolio: [],
+      portfolio: [
+        {
+          projectId: portfolioProjectId,
+          provenance: {
+            evidenceStatus: "UNVERIFIED",
+            kind: "SELF_DECLARED",
+          },
+          photos: [
+            {
+              displayOrder: 1,
+              mediaAssetId,
+              phase: "AFTER",
+            },
+          ],
+          title: "Dubová knižnica",
+        },
+      ],
       professions: [
         {
           declaredProficiency: { level: "MASTER", source: "SELF_DECLARED" },
@@ -59,15 +77,26 @@ describe("public craftsman profile repository", () => {
     expect(gate).toContain("publication.owner_visibility = 'PUBLIC'");
     expect(gate).toContain("publication.moderation_state = 'ALLOWED'");
     expect(gate).toContain("owner.account_state = 'ACTIVE'");
-    const credentialQuery = sql.queries.at(-1) ?? "";
+    const credentialQuery =
+      sql.queries.find((query) => query.includes("credential_claims")) ?? "";
     expect(credentialQuery).toContain("claim.state = 'APPROVED'");
     expect(credentialQuery).toContain("claim.expires_on >= CURRENT_DATE");
     expect(credentialQuery).not.toMatch(
       /credential_claim_evidence|media_assets/iu,
     );
     expect(sql.queries.join("\n")).not.toMatch(
-      /email_addresses|phone_verification|company_registration_number|identity_verification_reference|company_registration_verification_reference|credential_claim_evidence|storage_key|sha256|risk_score|completeness|current_craftsman_availability_blocks|portfolio_projects/iu,
+      /email_addresses|phone_verification|company_registration_number|identity_verification_reference|company_registration_verification_reference|credential_claim_evidence|storage_key|sha256|risk_score|completeness|current_craftsman_availability_blocks/iu,
     );
+    const portfolioQuery =
+      sql.queries.find((query) =>
+        query.includes("current_public_portfolio_projects project"),
+      ) ?? "";
+    expect(portfolioQuery).toContain("current_featured_project_candidates");
+    expect(portfolioQuery).toContain(
+      "project.provenance_kind = 'SELF_DECLARED'",
+    );
+    expect(portfolioQuery).toContain("project.evidence_status = 'UNVERIFIED'");
+    expect(portfolioQuery).not.toMatch(/storage|sha256|public_url|customer/iu);
   });
 
   it("returns the same absence for hidden, suspended, rejected, and unknown profiles", async () => {
@@ -86,6 +115,32 @@ describe("public craftsman profile repository", () => {
       {
         ...(responses[0]?.[0] as Record<string, unknown>),
         about: "Kontakt +421 900 123 456",
+      },
+    ];
+    await expect(
+      sqlRepository(scriptedSql(responses)).findPublic(profileId),
+    ).resolves.toBeNull();
+  });
+
+  it("fails closed when a public project contains customer contact data", async () => {
+    const responses = completeResponses();
+    responses[8] = [
+      {
+        ...(responses[8]?.[0] as Record<string, unknown>),
+        solution: "Kontakt na zákazníka majitel@example.test",
+      },
+    ];
+    await expect(
+      sqlRepository(scriptedSql(responses)).findPublic(profileId),
+    ).resolves.toBeNull();
+  });
+
+  it("fails closed when a referenced project catalog label is missing", async () => {
+    const responses = completeResponses();
+    responses[11] = [
+      {
+        ...(responses[11]?.[0] as Record<string, unknown>),
+        label: null,
       },
     ];
     await expect(
@@ -185,5 +240,50 @@ function completeResponses(): unknown[][] {
         storageKey: "must-not-leak",
       },
     ],
+    [
+      {
+        contribution: "Návrh a realizácia",
+        districtCode: "SK0101",
+        durationUnit: "WEEKS",
+        durationValue: 2,
+        exactAddress: "must-not-leak",
+        indicativePriceMaxCents: "150000",
+        indicativePriceMinCents: "120000",
+        materialsAndTechnologies: "Masívny dub",
+        municipalityCode: "SK0101528595",
+        problem: "Nevyužitý priestor",
+        projectId: portfolioProjectId,
+        shortDescription: "Výroba knižnice na mieru.",
+        solution: "Knižnica na celú výšku miestnosti",
+        title: "Dubová knižnica",
+      },
+    ],
+    [
+      {
+        canonicalHeight: 900,
+        canonicalWidth: 1200,
+        displayOrder: 1,
+        mediaAssetId,
+        phase: "AFTER",
+        projectId: portfolioProjectId,
+        storageKey: "must-not-leak",
+        contentSha256: "must-not-leak",
+      },
+    ],
+    [
+      {
+        code: "PROF:CARPENTER",
+        label: "Stolár",
+        projectId: portfolioProjectId,
+      },
+    ],
+    [
+      {
+        canonicalCode: "SKILL:FURNITURE",
+        label: "Výroba nábytku",
+        projectId: portfolioProjectId,
+      },
+    ],
+    [],
   ];
 }

@@ -35,6 +35,23 @@ export const R1_OWNER_ACTIONS = Object.freeze([
   "OWNER_READ",
   "OWNER_COMMAND",
 ] as const);
+export const R1_OWNER_COMMAND_ACCEPTED_OUTCOMES = Object.freeze({
+  PROFILE: Object.freeze(["UPDATED"] as const),
+  PROFESSIONS: Object.freeze(["APPLIED"] as const),
+  CAPABILITIES: Object.freeze(["APPLIED"] as const),
+  SERVICE_AREA: Object.freeze(["APPLIED"] as const),
+  INDICATIVE_PRICING: Object.freeze(["APPLIED"] as const),
+  EXPERIENCE: Object.freeze(["APPLIED"] as const),
+  AVAILABILITY: Object.freeze(["APPLIED"] as const),
+  CREDENTIAL_CLAIMS: Object.freeze(["APPLIED"] as const),
+  PORTFOLIO_PROJECTS: Object.freeze(["APPLIED"] as const),
+  // A one-photo fixture has no distinct valid order to apply.
+  PORTFOLIO_PHOTOS: Object.freeze(["UNCHANGED"] as const),
+  PORTFOLIO_COLLABORATIONS: Object.freeze(["APPLIED"] as const),
+  FEATURED_PROJECTS: Object.freeze(["APPLIED"] as const),
+  // Reasserting the already-public owner choice is intentionally idempotent.
+  PUBLICATION_CONTROL: Object.freeze(["UNCHANGED"] as const),
+} satisfies Readonly<Record<R1OwnerSurface, readonly string[]>>);
 export const R1_PRIVILEGED_REVIEW_SURFACES = Object.freeze([
   "PROFILE_REVIEW",
   "CREDENTIAL_REVIEW",
@@ -68,17 +85,25 @@ export type R1PortfolioDeliveryScenario =
 
 export interface R1BoundaryProbeResult {
   readonly allowed: boolean;
+  /** Actual bounded repository/authorizer outcome, when the probe has one. */
+  readonly outcome?: string;
   readonly payload?: unknown;
 }
 
 export interface R1CommandRaceEvidence {
   readonly cas: Readonly<{
     effectCount: number;
-    outcomes: readonly ("APPLIED" | "STALE_REVISION" | "DENIED")[];
+    outcomes: readonly [
+      "APPLIED" | "STALE_REVISION" | "DENIED",
+      "APPLIED" | "STALE_REVISION" | "DENIED",
+    ];
   }>;
   readonly idempotency: Readonly<{
     effectCount: number;
-    outcomes: readonly ("APPLIED" | "DEDUPLICATED" | "DENIED")[];
+    outcomes: readonly [
+      "APPLIED" | "DEDUPLICATED" | "DENIED",
+      "APPLIED" | "DEDUPLICATED" | "DENIED",
+    ];
     retryOutcome: "APPLIED" | "DEDUPLICATED" | "DENIED";
   }>;
 }
@@ -204,7 +229,12 @@ export async function verifyR1SupplySideMatrix(
         });
         const shouldAllow = actor === "OWNER";
         assertDecision(result, shouldAllow, `${surface}/${action}/${actor}`);
-        assertNoPrivateData(result.payload, adapter.forbiddenMarkers);
+        if (shouldAllow && action === "OWNER_COMMAND") {
+          assertAcceptedOwnerCommandOutcome(surface, result);
+        }
+        if (!shouldAllow) {
+          assertNoPrivateData(result.payload, adapter.forbiddenMarkers);
+        }
         ownerBoundaryProbes += 1;
       }
     }
@@ -219,7 +249,15 @@ export async function verifyR1SupplySideMatrix(
         actor === "MFA_CAPABILITY_ACTOR",
         `${surface}/${actor}`,
       );
-      assertNoPrivateData(result.payload, adapter.forbiddenMarkers);
+      if (actor === "MFA_CAPABILITY_ACTOR") {
+        if (result.outcome !== "AUTHORIZED") {
+          throw new Error(
+            `R1 privileged review ${surface} lacked an AUTHORIZED authorizer result.`,
+          );
+        }
+      } else {
+        assertNoPrivateData(result.payload, adapter.forbiddenMarkers);
+      }
       privilegedReviewProbes += 1;
     }
   }
@@ -311,8 +349,22 @@ function assertDecision(
   }
 }
 
+function assertAcceptedOwnerCommandOutcome(
+  surface: R1OwnerSurface,
+  result: R1BoundaryProbeResult,
+): void {
+  const accepted: readonly string[] =
+    R1_OWNER_COMMAND_ACCEPTED_OUTCOMES[surface];
+  if (result.outcome === undefined || !accepted.includes(result.outcome)) {
+    throw new Error(
+      `R1 owner command ${surface} returned unaccepted outcome: ${result.outcome ?? "MISSING"}.`,
+    );
+  }
+}
+
 function assertRaceEvidence(evidence: R1CommandRaceEvidence): void {
   if (
+    evidence.idempotency.outcomes.length !== 2 ||
     evidence.idempotency.effectCount !== 1 ||
     evidence.idempotency.outcomes.filter((outcome) => outcome === "APPLIED")
       .length !== 1 ||
@@ -324,6 +376,7 @@ function assertRaceEvidence(evidence: R1CommandRaceEvidence): void {
     throw new Error("R1 idempotent race did not produce exactly one effect.");
   }
   if (
+    evidence.cas.outcomes.length !== 2 ||
     evidence.cas.effectCount !== 1 ||
     evidence.cas.outcomes.filter((outcome) => outcome === "APPLIED").length !==
       1 ||

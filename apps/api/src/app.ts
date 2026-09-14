@@ -14,12 +14,17 @@ import {
   registerPublicCraftsmanProfileRoutes,
   type PublicCraftsmanProfileRouteDependencies,
 } from "./public-craftsman-profile/routes.js";
+import {
+  registerPublicPortfolioMediaRoutes,
+  type PublicPortfolioMediaRouteDependencies,
+} from "./public-portfolio-media/routes.js";
 
 export interface ApiDependencies {
   readonly auth?: AuthModuleDependencies;
   readonly database: DatabaseHealthProbe;
   readonly observability?: ApiObservabilityDependencies;
   readonly publicCraftsmanProfiles?: PublicCraftsmanProfileRouteDependencies;
+  readonly publicPortfolioMedia?: PublicPortfolioMediaRouteDependencies;
 }
 
 export function buildApi(dependencies: ApiDependencies): FastifyInstance {
@@ -42,6 +47,9 @@ export function buildApi(dependencies: ApiDependencies): FastifyInstance {
       app,
       dependencies.publicCraftsmanProfiles,
     );
+  }
+  if (dependencies.publicPortfolioMedia !== undefined) {
+    registerPublicPortfolioMediaRoutes(app, dependencies.publicPortfolioMedia);
   }
 
   app.get("/", () => ({

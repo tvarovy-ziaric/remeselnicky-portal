@@ -460,10 +460,22 @@ export interface PublicPortfolioDeliveryRepository {
   }): Promise<"REVOKED" | "STALE">;
 }
 
-export function createPublicPortfolioDeliveryService(input: {
+export type PublicPortfolioEndpointResponse =
+  | PrivateMediaEndpointResponse
+  | Readonly<{
+      readonly headers: Readonly<
+        Record<"cache-control" | "location" | "x-content-type-options", string>
+      >;
+      readonly statusCode: 302;
+    }>;
+
+export interface PublicPortfolioDeliveryResolver {
+  resolve(mediaAssetId: string): Promise<PublicPortfolioEndpointResponse>;
+}
+
+export function createPublicPortfolioDeliveryResolver(input: {
   readonly repository: PublicPortfolioDeliveryRepository;
-  readonly storage: Pick<ObjectStorageService, "revokePublicDerivative">;
-}) {
+}): PublicPortfolioDeliveryResolver {
   return Object.freeze({
     async resolve(mediaAssetId: string) {
       if (!uuidPattern.test(mediaAssetId)) return notFoundResponse;
@@ -479,6 +491,16 @@ export function createPublicPortfolioDeliveryService(input: {
         statusCode: 302 as const,
       });
     },
+  });
+}
+
+export function createPublicPortfolioDeliveryService(input: {
+  readonly repository: PublicPortfolioDeliveryRepository;
+  readonly storage: Pick<ObjectStorageService, "revokePublicDerivative">;
+}) {
+  const resolver = createPublicPortfolioDeliveryResolver(input);
+  return Object.freeze({
+    resolve: (mediaAssetId: string) => resolver.resolve(mediaAssetId),
 
     async revokeHiddenOrModerated(mediaAssetId: string) {
       if (!uuidPattern.test(mediaAssetId)) return "NOT_FOUND" as const;

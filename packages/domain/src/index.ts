@@ -299,6 +299,8 @@ export type {
   PublicCraftsmanSpecialization,
   PublicIndicativePrice,
   PublicMunicipality,
+  PublicPortfolioPhoto,
+  PublicPortfolioProject,
   PublicVerifiedCredential,
 } from "./public-craftsman-profile.js";
 export type {

@@ -72,6 +72,7 @@ export type {
 export {
   asStorageObjectKey,
   createPrivateMediaDeliveryService,
+  createPublicPortfolioDeliveryResolver,
   createPublicPortfolioDeliveryService,
   createServerMediaEntityAccess,
   PRIVATE_MEDIA_ACCESS_GRANTS,
@@ -84,8 +85,10 @@ export type {
   PrivateMediaDeliveryRepository,
   PrivateMediaDeliverySnapshot,
   PrivateMediaEndpointResponse,
+  PublicPortfolioDeliveryResolver,
   PublicPortfolioDeliveryRepository,
   PublicPortfolioDerivativeSnapshot,
+  PublicPortfolioEndpointResponse,
   ServerMediaEntityAccess,
 } from "./delivery.js";
 export {
