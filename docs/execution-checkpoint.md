@@ -4,12 +4,12 @@ This file is the persistent implementation-status overlay for the hash-verified 
 
 - Updated: 2026-09-14
 - Definition: D01–D30 LOCKED and hash verified
-- Active release: R1 — Supply side
-- Last completed ticket: R1-014 — Portfolio media/photos/phase tags/max-15
-- Active tickets: R1-011 — public CraftsmanProfile projection/page; R1-016 — portfolio collaborators; R1-017 — featured projects max-3; R1-018 — property-photo consent/publication hooks
-- Next dependency-satisfied candidate: R1-019 — R1 authorization/privacy/E2E suite
+- Active release: R2 — Discovery
+- Last completed ticket: R1-019 — R1 authorization/privacy/E2E suite
+- Active tickets: none; R2 discovery implementation is ready to start
+- Next dependency-satisfied candidates: R2-001 — approved-PUBLIC search model; R2-002 — profession/service query and taxonomy autocomplete
 - Human gate: canonical Slovak profession/skill/location content still requires expert/legal/source review before activation; this does not block private supply-side implementation
-- Integrated verification: CI run 34821341674 passed quality, dependency audit, secret scan and clean PostgreSQL/PostGIS migrations
+- Integrated verification: CI run 34830163326 passed quality, dependency audit, secret scan, clean PostgreSQL/PostGIS migrations and the live R1 authorization/privacy matrix
 
 ## Ticket state overlay
 
@@ -58,16 +58,17 @@ This file is the persistent implementation-status overlay for the hash-verified 
 | R1-008 | DONE     | Working-since history, owner CAS/idempotency and suspension-race guards passed                               |
 | R1-009 | DONE     | Credential evidence, MFA admin review, immutable decisions and revocation/race guards passed                 |
 | R1-010 | DONE     | Independent approval/visibility/moderation history and atomic audit guards passed                            |
-| R1-011 | ACTIVE   | Public CraftsmanProfile projection/page                                                                      |
+| R1-011 | DONE     | Allowlisted public profile/page and exact public portfolio/media delivery intersection passed                |
 | R1-012 | DONE     | Lightweight UTC availability history, overlap-tolerant semantics and owner/race guards passed                |
 | R1-013 | DONE     | Immutable self-declared portfolio provenance, privacy-safe content and owner/race guards passed              |
 | R1-014 | DONE     | Private project photo sets, phase/order history, max-15 and delivery/revocation guards passed                |
 | R1-015 | DEFERRED | Job-linked provenance hooks are completed with R4 Job integration                                            |
-| R1-016 | ACTIVE   | Portfolio collaborator role/contribution and confirmation model                                              |
-| R1-017 | ACTIVE   | Owner-managed featured-project history with a hard maximum of three                                          |
-| R1-018 | ACTIVE   | Property-photo consent/publication hooks                                                                     |
+| R1-016 | DONE     | Immutable collaborator invitation/acceptance/visibility history and permission races passed                  |
+| R1-017 | DONE     | Owner-managed featured-project history, deterministic ordering and hard maximum of three passed              |
+| R1-018 | DONE     | Self-declared project/photo publication, public derivative and revoke/visibility intersections passed        |
+| R1-019 | DONE     | Live public/private/admin matrix, exact command outcomes, two-way races and leakage negatives passed         |
 
-All DONE rows above are covered by CI run `34821341674` unless a more specific earlier run is referenced in history. The run applied migrations `0000`–`0025` twice and passed the complete live PostgreSQL/PostGIS integration suite.
+All DONE rows above are covered by CI run `34830163326` unless a more specific earlier run is referenced in history. The run applied migrations `0000`–`0028` twice and passed the complete live PostgreSQL/PostGIS integration suite, including the R1 supply-side authorization/privacy matrix.
 
 ## Durable decisions
 
