@@ -263,7 +263,7 @@ async function exerciseCatalogAndRawSqlGuards(
       ) VALUES (
         ${randomUUID()}, ${profileId}, ${nonOwnerUserId}, 3,
         'UNCHANGED', 3, ${baseCode}, 26000, 80000,
-        ${JSON.stringify(extraCodes.slice(0, 3))}::jsonb,
+        ${transaction.json(extraCodes.slice(0, 3))},
         'Bežne bez príplatku.', 30000, ${"a".repeat(64)}
       )
     `;
@@ -286,7 +286,7 @@ async function exerciseCatalogAndRawSqlGuards(
         ) VALUES (
           ${randomUUID()}, ${profileId}, ${ownerUserId}, ${current.revision},
           'APPLIED', ${current.revision + 1}, ${baseCode}, 28000, 80000,
-          ${JSON.stringify(extraCodes.slice(0, 3))}::jsonb,
+          ${transaction.json(extraCodes.slice(0, 3))},
           'Volajte +421 900 123 456', 30000, ${"d".repeat(64)}
         )
       `;
@@ -303,7 +303,7 @@ async function exerciseCatalogAndRawSqlGuards(
       ) VALUES (
         ${randomUUID()}, ${profileId}, ${ownerUserId}, ${current.revision},
         'UNCHANGED', ${current.revision}, ${baseCode}, 999000, 999000,
-        ${JSON.stringify(extraCodes.slice(0, 3))}::jsonb,
+        ${transaction.json(extraCodes.slice(0, 3))},
         'Falošný no-op.', 30000, ${"b".repeat(64)}
       )
     `;
@@ -321,7 +321,7 @@ async function exerciseCatalogAndRawSqlGuards(
       ) VALUES (
         ${randomUUID()}, ${profileId}, ${ownerUserId}, ${current.revision},
         'APPLIED', ${current.revision + 1}, ${baseCode}, 28000, 80000,
-        ${JSON.stringify(extraCodes.slice(0, 3))}::jsonb,
+        ${transaction.json(extraCodes.slice(0, 3))},
         'Bez revízneho efektu.', 30000, ${"c".repeat(64)}
       )
     `;

@@ -281,7 +281,7 @@ async function insertCommand(
       ${input.baseMunicipalityCode},
       ${toMeters(input.normalRadiusKm)},
       ${toMeters(input.maximumRadiusKm)},
-      ${JSON.stringify(input.extraMunicipalityCodes)}::jsonb,
+      ${transaction.json([...input.extraMunicipalityCodes])},
       ${input.travelFeePolicy},
       ${toMeters(input.travelFeeThresholdKm)},
       ${payloadFingerprint}

@@ -137,6 +137,7 @@ function scriptedSql(responses: readonly unknown[][]): ScriptedSql {
   }) as unknown as ScriptedSql;
   Object.assign(tagged, {
     begin: (work: (transaction: Sql) => Promise<unknown>) => work(tagged),
+    json: (value: unknown) => value,
     queries,
   });
   return tagged;
