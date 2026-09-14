@@ -2,14 +2,14 @@
 
 This file is the persistent implementation-status overlay for the hash-verified canonical `IMPLEMENTATION_BACKLOG.md`. It records execution state without rewriting the canonical source bundle.
 
-- Updated: 2026-09-14
+- Updated: 2026-09-15
 - Definition: D01–D30 LOCKED and hash verified
-- Active release: R2 — Discovery
-- Last completed ticket: R2-008 — cold-start-safe trust and evidence facts
-- Active tickets: R2-009 — Recommended ranking; R2-010 — Nearest/Best-rated alternate sorts; R2-011 — search cards and why-matched explanations
-- Next dependency-satisfied candidate: R2-012 — discovery query composition, after ranking and card contracts stabilize
+- Active release: R3 — Demand side
+- Last completed ticket: R3-001 — private JobRequest DRAFT/ACTIVE core and state history
+- Active ticket: R3-002 — server autosave and draft recovery
+- Next dependency-satisfied candidate: R3-003 — auth-boundary draft survival, after autosave/recovery stabilizes
 - Human gate: canonical Slovak profession/skill/location content still requires expert/legal/source review before activation; this does not block private supply-side implementation
-- Integrated verification: commit `2a5c3a7`, CI run `34900591388`, passed quality, dependency audit, secret scan, clean PostgreSQL/PostGIS migrations 0000–0034 and the complete live R1/R2 integration suite
+- Integrated verification: commit `b6095dc`, CI run `34907529214`, passed quality, dependency audit, secret scan, clean PostgreSQL/PostGIS migrations 0000–0036 and the complete live R0/R1/R2 plus R3-001 integration suite
 
 ## Ticket state overlay
 
@@ -75,11 +75,16 @@ This file is the persistent implementation-status overlay for the hash-verified 
 | R2-006 | DONE     | Governed REQUIRED/OPTIONAL qualification policy, hard gate and privacy/race tests passed                     |
 | R2-007 | DONE     | Availability overlap facts, AVAILABLE-only soft signal/filter and private-time guards passed                 |
 | R2-008 | DONE     | Sparse trust/evidence volume, quality and confidence facts with neutral cold-start semantics passed          |
-| R2-009 | ACTIVE   | Recommended categorical ranking without numeric weights or cold-start penalty                                |
-| R2-010 | ACTIVE   | Nearest and Best-rated alternate sorts with strict fact integrity                                            |
-| R2-011 | ACTIVE   | Privacy-safe result cards and categorical why-matched explanations                                           |
+| R2-009 | DONE     | Recommended categorical ranking without numeric weights or cold-start penalty passed                        |
+| R2-010 | DONE     | Nearest and Best-rated alternate sorts with strict fact integrity passed                                     |
+| R2-011 | DONE     | Privacy-safe result cards, live qualification gates and why-matched explanations passed                      |
+| R2-012 | DONE     | Private persistent shortlist, idempotent commands and unavailable-target tombstones passed                   |
+| R2-013 | DONE     | Privacy-minimal discovery and shortlist analytics catalog tests passed                                       |
+| R2-014 | DONE     | Search abuse admission, response bounds and privacy/security/performance regressions passed                  |
+| R3-001 | DONE     | Private JobRequest identity, immutable DRAFT history and fail-closed ACTIVE transition passed                |
+| R3-002 | ACTIVE   | Server autosave and recoverable private draft sections                                                       |
 
-All DONE rows above are covered by CI run `34900591388` unless a more specific earlier run is referenced in history. The run applied migrations `0000`–`0034` twice and passed the complete live PostgreSQL/PostGIS integration suite, including the R1 supply-side authorization/privacy matrix and R2 search, distance, service-area, qualification, availability and trust-evidence assertions.
+All DONE rows above are covered by CI run `34907529214` unless a more specific earlier run is referenced in history. The run applied migrations `0000`–`0036` twice and passed the complete live PostgreSQL/PostGIS integration suite, including the R1 supply-side authorization/privacy matrix, full R2 discovery/shortlist assertions and R3-001 request-core checks.
 
 ## Durable decisions
 
