@@ -68,11 +68,11 @@ This file is the persistent implementation-status overlay for the hash-verified 
 | R1-018 | DONE     | Self-declared project/photo publication, public derivative and revoke/visibility intersections passed        |
 | R1-019 | DONE     | Live public/private/admin matrix, exact command outcomes, two-way races and leakage negatives passed         |
 | R2-001 | DONE     | Live approved-PUBLIC search views, strict public DTO and cold-start-safe discovery hooks passed              |
-| R2-002 | DONE     | Governed deterministic taxonomy autocomplete, privacy guards and live SQL execution passed                  |
+| R2-002 | DONE     | Governed deterministic taxonomy autocomplete, privacy guards and live SQL execution passed                   |
 | R2-003 | DONE     | PostGIS distance facts, optional-location semantics and privacy-safe output passed                           |
 | R2-004 | ACTIVE   | Service-radius and explicit outside-radius matching semantics                                                |
-| R2-005 | ACTIVE   | Evidence-aware specialization and skill relevance hooks                                                     |
-| R2-006 | ACTIVE   | Required credential qualification gate                                                                      |
+| R2-005 | ACTIVE   | Evidence-aware specialization and skill relevance hooks                                                      |
+| R2-006 | ACTIVE   | Required credential qualification gate                                                                       |
 
 All DONE rows above are covered by CI run `34833162665` unless a more specific earlier run is referenced in history. The run applied migrations `0000`–`0030` twice and passed the complete live PostgreSQL/PostGIS integration suite, including the R1 supply-side authorization/privacy matrix and R2 search/autocomplete/distance assertions.
 
