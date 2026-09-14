@@ -330,7 +330,7 @@ async function runFeaturedRawSqlNegatives(
       ${fixture.currentRevision + 1},
       ${[fixture.currentProjectIds[0]!, fixture.currentProjectIds[0]!]},
       ${"9".repeat(64)})
-  `).rejects.toThrow(/max_three_unique/u);
+  `).rejects.toThrow(/owned current draft featured projects required/u);
 
   await expect(
     sql.begin(async (transaction) => {
