@@ -146,10 +146,11 @@ async function createMatrixFixture(sql: Sql): Promise<MatrixFixture> {
   );
   await sql`
     INSERT INTO auth_credentials (
-      user_id, normalized_email, password_hash, normalized_phone
+      user_id, normalized_email, password_hash, normalized_phone,
+      phone_verified_at
     ) VALUES (
       ${ownerId}, ${privateEmail}, ${"$argon2id$test$" + "x".repeat(32)},
-      ${privatePhone}
+      ${privatePhone}, CURRENT_TIMESTAMP
     )
   `;
   const [profile] = await sql<{ readonly id: CraftsmanProfileId }[]>`
