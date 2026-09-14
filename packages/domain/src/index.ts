@@ -445,3 +445,4 @@ export type {
   TrustEvidenceVolume,
   TrustEvidenceVolumeCandidate,
 } from "./craftsman-trust-evidence.js";
+export * from "./job-request.js";

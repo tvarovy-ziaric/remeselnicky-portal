@@ -94,11 +94,13 @@ import { createPrivacyRepository } from "./privacy-repository.js";
 import type { PrivacyRepository } from "@portal/privacy";
 import { createCustomerProfileRepository } from "./customer-profile-repository.js";
 import { createCustomerShortlistRepository } from "./customer-shortlist-repository.js";
+import { createJobRequestRepository } from "./job-request-repository.js";
 import { createCraftsmanProfileRepository } from "./craftsman-profile-repository.js";
 import type {
   CraftsmanProfilePersistence,
   CustomerShortlistPersistence,
   CustomerProfilePersistence,
+  JobRequestPersistence,
 } from "@portal/domain";
 import * as schema from "./schema/index.js";
 
@@ -578,6 +580,8 @@ export type {
   CustomerShortlistRepositoryListResult,
 } from "./customer-shortlist-repository.js";
 export type { CustomerShortlistPersistence } from "@portal/domain";
+export { createJobRequestRepository } from "./job-request-repository.js";
+export type { JobRequestPersistence } from "@portal/domain";
 export { createCraftsmanProfileRepository } from "./craftsman-profile-repository.js";
 export type { CraftsmanProfilePersistence } from "@portal/domain";
 export {
@@ -722,6 +726,7 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly credentialClaims: CredentialClaimRepository;
   readonly customerProfiles: CustomerProfilePersistence;
   readonly customerShortlist: CustomerShortlistPersistence;
+  readonly jobRequests: JobRequestPersistence;
   readonly emailVerification: EmailVerificationRepository;
   readonly media: MediaRepository;
   readonly privateMediaDelivery: PrivateMediaDeliveryRepository;
@@ -799,6 +804,7 @@ export function createDatabase(
   const credentialClaims = createCredentialClaimRepository(sql);
   const customerProfiles = createCustomerProfileRepository(sql);
   const customerShortlist = createCustomerShortlistRepository(sql);
+  const jobRequests = createJobRequestRepository(sql);
   const emailVerification = createEmailVerificationRepository(sql);
   const media = createMediaRepository(sql);
   const privateMediaDelivery = createPrivateMediaDeliveryRepository(sql);
@@ -842,6 +848,7 @@ export function createDatabase(
     credentialClaims,
     customerProfiles,
     customerShortlist,
+    jobRequests,
     emailVerification,
     media,
     privateMediaDelivery,

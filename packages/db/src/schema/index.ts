@@ -392,3 +392,4 @@ export {
   CRAFTSMAN_AVAILABILITY_MATCH_FUNCTION,
   CRAFTSMAN_AVAILABILITY_MATCH_RESULT_COLUMNS,
 } from "./craftsman-availability-match.js";
+export * from "./job-request.js";
