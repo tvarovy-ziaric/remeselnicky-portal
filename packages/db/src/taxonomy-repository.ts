@@ -63,7 +63,7 @@ export function createProfessionTaxonomyRepository(
             ${release.supersedesReleaseId},
             ${release.checksumSha256}
           )
-          ON CONFLICT (version) DO NOTHING
+          ON CONFLICT DO NOTHING
           RETURNING release_id AS "releaseId"
         `;
         if (created.length === 1) {
