@@ -113,7 +113,7 @@ function assertCandidate(
         value.professionCodes[0] !== value.code)) ||
     new Set(value.professionCodes).size !== value.professionCodes.length ||
     value.professionCodes.some(
-      (code) => !/^PROF:[A-Z0-9][A-Z0-9_]{1,62}$/u.test(code),
+      (code) => !/^(?:PROF|TEST):[A-Z0-9][A-Z0-9_]{1,62}$/u.test(code),
     ) ||
     query.normalizedText.length === 0
   ) {
@@ -151,7 +151,9 @@ function validCode(
       : kind === "SPECIALIZATION"
         ? "SPEC"
         : "SKILL";
-  return new RegExp(`^${prefix}:[A-Z0-9][A-Z0-9_]{1,62}$`, "u").test(code);
+  return new RegExp(`^(?:${prefix}|TEST):[A-Z0-9][A-Z0-9_]{1,62}$`, "u").test(
+    code,
+  );
 }
 
 function publicSuggestion(

@@ -11,6 +11,23 @@ import {
 } from "../src/index.js";
 
 describe("taxonomy relevance facts", () => {
+  it("supports a governed synthetic taxonomy release without weakening provenance", async () => {
+    const governedProfession = await governSuggestion(
+      professionSuggestion("TEST:PROFESSION_A"),
+    );
+    const candidate = searchableCandidate({
+      professions: [profession({ code: "TEST:PROFESSION_A" })],
+    });
+    expect(
+      projectTaxonomyRelevanceFacts(
+        composeGovernedTaxonomyRelevanceQuery({
+          profession: governedProfession,
+        }),
+        candidate,
+      ).taxonomyEligibility,
+    ).toBe("EXACT_PROFESSION");
+  });
+
   it("keeps exact profession as the prerequisite and exposes evidence separately", async () => {
     const candidate = searchableCandidate({
       professions: [

@@ -93,6 +93,26 @@ describe("taxonomy autocomplete service", () => {
     expect(persistence.findCandidates.mock.calls).toEqual([]);
   });
 
+  it("accepts the reserved synthetic namespace only through governed candidates", async () => {
+    const synthetic = candidate({
+      code: "TEST:PROFESSION_A",
+      professionCodes: ["TEST:PROFESSION_A"],
+    });
+    await expect(
+      createTaxonomyAutocompleteService(repository([synthetic])).autocomplete({
+        query: "synteticka profesia",
+      }),
+    ).resolves.toMatchObject({
+      status: "OK",
+      suggestions: [
+        {
+          code: "TEST:PROFESSION_A",
+          professionCodes: ["TEST:PROFESSION_A"],
+        },
+      ],
+    });
+  });
+
   it.each([
     { activated: false },
     { contentClass: "PLACEHOLDER" },

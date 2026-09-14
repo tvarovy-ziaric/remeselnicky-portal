@@ -270,19 +270,22 @@ function supportForCapability(
 
 function isProfessionCode(value: unknown): value is string {
   return (
-    typeof value === "string" && /^PROF:[A-Z0-9][A-Z0-9_]{1,62}$/u.test(value)
+    typeof value === "string" &&
+    /^(?:PROF|TEST):[A-Z0-9][A-Z0-9_]{1,62}$/u.test(value)
   );
 }
 
 function isSpecializationCode(value: unknown): value is string {
   return (
-    typeof value === "string" && /^SPEC:[A-Z0-9][A-Z0-9_]{1,62}$/u.test(value)
+    typeof value === "string" &&
+    /^(?:SPEC|TEST):[A-Z0-9][A-Z0-9_]{1,62}$/u.test(value)
   );
 }
 
 function isSkillCode(value: unknown): value is string {
   return (
-    typeof value === "string" && /^SKILL:[A-Z0-9][A-Z0-9_]{1,62}$/u.test(value)
+    typeof value === "string" &&
+    /^(?:SKILL|TEST):[A-Z0-9][A-Z0-9_]{1,62}$/u.test(value)
   );
 }
 

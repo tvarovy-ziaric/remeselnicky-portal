@@ -889,16 +889,17 @@ function parseIdentityQuery(value: unknown): string | null | undefined {
 }
 
 function isProfessionCode(value: string): boolean {
-  return /^PROF:[A-Z0-9][A-Z0-9_]{1,62}$/u.test(value);
+  return /^(?:PROF|TEST):[A-Z0-9][A-Z0-9_]{1,62}$/u.test(value);
 }
 
 function isSpecializationCode(value: string): boolean {
-  return /^SPEC:[A-Z0-9][A-Z0-9_]{1,62}$/u.test(value);
+  return /^(?:SPEC|TEST):[A-Z0-9][A-Z0-9_]{1,62}$/u.test(value);
 }
 
 function isSkillCode(value: unknown): value is string {
   return (
-    typeof value === "string" && /^SKILL:[A-Z0-9][A-Z0-9_]{1,62}$/u.test(value)
+    typeof value === "string" &&
+    /^(?:SKILL|TEST):[A-Z0-9][A-Z0-9_]{1,62}$/u.test(value)
   );
 }
 

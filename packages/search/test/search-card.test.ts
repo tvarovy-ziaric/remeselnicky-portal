@@ -287,6 +287,9 @@ describe("public search cards", () => {
       specializationCode: null,
       timing: null,
     });
+    expect(
+      parsePublicSearchCardQuery({ professionCode: "TEST:PROFESSION_A" }),
+    ).toMatchObject({ professionCode: "TEST:PROFESSION_A" });
   });
 
   it("ranks the complete bounded cohort before applying the outward cursor", async () => {
