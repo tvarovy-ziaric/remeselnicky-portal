@@ -145,7 +145,13 @@ describe("credential qualification repository", () => {
           version: release.version,
         },
       ],
-      release.entries.map((entry) => ({ ...entry })),
+      // postgres-js preserves SELECT column order, which is intentionally
+      // different from the canonical seed object's property order.
+      release.entries.map((entry) => ({
+        professionCode: entry.professionCode,
+        credentialTypeCode: entry.credentialTypeCode,
+        requirement: entry.requirement,
+      })),
     ]);
     await expect(
       createCredentialQualificationRepository(sql).installRelease(release),

@@ -182,7 +182,16 @@ async function assertStoredRelease(
     header.reviewReference !== release.reviewReference ||
     header.supersedesReleaseId !== release.supersedesReleaseId ||
     header.checksumSha256 !== release.checksumSha256 ||
-    JSON.stringify(entries) !== JSON.stringify(release.entries)
+    entries.length !== release.entries.length ||
+    entries.some((entry, index) => {
+      const expected = release.entries[index];
+      return (
+        expected === undefined ||
+        entry.professionCode !== expected.professionCode ||
+        entry.credentialTypeCode !== expected.credentialTypeCode ||
+        entry.requirement !== expected.requirement
+      );
+    })
   ) {
     throw new Error(
       "Existing credential qualification policy conflicts with the governed release.",
