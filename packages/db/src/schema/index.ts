@@ -367,3 +367,7 @@ export {
   CRAFTSMAN_SEARCH_READ_MODEL_VIEWS,
   SEARCHABLE_CRAFTSMAN_PROFILE_COLUMNS,
 } from "./craftsman-search-read-model.js";
+export {
+  CRAFTSMAN_SERVICE_AREA_MATCH_FUNCTION,
+  CRAFTSMAN_SERVICE_AREA_MATCH_RESULT_COLUMNS,
+} from "./craftsman-service-area-match.js";

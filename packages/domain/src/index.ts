@@ -81,6 +81,22 @@ export type {
   ReplaceCraftsmanServiceAreaInput,
   ReplaceCraftsmanServiceAreaResult,
 } from "./craftsman-service-area.js";
+export {
+  assertCraftsmanServiceAreaMatchQuery,
+  CRAFTSMAN_SERVICE_AREA_MATCH_KINDS,
+  createCraftsmanServiceAreaMatch,
+  CraftsmanServiceAreaMatchValidationError,
+  serializePublicCraftsmanServiceAreaMatch,
+} from "./craftsman-service-area-match.js";
+export type {
+  CraftsmanServiceAreaMatch,
+  CraftsmanServiceAreaMatchKind,
+  CraftsmanServiceAreaMatchPersistence,
+  CraftsmanServiceAreaMatchQuery,
+  CraftsmanServiceAreaMatchResult,
+  CraftsmanServiceAreaMatchValues,
+  PublicCraftsmanServiceAreaMatch,
+} from "./craftsman-service-area-match.js";
 export type {
   AssignCraftsmanProfessionInput,
   AssignCraftsmanProfessionResult,

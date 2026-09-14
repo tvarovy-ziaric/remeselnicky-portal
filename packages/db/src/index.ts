@@ -68,9 +68,11 @@ import type { CraftsmanPublicationPersistence } from "@portal/domain";
 import { createPublicCraftsmanProfileRepository } from "./public-craftsman-profile-repository.js";
 import { createCraftsmanSearchReadModelRepository } from "./craftsman-search-read-model-repository.js";
 import { createCraftsmanDistanceRepository } from "./craftsman-distance-repository.js";
+import { createCraftsmanServiceAreaMatchRepository } from "./craftsman-service-area-match-repository.js";
 import type {
   CraftsmanDistancePersistence,
   CraftsmanSearchReadModelPersistence,
+  CraftsmanServiceAreaMatchPersistence,
   PublicCraftsmanProfilePersistence,
 } from "@portal/domain";
 import { createTaxonomyAutocompleteRepository } from "./taxonomy-autocomplete-repository.js";
@@ -468,14 +470,18 @@ export { createPublicCraftsmanProfileRepository } from "./public-craftsman-profi
 export type { PublicCraftsmanProfilePersistence } from "@portal/domain";
 export { createCraftsmanSearchReadModelRepository } from "./craftsman-search-read-model-repository.js";
 export { createCraftsmanDistanceRepository } from "./craftsman-distance-repository.js";
+export { createCraftsmanServiceAreaMatchRepository } from "./craftsman-service-area-match-repository.js";
 export type {
   CraftsmanDistancePersistence,
   CraftsmanSearchReadModelPersistence,
+  CraftsmanServiceAreaMatchPersistence,
 } from "@portal/domain";
 export { createTaxonomyAutocompleteRepository } from "./taxonomy-autocomplete-repository.js";
 export type { TaxonomyAutocompletePersistence } from "@portal/search";
 export {
   CRAFTSMAN_SEARCH_READ_MODEL_VIEWS,
+  CRAFTSMAN_SERVICE_AREA_MATCH_FUNCTION,
+  CRAFTSMAN_SERVICE_AREA_MATCH_RESULT_COLUMNS,
   SEARCHABLE_CRAFTSMAN_PROFILE_COLUMNS,
 } from "./schema/index.js";
 export { createPrivacyRepository } from "./privacy-repository.js";
@@ -669,6 +675,7 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly publicCraftsmanProfiles: PublicCraftsmanProfilePersistence;
   readonly craftsmanSearch: CraftsmanSearchReadModelPersistence;
   readonly craftsmanDistances: CraftsmanDistancePersistence;
+  readonly craftsmanServiceAreaMatches: CraftsmanServiceAreaMatchPersistence;
   readonly taxonomyAutocomplete: TaxonomyAutocompletePersistence;
   readonly credentialClaims: CredentialClaimRepository;
   readonly customerProfiles: CustomerProfilePersistence;
@@ -738,6 +745,8 @@ export function createDatabase(
   const publicCraftsmanProfiles = createPublicCraftsmanProfileRepository(sql);
   const craftsmanSearch = createCraftsmanSearchReadModelRepository(sql);
   const craftsmanDistances = createCraftsmanDistanceRepository(sql);
+  const craftsmanServiceAreaMatches =
+    createCraftsmanServiceAreaMatchRepository(sql);
   const taxonomyAutocomplete = createTaxonomyAutocompleteRepository(sql);
   const credentialClaims = createCredentialClaimRepository(sql);
   const customerProfiles = createCustomerProfileRepository(sql);
@@ -775,6 +784,7 @@ export function createDatabase(
     publicCraftsmanProfiles,
     craftsmanSearch,
     craftsmanDistances,
+    craftsmanServiceAreaMatches,
     taxonomyAutocomplete,
     credentialClaims,
     customerProfiles,
