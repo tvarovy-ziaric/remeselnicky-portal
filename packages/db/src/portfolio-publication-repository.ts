@@ -687,7 +687,7 @@ function assertStoredDerivatives(
       !Number.isSafeInteger(derivative.canonicalHeight) ||
       derivative.canonicalHeight < 1 ||
       derivative.canonicalHeight > 12_000 ||
-      derivative.displayOrder !== index ||
+      derivative.displayOrder !== index + 1 ||
       !["BEFORE", "PROGRESS", "AFTER", "OTHER"].includes(derivative.phase) ||
       attachmentIds.has(derivative.attachmentId) ||
       mediaAssetIds.has(derivative.mediaAssetId) ||
