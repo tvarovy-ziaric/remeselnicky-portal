@@ -57,6 +57,20 @@ describe("credential qualification policy release", () => {
     ).toThrow(/ordering/u);
   });
 
+  it("accepts a governed TEST profession in an isolated policy release", () => {
+    expect(() =>
+      prepareCredentialQualificationPolicyRelease({
+        ...seed,
+        entries: [
+          {
+            ...seed.entries[0]!,
+            professionCode: "TEST:INTEGRATION_PROFESSION",
+          },
+        ],
+      }),
+    ).not.toThrow();
+  });
+
   it.each([
     { ...seed, entries: [] },
     { ...seed, reviewReference: "short" },

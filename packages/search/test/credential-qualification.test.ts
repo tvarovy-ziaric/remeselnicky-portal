@@ -78,6 +78,16 @@ describe("credential qualification gate", () => {
     expect(persistence.evaluateMock).not.toHaveBeenCalled();
   });
 
+  it("accepts the governed TEST namespace used by isolated integration taxonomies", async () => {
+    const persistence = fakePersistence(null);
+    await expect(
+      createCredentialQualificationGate(persistence).evaluate({
+        ...input,
+        professionCode: "TEST:INTEGRATION_PROFESSION",
+      }),
+    ).resolves.toEqual({ eligible: false, status: "UNAVAILABLE" });
+  });
+
   it("returns only the bounded qualification allowlist", () => {
     const result = serializeCredentialQualification(
       row("QUALIFIED", "REQUIRED", true, "REQUIRED_CREDENTIAL_APPROVED", {

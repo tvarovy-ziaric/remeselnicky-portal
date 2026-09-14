@@ -121,7 +121,7 @@ function validateRelease(input: CredentialQualificationPolicyReleaseSeed) {
   for (const entry of input.entries) {
     const identity = `${entry.professionCode}\u0000${entry.credentialTypeCode}`;
     if (
-      !/^PROF:[A-Z0-9][A-Z0-9_]{1,62}$/u.test(entry.professionCode) ||
+      !/^(?:PROF|TEST):[A-Z0-9][A-Z0-9_]{1,62}$/u.test(entry.professionCode) ||
       !/^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/u.test(entry.credentialTypeCode) ||
       entry.credentialTypeCode.length > 64 ||
       (entry.requirement !== "REQUIRED" && entry.requirement !== "OPTIONAL") ||

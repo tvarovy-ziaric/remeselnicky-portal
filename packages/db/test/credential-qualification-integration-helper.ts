@@ -36,6 +36,7 @@ const codes = Object.freeze({
   rejected: "test.r2006-rejected",
   revoked: "test.r2006-revoked",
 });
+const unknownCredentialTypeCode = ["test.r2006", "unknown"].join("-");
 
 interface AdminFixture {
   readonly rawSessionId: string;
@@ -148,7 +149,7 @@ export async function runCredentialQualificationIntegrationAssertions(
   await expect(
     gate.evaluate({
       craftsmanProfileId: profile.profileId,
-      credentialTypeCode: "test.r2006-unknown",
+      credentialTypeCode: unknownCredentialTypeCode,
       professionCode: profile.professionCode,
     }),
   ).resolves.toEqual({ eligible: false, status: "UNAVAILABLE" });

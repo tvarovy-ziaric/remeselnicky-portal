@@ -82,7 +82,7 @@ export function assertCredentialQualificationInput(
     typeof input !== "object" ||
     Array.isArray(input) ||
     !isUuid(input.craftsmanProfileId) ||
-    !/^PROF:[A-Z0-9][A-Z0-9_]{1,62}$/u.test(input.professionCode) ||
+    !/^(?:PROF|TEST):[A-Z0-9][A-Z0-9_]{1,62}$/u.test(input.professionCode) ||
     !/^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/u.test(input.credentialTypeCode) ||
     input.credentialTypeCode.length > 64
   ) {
