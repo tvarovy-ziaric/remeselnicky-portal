@@ -151,8 +151,30 @@ export async function runNotificationIntegrationAssertions(
   `).rejects.toThrow(/notification provenance and content are immutable/u);
 
   await expect(sql`
-    UPDATE notifications
-    SET payload = ${sql.json({ exact_address: "Private:12" })}
+    INSERT INTO notifications (
+      recipient_user_id,
+      type,
+      domain_event_id,
+      event_idempotency_key,
+      entity_type,
+      entity_id,
+      entity_revision,
+      deep_link_path,
+      priority,
+      payload
+    )
+    SELECT
+      ${other.id},
+      type,
+      domain_event_id,
+      event_idempotency_key,
+      entity_type,
+      entity_id,
+      entity_revision,
+      deep_link_path,
+      priority,
+      ${sql.json({ exact_address: "Private:12" })}
+    FROM notifications
     WHERE id = ${notification.id}
   `).rejects.toThrow(/notifications_payload_is_safe/u);
 }
