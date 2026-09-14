@@ -555,11 +555,11 @@ BEGIN
       OR audit.correlation_id IS DISTINCT FROM NEW.command_id
       OR audit.target_type IS DISTINCT FROM 'CREDENTIAL_CLAIM'
       OR audit.target_id IS DISTINCT FROM NEW.claim_id::text
-      OR audit.action_type IS DISTINCT FROM CASE NEW.command_kind
+      OR audit.action_type IS DISTINCT FROM (CASE NEW.command_kind
         WHEN 'APPROVE' THEN 'admin.credential.approved'
         WHEN 'REJECT' THEN 'admin.credential.rejected'
         ELSE 'admin.credential.revoked'
-      END
+      END)
       OR audit.changes IS DISTINCT FROM jsonb_build_object(
         'credential_state',
         jsonb_build_object(
