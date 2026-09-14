@@ -25,6 +25,10 @@ import {
   registerAdminAuthRoutes,
   type AdminAuthRouteDependencies,
 } from "../admin-auth/index.js";
+import {
+  registerCustomerShortlistRoutes,
+  type CustomerShortlistRouteDependencies,
+} from "../customer-shortlist/routes.js";
 import { createSessionGuard } from "./guard.js";
 import {
   createEmailVerificationService,
@@ -64,6 +68,10 @@ export interface AuthModuleDependencies {
   readonly adminAccess?: Pick<AdminAuthRouteDependencies, "service">;
   readonly clock?: () => Date;
   readonly config: AuthRuntimeConfig;
+  readonly customerShortlist?: Pick<
+    CustomerShortlistRouteDependencies,
+    "onApplied" | "shortlist"
+  >;
   readonly delivery?: PasswordResetDeliveryPort;
   readonly emailVerification?: {
     readonly delivery?: EmailVerificationDeliveryPort;
@@ -193,6 +201,12 @@ async function configureAuthModule(
       : { tokens: dependencies.tokens }),
   });
   const guard = createSessionGuard(dependencies.persistence);
+  if (dependencies.customerShortlist !== undefined) {
+    registerCustomerShortlistRoutes(app, {
+      guard,
+      ...dependencies.customerShortlist,
+    });
+  }
   if (dependencies.adminAccess !== undefined) {
     registerAdminAuthRoutes(app, {
       config,

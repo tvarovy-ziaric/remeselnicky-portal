@@ -21,6 +21,21 @@ export type {
   EnsureCustomerProfileResult,
 } from "./customer-profile.js";
 export {
+  assertCustomerShortlistCommandInput,
+  createCustomerShortlistService,
+} from "./customer-shortlist.js";
+export type {
+  CustomerShortlistCommandInput,
+  CustomerShortlistCommandResult,
+  CustomerShortlistCommandStatus,
+  CustomerShortlistEntry,
+  CustomerShortlistListResult,
+  CustomerShortlistPersistence,
+  CustomerShortlistService,
+  CustomerShortlistState,
+  PersistCustomerShortlistCommandInput,
+} from "./customer-shortlist.js";
+export {
   CRAFTSMAN_PROFILE_TYPES,
   CraftsmanProfileValidationError,
   createCraftsmanProfileService,

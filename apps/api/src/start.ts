@@ -1,5 +1,9 @@
 import { loadServerConfig } from "@portal/config/server";
 import { createDatabase } from "@portal/db";
+import {
+  createCustomerProfileService,
+  createCustomerShortlistService,
+} from "@portal/domain";
 import { createPublicPortfolioDeliveryResolver } from "@portal/media";
 import {
   createCentralErrorTracker,
@@ -9,7 +13,10 @@ import {
   createStreamDestination,
   createStructuredLogger,
 } from "@portal/observability";
-import { createTaxonomyAutocompleteService } from "@portal/search";
+import {
+  createPublicSearchCardSearch,
+  createTaxonomyAutocompleteService,
+} from "@portal/search";
 
 import { buildApi } from "./app.js";
 import {
@@ -40,6 +47,15 @@ const errorTracker = createCentralErrorTracker({
 });
 const metrics = createPortalMetrics(observabilityContext);
 const monitoringServer = createMonitoringServer({ metrics });
+const customerShortlist = createCustomerShortlistService({
+  customerProfiles: createCustomerProfileService({
+    persistence: database.customerProfiles,
+  }),
+  persistence: database.customerShortlist,
+});
+const publicSearchCards = createPublicSearchCardSearch(
+  database.publicSearchCards,
+);
 
 const app = buildApi({
   auth: {
@@ -58,6 +74,7 @@ const app = buildApi({
         database.phoneVerification,
       ),
     },
+    customerShortlist: { shortlist: customerShortlist },
     persistence: authPersistence,
   },
   database,
@@ -67,6 +84,7 @@ const app = buildApi({
       repository: database.publicPortfolioDelivery,
     }),
   },
+  publicSearchCards: { searchCards: publicSearchCards },
   taxonomyAutocomplete: {
     autocomplete: createTaxonomyAutocompleteService(
       database.taxonomyAutocomplete,

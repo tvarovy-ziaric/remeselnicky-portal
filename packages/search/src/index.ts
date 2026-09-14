@@ -100,3 +100,28 @@ export type {
   BestRatedSortFact,
   EligibleAlternateSortCandidate,
 } from "./alternate-sort.js";
+export {
+  composePublicSearchCards,
+  createPublicSearchCardSearch,
+  parsePublicSearchCardQuery,
+  PUBLIC_SEARCH_CARD_DEFAULT_LIMIT,
+  PUBLIC_SEARCH_CARD_MAX_BADGES,
+  PUBLIC_SEARCH_CARD_MAX_LIMIT,
+  PUBLIC_SEARCH_CARD_MAX_REASONS,
+  PUBLIC_SEARCH_CARD_MAX_SKILLS,
+  PUBLIC_SEARCH_SORT_MODES,
+  PublicSearchCardIntegrityError,
+} from "./search-card.js";
+export type {
+  PublicSearchCard,
+  PublicSearchCardBadge,
+  PublicSearchCardPage,
+  PublicSearchCardQuery,
+  PublicSearchCardReason,
+  PublicSearchCardSearch,
+  PublicSearchCardSearchResult,
+  PublicSearchCardSource,
+  PublicSearchDiscoveryBatch,
+  PublicSearchPreparedCohort,
+  PublicSearchSortMode,
+} from "./search-card.js";

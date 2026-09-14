@@ -11,3 +11,13 @@ export {
   TAXONOMY_AUTOCOMPLETE_PATH,
 } from "./taxonomy-autocomplete/routes.js";
 export type { TaxonomyAutocompleteRouteDependencies } from "./taxonomy-autocomplete/routes.js";
+export {
+  CUSTOMER_SHORTLIST_PATHS,
+  registerCustomerShortlistRoutes,
+} from "./customer-shortlist/routes.js";
+export type { CustomerShortlistRouteDependencies } from "./customer-shortlist/routes.js";
+export {
+  PUBLIC_SEARCH_CARDS_PATH,
+  registerPublicSearchCardRoutes,
+} from "./public-search-cards/routes.js";
+export type { PublicSearchCardRouteDependencies } from "./public-search-cards/routes.js";

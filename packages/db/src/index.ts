@@ -71,6 +71,7 @@ import { createCraftsmanDistanceRepository } from "./craftsman-distance-reposito
 import { createCraftsmanServiceAreaMatchRepository } from "./craftsman-service-area-match-repository.js";
 import { createCraftsmanAvailabilityMatchRepository } from "./craftsman-availability-match-repository.js";
 import { createCraftsmanTrustEvidenceRepository } from "./craftsman-trust-evidence-repository.js";
+import { createPublicSearchCardSource } from "./public-search-card-source.js";
 import type {
   CraftsmanAvailabilityMatchPersistence,
   CraftsmanDistancePersistence,
@@ -92,9 +93,11 @@ import {
 import { createPrivacyRepository } from "./privacy-repository.js";
 import type { PrivacyRepository } from "@portal/privacy";
 import { createCustomerProfileRepository } from "./customer-profile-repository.js";
+import { createCustomerShortlistRepository } from "./customer-shortlist-repository.js";
 import { createCraftsmanProfileRepository } from "./craftsman-profile-repository.js";
 import type {
   CraftsmanProfilePersistence,
+  CustomerShortlistPersistence,
   CustomerProfilePersistence,
 } from "@portal/domain";
 import * as schema from "./schema/index.js";
@@ -481,6 +484,12 @@ export { createCraftsmanDistanceRepository } from "./craftsman-distance-reposito
 export { createCraftsmanServiceAreaMatchRepository } from "./craftsman-service-area-match-repository.js";
 export { createCraftsmanAvailabilityMatchRepository } from "./craftsman-availability-match-repository.js";
 export { createCraftsmanTrustEvidenceRepository } from "./craftsman-trust-evidence-repository.js";
+export { createPublicSearchCardSource } from "./public-search-card-source.js";
+export type {
+  DatabasePublicSearchCardQuery,
+  DatabasePublicSearchCardSource,
+  DatabasePublicSearchPreparedCohort,
+} from "./public-search-card-source.js";
 export type {
   CraftsmanAvailabilityMatchPersistence,
   CraftsmanDistancePersistence,
@@ -558,6 +567,17 @@ export { createProfessionTaxonomyRepository } from "./taxonomy-repository.js";
 export type { ProfessionTaxonomyPersistence } from "@portal/taxonomy";
 export { createCustomerProfileRepository } from "./customer-profile-repository.js";
 export type { CustomerProfilePersistence } from "@portal/domain";
+export {
+  createCustomerShortlistRepository,
+  CustomerShortlistIdempotencyError,
+} from "./customer-shortlist-repository.js";
+export type {
+  CustomerShortlistRepositoryAddInput,
+  CustomerShortlistRepositoryCommandInput,
+  CustomerShortlistRepositoryCommandResult,
+  CustomerShortlistRepositoryListResult,
+} from "./customer-shortlist-repository.js";
+export type { CustomerShortlistPersistence } from "@portal/domain";
 export { createCraftsmanProfileRepository } from "./craftsman-profile-repository.js";
 export type { CraftsmanProfilePersistence } from "@portal/domain";
 export {
@@ -696,10 +716,12 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly craftsmanServiceAreaMatches: CraftsmanServiceAreaMatchPersistence;
   readonly craftsmanAvailabilityMatches: CraftsmanAvailabilityMatchPersistence;
   readonly craftsmanTrustEvidence: CraftsmanTrustEvidencePersistence;
+  readonly publicSearchCards: ReturnType<typeof createPublicSearchCardSource>;
   readonly taxonomyAutocomplete: TaxonomyAutocompletePersistence;
   readonly credentialQualifications: CredentialQualificationPolicyPersistence;
   readonly credentialClaims: CredentialClaimRepository;
   readonly customerProfiles: CustomerProfilePersistence;
+  readonly customerShortlist: CustomerShortlistPersistence;
   readonly emailVerification: EmailVerificationRepository;
   readonly media: MediaRepository;
   readonly privateMediaDelivery: PrivateMediaDeliveryRepository;
@@ -771,10 +793,12 @@ export function createDatabase(
   const craftsmanAvailabilityMatches =
     createCraftsmanAvailabilityMatchRepository(sql);
   const craftsmanTrustEvidence = createCraftsmanTrustEvidenceRepository(sql);
+  const publicSearchCards = createPublicSearchCardSource(sql);
   const taxonomyAutocomplete = createTaxonomyAutocompleteRepository(sql);
   const credentialQualifications = createCredentialQualificationRepository(sql);
   const credentialClaims = createCredentialClaimRepository(sql);
   const customerProfiles = createCustomerProfileRepository(sql);
+  const customerShortlist = createCustomerShortlistRepository(sql);
   const emailVerification = createEmailVerificationRepository(sql);
   const media = createMediaRepository(sql);
   const privateMediaDelivery = createPrivateMediaDeliveryRepository(sql);
@@ -812,10 +836,12 @@ export function createDatabase(
     craftsmanServiceAreaMatches,
     craftsmanAvailabilityMatches,
     craftsmanTrustEvidence,
+    publicSearchCards,
     taxonomyAutocomplete,
     credentialQualifications,
     credentialClaims,
     customerProfiles,
+    customerShortlist,
     emailVerification,
     media,
     privateMediaDelivery,

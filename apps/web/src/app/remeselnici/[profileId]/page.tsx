@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { CustomerShortlistToggle } from "../../../customer-shortlist-toggle";
 import { loadPublicCraftsmanProfile } from "../../../public-craftsman-profile-client";
 import {
   formatEurCents,
@@ -46,6 +47,7 @@ export default async function PublicCraftsmanProfilePage({
             </p>
           )}
           <p>{profile.identity.about}</p>
+          <CustomerShortlistToggle craftsmanProfileId={profile.profileId} />
         </header>
 
         <section

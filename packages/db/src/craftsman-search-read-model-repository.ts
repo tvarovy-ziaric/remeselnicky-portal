@@ -152,6 +152,61 @@ async function searchSnapshot(
   if (pageRows.length === 0) {
     return Object.freeze({ items: Object.freeze([]), nextCursor: null });
   }
+  return hydrateCandidateRows(sql, pageRows, hasNextPage);
+}
+
+export async function readCraftsmanCandidatesByIdsSnapshot(
+  sql: TransactionSql,
+  profileIds: readonly string[],
+) {
+  if (profileIds.length === 0) {
+    return Object.freeze({ items: Object.freeze([]), nextCursor: null });
+  }
+  const rows = await sql<ProfileRow[]>`
+    SELECT
+      profile.craftsman_profile_id AS "profileId",
+      profile.profile_type AS "profileType",
+      profile.primary_name AS "primaryName",
+      profile.secondary_name AS "secondaryName",
+      profile.base_municipality_code AS "baseMunicipalityCode",
+      profile.base_municipality_name AS "baseMunicipalityName",
+      profile.normal_radius_meters AS "normalRadiusMeters",
+      profile.maximum_radius_meters AS "maximumRadiusMeters",
+      profile.extra_municipality_codes AS "extraMunicipalityCodes",
+      profile.identity_verified AS "identityVerified",
+      profile.company_registration_verified AS "companyRegistrationVerified",
+      availability.has_declared_availability AS "hasDeclaredAvailability",
+      portfolio.has_verified_evidence AS "hasVerifiedEvidence",
+      portfolio.has_unverified_content AS "hasUnverifiedContent",
+      portfolio.profession_codes AS "portfolioProfessionCodes",
+      portfolio.specialization_codes AS "portfolioSpecializationCodes",
+      portfolio.skill_codes AS "portfolioSkillCodes",
+      portfolio.representative_media_asset_id AS "representativeMediaAssetId",
+      trust.customer_score AS "customerScore",
+      trust.review_count AS "reviewCount",
+      trust.review_sample_sufficient AS "reviewSampleSufficient",
+      trust.verified_work_count AS "verifiedWorkCount",
+      experience.working_since_year AS "workingSinceYear"
+    FROM current_searchable_craftsman_profiles profile
+    JOIN current_searchable_craftsman_availability_signals availability
+      ON availability.craftsman_profile_id = profile.craftsman_profile_id
+    JOIN current_searchable_craftsman_portfolio_signals portfolio
+      ON portfolio.craftsman_profile_id = profile.craftsman_profile_id
+    JOIN current_searchable_craftsman_trust_signals trust
+      ON trust.craftsman_profile_id = profile.craftsman_profile_id
+    LEFT JOIN current_searchable_craftsman_experience experience
+      ON experience.craftsman_profile_id = profile.craftsman_profile_id
+    WHERE profile.craftsman_profile_id = ANY(${profileIds}::uuid[])
+    ORDER BY profile.craftsman_profile_id
+  `;
+  return hydrateCandidateRows(sql, rows, false);
+}
+
+async function hydrateCandidateRows(
+  sql: TransactionSql,
+  pageRows: readonly ProfileRow[],
+  hasNextPage: boolean,
+) {
   const profileIds = pageRows.map(({ profileId }) => profileId);
 
   const professions = await sql<ProfessionRow[]>`

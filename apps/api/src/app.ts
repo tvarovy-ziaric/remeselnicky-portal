@@ -22,6 +22,10 @@ import {
   registerTaxonomyAutocompleteRoutes,
   type TaxonomyAutocompleteRouteDependencies,
 } from "./taxonomy-autocomplete/routes.js";
+import {
+  registerPublicSearchCardRoutes,
+  type PublicSearchCardRouteDependencies,
+} from "./public-search-cards/routes.js";
 
 export interface ApiDependencies {
   readonly auth?: AuthModuleDependencies;
@@ -29,6 +33,7 @@ export interface ApiDependencies {
   readonly observability?: ApiObservabilityDependencies;
   readonly publicCraftsmanProfiles?: PublicCraftsmanProfileRouteDependencies;
   readonly publicPortfolioMedia?: PublicPortfolioMediaRouteDependencies;
+  readonly publicSearchCards?: PublicSearchCardRouteDependencies;
   readonly taxonomyAutocomplete?: TaxonomyAutocompleteRouteDependencies;
 }
 
@@ -55,6 +60,9 @@ export function buildApi(dependencies: ApiDependencies): FastifyInstance {
   }
   if (dependencies.publicPortfolioMedia !== undefined) {
     registerPublicPortfolioMediaRoutes(app, dependencies.publicPortfolioMedia);
+  }
+  if (dependencies.publicSearchCards !== undefined) {
+    registerPublicSearchCardRoutes(app, dependencies.publicSearchCards);
   }
   if (dependencies.taxonomyAutocomplete !== undefined) {
     registerTaxonomyAutocompleteRoutes(app, dependencies.taxonomyAutocomplete);

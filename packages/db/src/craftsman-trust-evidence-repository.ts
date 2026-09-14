@@ -49,13 +49,14 @@ export function createCraftsmanTrustEvidenceRepository(
       const profileIds = normalizeTrustEvidenceProfileIds(input.profileIds);
       return sql.begin(
         "isolation level repeatable read read only",
-        async (transaction) => readSnapshot(transaction, profileIds),
+        async (transaction) =>
+          readCraftsmanTrustEvidenceSnapshot(transaction, profileIds),
       );
     },
   });
 }
 
-async function readSnapshot(
+export async function readCraftsmanTrustEvidenceSnapshot(
   sql: TransactionSql,
   profileIds: readonly string[],
 ) {

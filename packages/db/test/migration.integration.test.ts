@@ -40,12 +40,12 @@ import { runPortfolioCollaborationIntegrationAssertions } from "./portfolio-coll
 import { runFeaturedProjectIntegrationAssertions } from "./featured-project-integration-helper.js";
 import { runPortfolioPublicationIntegrationAssertions } from "./portfolio-publication-integration-helper.js";
 import { runR1SupplySideIntegrationAssertions } from "./r1-supply-side-integration-helper.js";
-import { runCraftsmanSearchReadModelIntegrationAssertions } from "./craftsman-search-read-model-integration-helper.js";
+import { runPublicSearchCardIntegrationAssertions } from "./public-search-card-integration-helper.js";
 import { runCraftsmanDistanceIntegrationAssertions } from "./craftsman-distance-integration-helper.js";
 import { runCraftsmanServiceAreaMatchIntegrationAssertions } from "./craftsman-service-area-match-integration-helper.js";
-import { runCredentialQualificationIntegrationAssertions } from "./credential-qualification-integration-helper.js";
 import { runCraftsmanAvailabilityMatchIntegrationAssertions } from "./craftsman-availability-match-integration-helper.js";
 import { runCraftsmanTrustEvidenceIntegrationAssertions } from "./craftsman-trust-evidence-integration-helper.js";
+import { runCustomerShortlistIntegrationAssertions } from "./customer-shortlist-integration-helper.js";
 
 const testDatabaseUrl = process.env["TEST_DATABASE_URL"];
 const migrationsDirectory = fileURLToPath(
@@ -106,6 +106,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
           "0032_credential_qualification_gate.sql",
           "0033_craftsman_availability_matching.sql",
           "0034_trust_evidence_read_model.sql",
+          "0035_customer_shortlist.sql",
         ],
         alreadyApplied: 0,
       });
@@ -114,7 +115,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         testDatabaseUrl,
         migrationsDirectory,
       );
-      expect(secondRun).toEqual({ applied: [], alreadyApplied: 35 });
+      expect(secondRun).toEqual({ applied: [], alreadyApplied: 36 });
 
       const sql = postgres(testDatabaseUrl, { max: 5 });
       try {
@@ -160,7 +161,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         `;
 
         expect(postgis?.extversion).toMatch(/^3\./);
-        expect(ledger?.count).toBe(35);
+        expect(ledger?.count).toBe(36);
         expect(created).toMatchObject({ account_state: "ACTIVE" });
         expect(created?.id).toMatch(
           /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
@@ -1686,7 +1687,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         await runFeaturedProjectIntegrationAssertions(sql);
         await runPortfolioPublicationIntegrationAssertions(sql);
         await runR1SupplySideIntegrationAssertions(sql);
-        await runCraftsmanSearchReadModelIntegrationAssertions(sql);
+        await runPublicSearchCardIntegrationAssertions(sql);
         await createTaxonomyAutocompleteRepository(sql).findCandidates({
           limit: 10,
           normalizedText: "test",
@@ -1694,9 +1695,9 @@ describe.skipIf(testDatabaseUrl === undefined)(
         });
         await runCraftsmanDistanceIntegrationAssertions(sql);
         await runCraftsmanServiceAreaMatchIntegrationAssertions(sql);
-        await runCredentialQualificationIntegrationAssertions(sql);
         await runCraftsmanAvailabilityMatchIntegrationAssertions(sql);
         await runCraftsmanTrustEvidenceIntegrationAssertions(sql);
+        await runCustomerShortlistIntegrationAssertions(sql);
 
         await adminAccess.revokePrivilegedSession(superSessionDigest);
         await expect(
