@@ -5,11 +5,11 @@ This file is the persistent implementation-status overlay for the hash-verified 
 - Updated: 2026-09-14
 - Definition: D01–D30 LOCKED and hash verified
 - Active release: R2 — Discovery
-- Last completed ticket: R1-019 — R1 authorization/privacy/E2E suite
-- Active tickets: R2-001 — approved-PUBLIC search model; R2-002 — profession/service query and taxonomy autocomplete; R2-003 — PostGIS distance query
-- Next dependency-satisfied candidate: R2-004 — service-radius/outside-radius matching semantics, after the core search and distance contracts stabilize
+- Last completed ticket: R2-003 — privacy-safe PostGIS distance query
+- Active tickets: R2-004 — service-radius/outside-radius matching; R2-005 — evidence-aware specialization/skill relevance; R2-006 — required credential qualification gate
+- Next dependency-satisfied candidate: R2-007 — availability soft signal/filter, after the core qualification pipeline stabilizes
 - Human gate: canonical Slovak profession/skill/location content still requires expert/legal/source review before activation; this does not block private supply-side implementation
-- Integrated verification: CI run 34830163326 passed quality, dependency audit, secret scan, clean PostgreSQL/PostGIS migrations and the live R1 authorization/privacy matrix
+- Integrated verification: CI run 34833162665 passed quality, dependency audit, secret scan, clean PostgreSQL/PostGIS migrations 0000–0030, the live R1 authorization/privacy matrix and R2 discovery foundations
 
 ## Ticket state overlay
 
@@ -67,11 +67,14 @@ This file is the persistent implementation-status overlay for the hash-verified 
 | R1-017 | DONE     | Owner-managed featured-project history, deterministic ordering and hard maximum of three passed              |
 | R1-018 | DONE     | Self-declared project/photo publication, public derivative and revoke/visibility intersections passed        |
 | R1-019 | DONE     | Live public/private/admin matrix, exact command outcomes, two-way races and leakage negatives passed         |
-| R2-001 | ACTIVE   | Approved-PUBLIC search index/query model                                                                     |
-| R2-002 | ACTIVE   | Profession/service query and governed taxonomy autocomplete                                                  |
-| R2-003 | ACTIVE   | Privacy-safe PostGIS distance query                                                                          |
+| R2-001 | DONE     | Live approved-PUBLIC search views, strict public DTO and cold-start-safe discovery hooks passed              |
+| R2-002 | DONE     | Governed deterministic taxonomy autocomplete, privacy guards and live SQL execution passed                  |
+| R2-003 | DONE     | PostGIS distance facts, optional-location semantics and privacy-safe output passed                           |
+| R2-004 | ACTIVE   | Service-radius and explicit outside-radius matching semantics                                                |
+| R2-005 | ACTIVE   | Evidence-aware specialization and skill relevance hooks                                                     |
+| R2-006 | ACTIVE   | Required credential qualification gate                                                                      |
 
-All DONE rows above are covered by CI run `34830163326` unless a more specific earlier run is referenced in history. The run applied migrations `0000`–`0028` twice and passed the complete live PostgreSQL/PostGIS integration suite, including the R1 supply-side authorization/privacy matrix.
+All DONE rows above are covered by CI run `34833162665` unless a more specific earlier run is referenced in history. The run applied migrations `0000`–`0030` twice and passed the complete live PostgreSQL/PostGIS integration suite, including the R1 supply-side authorization/privacy matrix and R2 search/autocomplete/distance assertions.
 
 ## Durable decisions
 
