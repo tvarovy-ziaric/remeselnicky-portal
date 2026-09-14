@@ -476,6 +476,10 @@ importers:
         version: 3.2.7(@types/node@26.5.1)(tsx@4.23.13)
 
   packages/search:
+    dependencies:
+      '@portal/domain':
+        specifier: workspace:*
+        version: link:../domain
     devDependencies:
       '@types/node':
         specifier: 'catalog:'

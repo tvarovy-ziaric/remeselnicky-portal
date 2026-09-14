@@ -19,6 +19,9 @@
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json"
   },
+  "dependencies": {
+    "@portal/domain": "workspace:*"
+  },
   "devDependencies": {
     "@types/node": "catalog:",
     "typescript": "catalog:",

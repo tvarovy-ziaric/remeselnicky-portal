@@ -25,3 +25,43 @@ export {
   createTaxonomyAutocompleteService,
   TaxonomyAutocompleteIntegrityError,
 } from "./service.js";
+export {
+  composeGovernedTaxonomyRelevanceQuery,
+  projectTaxonomyRelevanceFacts,
+  TAXONOMY_RELEVANCE_MAX_SKILL_TARGETS,
+  TaxonomyRelevanceIntegrityError,
+} from "./taxonomy-relevance.js";
+export {
+  assertCredentialQualificationInput,
+  CREDENTIAL_QUALIFICATION_REASONS,
+  CREDENTIAL_QUALIFICATION_REQUIREMENTS,
+  createCredentialQualificationGate,
+  CredentialQualificationValidationError,
+  serializeCredentialQualification,
+} from "./credential-qualification.js";
+export type {
+  CredentialQualificationGate,
+  CredentialQualificationInput,
+  CredentialQualificationPersistence,
+  CredentialQualificationReason,
+  CredentialQualificationRequirement,
+  CredentialQualificationResult,
+  CredentialQualificationRow,
+} from "./credential-qualification.js";
+export {
+  assertPreparedCredentialQualificationPolicyRelease,
+  createCredentialQualificationPolicyService,
+  prepareCredentialQualificationPolicyRelease,
+} from "./credential-qualification-policy.js";
+export type {
+  CredentialQualificationPolicyActivationInput,
+  CredentialQualificationPolicyEntrySeed,
+  CredentialQualificationPolicyPersistence,
+  CredentialQualificationPolicyReleaseSeed,
+  PreparedCredentialQualificationPolicyRelease,
+} from "./credential-qualification-policy.js";
+export type {
+  GovernedTaxonomyRelevanceQuery,
+  TaxonomyEvidenceSupport,
+  TaxonomyRelevanceFacts,
+} from "./taxonomy-relevance.js";

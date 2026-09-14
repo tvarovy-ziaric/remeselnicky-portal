@@ -12,6 +12,7 @@ import {
   normalizeTaxonomySearchText,
   parseTaxonomyAutocompleteQuery,
 } from "./query.js";
+import { markGovernedSuggestion } from "./governed-suggestion.js";
 
 const resultOrder: readonly string[] = Object.freeze([
   "EXACT_CANONICAL:PROFESSION",
@@ -156,11 +157,13 @@ function validCode(
 function publicSuggestion(
   value: TaxonomyAutocompleteCandidate,
 ): TaxonomyAutocompleteSuggestion {
-  return Object.freeze({
-    code: value.code,
-    kind: value.kind,
-    label: value.label,
-    matchedBy: value.matchedBy,
-    professionCodes: Object.freeze([...value.professionCodes]),
-  });
+  return markGovernedSuggestion(
+    Object.freeze({
+      code: value.code,
+      kind: value.kind,
+      label: value.label,
+      matchedBy: value.matchedBy,
+      professionCodes: Object.freeze([...value.professionCodes]),
+    }),
+  );
 }

@@ -76,7 +76,11 @@ import type {
   PublicCraftsmanProfilePersistence,
 } from "@portal/domain";
 import { createTaxonomyAutocompleteRepository } from "./taxonomy-autocomplete-repository.js";
-import type { TaxonomyAutocompletePersistence } from "@portal/search";
+import { createCredentialQualificationRepository } from "./credential-qualification-repository.js";
+import type {
+  CredentialQualificationPolicyPersistence,
+  TaxonomyAutocompletePersistence,
+} from "@portal/search";
 import {
   createCredentialClaimRepository,
   type CredentialClaimRepository,
@@ -477,7 +481,11 @@ export type {
   CraftsmanServiceAreaMatchPersistence,
 } from "@portal/domain";
 export { createTaxonomyAutocompleteRepository } from "./taxonomy-autocomplete-repository.js";
-export type { TaxonomyAutocompletePersistence } from "@portal/search";
+export { createCredentialQualificationRepository } from "./credential-qualification-repository.js";
+export type {
+  CredentialQualificationPolicyPersistence,
+  TaxonomyAutocompletePersistence,
+} from "@portal/search";
 export {
   CRAFTSMAN_SEARCH_READ_MODEL_VIEWS,
   CRAFTSMAN_SERVICE_AREA_MATCH_FUNCTION,
@@ -677,6 +685,7 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly craftsmanDistances: CraftsmanDistancePersistence;
   readonly craftsmanServiceAreaMatches: CraftsmanServiceAreaMatchPersistence;
   readonly taxonomyAutocomplete: TaxonomyAutocompletePersistence;
+  readonly credentialQualifications: CredentialQualificationPolicyPersistence;
   readonly credentialClaims: CredentialClaimRepository;
   readonly customerProfiles: CustomerProfilePersistence;
   readonly emailVerification: EmailVerificationRepository;
@@ -748,6 +757,7 @@ export function createDatabase(
   const craftsmanServiceAreaMatches =
     createCraftsmanServiceAreaMatchRepository(sql);
   const taxonomyAutocomplete = createTaxonomyAutocompleteRepository(sql);
+  const credentialQualifications = createCredentialQualificationRepository(sql);
   const credentialClaims = createCredentialClaimRepository(sql);
   const customerProfiles = createCustomerProfileRepository(sql);
   const emailVerification = createEmailVerificationRepository(sql);
@@ -786,6 +796,7 @@ export function createDatabase(
     craftsmanDistances,
     craftsmanServiceAreaMatches,
     taxonomyAutocomplete,
+    credentialQualifications,
     credentialClaims,
     customerProfiles,
     emailVerification,

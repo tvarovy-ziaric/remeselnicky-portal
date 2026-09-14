@@ -43,6 +43,7 @@ import { runR1SupplySideIntegrationAssertions } from "./r1-supply-side-integrati
 import { runCraftsmanSearchReadModelIntegrationAssertions } from "./craftsman-search-read-model-integration-helper.js";
 import { runCraftsmanDistanceIntegrationAssertions } from "./craftsman-distance-integration-helper.js";
 import { runCraftsmanServiceAreaMatchIntegrationAssertions } from "./craftsman-service-area-match-integration-helper.js";
+import { runCredentialQualificationIntegrationAssertions } from "./credential-qualification-integration-helper.js";
 
 const testDatabaseUrl = process.env["TEST_DATABASE_URL"];
 const migrationsDirectory = fileURLToPath(
@@ -100,6 +101,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
           "0029_craftsman_search_read_model.sql",
           "0030_craftsman_distance_facts.sql",
           "0031_craftsman_service_area_matching.sql",
+          "0032_credential_qualification_gate.sql",
         ],
         alreadyApplied: 0,
       });
@@ -108,7 +110,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         testDatabaseUrl,
         migrationsDirectory,
       );
-      expect(secondRun).toEqual({ applied: [], alreadyApplied: 32 });
+      expect(secondRun).toEqual({ applied: [], alreadyApplied: 33 });
 
       const sql = postgres(testDatabaseUrl, { max: 5 });
       try {
@@ -154,7 +156,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         `;
 
         expect(postgis?.extversion).toMatch(/^3\./);
-        expect(ledger?.count).toBe(32);
+        expect(ledger?.count).toBe(33);
         expect(created).toMatchObject({ account_state: "ACTIVE" });
         expect(created?.id).toMatch(
           /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
@@ -1688,6 +1690,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         });
         await runCraftsmanDistanceIntegrationAssertions(sql);
         await runCraftsmanServiceAreaMatchIntegrationAssertions(sql);
+        await runCredentialQualificationIntegrationAssertions(sql);
 
         await adminAccess.revokePrivilegedSession(superSessionDigest);
         await expect(
