@@ -87,7 +87,8 @@ CREATE TABLE taxonomy_specializations (
   replaced_by_code text,
   PRIMARY KEY (release_id, specialization_code),
   UNIQUE (release_id, slug),
-  FOREIGN KEY (release_id, profession_code)
+  CONSTRAINT taxonomy_specializations_profession_fkey
+    FOREIGN KEY (release_id, profession_code)
     REFERENCES taxonomy_professions(release_id, profession_code)
     ON DELETE RESTRICT,
   FOREIGN KEY (release_id, replaced_by_code)
