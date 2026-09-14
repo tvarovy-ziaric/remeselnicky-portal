@@ -10,11 +10,16 @@ import {
   registerApiObservability,
   type ApiObservabilityDependencies,
 } from "./observability.js";
+import {
+  registerPublicCraftsmanProfileRoutes,
+  type PublicCraftsmanProfileRouteDependencies,
+} from "./public-craftsman-profile/routes.js";
 
 export interface ApiDependencies {
   readonly auth?: AuthModuleDependencies;
   readonly database: DatabaseHealthProbe;
   readonly observability?: ApiObservabilityDependencies;
+  readonly publicCraftsmanProfiles?: PublicCraftsmanProfileRouteDependencies;
 }
 
 export function buildApi(dependencies: ApiDependencies): FastifyInstance {
@@ -31,6 +36,12 @@ export function buildApi(dependencies: ApiDependencies): FastifyInstance {
 
   if (dependencies.auth !== undefined) {
     registerAuthModule(app, dependencies.auth);
+  }
+  if (dependencies.publicCraftsmanProfiles !== undefined) {
+    registerPublicCraftsmanProfileRoutes(
+      app,
+      dependencies.publicCraftsmanProfiles,
+    );
   }
 
   app.get("/", () => ({

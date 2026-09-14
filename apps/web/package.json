@@ -12,6 +12,7 @@
   "dependencies": {
     "@portal/config": "workspace:*",
     "@portal/contracts": "workspace:*",
+    "@portal/domain": "workspace:*",
     "@portal/observability": "workspace:*",
     "next": "16.3.5",
     "react": "19.3.0",

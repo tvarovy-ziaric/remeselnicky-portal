@@ -46,6 +46,70 @@ section {
   text-transform: uppercase;
 }
 
+.public-profile {
+  display: block;
+  background: #f6f4ee;
+}
+
+.public-profile-card {
+  width: min(100%, 64rem);
+  margin: 0 auto;
+  padding: clamp(1.25rem, 4vw, 3rem);
+}
+
+.public-profile-identity,
+.profile-section {
+  width: 100%;
+  margin-bottom: 1rem;
+  padding: clamp(1.25rem, 4vw, 2.5rem);
+  border: 1px solid #d8d4c8;
+  border-radius: 1rem;
+  background: #fffdf7;
+  box-shadow: 0 1rem 3rem rgb(39 51 43 / 6%);
+}
+
+.public-profile-identity h1,
+.profile-section h2 {
+  margin: 0.5rem 0 1rem;
+}
+
+.public-profile-secondary {
+  color: #55705f;
+  font-weight: 700;
+}
+
+.profile-list,
+.trust-facts {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.profile-list li {
+  display: grid;
+  gap: 0.3rem;
+  padding: 1rem;
+  border-radius: 0.7rem;
+  background: #f4f8f3;
+}
+
+.profile-list span,
+.profile-disclaimer {
+  color: #55705f;
+  font-size: 0.92rem;
+}
+
+.platform-cta {
+  display: grid;
+  gap: 0.25rem;
+  margin-top: 1.25rem;
+  padding: 1rem;
+  border-radius: 0.7rem;
+  background: #dce7de;
+}
+
 h1 {
   margin: 0.75rem 0;
   font-size: clamp(2.25rem, 8vw, 4.5rem);

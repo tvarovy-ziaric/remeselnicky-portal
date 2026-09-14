@@ -4,6 +4,10 @@ const nextConfig: NextConfig = {
   headers() {
     return Promise.resolve([
       {
+        headers: [{ key: "Cache-Control", value: "no-store" }],
+        source: "/remeselnici/:path*",
+      },
+      {
         headers: [
           { key: "Cache-Control", value: "no-store" },
           { key: "X-Robots-Tag", value: "noindex, nofollow" },
@@ -16,6 +20,7 @@ const nextConfig: NextConfig = {
   transpilePackages: [
     "@portal/config",
     "@portal/contracts",
+    "@portal/domain",
     "@portal/observability",
   ],
 };

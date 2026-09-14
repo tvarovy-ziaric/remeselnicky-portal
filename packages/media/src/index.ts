@@ -52,6 +52,24 @@ export {
   detectImageSignature,
 } from "./image-processing.js";
 export {
+  PORTFOLIO_PUBLICATION_STATES,
+  assertPortfolioPublicationCommand,
+  createPortfolioPublicationService,
+} from "./portfolio-publication.js";
+export type {
+  ApplyPortfolioPublicationResult,
+  HidePortfolioPublicationResult,
+  PendingPublicDerivativeRevocation,
+  PortfolioPublicationCommandInput,
+  PortfolioPublicationRepository,
+  PortfolioPublicationSnapshot,
+  PortfolioPublicationState,
+  PreparePortfolioPublicationResult,
+  PreparedPortfolioPublicationPhoto,
+  PublicDerivativeCleanupObserver,
+  StoredPortfolioPublicDerivative,
+} from "./portfolio-publication.js";
+export {
   asStorageObjectKey,
   createPrivateMediaDeliveryService,
   createPublicPortfolioDeliveryService,

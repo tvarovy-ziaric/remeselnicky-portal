@@ -560,7 +560,7 @@ describe("public portfolio derivative delivery", () => {
     });
     await expect(service.resolve(assetId)).resolves.toEqual({
       headers: {
-        "cache-control": "public, max-age=30, must-revalidate",
+        "cache-control": "private, no-store",
         location: "https://cdn.invalid/portfolio.webp",
         "x-content-type-options": "nosniff",
       },
@@ -576,6 +576,9 @@ describe("public portfolio derivative delivery", () => {
     publicSnapshot({ purpose: "JOB_IMAGE" }),
     publicSnapshot({ storageObject: { area: "private", key: privateKey } }),
     publicSnapshot({ contentType: "image/svg+xml" }),
+    publicSnapshot({
+      url: new URL("https://cdn.invalid/portfolio.webp?opaque=secret"),
+    }),
   ])(
     "never promotes or exposes a non-public canonical object",
     async (value) => {

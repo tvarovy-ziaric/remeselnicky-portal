@@ -234,6 +234,18 @@ export {
   portfolioPhotoStateEnum,
   portfolioProjectPhotoSets,
 } from "./portfolio-project-media.js";
+export {
+  FEATURED_PROJECT_COMMAND_KINDS,
+  featuredProjectCommandKindEnum,
+  featuredProjectCommands,
+  featuredProjectRevisions,
+  featuredProjectSets,
+} from "./featured-projects.js";
+export type {
+  FeaturedProjectCommandRecord,
+  FeaturedProjectRevisionRecord,
+  FeaturedProjectSetRecord,
+} from "./featured-projects.js";
 export type {
   PortfolioPhotoAttachmentRecord,
   PortfolioPhotoCommandRecord,
@@ -241,11 +253,43 @@ export type {
   PortfolioPhotoRevisionRecord,
   PortfolioProjectPhotoSetRecord,
 } from "./portfolio-project-media.js";
+export {
+  PORTFOLIO_PROJECT_PUBLICATION_COMMAND_KINDS,
+  PORTFOLIO_PROJECT_PUBLICATION_STATES,
+  portfolioProjectPublicationCommandKindEnum,
+  portfolioProjectPublicationCommands,
+  portfolioProjectPublicationItems,
+  portfolioProjectPublicationRevisions,
+  portfolioProjectPublications,
+  portfolioProjectPublicationStateEnum,
+} from "./portfolio-project-publication.js";
+export type {
+  PortfolioProjectPublicationCommandRecord,
+  PortfolioProjectPublicationItemRecord,
+  PortfolioProjectPublicationRecord,
+  PortfolioProjectPublicationRevisionRecord,
+} from "./portfolio-project-publication.js";
 export type {
   PortfolioProjectCommandRecord,
   PortfolioProjectRecord,
   PortfolioProjectRevisionRecord,
 } from "./portfolio-project.js";
+export {
+  portfolioCollaborationActorKindEnum,
+  portfolioCollaborationCommandKindEnum,
+  portfolioCollaborationCommands,
+  portfolioCollaborationRevisions,
+  portfolioCollaborations,
+  portfolioCollaborationStateEnum,
+  portfolioCollaborationVisibilityEnum,
+  PORTFOLIO_COLLABORATION_ACTOR_KINDS,
+  PORTFOLIO_COLLABORATION_COMMAND_KINDS,
+} from "./portfolio-collaboration.js";
+export type {
+  PortfolioCollaborationCommandRecord,
+  PortfolioCollaborationRecord,
+  PortfolioCollaborationRevisionRecord,
+} from "./portfolio-collaboration.js";
 export {
   CRAFTSMAN_AVAILABILITY_COMMAND_KINDS,
   CRAFTSMAN_AVAILABILITY_COMMAND_RESULTS,

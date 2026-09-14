@@ -18,7 +18,15 @@ import {
   type MediaRepository,
 } from "./media-repository.js";
 import { createPrivateMediaDeliveryRepository } from "./media-delivery-repository.js";
-import type { PrivateMediaDeliveryRepository } from "@portal/media";
+import {
+  createPortfolioPublicationRepository,
+  createPublicPortfolioDeliveryRepository,
+} from "./portfolio-publication-repository.js";
+import type {
+  PortfolioPublicationRepository,
+  PrivateMediaDeliveryRepository,
+  PublicPortfolioDeliveryRepository,
+} from "@portal/media";
 import {
   createPhoneVerificationRepository,
   type PhoneVerificationRepository,
@@ -45,14 +53,20 @@ import { createIndicativePricingRepository } from "./indicative-pricing-reposito
 import type { IndicativePricingPersistence } from "@portal/domain";
 import { createPortfolioProjectRepository } from "./portfolio-project-repository.js";
 import type { PortfolioProjectPersistence } from "@portal/domain";
+import { createPortfolioCollaborationRepository } from "./portfolio-collaboration-repository.js";
+import type { PortfolioCollaborationPersistence } from "@portal/domain";
 import { createPortfolioProjectPhotoRepository } from "./portfolio-project-media-repository.js";
 import type { PortfolioProjectPhotoPersistence } from "@portal/domain";
+import { createFeaturedProjectRepository } from "./featured-project-repository.js";
+import type { FeaturedProjectPersistence } from "@portal/domain";
 import { createCraftsmanExperienceRepository } from "./craftsman-experience-repository.js";
 import type { CraftsmanExperiencePersistence } from "@portal/domain";
 import { createCraftsmanAvailabilityRepository } from "./craftsman-availability-repository.js";
 import type { CraftsmanAvailabilityPersistence } from "@portal/domain";
 import { createCraftsmanPublicationRepository } from "./craftsman-publication-repository.js";
 import type { CraftsmanPublicationPersistence } from "@portal/domain";
+import { createPublicCraftsmanProfileRepository } from "./public-craftsman-profile-repository.js";
+import type { PublicCraftsmanProfilePersistence } from "@portal/domain";
 import {
   createCredentialClaimRepository,
   type CredentialClaimRepository,
@@ -109,6 +123,18 @@ export type {
   PrivacyRetentionPolicyVersionRecord,
 } from "./schema/index.js";
 export {
+  FEATURED_PROJECT_COMMAND_KINDS,
+  featuredProjectCommandKindEnum,
+  featuredProjectCommands,
+  featuredProjectRevisions,
+  featuredProjectSets,
+} from "./schema/index.js";
+export type {
+  FeaturedProjectCommandRecord,
+  FeaturedProjectRevisionRecord,
+  FeaturedProjectSetRecord,
+} from "./schema/index.js";
+export {
   PORTFOLIO_PHOTO_COMMAND_KINDS,
   portfolioPhotoAttachments,
   portfolioPhotoCommandKindEnum,
@@ -127,6 +153,22 @@ export type {
   PortfolioProjectPhotoSetRecord,
 } from "./schema/index.js";
 export {
+  PORTFOLIO_PROJECT_PUBLICATION_COMMAND_KINDS,
+  PORTFOLIO_PROJECT_PUBLICATION_STATES,
+  portfolioProjectPublicationCommandKindEnum,
+  portfolioProjectPublicationCommands,
+  portfolioProjectPublicationItems,
+  portfolioProjectPublicationRevisions,
+  portfolioProjectPublications,
+  portfolioProjectPublicationStateEnum,
+} from "./schema/index.js";
+export type {
+  PortfolioProjectPublicationCommandRecord,
+  PortfolioProjectPublicationItemRecord,
+  PortfolioProjectPublicationRecord,
+  PortfolioProjectPublicationRevisionRecord,
+} from "./schema/index.js";
+export {
   PORTFOLIO_PROJECT_COMMAND_KINDS,
   portfolioProjectCommandKindEnum,
   portfolioProjectCommands,
@@ -140,6 +182,22 @@ export type {
   PortfolioProjectCommandRecord,
   PortfolioProjectRecord,
   PortfolioProjectRevisionRecord,
+} from "./schema/index.js";
+export {
+  portfolioCollaborationActorKindEnum,
+  portfolioCollaborationCommandKindEnum,
+  portfolioCollaborationCommands,
+  portfolioCollaborationRevisions,
+  portfolioCollaborations,
+  portfolioCollaborationStateEnum,
+  portfolioCollaborationVisibilityEnum,
+  PORTFOLIO_COLLABORATION_ACTOR_KINDS,
+  PORTFOLIO_COLLABORATION_COMMAND_KINDS,
+} from "./schema/index.js";
+export type {
+  PortfolioCollaborationCommandRecord,
+  PortfolioCollaborationRecord,
+  PortfolioCollaborationRevisionRecord,
 } from "./schema/index.js";
 export {
   CRAFTSMAN_AVAILABILITY_COMMAND_KINDS,
@@ -398,6 +456,8 @@ export {
   CraftsmanPublicationIdempotencyError,
 } from "./craftsman-publication-repository.js";
 export type { CraftsmanPublicationPersistence } from "@portal/domain";
+export { createPublicCraftsmanProfileRepository } from "./public-craftsman-profile-repository.js";
+export type { PublicCraftsmanProfilePersistence } from "@portal/domain";
 export { createPrivacyRepository } from "./privacy-repository.js";
 export type { PrivacyRepository } from "@portal/privacy";
 export type {
@@ -504,6 +564,11 @@ export {
 } from "./portfolio-project-repository.js";
 export type { PortfolioProjectPersistence } from "@portal/domain";
 export {
+  createPortfolioCollaborationRepository,
+  PortfolioCollaborationIdempotencyError,
+} from "./portfolio-collaboration-repository.js";
+export type { PortfolioCollaborationPersistence } from "@portal/domain";
+export {
   createPortfolioMediaEntityAccessResolver,
   createPortfolioProjectPhotoRepository,
   preparePortfolioPhotoUpload,
@@ -511,6 +576,20 @@ export {
 } from "./portfolio-project-media-repository.js";
 export type { PreparePortfolioPhotoUploadResult } from "./portfolio-project-media-repository.js";
 export type { PortfolioProjectPhotoPersistence } from "@portal/domain";
+export {
+  createPortfolioPublicationRepository,
+  createPublicPortfolioDeliveryRepository,
+  PortfolioPublicationIdempotencyError,
+} from "./portfolio-publication-repository.js";
+export type {
+  PortfolioPublicationRepository,
+  PublicPortfolioDeliveryRepository,
+} from "@portal/media";
+export {
+  createFeaturedProjectRepository,
+  FeaturedProjectIdempotencyError,
+} from "./featured-project-repository.js";
+export type { FeaturedProjectPersistence } from "@portal/domain";
 export {
   createSkillCatalogRepository,
   prepareSkillCatalogRelease,
@@ -559,10 +638,15 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly craftsmanServiceAreas: CraftsmanServiceAreaPersistence;
   readonly indicativePricing: IndicativePricingPersistence;
   readonly portfolioProjects: PortfolioProjectPersistence;
+  readonly portfolioCollaborations: PortfolioCollaborationPersistence;
   readonly portfolioProjectPhotos: PortfolioProjectPhotoPersistence;
+  readonly portfolioPublication: PortfolioPublicationRepository;
+  readonly publicPortfolioDelivery: PublicPortfolioDeliveryRepository;
+  readonly featuredProjects: FeaturedProjectPersistence;
   readonly craftsmanExperience: CraftsmanExperiencePersistence;
   readonly craftsmanAvailability: CraftsmanAvailabilityPersistence;
   readonly craftsmanPublication: CraftsmanPublicationPersistence;
+  readonly publicCraftsmanProfiles: PublicCraftsmanProfilePersistence;
   readonly credentialClaims: CredentialClaimRepository;
   readonly customerProfiles: CustomerProfilePersistence;
   readonly emailVerification: EmailVerificationRepository;
@@ -620,10 +704,15 @@ export function createDatabase(
   const craftsmanServiceAreas = createCraftsmanServiceAreaRepository(sql);
   const indicativePricing = createIndicativePricingRepository(sql);
   const portfolioProjects = createPortfolioProjectRepository(sql);
+  const portfolioCollaborations = createPortfolioCollaborationRepository(sql);
   const portfolioProjectPhotos = createPortfolioProjectPhotoRepository(sql);
+  const portfolioPublication = createPortfolioPublicationRepository(sql);
+  const publicPortfolioDelivery = createPublicPortfolioDeliveryRepository(sql);
+  const featuredProjects = createFeaturedProjectRepository(sql);
   const craftsmanExperience = createCraftsmanExperienceRepository(sql);
   const craftsmanAvailability = createCraftsmanAvailabilityRepository(sql);
   const craftsmanPublication = createCraftsmanPublicationRepository(sql);
+  const publicCraftsmanProfiles = createPublicCraftsmanProfileRepository(sql);
   const credentialClaims = createCredentialClaimRepository(sql);
   const customerProfiles = createCustomerProfileRepository(sql);
   const emailVerification = createEmailVerificationRepository(sql);
@@ -649,10 +738,15 @@ export function createDatabase(
     craftsmanServiceAreas,
     indicativePricing,
     portfolioProjects,
+    portfolioCollaborations,
     portfolioProjectPhotos,
+    portfolioPublication,
+    publicPortfolioDelivery,
+    featuredProjects,
     craftsmanExperience,
     craftsmanAvailability,
     craftsmanPublication,
+    publicCraftsmanProfiles,
     credentialClaims,
     customerProfiles,
     emailVerification,

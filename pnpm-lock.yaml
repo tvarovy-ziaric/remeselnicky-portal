@@ -120,6 +120,9 @@ importers:
       '@portal/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@portal/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       '@portal/observability':
         specifier: workspace:*
         version: link:../../packages/observability

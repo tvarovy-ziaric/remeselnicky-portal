@@ -472,7 +472,7 @@ export function createPublicPortfolioDeliveryService(input: {
       if (!isPublicPortfolioDerivative(snapshot)) return notFoundResponse;
       return Object.freeze({
         headers: Object.freeze({
-          "cache-control": "public, max-age=30, must-revalidate",
+          "cache-control": "private, no-store",
           location: snapshot.url.toString(),
           "x-content-type-options": "nosniff",
         }),
@@ -516,6 +516,7 @@ function isPublicPortfolioDerivative(
     snapshot.url.protocol === "https:" &&
     snapshot.url.username === "" &&
     snapshot.url.password === "" &&
+    snapshot.url.search === "" &&
     snapshot.url.hash === ""
   );
 }

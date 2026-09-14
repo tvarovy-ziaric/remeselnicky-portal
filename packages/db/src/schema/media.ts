@@ -8,7 +8,7 @@ import {
   pgTable,
   text,
   timestamp,
-  unique,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -163,17 +163,17 @@ export const mediaAssetStorageObjects = pgTable(
     contentType: text("content_type").notNull(),
     byteSize: integer("byte_size").notNull(),
     contentSha256: char("content_sha256", { length: 64 }),
+    publicUrl: text("public_url"),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .notNull()
       .defaultNow(),
     revokedAt: timestamp("revoked_at", { mode: "date", withTimezone: true }),
   },
   (table) => [
-    unique("media_asset_storage_objects_key_unique").on(table.storageKey),
-    unique("media_asset_storage_objects_role_unique").on(
-      table.mediaAssetId,
-      table.role,
-    ),
+    uniqueIndex("media_asset_storage_objects_key_unique").on(table.storageKey),
+    uniqueIndex("media_asset_storage_objects_live_role_unique")
+      .on(table.mediaAssetId, table.role)
+      .where(sql`${table.revokedAt} IS NULL`),
     index("media_asset_storage_objects_asset_idx").on(
       table.mediaAssetId,
       table.createdAt,

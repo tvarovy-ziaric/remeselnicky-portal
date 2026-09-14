@@ -59,6 +59,7 @@ const app = buildApi({
     persistence: authPersistence,
   },
   database,
+  publicCraftsmanProfiles: { profiles: database.publicCraftsmanProfiles },
   observability: {
     appOrigin: config.appOrigin,
     context: config.observability,

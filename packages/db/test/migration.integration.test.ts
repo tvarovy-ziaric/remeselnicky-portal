@@ -35,6 +35,9 @@ import { runPortfolioProjectIntegrationAssertions } from "./portfolio-project-in
 import { runCredentialClaimIntegrationAssertions } from "./credential-claim-integration-helper.js";
 import { runCraftsmanPublicationIntegrationAssertions } from "./craftsman-publication-integration-helper.js";
 import { runPortfolioProjectMediaIntegrationAssertions } from "./portfolio-project-media-integration-helper.js";
+import { runPortfolioCollaborationIntegrationAssertions } from "./portfolio-collaboration-integration-helper.js";
+import { runFeaturedProjectIntegrationAssertions } from "./featured-project-integration-helper.js";
+import { runPortfolioPublicationIntegrationAssertions } from "./portfolio-publication-integration-helper.js";
 
 const testDatabaseUrl = process.env["TEST_DATABASE_URL"];
 const migrationsDirectory = fileURLToPath(
@@ -86,6 +89,9 @@ describe.skipIf(testDatabaseUrl === undefined)(
           "0023_credential_claim_review.sql",
           "0024_craftsman_profile_publication.sql",
           "0025_portfolio_project_photos.sql",
+          "0026_portfolio_collaborations.sql",
+          "0027_featured_projects.sql",
+          "0028_portfolio_publication_consent_hooks.sql",
         ],
         alreadyApplied: 0,
       });
@@ -94,7 +100,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         testDatabaseUrl,
         migrationsDirectory,
       );
-      expect(secondRun).toEqual({ applied: [], alreadyApplied: 26 });
+      expect(secondRun).toEqual({ applied: [], alreadyApplied: 29 });
 
       const sql = postgres(testDatabaseUrl, { max: 5 });
       try {
@@ -140,7 +146,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         `;
 
         expect(postgis?.extversion).toMatch(/^3\./);
-        expect(ledger?.count).toBe(26);
+        expect(ledger?.count).toBe(29);
         expect(created).toMatchObject({ account_state: "ACTIVE" });
         expect(created?.id).toMatch(
           /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
@@ -1662,6 +1668,9 @@ describe.skipIf(testDatabaseUrl === undefined)(
         await runCredentialClaimIntegrationAssertions(sql);
         await runCraftsmanPublicationIntegrationAssertions(sql);
         await runPortfolioProjectMediaIntegrationAssertions(sql);
+        await runPortfolioCollaborationIntegrationAssertions(sql);
+        await runFeaturedProjectIntegrationAssertions(sql);
+        await runPortfolioPublicationIntegrationAssertions(sql);
 
         await adminAccess.revokePrivilegedSession(superSessionDigest);
         await expect(

@@ -142,6 +142,26 @@ export {
   PORTFOLIO_PROJECT_MAX_PHOTOS,
   PortfolioProjectPhotoValidationError,
 } from "./portfolio-project-media.js";
+export {
+  assertListOwnedFeaturedProjectsInput,
+  assertPinFeaturedProjectInput,
+  assertReorderFeaturedProjectsInput,
+  assertUnpinFeaturedProjectInput,
+  FEATURED_PROJECT_AVAILABILITY,
+  FeaturedProjectValidationError,
+  MAX_FEATURED_PROJECTS,
+} from "./featured-projects.js";
+export type {
+  FeaturedProjectAvailability,
+  FeaturedProjectCommandResult,
+  FeaturedProjectItem,
+  FeaturedProjectPersistence,
+  FeaturedProjectSet,
+  ListOwnedFeaturedProjectsInput,
+  PinFeaturedProjectInput,
+  ReorderFeaturedProjectsInput,
+  UnpinFeaturedProjectInput,
+} from "./featured-projects.js";
 export type {
   AttachPortfolioProjectPhotoInput,
   HidePortfolioProjectPhotoInput,
@@ -264,6 +284,23 @@ export {
   PROFILE_READINESS_REQUIREMENTS,
   PROFILE_REVIEW_STATES,
 } from "./craftsman-publication.js";
+export {
+  isPublicCraftsmanProfileId,
+  isPublicDisplayTextSafe,
+  PUBLIC_CRAFTSMAN_PROFILE_FIELDS,
+  serializePublicCraftsmanProfile,
+} from "./public-craftsman-profile.js";
+export type {
+  PublicCraftsmanProfile,
+  PublicCraftsmanProfileCandidate,
+  PublicCraftsmanProfilePersistence,
+  PublicCraftsmanProfession,
+  PublicCraftsmanSkill,
+  PublicCraftsmanSpecialization,
+  PublicIndicativePrice,
+  PublicMunicipality,
+  PublicVerifiedCredential,
+} from "./public-craftsman-profile.js";
 export type {
   CraftsmanPublicationPersistence,
   CraftsmanPublicationState,
@@ -283,3 +320,26 @@ export type {
   SetOwnerProfileVisibilityInput,
   SetProfileModerationInput,
 } from "./craftsman-publication.js";
+export {
+  assertAuthorPortfolioCollaborationStateInput,
+  assertCollaboratorPortfolioCollaborationStateInput,
+  assertEditPendingPortfolioCollaborationInput,
+  assertInvitePortfolioCollaboratorInput,
+  assertPortfolioCollaborationAuthorListInput,
+  assertPortfolioCollaborationCollaboratorListInput,
+  PORTFOLIO_COLLABORATION_STATES,
+  PORTFOLIO_COLLABORATION_VISIBILITIES,
+  PortfolioCollaborationValidationError,
+} from "./portfolio-collaboration.js";
+export type {
+  AuthorPortfolioCollaborationStateInput,
+  CollaboratorPortfolioCollaborationStateInput,
+  EditPendingPortfolioCollaborationInput,
+  InvitePortfolioCollaboratorInput,
+  PortfolioCollaboration,
+  PortfolioCollaborationCommandResult,
+  PortfolioCollaborationId,
+  PortfolioCollaborationPersistence,
+  PortfolioCollaborationState,
+  PortfolioCollaborationVisibility,
+} from "./portfolio-collaboration.js";
