@@ -49,6 +49,22 @@ export {
   CraftsmanProfessionValidationError,
   PROFESSION_PROFICIENCY_LEVELS,
 } from "./craftsman-profession.js";
+export {
+  ALPHA_EXTRA_SERVICE_AREA_UI_LIMIT,
+  assertCraftsmanServiceAreaReadInput,
+  assertReplaceCraftsmanServiceAreaInput,
+  CraftsmanServiceAreaValidationError,
+  normalizeTravelFeePolicy,
+  SERVICE_AREA_EXTRA_TECHNICAL_LIMIT,
+} from "./craftsman-service-area.js";
+export type {
+  CraftsmanServiceArea,
+  CraftsmanServiceAreaPersistence,
+  CraftsmanServiceAreaRevisionId,
+  MunicipalityCode,
+  ReplaceCraftsmanServiceAreaInput,
+  ReplaceCraftsmanServiceAreaResult,
+} from "./craftsman-service-area.js";
 export type {
   AssignCraftsmanProfessionInput,
   AssignCraftsmanProfessionResult,
@@ -62,3 +78,59 @@ export type {
   DeactivateCraftsmanProfessionResult,
   ProfessionProficiencyLevel,
 } from "./craftsman-profession.js";
+export {
+  assertAddCraftsmanSkillInput,
+  assertAddCraftsmanSpecializationInput,
+  assertCraftsmanCapabilityListInput,
+  assertDeactivateCraftsmanCapabilityInput,
+  assertMapCustomCraftsmanSkillInput,
+  CRAFTSMAN_CAPABILITY_STATES,
+  CraftsmanCapabilityValidationError,
+  isCraftsmanCapabilityPublicTextSafe,
+  SKILL_IDENTITY_KINDS,
+} from "./craftsman-capability.js";
+export type {
+  AddCanonicalCraftsmanSkillInput,
+  AddCraftsmanSkillInput,
+  AddCraftsmanSkillResult,
+  AddCraftsmanSpecializationInput,
+  AddCraftsmanSpecializationResult,
+  AddCustomCraftsmanSkillInput,
+  CapabilityEvidencePresentation,
+  CraftsmanCapabilityPersistence,
+  CraftsmanCapabilityState,
+  CraftsmanSkill,
+  CraftsmanSkillId,
+  CraftsmanSpecialization,
+  CraftsmanSpecializationId,
+  DeactivateCraftsmanCapabilityInput,
+  DeactivateCraftsmanSkillResult,
+  DeactivateCraftsmanSpecializationResult,
+  MapCustomCraftsmanSkillInput,
+  MapCustomCraftsmanSkillResult,
+  SkillIdentityKind,
+} from "./craftsman-capability.js";
+export {
+  assertArchiveIndicativePricingEntryInput,
+  assertIndicativePricingListInput,
+  assertNormalizedAddIndicativePricingEntryInput,
+  assertNormalizedEditIndicativePricingEntryInput,
+  createIndicativePricingService,
+  INDICATIVE_PRICE_MODES,
+  INDICATIVE_PRICING_ENTRY_STATES,
+  IndicativePricingValidationError,
+} from "./indicative-pricing.js";
+export type {
+  AddIndicativePricingEntryInput,
+  AddIndicativePricingEntryResult,
+  ArchiveIndicativePricingEntryInput,
+  ArchiveIndicativePricingEntryResult,
+  EditIndicativePricingEntryInput,
+  EditIndicativePricingEntryResult,
+  IndicativePriceMode,
+  IndicativePricingEntry,
+  IndicativePricingEntryId,
+  IndicativePricingEntryState,
+  IndicativePricingPersistence,
+  IndicativePricingService,
+} from "./indicative-pricing.js";

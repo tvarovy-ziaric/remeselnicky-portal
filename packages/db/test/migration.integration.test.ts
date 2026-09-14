@@ -26,6 +26,9 @@ import { runTaxonomyIntegrationAssertions } from "./taxonomy-integration-helper.
 import { runCustomerProfileIntegrationAssertions } from "./customer-profile-integration-helper.js";
 import { runCraftsmanProfileIntegrationAssertions } from "./craftsman-profile-integration-helper.js";
 import { runCraftsmanProfessionIntegrationAssertions } from "./craftsman-profession-integration-helper.js";
+import { runCraftsmanCapabilityIntegrationAssertions } from "./craftsman-capability-integration-helper.js";
+import { runCraftsmanServiceAreaIntegrationAssertions } from "./craftsman-service-area-integration-helper.js";
+import { runIndicativePricingIntegrationAssertions } from "./indicative-pricing-integration-helper.js";
 
 const testDatabaseUrl = process.env["TEST_DATABASE_URL"];
 const migrationsDirectory = fileURLToPath(
@@ -68,6 +71,9 @@ describe.skipIf(testDatabaseUrl === undefined)(
           "0014_customer_profile.sql",
           "0015_craftsman_profile.sql",
           "0016_craftsman_professions.sql",
+          "0017_skills_specializations.sql",
+          "0018_craftsman_service_area.sql",
+          "0019_indicative_pricing.sql",
         ],
         alreadyApplied: 0,
       });
@@ -76,7 +82,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         testDatabaseUrl,
         migrationsDirectory,
       );
-      expect(secondRun).toEqual({ applied: [], alreadyApplied: 17 });
+      expect(secondRun).toEqual({ applied: [], alreadyApplied: 20 });
 
       const sql = postgres(testDatabaseUrl, { max: 5 });
       try {
@@ -122,7 +128,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         `;
 
         expect(postgis?.extversion).toMatch(/^3\./);
-        expect(ledger?.count).toBe(17);
+        expect(ledger?.count).toBe(20);
         expect(created).toMatchObject({ account_state: "ACTIVE" });
         expect(created?.id).toMatch(
           /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
@@ -1635,6 +1641,9 @@ describe.skipIf(testDatabaseUrl === undefined)(
         await runCustomerProfileIntegrationAssertions(sql);
         await runCraftsmanProfileIntegrationAssertions(sql);
         await runCraftsmanProfessionIntegrationAssertions(sql);
+        await runCraftsmanCapabilityIntegrationAssertions(sql);
+        await runCraftsmanServiceAreaIntegrationAssertions(sql);
+        await runIndicativePricingIntegrationAssertions(sql);
 
         await adminAccess.revokePrivilegedSession(superSessionDigest);
         await expect(

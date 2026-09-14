@@ -35,6 +35,14 @@ import { createProfessionTaxonomyRepository } from "./taxonomy-repository.js";
 import type { ProfessionTaxonomyPersistence } from "@portal/taxonomy";
 import { createCraftsmanProfessionRepository } from "./craftsman-profession-repository.js";
 import type { CraftsmanProfessionPersistence } from "@portal/domain";
+import { createCraftsmanServiceAreaRepository } from "./craftsman-service-area-repository.js";
+import type { CraftsmanServiceAreaPersistence } from "@portal/domain";
+import { createCraftsmanCapabilityRepository } from "./craftsman-capability-repository.js";
+import type { CraftsmanCapabilityPersistence } from "@portal/domain";
+import { createSkillCatalogRepository } from "./skill-catalog-repository.js";
+import type { SkillCatalogRepository } from "./skill-catalog-repository.js";
+import { createIndicativePricingRepository } from "./indicative-pricing-repository.js";
+import type { IndicativePricingPersistence } from "@portal/domain";
 import { createPrivacyRepository } from "./privacy-repository.js";
 import type { PrivacyRepository } from "@portal/privacy";
 import { createCustomerProfileRepository } from "./customer-profile-repository.js";
@@ -87,6 +95,47 @@ export type {
   PrivacyRetentionPolicyVersionRecord,
 } from "./schema/index.js";
 export {
+  CRAFTSMAN_SKILL_COMMAND_KINDS,
+  CRAFTSMAN_SPECIALIZATION_COMMAND_KINDS,
+  craftsmanCapabilityStateEnum,
+  craftsmanCustomSkillMappingEvents,
+  craftsmanSkillCommands,
+  craftsmanSkillCommandKindEnum,
+  craftsmanSkillIdentityKindEnum,
+  craftsmanSkillProfessionLinks,
+  craftsmanSkills,
+  craftsmanSpecializationCommands,
+  craftsmanSpecializationCommandKindEnum,
+  craftsmanSpecializations,
+  skillCatalogActivationEvents,
+  skillCatalogReleases,
+  skillCatalogSkillProfessions,
+  skillCatalogSkills,
+} from "./schema/index.js";
+export type {
+  CraftsmanSkillRecord,
+  CraftsmanSpecializationRecord,
+  SkillCatalogReleaseRecord,
+  SkillCatalogSkillRecord,
+} from "./schema/index.js";
+export {
+  CRAFTSMAN_SERVICE_AREA_COMMAND_RESULTS,
+  craftsmanServiceAreaCommandResultEnum,
+  craftsmanServiceAreaCommands,
+  craftsmanServiceAreaExtraMunicipalities,
+  craftsmanServiceAreaRevisions,
+  locationDistricts,
+  locationMunicipalities,
+  locationRegions,
+} from "./schema/index.js";
+export type {
+  CraftsmanServiceAreaCommandRecord,
+  CraftsmanServiceAreaRevisionRecord,
+  LocationDistrictRecord,
+  LocationMunicipalityRecord,
+  LocationRegionRecord,
+} from "./schema/index.js";
+export {
   professionTaxonomyActivationEvents,
   professionTaxonomyReleases,
   taxonomyAliases,
@@ -118,6 +167,20 @@ export type {
   CraftsmanProfessionCommandRecord,
   CraftsmanProfessionDeclaredLevelEventRecord,
   CraftsmanProfessionRecord,
+} from "./schema/index.js";
+export {
+  INDICATIVE_PRICING_COMMAND_KINDS,
+  indicativePriceModeEnum,
+  indicativePricingCommandKindEnum,
+  indicativePricingCommands,
+  indicativePricingEntries,
+  indicativePricingEntryRevisions,
+  indicativePricingEntryStateEnum,
+} from "./schema/index.js";
+export type {
+  IndicativePricingCommandRecord,
+  IndicativePricingEntryRecord,
+  IndicativePricingEntryRevisionRecord,
 } from "./schema/index.js";
 export type {
   AdminMfaChallengeRecord,
@@ -286,6 +349,32 @@ export {
   CraftsmanProfessionIdempotencyError,
 } from "./craftsman-profession-repository.js";
 export type { CraftsmanProfessionPersistence } from "@portal/domain";
+export {
+  createIndicativePricingRepository,
+  IndicativePricingIdempotencyError,
+} from "./indicative-pricing-repository.js";
+export type { IndicativePricingPersistence } from "@portal/domain";
+export {
+  createCraftsmanServiceAreaRepository,
+  CraftsmanServiceAreaIdempotencyError,
+} from "./craftsman-service-area-repository.js";
+export type { CraftsmanServiceAreaPersistence } from "@portal/domain";
+export {
+  createCraftsmanCapabilityRepository,
+  CraftsmanCapabilityIdempotencyError,
+} from "./craftsman-capability-repository.js";
+export type { CraftsmanCapabilityPersistence } from "@portal/domain";
+export {
+  createSkillCatalogRepository,
+  prepareSkillCatalogRelease,
+  SkillCatalogIdempotencyError,
+} from "./skill-catalog-repository.js";
+export type {
+  PreparedSkillCatalogRelease,
+  SkillCatalogReleaseSeed,
+  SkillCatalogRepository,
+  SkillCatalogSkillSeed,
+} from "./skill-catalog-repository.js";
 
 export {
   createPostgresMigrationStore,
@@ -319,6 +408,9 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly audit: AuditRepository;
   readonly craftsmanProfiles: CraftsmanProfilePersistence;
   readonly craftsmanProfessions: CraftsmanProfessionPersistence;
+  readonly craftsmanCapabilities: CraftsmanCapabilityPersistence;
+  readonly craftsmanServiceAreas: CraftsmanServiceAreaPersistence;
+  readonly indicativePricing: IndicativePricingPersistence;
   readonly customerProfiles: CustomerProfilePersistence;
   readonly emailVerification: EmailVerificationRepository;
   readonly media: MediaRepository;
@@ -327,6 +419,7 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly outbox: OutboxRepository;
   readonly phoneVerification: PhoneVerificationRepository;
   readonly professionTaxonomy: ProfessionTaxonomyPersistence;
+  readonly skillCatalog: SkillCatalogRepository;
   readonly privacy: PrivacyRepository;
   close(): Promise<void>;
 }
@@ -370,6 +463,9 @@ export function createDatabase(
   const audit = createAuditRepository(sql);
   const craftsmanProfiles = createCraftsmanProfileRepository(sql);
   const craftsmanProfessions = createCraftsmanProfessionRepository(sql);
+  const craftsmanCapabilities = createCraftsmanCapabilityRepository(sql);
+  const craftsmanServiceAreas = createCraftsmanServiceAreaRepository(sql);
+  const indicativePricing = createIndicativePricingRepository(sql);
   const customerProfiles = createCustomerProfileRepository(sql);
   const emailVerification = createEmailVerificationRepository(sql);
   const media = createMediaRepository(sql);
@@ -378,6 +474,7 @@ export function createDatabase(
   const outbox = createOutboxRepository(sql);
   const phoneVerification = createPhoneVerificationRepository(sql);
   const professionTaxonomy = createProfessionTaxonomyRepository(sql);
+  const skillCatalog = createSkillCatalogRepository(sql);
   const privacy = createPrivacyRepository(sql);
   const health = createDatabaseHealthProbe(async () => {
     await sql`select 1 as health`;
@@ -389,6 +486,9 @@ export function createDatabase(
     auth,
     craftsmanProfiles,
     craftsmanProfessions,
+    craftsmanCapabilities,
+    craftsmanServiceAreas,
+    indicativePricing,
     customerProfiles,
     emailVerification,
     media,
@@ -397,6 +497,7 @@ export function createDatabase(
     outbox,
     phoneVerification,
     professionTaxonomy,
+    skillCatalog,
     privacy,
     query,
     ping(): Promise<void> {

@@ -158,11 +158,66 @@ export {
   craftsmanProfessionStateEnum,
   professionProficiencyLevelEnum,
 } from "./craftsman-profession.js";
+export {
+  CRAFTSMAN_SERVICE_AREA_COMMAND_RESULTS,
+  craftsmanServiceAreaCommandResultEnum,
+  craftsmanServiceAreaCommands,
+  craftsmanServiceAreaExtraMunicipalities,
+  craftsmanServiceAreaRevisions,
+  locationDistricts,
+  locationMunicipalities,
+  locationRegions,
+} from "./craftsman-service-area.js";
+export type {
+  CraftsmanServiceAreaCommandRecord,
+  CraftsmanServiceAreaRevisionRecord,
+  LocationDistrictRecord,
+  LocationMunicipalityRecord,
+  LocationRegionRecord,
+} from "./craftsman-service-area.js";
 export type {
   CraftsmanProfessionCommandRecord,
   CraftsmanProfessionDeclaredLevelEventRecord,
   CraftsmanProfessionRecord,
 } from "./craftsman-profession.js";
+export {
+  CRAFTSMAN_SKILL_COMMAND_KINDS,
+  CRAFTSMAN_SPECIALIZATION_COMMAND_KINDS,
+  craftsmanCapabilityStateEnum,
+  craftsmanCustomSkillMappingEvents,
+  craftsmanSkillCommands,
+  craftsmanSkillCommandKindEnum,
+  craftsmanSkillIdentityKindEnum,
+  craftsmanSkillProfessionLinks,
+  craftsmanSkills,
+  craftsmanSpecializationCommands,
+  craftsmanSpecializationCommandKindEnum,
+  craftsmanSpecializations,
+  skillCatalogActivationEvents,
+  skillCatalogReleases,
+  skillCatalogSkillProfessions,
+  skillCatalogSkills,
+} from "./craftsman-capability.js";
+export type {
+  CraftsmanSkillRecord,
+  CraftsmanSpecializationRecord,
+  SkillCatalogReleaseRecord,
+  SkillCatalogSkillRecord,
+} from "./craftsman-capability.js";
+export {
+  INDICATIVE_PRICING_COMMAND_KINDS,
+  indicativePriceModeEnum,
+  indicativePricingCommandKindEnum,
+  indicativePricingCommands,
+  indicativePricingEntries,
+  indicativePricingEntryRevisions,
+  indicativePricingEntryStateEnum,
+} from "./indicative-pricing.js";
+export type {
+  IndicativePricingCommandRecord,
+  IndicativePricingEntryRecord,
+  IndicativePricingEntryRevisionRecord,
+} from "./indicative-pricing.js";
 export type {
   PrivacyConsentEventRecord,
   PrivacyConsentPurposeRecord,
