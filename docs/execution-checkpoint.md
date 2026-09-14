@@ -75,7 +75,7 @@ This file is the persistent implementation-status overlay for the hash-verified 
 | R2-006 | DONE     | Governed REQUIRED/OPTIONAL qualification policy, hard gate and privacy/race tests passed                     |
 | R2-007 | DONE     | Availability overlap facts, AVAILABLE-only soft signal/filter and private-time guards passed                 |
 | R2-008 | DONE     | Sparse trust/evidence volume, quality and confidence facts with neutral cold-start semantics passed          |
-| R2-009 | DONE     | Recommended categorical ranking without numeric weights or cold-start penalty passed                        |
+| R2-009 | DONE     | Recommended categorical ranking without numeric weights or cold-start penalty passed                         |
 | R2-010 | DONE     | Nearest and Best-rated alternate sorts with strict fact integrity passed                                     |
 | R2-011 | DONE     | Privacy-safe result cards, live qualification gates and why-matched explanations passed                      |
 | R2-012 | DONE     | Private persistent shortlist, idempotent commands and unavailable-target tombstones passed                   |
