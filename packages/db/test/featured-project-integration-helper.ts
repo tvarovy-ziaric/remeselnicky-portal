@@ -266,6 +266,14 @@ export async function runFeaturedProjectIntegrationAssertions(
     ).resolves.toEqual({ status: "PROJECT_UNAVAILABLE" });
   }
 
+  const overflowProjectId = await createProject(
+    projects,
+    owner,
+    professionId,
+    location,
+    6,
+  );
+
   await runFeaturedRawSqlNegatives(sql, {
     actorUserId: owner.userId,
     craftsmanProfileId: owner.profileId,
@@ -274,6 +282,7 @@ export async function runFeaturedProjectIntegrationAssertions(
     ),
     currentRevision: current.revision,
     foreignProjectId,
+    overflowProjectId,
     spareProjectId: spareId,
   });
   await runFeaturedSuspensionRace(sql, featured, owner, current);
@@ -287,13 +296,14 @@ async function runFeaturedRawSqlNegatives(
     readonly currentProjectIds: readonly PortfolioProjectId[];
     readonly currentRevision: number;
     readonly foreignProjectId: PortfolioProjectId;
+    readonly overflowProjectId: PortfolioProjectId;
     readonly spareProjectId: PortfolioProjectId;
   },
 ): Promise<void> {
   const four = [
     ...fixture.currentProjectIds,
     fixture.spareProjectId,
-    randomUUID(),
+    fixture.overflowProjectId,
   ];
   await expect(sql`
     INSERT INTO featured_project_commands (
