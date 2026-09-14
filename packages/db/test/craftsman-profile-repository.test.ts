@@ -231,7 +231,9 @@ describe("CraftsmanProfile repository", () => {
         profileId,
       ),
     ).resolves.toBeNull();
-    expect(statements[0]).toMatch(/id = [\s\S]*owner_user_id =/u);
+    expect(statements[0]).toMatch(
+      /JOIN users[\s\S]*account_state = 'ACTIVE'[\s\S]*id = [\s\S]*owner_user_id =/u,
+    );
   });
 });
 

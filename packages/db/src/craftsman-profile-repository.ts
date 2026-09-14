@@ -133,26 +133,28 @@ export function createCraftsmanProfileRepository(
     ): Promise<CraftsmanProfile | null> {
       const [profile] = await sql<CraftsmanProfileRow[]>`
         SELECT
-          id,
-          owner_user_id AS "ownerUserId",
-          profile_type AS "profileType",
-          real_first_name AS "realFirstName",
-          real_last_name AS "realLastName",
-          nickname,
-          official_company_name AS "officialCompanyName",
-          company_registration_number AS "companyRegistrationNumber",
-          about,
-          identity_verified_at AS "identityVerifiedAt",
-          identity_verification_reference AS "identityVerificationReference",
-          company_registration_verified_at AS "companyRegistrationVerifiedAt",
-          company_registration_verification_reference
+          profile.id,
+          profile.owner_user_id AS "ownerUserId",
+          profile.profile_type AS "profileType",
+          profile.real_first_name AS "realFirstName",
+          profile.real_last_name AS "realLastName",
+          profile.nickname,
+          profile.official_company_name AS "officialCompanyName",
+          profile.company_registration_number AS "companyRegistrationNumber",
+          profile.about,
+          profile.identity_verified_at AS "identityVerifiedAt",
+          profile.identity_verification_reference AS "identityVerificationReference",
+          profile.company_registration_verified_at AS "companyRegistrationVerifiedAt",
+          profile.company_registration_verification_reference
             AS "companyRegistrationVerificationReference",
-          revision,
-          created_at AS "createdAt",
-          updated_at AS "updatedAt"
-        FROM craftsman_profiles
-        WHERE id = ${profileId}
-          AND owner_user_id = ${actorUserId}
+          profile.revision,
+          profile.created_at AS "createdAt",
+          profile.updated_at AS "updatedAt"
+        FROM craftsman_profiles profile
+        JOIN users ON users.id = profile.owner_user_id
+          AND users.account_state = 'ACTIVE'
+        WHERE profile.id = ${profileId}
+          AND profile.owner_user_id = ${actorUserId}
       `;
       return profile === undefined ? null : mapProfile(profile);
     },
