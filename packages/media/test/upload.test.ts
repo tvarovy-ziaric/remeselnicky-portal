@@ -232,6 +232,37 @@ describe("controlled media upload", () => {
     );
   });
 
+  it("accepts credential photos only through the private image purpose", async () => {
+    const { createProcessingAsset, service } = setup();
+    const provenance = createServerMediaProvenance({
+      entityId: sourceId,
+      entityRevision: 1,
+      entityType: "CREDENTIAL",
+    });
+    await service.upload({
+      actor: actor(),
+      body: new Uint8Array([1]),
+      declaredContentType: "image/jpeg",
+      provenance,
+      purpose: "CREDENTIAL_IMAGE",
+    });
+    expect(createProcessingAsset).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "IMAGE",
+        purpose: "CREDENTIAL_IMAGE",
+      }),
+    );
+    await expect(
+      service.upload({
+        actor: actor(),
+        body: new Uint8Array([1]),
+        declaredContentType: "application/pdf",
+        provenance,
+        purpose: "CREDENTIAL_IMAGE",
+      }),
+    ).rejects.toMatchObject({ code: "INVALID_CONTENT_TYPE" });
+  });
+
   it("reports an inaccessible private orphan when metadata persistence fails", async () => {
     const { createProcessingAsset, recordOrphanedPrivateObject, service } =
       setup();

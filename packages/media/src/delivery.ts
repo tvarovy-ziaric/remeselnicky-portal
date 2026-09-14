@@ -35,6 +35,7 @@ export const PRIVATE_MEDIA_ACCESS_GRANTS = Object.freeze([
   "CREDENTIAL_REVIEWER",
   "DISPUTE_CASE_MEMBER",
   "DISPUTE_REVIEWER",
+  "PORTFOLIO_PROJECT_OWNER",
 ] as const);
 
 export type PrivateMediaAccessGrant =
@@ -161,7 +162,12 @@ const privateMediaDownloadPolicy = defineAuthorizationPolicy<
     ) {
       return denyAuthorization();
     }
-    if (actor.userId === target.ownerUserId) return permitAuthorization();
+    if (
+      actor.userId === target.ownerUserId &&
+      target.purpose !== "PORTFOLIO_IMAGE"
+    ) {
+      return permitAuthorization();
+    }
 
     const allowed = allowedGrantsForPurpose(target.purpose);
     return context.access.grants.some((grant) => allowed.has(grant))
@@ -358,6 +364,7 @@ function allowedGrantsForPurpose(
     case "CHAT_DOCUMENT":
       return new Set(["CONVERSATION_MEMBER"]);
     case "CREDENTIAL_DOCUMENT":
+    case "CREDENTIAL_IMAGE":
       return new Set(["CREDENTIAL_REVIEWER"]);
     case "QUOTE_DOCUMENT":
       return new Set(["QUOTE_AUTHOR", "QUOTE_REQUEST_CUSTOMER"]);
@@ -370,8 +377,9 @@ function allowedGrantsForPurpose(
     case "DISPUTE_EVIDENCE":
       return new Set(["DISPUTE_CASE_MEMBER", "DISPUTE_REVIEWER"]);
     case "PROFILE_IMAGE":
-    case "PORTFOLIO_IMAGE":
       return new Set();
+    case "PORTFOLIO_IMAGE":
+      return new Set(["PORTFOLIO_PROJECT_OWNER"]);
   }
 }
 

@@ -43,6 +43,20 @@ import { createSkillCatalogRepository } from "./skill-catalog-repository.js";
 import type { SkillCatalogRepository } from "./skill-catalog-repository.js";
 import { createIndicativePricingRepository } from "./indicative-pricing-repository.js";
 import type { IndicativePricingPersistence } from "@portal/domain";
+import { createPortfolioProjectRepository } from "./portfolio-project-repository.js";
+import type { PortfolioProjectPersistence } from "@portal/domain";
+import { createPortfolioProjectPhotoRepository } from "./portfolio-project-media-repository.js";
+import type { PortfolioProjectPhotoPersistence } from "@portal/domain";
+import { createCraftsmanExperienceRepository } from "./craftsman-experience-repository.js";
+import type { CraftsmanExperiencePersistence } from "@portal/domain";
+import { createCraftsmanAvailabilityRepository } from "./craftsman-availability-repository.js";
+import type { CraftsmanAvailabilityPersistence } from "@portal/domain";
+import { createCraftsmanPublicationRepository } from "./craftsman-publication-repository.js";
+import type { CraftsmanPublicationPersistence } from "@portal/domain";
+import {
+  createCredentialClaimRepository,
+  type CredentialClaimRepository,
+} from "./credential-claim-repository.js";
 import { createPrivacyRepository } from "./privacy-repository.js";
 import type { PrivacyRepository } from "@portal/privacy";
 import { createCustomerProfileRepository } from "./customer-profile-repository.js";
@@ -93,6 +107,68 @@ export type {
   PrivacyRequestCaseRecord,
   PrivacyRequestEventRecord,
   PrivacyRetentionPolicyVersionRecord,
+} from "./schema/index.js";
+export {
+  PORTFOLIO_PHOTO_COMMAND_KINDS,
+  portfolioPhotoAttachments,
+  portfolioPhotoCommandKindEnum,
+  portfolioPhotoCommands,
+  portfolioPhotoPhaseEnum,
+  portfolioPhotoRevisionItems,
+  portfolioPhotoRevisions,
+  portfolioPhotoStateEnum,
+  portfolioProjectPhotoSets,
+} from "./schema/index.js";
+export type {
+  PortfolioPhotoAttachmentRecord,
+  PortfolioPhotoCommandRecord,
+  PortfolioPhotoRevisionItemRecord,
+  PortfolioPhotoRevisionRecord,
+  PortfolioProjectPhotoSetRecord,
+} from "./schema/index.js";
+export {
+  PORTFOLIO_PROJECT_COMMAND_KINDS,
+  portfolioProjectCommandKindEnum,
+  portfolioProjectCommands,
+  portfolioProjectDurationUnitEnum,
+  portfolioProjectProvenanceKindEnum,
+  portfolioProjectRecordStateEnum,
+  portfolioProjectRevisions,
+  portfolioProjects,
+} from "./schema/index.js";
+export type {
+  PortfolioProjectCommandRecord,
+  PortfolioProjectRecord,
+  PortfolioProjectRevisionRecord,
+} from "./schema/index.js";
+export {
+  CRAFTSMAN_AVAILABILITY_COMMAND_KINDS,
+  CRAFTSMAN_AVAILABILITY_COMMAND_RESULTS,
+  craftsmanAvailabilityBlockStateEnum,
+  craftsmanAvailabilityCommandKindEnum,
+  craftsmanAvailabilityCommandResultEnum,
+  craftsmanAvailabilityCommands,
+  craftsmanAvailabilityRevisions,
+  craftsmanAvailabilityStateEnum,
+} from "./schema/index.js";
+export type {
+  CraftsmanAvailabilityCommandRecord,
+  CraftsmanAvailabilityRevisionRecord,
+} from "./schema/index.js";
+export {
+  craftsmanProfileModerationStateEnum,
+  craftsmanProfileOwnerVisibilityEnum,
+  craftsmanProfilePublicationActorKindEnum,
+  craftsmanProfilePublicationCommandKindEnum,
+  craftsmanProfilePublicationCommands,
+  craftsmanProfilePublicationRevisions,
+  craftsmanProfileReviewStateEnum,
+  PROFILE_PUBLICATION_ACTOR_KINDS,
+  PROFILE_PUBLICATION_COMMAND_KINDS,
+} from "./schema/index.js";
+export type {
+  CraftsmanProfilePublicationCommandRecord,
+  CraftsmanProfilePublicationRevisionRecord,
 } from "./schema/index.js";
 export {
   CRAFTSMAN_SKILL_COMMAND_KINDS,
@@ -181,6 +257,37 @@ export type {
   IndicativePricingCommandRecord,
   IndicativePricingEntryRecord,
   IndicativePricingEntryRevisionRecord,
+} from "./schema/index.js";
+export {
+  CRAFTSMAN_EXPERIENCE_COMMAND_RESULTS,
+  craftsmanExperienceCommandResultEnum,
+  craftsmanExperienceCommands,
+  craftsmanExperienceRevisions,
+} from "./schema/index.js";
+export type {
+  CraftsmanExperienceCommandRecord,
+  CraftsmanExperienceRevisionRecord,
+} from "./schema/index.js";
+export {
+  CREDENTIAL_CLAIM_COMMAND_KINDS,
+  credentialClaimCommandKindEnum,
+  credentialClaimCommands,
+  credentialClaimDecisions,
+  credentialClaimEvidence,
+  credentialClaimRevisions,
+  credentialClaims,
+  credentialClaimStateEnum,
+  credentialEvidenceRequirementEnum,
+  credentialReviewReasonCategoryEnum,
+  credentialTypePolicies,
+} from "./schema/index.js";
+export type {
+  CredentialClaimCommandRecord,
+  CredentialClaimDecisionRecord,
+  CredentialClaimEvidenceRecord,
+  CredentialClaimRecord,
+  CredentialClaimRevisionRecord,
+  CredentialTypePolicyRecord,
 } from "./schema/index.js";
 export type {
   AdminMfaChallengeRecord,
@@ -286,6 +393,11 @@ export { createAdminAccessRepository } from "./admin-auth-repository.js";
 export type { AdminAccessRepository } from "@portal/admin-auth";
 export { createAuditRepository } from "./audit-repository.js";
 export type { AuditRepository } from "@portal/audit";
+export {
+  createCraftsmanPublicationRepository,
+  CraftsmanPublicationIdempotencyError,
+} from "./craftsman-publication-repository.js";
+export type { CraftsmanPublicationPersistence } from "@portal/domain";
 export { createPrivacyRepository } from "./privacy-repository.js";
 export type { PrivacyRepository } from "@portal/privacy";
 export type {
@@ -355,6 +467,28 @@ export {
 } from "./indicative-pricing-repository.js";
 export type { IndicativePricingPersistence } from "@portal/domain";
 export {
+  createCraftsmanExperienceRepository,
+  CraftsmanExperienceIdempotencyError,
+} from "./craftsman-experience-repository.js";
+export type { CraftsmanExperiencePersistence } from "@portal/domain";
+export {
+  createCraftsmanAvailabilityRepository,
+  CraftsmanAvailabilityIdempotencyError,
+} from "./craftsman-availability-repository.js";
+export type { CraftsmanAvailabilityPersistence } from "@portal/domain";
+export {
+  createCredentialClaimRepository,
+  createCredentialReviewService,
+  CredentialClaimIdempotencyError,
+} from "./credential-claim-repository.js";
+export type {
+  CredentialClaimRepository,
+  CredentialReviewResult,
+  CredentialReviewService,
+  CredentialReviewServiceResult,
+} from "./credential-claim-repository.js";
+export type { CredentialClaimPersistence } from "@portal/domain";
+export {
   createCraftsmanServiceAreaRepository,
   CraftsmanServiceAreaIdempotencyError,
 } from "./craftsman-service-area-repository.js";
@@ -364,6 +498,19 @@ export {
   CraftsmanCapabilityIdempotencyError,
 } from "./craftsman-capability-repository.js";
 export type { CraftsmanCapabilityPersistence } from "@portal/domain";
+export {
+  createPortfolioProjectRepository,
+  PortfolioProjectIdempotencyError,
+} from "./portfolio-project-repository.js";
+export type { PortfolioProjectPersistence } from "@portal/domain";
+export {
+  createPortfolioMediaEntityAccessResolver,
+  createPortfolioProjectPhotoRepository,
+  preparePortfolioPhotoUpload,
+  PortfolioProjectPhotoIdempotencyError,
+} from "./portfolio-project-media-repository.js";
+export type { PreparePortfolioPhotoUploadResult } from "./portfolio-project-media-repository.js";
+export type { PortfolioProjectPhotoPersistence } from "@portal/domain";
 export {
   createSkillCatalogRepository,
   prepareSkillCatalogRelease,
@@ -411,6 +558,12 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly craftsmanCapabilities: CraftsmanCapabilityPersistence;
   readonly craftsmanServiceAreas: CraftsmanServiceAreaPersistence;
   readonly indicativePricing: IndicativePricingPersistence;
+  readonly portfolioProjects: PortfolioProjectPersistence;
+  readonly portfolioProjectPhotos: PortfolioProjectPhotoPersistence;
+  readonly craftsmanExperience: CraftsmanExperiencePersistence;
+  readonly craftsmanAvailability: CraftsmanAvailabilityPersistence;
+  readonly craftsmanPublication: CraftsmanPublicationPersistence;
+  readonly credentialClaims: CredentialClaimRepository;
   readonly customerProfiles: CustomerProfilePersistence;
   readonly emailVerification: EmailVerificationRepository;
   readonly media: MediaRepository;
@@ -466,6 +619,12 @@ export function createDatabase(
   const craftsmanCapabilities = createCraftsmanCapabilityRepository(sql);
   const craftsmanServiceAreas = createCraftsmanServiceAreaRepository(sql);
   const indicativePricing = createIndicativePricingRepository(sql);
+  const portfolioProjects = createPortfolioProjectRepository(sql);
+  const portfolioProjectPhotos = createPortfolioProjectPhotoRepository(sql);
+  const craftsmanExperience = createCraftsmanExperienceRepository(sql);
+  const craftsmanAvailability = createCraftsmanAvailabilityRepository(sql);
+  const craftsmanPublication = createCraftsmanPublicationRepository(sql);
+  const credentialClaims = createCredentialClaimRepository(sql);
   const customerProfiles = createCustomerProfileRepository(sql);
   const emailVerification = createEmailVerificationRepository(sql);
   const media = createMediaRepository(sql);
@@ -489,6 +648,12 @@ export function createDatabase(
     craftsmanCapabilities,
     craftsmanServiceAreas,
     indicativePricing,
+    portfolioProjects,
+    portfolioProjectPhotos,
+    craftsmanExperience,
+    craftsmanAvailability,
+    craftsmanPublication,
+    credentialClaims,
     customerProfiles,
     emailVerification,
     media,

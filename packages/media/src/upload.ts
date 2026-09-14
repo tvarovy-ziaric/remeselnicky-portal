@@ -28,6 +28,7 @@ const IMAGE_PURPOSES = new Set<MediaUploadPurpose>([
   "JOB_REQUEST_IMAGE",
   "JOB_IMAGE",
   "CHAT_IMAGE",
+  "CREDENTIAL_IMAGE",
 ]);
 const DOCUMENT_PURPOSES = new Set<MediaUploadPurpose>([
   "CHAT_DOCUMENT",

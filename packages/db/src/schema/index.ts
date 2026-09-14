@@ -213,11 +213,104 @@ export {
   indicativePricingEntryRevisions,
   indicativePricingEntryStateEnum,
 } from "./indicative-pricing.js";
+export {
+  PORTFOLIO_PROJECT_COMMAND_KINDS,
+  portfolioProjectCommandKindEnum,
+  portfolioProjectCommands,
+  portfolioProjectDurationUnitEnum,
+  portfolioProjectProvenanceKindEnum,
+  portfolioProjectRecordStateEnum,
+  portfolioProjectRevisions,
+  portfolioProjects,
+} from "./portfolio-project.js";
+export {
+  PORTFOLIO_PHOTO_COMMAND_KINDS,
+  portfolioPhotoAttachments,
+  portfolioPhotoCommandKindEnum,
+  portfolioPhotoCommands,
+  portfolioPhotoPhaseEnum,
+  portfolioPhotoRevisionItems,
+  portfolioPhotoRevisions,
+  portfolioPhotoStateEnum,
+  portfolioProjectPhotoSets,
+} from "./portfolio-project-media.js";
+export type {
+  PortfolioPhotoAttachmentRecord,
+  PortfolioPhotoCommandRecord,
+  PortfolioPhotoRevisionItemRecord,
+  PortfolioPhotoRevisionRecord,
+  PortfolioProjectPhotoSetRecord,
+} from "./portfolio-project-media.js";
+export type {
+  PortfolioProjectCommandRecord,
+  PortfolioProjectRecord,
+  PortfolioProjectRevisionRecord,
+} from "./portfolio-project.js";
+export {
+  CRAFTSMAN_AVAILABILITY_COMMAND_KINDS,
+  CRAFTSMAN_AVAILABILITY_COMMAND_RESULTS,
+  craftsmanAvailabilityBlockStateEnum,
+  craftsmanAvailabilityCommandKindEnum,
+  craftsmanAvailabilityCommandResultEnum,
+  craftsmanAvailabilityCommands,
+  craftsmanAvailabilityRevisions,
+  craftsmanAvailabilityStateEnum,
+} from "./craftsman-availability.js";
+export type {
+  CraftsmanAvailabilityCommandRecord,
+  CraftsmanAvailabilityRevisionRecord,
+} from "./craftsman-availability.js";
 export type {
   IndicativePricingCommandRecord,
   IndicativePricingEntryRecord,
   IndicativePricingEntryRevisionRecord,
 } from "./indicative-pricing.js";
+export {
+  CRAFTSMAN_EXPERIENCE_COMMAND_RESULTS,
+  craftsmanExperienceCommandResultEnum,
+  craftsmanExperienceCommands,
+  craftsmanExperienceRevisions,
+} from "./craftsman-experience.js";
+export type {
+  CraftsmanExperienceCommandRecord,
+  CraftsmanExperienceRevisionRecord,
+} from "./craftsman-experience.js";
+export {
+  craftsmanProfileModerationStateEnum,
+  craftsmanProfileOwnerVisibilityEnum,
+  craftsmanProfilePublicationActorKindEnum,
+  craftsmanProfilePublicationCommandKindEnum,
+  craftsmanProfilePublicationCommands,
+  craftsmanProfilePublicationRevisions,
+  craftsmanProfileReviewStateEnum,
+  PROFILE_PUBLICATION_ACTOR_KINDS,
+  PROFILE_PUBLICATION_COMMAND_KINDS,
+} from "./craftsman-publication.js";
+export type {
+  CraftsmanProfilePublicationCommandRecord,
+  CraftsmanProfilePublicationRevisionRecord,
+} from "./craftsman-publication.js";
+export {
+  CREDENTIAL_CLAIM_COMMAND_KINDS,
+  credentialClaimCommandKindEnum,
+  credentialClaimCommands,
+  credentialClaimDecisions,
+  credentialClaimEvidence,
+  credentialClaimRevisions,
+  credentialClaims,
+  credentialClaimStateEnum,
+  credentialEvidenceRequirementEnum,
+  credentialReviewReasonCategoryEnum,
+  credentialTypePolicies,
+} from "./credential-claim.js";
+export type {
+  CredentialClaimCommandRecord,
+  CredentialClaimDecisionRecord,
+  CredentialClaimEvidenceRecord,
+  CredentialClaimRecord,
+  CredentialClaimRevisionRecord,
+  CredentialTypePolicyRecord,
+} from "./credential-claim.js";
 export type {
   PrivacyConsentEventRecord,
   PrivacyConsentPurposeRecord,

@@ -29,6 +29,12 @@ import { runCraftsmanProfessionIntegrationAssertions } from "./craftsman-profess
 import { runCraftsmanCapabilityIntegrationAssertions } from "./craftsman-capability-integration-helper.js";
 import { runCraftsmanServiceAreaIntegrationAssertions } from "./craftsman-service-area-integration-helper.js";
 import { runIndicativePricingIntegrationAssertions } from "./indicative-pricing-integration-helper.js";
+import { runCraftsmanExperienceIntegrationAssertions } from "./craftsman-experience-integration-helper.js";
+import { runCraftsmanAvailabilityIntegrationAssertions } from "./craftsman-availability-integration-helper.js";
+import { runPortfolioProjectIntegrationAssertions } from "./portfolio-project-integration-helper.js";
+import { runCredentialClaimIntegrationAssertions } from "./credential-claim-integration-helper.js";
+import { runCraftsmanPublicationIntegrationAssertions } from "./craftsman-publication-integration-helper.js";
+import { runPortfolioProjectMediaIntegrationAssertions } from "./portfolio-project-media-integration-helper.js";
 
 const testDatabaseUrl = process.env["TEST_DATABASE_URL"];
 const migrationsDirectory = fileURLToPath(
@@ -74,6 +80,12 @@ describe.skipIf(testDatabaseUrl === undefined)(
           "0017_skills_specializations.sql",
           "0018_craftsman_service_area.sql",
           "0019_indicative_pricing.sql",
+          "0020_craftsman_experience.sql",
+          "0021_craftsman_availability.sql",
+          "0022_portfolio_project_core.sql",
+          "0023_credential_claim_review.sql",
+          "0024_craftsman_profile_publication.sql",
+          "0025_portfolio_project_photos.sql",
         ],
         alreadyApplied: 0,
       });
@@ -82,7 +94,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         testDatabaseUrl,
         migrationsDirectory,
       );
-      expect(secondRun).toEqual({ applied: [], alreadyApplied: 20 });
+      expect(secondRun).toEqual({ applied: [], alreadyApplied: 26 });
 
       const sql = postgres(testDatabaseUrl, { max: 5 });
       try {
@@ -128,7 +140,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         `;
 
         expect(postgis?.extversion).toMatch(/^3\./);
-        expect(ledger?.count).toBe(20);
+        expect(ledger?.count).toBe(26);
         expect(created).toMatchObject({ account_state: "ACTIVE" });
         expect(created?.id).toMatch(
           /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
@@ -1644,6 +1656,12 @@ describe.skipIf(testDatabaseUrl === undefined)(
         await runCraftsmanCapabilityIntegrationAssertions(sql);
         await runCraftsmanServiceAreaIntegrationAssertions(sql);
         await runIndicativePricingIntegrationAssertions(sql);
+        await runCraftsmanExperienceIntegrationAssertions(sql);
+        await runCraftsmanAvailabilityIntegrationAssertions(sql);
+        await runPortfolioProjectIntegrationAssertions(sql);
+        await runCredentialClaimIntegrationAssertions(sql);
+        await runCraftsmanPublicationIntegrationAssertions(sql);
+        await runPortfolioProjectMediaIntegrationAssertions(sql);
 
         await adminAccess.revokePrivilegedSession(superSessionDigest);
         await expect(

@@ -274,7 +274,9 @@ describe("private media delivery", () => {
     ["QUOTE_DOCUMENT", "QUOTE_REQUEST_CUSTOMER"],
     ["CHANGE_ORDER_DOCUMENT", "JOB_COMMERCIAL_PARTICIPANT"],
     ["CREDENTIAL_DOCUMENT", "CREDENTIAL_REVIEWER"],
+    ["CREDENTIAL_IMAGE", "CREDENTIAL_REVIEWER"],
     ["DISPUTE_EVIDENCE", "DISPUTE_CASE_MEMBER"],
+    ["PORTFOLIO_IMAGE", "PORTFOLIO_PROJECT_OWNER"],
   ] as const)("allows %s only with its %s relation", async (purpose, grant) => {
     const fixture = privateService({
       access: [grant],
@@ -291,6 +293,21 @@ describe("private media delivery", () => {
     ).resolves.toMatchObject({ statusCode: 303 });
   });
 
+  it("requires current portfolio attachment authorization even from the asset owner", async () => {
+    const denied = privateService({
+      snapshot: snapshot({
+        asset: { ...snapshot().asset, purpose: "PORTFOLIO_IMAGE" },
+      }),
+    });
+    await expect(
+      denied.service.handleDownload({
+        actorUserId: aliceId,
+        mediaAssetId: assetId,
+      }),
+    ).resolves.toMatchObject({ statusCode: 404 });
+    expect(denied.issuePrivateDownload).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["JOB_REQUEST_IMAGE", "JOB_EXECUTION_PARTICIPANT"],
     ["JOB_DOCUMENT", "INVITED_PROVIDER"],
@@ -298,6 +315,7 @@ describe("private media delivery", () => {
     ["QUOTE_DOCUMENT", "CONVERSATION_MEMBER"],
     ["CHANGE_ORDER_DOCUMENT", "JOB_EXECUTION_PARTICIPANT"],
     ["DISPUTE_EVIDENCE", "JOB_CUSTOMER"],
+    ["CREDENTIAL_IMAGE", "JOB_CUSTOMER"],
     ["PORTFOLIO_IMAGE", "INVITED_PROVIDER"],
   ] as const)(
     "denies wrong-role access: %s with %s",
