@@ -50,9 +50,16 @@ export function createPostgresSessionStore(input: {
     },
 
     set(sessionId, session, callback): void {
+      const policyExpiresAt = new Date(clock().valueOf() + input.sessionTtlMs);
       const expiresAt =
-        session.cookie.expires ??
-        new Date(clock().valueOf() + input.sessionTtlMs);
+        session.cookie.expires === undefined || session.cookie.expires === null
+          ? policyExpiresAt
+          : new Date(
+              Math.min(
+                session.cookie.expires.valueOf(),
+                policyExpiresAt.valueOf(),
+              ),
+            );
       const payload: StoredSessionPayload = {
         ...(session._csrf === undefined ? {} : { _csrf: session._csrf }),
         ...(session.authUserId === undefined
