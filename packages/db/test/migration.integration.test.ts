@@ -1469,7 +1469,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         ).resolves.toBeUndefined();
         await sql`
           UPDATE admin_privileged_sessions
-          SET mfa_authenticated_at = CURRENT_TIMESTAMP
+          SET mfa_authenticated_at = created_at
           WHERE session_id_hash = ${superSessionDigest}
         `;
         await sql`
