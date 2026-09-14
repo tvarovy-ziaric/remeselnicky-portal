@@ -31,6 +31,9 @@ describe("availability search composition", () => {
       "NEUTRAL",
       "NEUTRAL",
     ]);
+    expect(result.map(({ availability }) => availability.profileId)).toEqual(
+      ids.slice(0, 2),
+    );
     expect(Object.isFrozen(result)).toBe(true);
     expect(Object.isFrozen(result[0]?.availability)).toBe(true);
   });

@@ -17,6 +17,8 @@ returns only:
 
 It never returns the requested or stored timestamps, number of blocks, source
 of work, employer, capacity, booking state, contact data, or calendar contents.
+The composed relevance fact retains the originating public profile UUID so a
+soft-positive fact cannot be detached and applied to another candidate.
 The underlying exact periods remain private. Candidate eligibility is inherited
 from `current_searchable_craftsman_profiles`, so hidden, restricted, unapproved,
 not-ready, and non-ACTIVE-owner profiles fail closed.

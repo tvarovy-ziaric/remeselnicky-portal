@@ -19,6 +19,7 @@ export interface AvailabilitySearchCandidate {
 }
 
 export interface AvailabilitySearchRelevance {
+  readonly profileId: string;
   readonly matchKind: AvailabilitySearchMatchKind;
   /** A categorical hook only. R2-009 owns cross-signal ranking weights. */
   readonly relevance: "NEUTRAL" | "SOFT_POSITIVE";
@@ -76,6 +77,7 @@ export function composeAvailabilityRelevance<
     composed.push(
       Object.freeze({
         availability: Object.freeze({
+          profileId: candidate.profileId,
           matchKind: fact.matchKind,
           relevance: fact.indicativelyAvailable
             ? ("SOFT_POSITIVE" as const)

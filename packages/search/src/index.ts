@@ -77,3 +77,26 @@ export type {
   AvailabilitySearchMatchKind,
   AvailabilitySearchRelevance,
 } from "./availability-relevance.js";
+export {
+  createRecommendedRankingPipeline,
+  RECOMMENDED_RANKING_MAX_CANDIDATES,
+  RecommendedRankingIntegrityError,
+} from "./recommended-ranking.js";
+export type {
+  RecommendedQualificationContextCandidate,
+  RecommendedQualificationContextResolver,
+  RecommendedRankingCandidate,
+  RecommendedRankingPipeline,
+  RecommendedRankingResult,
+} from "./recommended-ranking.js";
+export {
+  ALTERNATE_SEARCH_SORT_MODES,
+  AlternateSearchSortIntegrityError,
+  sortEligibleSearchCandidates,
+} from "./alternate-sort.js";
+export type {
+  AlternateSearchSortInput,
+  AlternateSearchSortMode,
+  BestRatedSortFact,
+  EligibleAlternateSortCandidate,
+} from "./alternate-sort.js";
