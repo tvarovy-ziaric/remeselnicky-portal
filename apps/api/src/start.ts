@@ -9,6 +9,7 @@ import {
   createStreamDestination,
   createStructuredLogger,
 } from "@portal/observability";
+import { createTaxonomyAutocompleteService } from "@portal/search";
 
 import { buildApi } from "./app.js";
 import {
@@ -65,6 +66,11 @@ const app = buildApi({
     delivery: createPublicPortfolioDeliveryResolver({
       repository: database.publicPortfolioDelivery,
     }),
+  },
+  taxonomyAutocomplete: {
+    autocomplete: createTaxonomyAutocompleteService(
+      database.taxonomyAutocomplete,
+    ),
   },
   observability: {
     appOrigin: config.appOrigin,

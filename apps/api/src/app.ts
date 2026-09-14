@@ -18,6 +18,10 @@ import {
   registerPublicPortfolioMediaRoutes,
   type PublicPortfolioMediaRouteDependencies,
 } from "./public-portfolio-media/routes.js";
+import {
+  registerTaxonomyAutocompleteRoutes,
+  type TaxonomyAutocompleteRouteDependencies,
+} from "./taxonomy-autocomplete/routes.js";
 
 export interface ApiDependencies {
   readonly auth?: AuthModuleDependencies;
@@ -25,6 +29,7 @@ export interface ApiDependencies {
   readonly observability?: ApiObservabilityDependencies;
   readonly publicCraftsmanProfiles?: PublicCraftsmanProfileRouteDependencies;
   readonly publicPortfolioMedia?: PublicPortfolioMediaRouteDependencies;
+  readonly taxonomyAutocomplete?: TaxonomyAutocompleteRouteDependencies;
 }
 
 export function buildApi(dependencies: ApiDependencies): FastifyInstance {
@@ -50,6 +55,9 @@ export function buildApi(dependencies: ApiDependencies): FastifyInstance {
   }
   if (dependencies.publicPortfolioMedia !== undefined) {
     registerPublicPortfolioMediaRoutes(app, dependencies.publicPortfolioMedia);
+  }
+  if (dependencies.taxonomyAutocomplete !== undefined) {
+    registerTaxonomyAutocompleteRoutes(app, dependencies.taxonomyAutocomplete);
   }
 
   app.get("/", () => ({

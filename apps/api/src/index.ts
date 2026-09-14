@@ -6,3 +6,8 @@ export {
 export type { PublicCraftsmanProfileRouteDependencies } from "./public-craftsman-profile/routes.js";
 export { registerPublicPortfolioMediaRoutes } from "./public-portfolio-media/routes.js";
 export type { PublicPortfolioMediaRouteDependencies } from "./public-portfolio-media/routes.js";
+export {
+  registerTaxonomyAutocompleteRoutes,
+  TAXONOMY_AUTOCOMPLETE_PATH,
+} from "./taxonomy-autocomplete/routes.js";
+export type { TaxonomyAutocompleteRouteDependencies } from "./taxonomy-autocomplete/routes.js";

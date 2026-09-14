@@ -95,6 +95,9 @@ importers:
       '@portal/observability':
         specifier: workspace:*
         version: link:../../packages/observability
+      '@portal/search':
+        specifier: workspace:*
+        version: link:../../packages/search
       argon2:
         specifier: 0.45.1
         version: 0.45.1
@@ -319,6 +322,9 @@ importers:
       '@portal/privacy':
         specifier: workspace:*
         version: link:../privacy
+      '@portal/search':
+        specifier: workspace:*
+        version: link:../search
       '@portal/taxonomy':
         specifier: workspace:*
         version: link:../taxonomy
@@ -458,6 +464,18 @@ importers:
         version: 3.2.7(@types/node@26.5.1)(tsx@4.23.13)
 
   packages/queue:
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.5.1
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 3.2.7(@types/node@26.5.1)(tsx@4.23.13)
+
+  packages/search:
     devDependencies:
       '@types/node':
         specifier: 'catalog:'

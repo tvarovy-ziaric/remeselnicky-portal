@@ -57,6 +57,22 @@ export {
   normalizeTravelFeePolicy,
   SERVICE_AREA_EXTRA_TECHNICAL_LIMIT,
 } from "./craftsman-service-area.js";
+export {
+  assertCraftsmanDistanceQueryInput,
+  CRAFTSMAN_DISTANCE_QUERY_MAX_RESULTS,
+  createCraftsmanDistanceFact,
+  CraftsmanDistanceValidationError,
+  MAX_RANKING_DISTANCE_METERS,
+  serializePublicCraftsmanApproximateDistance,
+} from "./craftsman-distance.js";
+export type {
+  CraftsmanDistanceFact,
+  CraftsmanDistanceFactValues,
+  CraftsmanDistancePersistence,
+  CraftsmanDistanceQueryInput,
+  CraftsmanDistanceQueryResult,
+  PublicCraftsmanApproximateDistance,
+} from "./craftsman-distance.js";
 export type {
   CraftsmanServiceArea,
   CraftsmanServiceAreaPersistence,
@@ -345,3 +361,22 @@ export type {
   PortfolioCollaborationState,
   PortfolioCollaborationVisibility,
 } from "./portfolio-collaboration.js";
+export {
+  CraftsmanSearchValidationError,
+  normalizeSearchCraftsmanCandidatesInput,
+  SEARCH_CANDIDATE_DEFAULT_LIMIT,
+  SEARCH_CANDIDATE_MAX_LIMIT,
+  SEARCH_IDENTITY_QUERY_MAX_LENGTH,
+} from "./craftsman-search-read-model.js";
+export type {
+  CraftsmanSearchReadModelPersistence,
+  NormalizedSearchCraftsmanCandidatesInput,
+  SearchableCraftsmanCandidate,
+  SearchableCraftsmanCandidatePage,
+  SearchableCraftsmanCredential,
+  SearchableCraftsmanProfession,
+  SearchableCraftsmanPrice,
+  SearchableCraftsmanSkill,
+  SearchableCraftsmanSpecialization,
+  SearchCraftsmanCandidatesInput,
+} from "./craftsman-search-read-model.js";

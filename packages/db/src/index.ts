@@ -66,7 +66,15 @@ import type { CraftsmanAvailabilityPersistence } from "@portal/domain";
 import { createCraftsmanPublicationRepository } from "./craftsman-publication-repository.js";
 import type { CraftsmanPublicationPersistence } from "@portal/domain";
 import { createPublicCraftsmanProfileRepository } from "./public-craftsman-profile-repository.js";
-import type { PublicCraftsmanProfilePersistence } from "@portal/domain";
+import { createCraftsmanSearchReadModelRepository } from "./craftsman-search-read-model-repository.js";
+import { createCraftsmanDistanceRepository } from "./craftsman-distance-repository.js";
+import type {
+  CraftsmanDistancePersistence,
+  CraftsmanSearchReadModelPersistence,
+  PublicCraftsmanProfilePersistence,
+} from "@portal/domain";
+import { createTaxonomyAutocompleteRepository } from "./taxonomy-autocomplete-repository.js";
+import type { TaxonomyAutocompletePersistence } from "@portal/search";
 import {
   createCredentialClaimRepository,
   type CredentialClaimRepository,
@@ -458,6 +466,18 @@ export {
 export type { CraftsmanPublicationPersistence } from "@portal/domain";
 export { createPublicCraftsmanProfileRepository } from "./public-craftsman-profile-repository.js";
 export type { PublicCraftsmanProfilePersistence } from "@portal/domain";
+export { createCraftsmanSearchReadModelRepository } from "./craftsman-search-read-model-repository.js";
+export { createCraftsmanDistanceRepository } from "./craftsman-distance-repository.js";
+export type {
+  CraftsmanDistancePersistence,
+  CraftsmanSearchReadModelPersistence,
+} from "@portal/domain";
+export { createTaxonomyAutocompleteRepository } from "./taxonomy-autocomplete-repository.js";
+export type { TaxonomyAutocompletePersistence } from "@portal/search";
+export {
+  CRAFTSMAN_SEARCH_READ_MODEL_VIEWS,
+  SEARCHABLE_CRAFTSMAN_PROFILE_COLUMNS,
+} from "./schema/index.js";
 export { createPrivacyRepository } from "./privacy-repository.js";
 export type { PrivacyRepository } from "@portal/privacy";
 export type {
@@ -647,6 +667,9 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly craftsmanAvailability: CraftsmanAvailabilityPersistence;
   readonly craftsmanPublication: CraftsmanPublicationPersistence;
   readonly publicCraftsmanProfiles: PublicCraftsmanProfilePersistence;
+  readonly craftsmanSearch: CraftsmanSearchReadModelPersistence;
+  readonly craftsmanDistances: CraftsmanDistancePersistence;
+  readonly taxonomyAutocomplete: TaxonomyAutocompletePersistence;
   readonly credentialClaims: CredentialClaimRepository;
   readonly customerProfiles: CustomerProfilePersistence;
   readonly emailVerification: EmailVerificationRepository;
@@ -713,6 +736,9 @@ export function createDatabase(
   const craftsmanAvailability = createCraftsmanAvailabilityRepository(sql);
   const craftsmanPublication = createCraftsmanPublicationRepository(sql);
   const publicCraftsmanProfiles = createPublicCraftsmanProfileRepository(sql);
+  const craftsmanSearch = createCraftsmanSearchReadModelRepository(sql);
+  const craftsmanDistances = createCraftsmanDistanceRepository(sql);
+  const taxonomyAutocomplete = createTaxonomyAutocompleteRepository(sql);
   const credentialClaims = createCredentialClaimRepository(sql);
   const customerProfiles = createCustomerProfileRepository(sql);
   const emailVerification = createEmailVerificationRepository(sql);
@@ -747,6 +773,9 @@ export function createDatabase(
     craftsmanAvailability,
     craftsmanPublication,
     publicCraftsmanProfiles,
+    craftsmanSearch,
+    craftsmanDistances,
+    taxonomyAutocomplete,
     credentialClaims,
     customerProfiles,
     emailVerification,

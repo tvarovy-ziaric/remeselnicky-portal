@@ -17,6 +17,7 @@ import {
   createPrivateMediaDeliveryRepository,
   createOutboxRepository,
   createPhoneVerificationRepository,
+  createTaxonomyAutocompleteRepository,
   type CreateProcessingMediaAssetInput,
 } from "../src/index.js";
 import { runNotificationIntegrationAssertions } from "./notification-integration-helper.js";
@@ -39,6 +40,8 @@ import { runPortfolioCollaborationIntegrationAssertions } from "./portfolio-coll
 import { runFeaturedProjectIntegrationAssertions } from "./featured-project-integration-helper.js";
 import { runPortfolioPublicationIntegrationAssertions } from "./portfolio-publication-integration-helper.js";
 import { runR1SupplySideIntegrationAssertions } from "./r1-supply-side-integration-helper.js";
+import { runCraftsmanSearchReadModelIntegrationAssertions } from "./craftsman-search-read-model-integration-helper.js";
+import { runCraftsmanDistanceIntegrationAssertions } from "./craftsman-distance-integration-helper.js";
 
 const testDatabaseUrl = process.env["TEST_DATABASE_URL"];
 const migrationsDirectory = fileURLToPath(
@@ -93,6 +96,8 @@ describe.skipIf(testDatabaseUrl === undefined)(
           "0026_portfolio_collaborations.sql",
           "0027_featured_projects.sql",
           "0028_portfolio_publication_consent_hooks.sql",
+          "0029_craftsman_search_read_model.sql",
+          "0030_craftsman_distance_facts.sql",
         ],
         alreadyApplied: 0,
       });
@@ -101,7 +106,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         testDatabaseUrl,
         migrationsDirectory,
       );
-      expect(secondRun).toEqual({ applied: [], alreadyApplied: 29 });
+      expect(secondRun).toEqual({ applied: [], alreadyApplied: 31 });
 
       const sql = postgres(testDatabaseUrl, { max: 5 });
       try {
@@ -147,7 +152,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         `;
 
         expect(postgis?.extversion).toMatch(/^3\./);
-        expect(ledger?.count).toBe(29);
+        expect(ledger?.count).toBe(31);
         expect(created).toMatchObject({ account_state: "ACTIVE" });
         expect(created?.id).toMatch(
           /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
@@ -1673,6 +1678,13 @@ describe.skipIf(testDatabaseUrl === undefined)(
         await runFeaturedProjectIntegrationAssertions(sql);
         await runPortfolioPublicationIntegrationAssertions(sql);
         await runR1SupplySideIntegrationAssertions(sql);
+        await runCraftsmanSearchReadModelIntegrationAssertions(sql);
+        await createTaxonomyAutocompleteRepository(sql).findCandidates({
+          limit: 10,
+          normalizedText: "test",
+          tokens: ["test"],
+        });
+        await runCraftsmanDistanceIntegrationAssertions(sql);
 
         await adminAccess.revokePrivilegedSession(superSessionDigest);
         await expect(

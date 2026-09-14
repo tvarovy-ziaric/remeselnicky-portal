@@ -363,3 +363,7 @@ export type {
   PrivacyRequestEventRecord,
   PrivacyRetentionPolicyVersionRecord,
 } from "./privacy.js";
+export {
+  CRAFTSMAN_SEARCH_READ_MODEL_VIEWS,
+  SEARCHABLE_CRAFTSMAN_PROFILE_COLUMNS,
+} from "./craftsman-search-read-model.js";

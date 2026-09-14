@@ -34,6 +34,7 @@ COPY packages/privacy/package.json packages/privacy/package.json
 COPY packages/projections/package.json packages/projections/package.json
 COPY packages/storage/package.json packages/storage/package.json
 COPY packages/taxonomy/package.json packages/taxonomy/package.json
+COPY packages/search/package.json packages/search/package.json
 RUN pnpm install --frozen-lockfile
 
 FROM dependencies AS build
