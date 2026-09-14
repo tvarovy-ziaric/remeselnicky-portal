@@ -5,11 +5,11 @@ This file is the persistent implementation-status overlay for the hash-verified 
 - Updated: 2026-09-14
 - Definition: D01–D30 LOCKED and hash verified
 - Active release: R1 — Supply side
-- Last completed ticket: R1-001 — Canonical Profession/Specialization taxonomy + seed governance
-- Active tickets: R1-002 — CustomerProfile lazy creation; R1-003 — CraftsmanProfile core entity
-- Next dependency-satisfied candidate: R1-004 — Craftsman profession/proficiency relationships (after R1-003)
-- Human gate: canonical Slovak taxonomy content still requires expert/legal review before activation; this does not block R1-002/R1-003
-- Integrated verification: CI run 34810124231 passed quality, dependency audit, secret scan and clean PostgreSQL/PostGIS migrations
+- Last completed ticket: R1-004 — Craftsman profession/proficiency relationships
+- Active tickets: R1-005 — skills/specializations; R1-006 — location/service area; R1-007 — indicative pricing
+- Next dependency-satisfied candidate: R1-008 — experience/working-since data
+- Human gate: canonical Slovak taxonomy content still requires expert/legal review before activation; this does not block private supply-side implementation
+- Integrated verification: CI run 34812163837 passed quality, dependency audit, secret scan and clean PostgreSQL/PostGIS migrations
 
 ## Ticket state overlay
 
@@ -49,8 +49,11 @@ This file is the persistent implementation-status overlay for the hash-verified 
 | R0-032 | DONE  | Isolated PG, multi-role auth, IDOR and concurrency harness passed locally and in CI                          |
 | R0-033 | DONE  | Digest-pinned release, bounded smoke, protected production and rollback validation passed                    |
 | R1-001 | DONE  | Append-only approved taxonomy releases, non-activatable placeholder and live PG governance/race tests passed |
+| R1-002 | DONE  | Lazy private CustomerProfile, ACTIVE-owner serialization and raw-SQL privacy/history guards passed           |
+| R1-003 | DONE  | Private INDIVIDUAL/COMPANY draft, owner/revision/verification and suspension-race guards passed              |
+| R1-004 | DONE  | Taxonomy-pinned professions, declared-level history, idempotency and live PG race/SQL guards passed          |
 
-All rows above are covered by CI run `34810124231` unless a more specific earlier run is referenced in history. The run applied migrations `0000`–`0013` twice and passed the complete live PostgreSQL/PostGIS integration suite.
+All rows above are covered by CI run `34812163837` unless a more specific earlier run is referenced in history. The run applied migrations `0000`–`0016` twice and passed the complete live PostgreSQL/PostGIS integration suite.
 
 ## Durable decisions
 
