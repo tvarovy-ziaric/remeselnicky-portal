@@ -274,18 +274,28 @@ export async function runFeaturedProjectIntegrationAssertions(
     6,
   );
 
+  const filled = await featured.pin({
+    actorUserId: owner.userId,
+    commandId: randomUUID(),
+    craftsmanProfileId: owner.profileId,
+    expectedRevision: current.revision,
+    portfolioProjectId: spareId,
+  });
+  if (filled.status !== "APPLIED") {
+    throw new Error("Expected the featured set to reach its database limit.");
+  }
+
   await runFeaturedRawSqlNegatives(sql, {
     actorUserId: owner.userId,
     craftsmanProfileId: owner.profileId,
-    currentProjectIds: current.items.map(
+    currentProjectIds: filled.featured.items.map(
       ({ portfolioProjectId }) => portfolioProjectId,
     ),
-    currentRevision: current.revision,
+    currentRevision: filled.featured.revision,
     foreignProjectId,
     overflowProjectId,
-    spareProjectId: spareId,
   });
-  await runFeaturedSuspensionRace(sql, featured, owner, current);
+  await runFeaturedSuspensionRace(sql, featured, owner, filled.featured);
 }
 
 async function runFeaturedRawSqlNegatives(
@@ -297,14 +307,9 @@ async function runFeaturedRawSqlNegatives(
     readonly currentRevision: number;
     readonly foreignProjectId: PortfolioProjectId;
     readonly overflowProjectId: PortfolioProjectId;
-    readonly spareProjectId: PortfolioProjectId;
   },
 ): Promise<void> {
-  const four = [
-    ...fixture.currentProjectIds,
-    fixture.spareProjectId,
-    fixture.overflowProjectId,
-  ];
+  const four = [...fixture.currentProjectIds, fixture.overflowProjectId];
   await expect(sql`
     INSERT INTO featured_project_commands (
       command_id, command_kind, craftsman_profile_id, actor_user_id,
@@ -312,7 +317,7 @@ async function runFeaturedRawSqlNegatives(
       resulting_project_ids, payload_fingerprint
     ) VALUES (${randomUUID()}, 'PIN', ${fixture.craftsmanProfileId},
       ${fixture.actorUserId}, ${fixture.currentRevision},
-      ${fixture.currentRevision + 1}, ${fixture.spareProjectId}, ${four},
+      ${fixture.currentRevision + 1}, ${fixture.overflowProjectId}, ${four},
       ${"0".repeat(64)})
   `).rejects.toThrow(/max_three_unique/u);
   await expect(sql`
@@ -366,12 +371,11 @@ async function runFeaturedRawSqlNegatives(
       await transaction`
         INSERT INTO featured_project_commands (
           command_id, command_kind, craftsman_profile_id, actor_user_id,
-          expected_revision, resulting_revision, target_project_id,
-          resulting_project_ids, payload_fingerprint
-        ) VALUES (${orphanCommandId}, 'PIN', ${fixture.craftsmanProfileId},
+          expected_revision, resulting_revision, resulting_project_ids,
+          payload_fingerprint
+        ) VALUES (${orphanCommandId}, 'REORDER', ${fixture.craftsmanProfileId},
           ${fixture.actorUserId}, ${fixture.currentRevision},
-          ${fixture.currentRevision + 1}, ${fixture.spareProjectId},
-          ${[...fixture.currentProjectIds, fixture.spareProjectId]},
+          ${fixture.currentRevision + 1}, ${[...fixture.currentProjectIds].reverse()},
           ${"2".repeat(64)})
       `;
     }),
