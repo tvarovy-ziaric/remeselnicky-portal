@@ -87,6 +87,8 @@ describe("analytics event envelope", () => {
       },
       subject: {
         anonymous_id: `anon_${"a".repeat(32)}`,
+        is_internal: false,
+        is_test: false,
         kind: "ANONYMOUS",
         session_id: `session_${"b".repeat(32)}`,
       },
@@ -94,6 +96,30 @@ describe("analytics event envelope", () => {
 
     expect(result.status).toBe("DELIVERED");
     expect(transport.events()[0]).not.toHaveProperty("actor_context");
+  });
+
+  it("requires trusted exclusion flags for anonymous traffic", async () => {
+    const transport = createMemoryAnalyticsTransport("development");
+    const analytics = createAnalytics({
+      appVersion: "dev",
+      environment: "development",
+      platform: "WEB",
+      transport,
+    });
+
+    await expect(
+      analytics.capture({
+        event_name: "search_started",
+        properties: {
+          search_id: "723e4567-e89b-42d3-a456-426614174000",
+        },
+        subject: {
+          anonymous_id: `anon_${"a".repeat(32)}`,
+          kind: "ANONYMOUS",
+        },
+      } as never),
+    ).resolves.toEqual({ reason: "INVALID_EVENT", status: "DROPPED" });
+    expect(transport.events()).toHaveLength(0);
   });
 
   it.each([

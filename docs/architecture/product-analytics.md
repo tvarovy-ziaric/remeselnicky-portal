@@ -17,7 +17,8 @@ for domain state and its availability cannot change a command result.
   signed URLs and whole business objects have no schema path into this package.
 - Authenticated context carries explicit `is_internal` and `is_test` exclusion
   flags. Admin actions are not accepted as marketplace funnel events.
-- Anonymous/session IDs use random first-party opaque values. A caller may only
+- Anonymous/session IDs use random first-party opaque values and carry trusted
+  `is_internal`/`is_test` exclusion flags. A caller may only
   create or persist those identifiers when the D27 cookie/consent rules permit
   it; this package neither creates cookies nor treats analytics as necessary
   authentication storage.
@@ -41,6 +42,11 @@ review. One locked `public_profile_viewed` UX schema provides the deliberately
 bounded anonymous-context path; R0 does not add client instrumentation. This is
 not the final feature catalog: feature tickets and R4-027 add their locked
 UX/domain events and KPI definitions deliberately.
+
+R2 search/liquidity event schemas and their authoritative denominators are
+documented in `docs/analytics/search-liquidity-events.md`. That feature does not
+itself wire `public_profile_viewed`; the public route still needs the compliant
+client consent/admission seam before emitting it.
 
 For a critical conversion, the owning command first commits its domain state and
 transactional outbox event. An idempotent analytics consumer then maps that

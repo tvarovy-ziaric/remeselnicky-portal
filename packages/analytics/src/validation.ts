@@ -1,7 +1,9 @@
 import {
   analyticsEventCatalog,
   analyticsEventNames,
+  SEARCH_ANALYTICS_VERSION,
   type AnalyticsEventName,
+  type AnalyticsPropertyKind,
 } from "./catalog.js";
 import type {
   AnalyticsActorContext,
@@ -24,6 +26,25 @@ const environments = new Set<AnalyticsEnvironment>([
 const platforms = new Set<AnalyticsPlatform>(["WEB", "IOS", "ANDROID"]);
 const eventNames = new Set<string>(analyticsEventNames);
 const actorProfiles = new Set(["CUSTOMER", "CRAFTSMAN", "BOTH"]);
+const ctaOrigins = new Set(["PUBLIC_PROFILE", "SEARCH_RESULTS"]);
+const locationAreaGranularities = new Set(["DISTRICT", "REGION"]);
+const locationScopes = new Set(["NONE", "MUNICIPALITY_SELECTED"]);
+const resultCountBuckets = new Set(["ZERO", "ONE_TO_FOUR", "FIVE_PLUS"]);
+const availabilityCountBuckets = new Set([
+  "NOT_APPLICABLE",
+  ...resultCountBuckets,
+]);
+const searchSortModes = new Set(["RECOMMENDED", "NEAREST", "BEST_RATED"]);
+const shortlistSizeBuckets = new Set([
+  "ZERO",
+  "ONE",
+  "TWO_TO_FOUR",
+  "FIVE_TO_NINE",
+  "TEN_PLUS",
+]);
+const professionCodePattern = /^PROF:[A-Z0-9][A-Z0-9_]{1,62}$/u;
+const specializationCodePattern = /^SPEC:[A-Z0-9][A-Z0-9_]{1,62}$/u;
+const governedLocationAreaCodePattern = /^[A-Z0-9][A-Z0-9._:-]{0,63}$/u;
 
 export function validateAnalyticsEnvelope(value: unknown): AnalyticsEnvelope {
   const envelope = assertPlainObject(value, "analytics envelope");
@@ -153,8 +174,8 @@ export function validateSubject(subject: unknown):
   if (record.kind === "ANONYMOUS") {
     assertExactKeys(
       record,
-      ["kind", "anonymous_id", "session_id"],
-      ["kind", "anonymous_id"],
+      ["kind", "anonymous_id", "is_internal", "is_test", "session_id"],
+      ["kind", "anonymous_id", "is_internal", "is_test"],
       "analytics anonymous subject",
     );
     return Object.freeze({
@@ -168,20 +189,47 @@ export function validateProperties(
   eventName: AnalyticsEventName,
   value: unknown,
 ): Readonly<Record<string, string>> {
+  return validatePropertiesFor(eventName, value, "ENVELOPE");
+}
+
+export function validateCaptureProperties(
+  eventName: AnalyticsEventName,
+  value: unknown,
+): Readonly<Record<string, string>> {
+  return validatePropertiesFor(eventName, value, "CAPTURE");
+}
+
+function validatePropertiesFor(
+  eventName: AnalyticsEventName,
+  value: unknown,
+  representation: "CAPTURE" | "ENVELOPE",
+): Readonly<Record<string, string>> {
   const properties = assertPlainObject(value, "analytics properties");
   const rules = analyticsEventCatalog[eventName].properties;
   const keys = Object.keys(rules);
-  assertExactKeys(properties, keys, keys, `${eventName} properties`);
+  const requiredKeys = keys.filter((key) => {
+    const rule = rules[key];
+    return typeof rule === "string";
+  });
+  assertExactKeys(properties, keys, requiredKeys, `${eventName} properties`);
 
   const validated: Record<string, string> = {};
   for (const key of keys) {
     const rule = rules[key];
-    if (rule !== "UUID") {
+    if (rule === undefined) {
       throw new TypeError("analytics catalog contains an unsupported rule");
     }
-    validated[key] = assertUuid(properties[key], key);
+    if (properties[key] === undefined && typeof rule !== "string") continue;
+    const kind = typeof rule === "string" ? rule : rule.kind;
+    validated[key] = validateProperty(
+      kind,
+      properties[key],
+      key,
+      representation,
+    );
   }
-  return Object.freeze(validated);
+  validatePropertyCoherence(eventName, validated);
+  return Object.freeze({ ...validated });
 }
 
 function validateActorContext(
@@ -224,8 +272,8 @@ function validateAnonymousContext(
   const anonymous = assertPlainObject(value, "analytics anonymous context");
   assertExactKeys(
     anonymous,
-    ["kind", "anonymous_id", "session_id"],
-    ["anonymous_id"],
+    ["kind", "anonymous_id", "is_internal", "is_test", "session_id"],
+    ["anonymous_id", "is_internal", "is_test"],
     "analytics anonymous context",
   );
   if (
@@ -233,6 +281,12 @@ function validateAnonymousContext(
     !anonymousIdPattern.test(anonymous.anonymous_id)
   ) {
     throw new TypeError("analytics anonymous_id must be a random opaque ID");
+  }
+  if (
+    typeof anonymous.is_internal !== "boolean" ||
+    typeof anonymous.is_test !== "boolean"
+  ) {
+    throw new TypeError("analytics exclusion flags must be boolean");
   }
   const session =
     anonymous.session_id === undefined
@@ -242,8 +296,150 @@ function validateAnonymousContext(
         };
   return Object.freeze({
     anonymous_id: anonymous.anonymous_id,
+    is_internal: anonymous.is_internal,
+    is_test: anonymous.is_test,
     ...session,
   });
+}
+
+function validateProperty(
+  kind: AnalyticsPropertyKind,
+  value: unknown,
+  key: string,
+  representation: "CAPTURE" | "ENVELOPE",
+): string {
+  switch (kind) {
+    case "UUID":
+      return assertUuid(value, key);
+    case "BOOLEAN":
+      if (representation === "CAPTURE" && typeof value === "boolean") {
+        return String(value);
+      }
+      if (
+        representation === "ENVELOPE" &&
+        (value === "false" || value === "true")
+      ) {
+        return value;
+      }
+      throw new TypeError(`${key} must be boolean`);
+    case "PROFESSION_CODE":
+      return assertPattern(value, professionCodePattern, key);
+    case "SPECIALIZATION_CODE":
+      return assertPattern(value, specializationCodePattern, key);
+    case "GOVERNED_LOCATION_AREA_CODE":
+      return assertPattern(value, governedLocationAreaCodePattern, key);
+    case "CTA_ORIGIN":
+      return assertEnum(value, ctaOrigins, key);
+    case "LOCATION_AREA_GRANULARITY":
+      return assertEnum(value, locationAreaGranularities, key);
+    case "LOCATION_SCOPE":
+      return assertEnum(value, locationScopes, key);
+    case "RESULT_COUNT_BUCKET":
+      return assertEnum(value, resultCountBuckets, key);
+    case "SEARCH_AVAILABILITY_COUNT_BUCKET":
+      return assertEnum(value, availabilityCountBuckets, key);
+    case "SEARCH_SORT_MODE":
+      return assertEnum(value, searchSortModes, key);
+    case "SEARCH_VERSION":
+      if (value !== SEARCH_ANALYTICS_VERSION) {
+        throw new TypeError(`${key} is not the catalog search version`);
+      }
+      return value;
+    case "SHORTLIST_SIZE_BUCKET":
+      return assertEnum(value, shortlistSizeBuckets, key);
+    case "RESULT_POSITION":
+      if (representation === "CAPTURE") {
+        if (
+          !Number.isSafeInteger(value) ||
+          (value as number) < 1 ||
+          (value as number) > 100
+        ) {
+          throw new TypeError(`${key} must be an integer from 1 through 100`);
+        }
+        return String(value);
+      }
+      if (
+        typeof value !== "string" ||
+        !/^(?:[1-9]|[1-9][0-9]|100)$/u.test(value)
+      ) {
+        throw new TypeError(`${key} must be an integer from 1 through 100`);
+      }
+      return value;
+  }
+}
+
+function validatePropertyCoherence(
+  eventName: AnalyticsEventName,
+  properties: Readonly<Record<string, string>>,
+): void {
+  if (eventName === "search_executed") {
+    const hasAreaGranularity =
+      properties.location_area_granularity !== undefined;
+    const hasAreaCode = properties.location_area_code !== undefined;
+    if (hasAreaGranularity !== hasAreaCode) {
+      throw new TypeError(
+        "search_executed coarse location area requires both granularity and code",
+      );
+    }
+    if (
+      properties.location_scope === "NONE" &&
+      (hasAreaGranularity || hasAreaCode)
+    ) {
+      throw new TypeError(
+        "search_executed cannot attach a location area without a selected location",
+      );
+    }
+    if (
+      properties.timing_supplied === "false" &&
+      (properties.indicative_availability_filter === "true" ||
+        properties.indicatively_available_count_bucket !== "NOT_APPLICABLE")
+    ) {
+      throw new TypeError(
+        "search_executed availability analytics requires supplied timing",
+      );
+    }
+    if (
+      properties.timing_supplied === "true" &&
+      properties.indicatively_available_count_bucket === "NOT_APPLICABLE"
+    ) {
+      throw new TypeError(
+        "search_executed supplied timing requires an availability count bucket",
+      );
+    }
+  }
+  if (
+    eventName === "craftsman_request_cta_clicked" &&
+    (properties.origin === "SEARCH_RESULTS") !==
+      (properties.search_id !== undefined)
+  ) {
+    throw new TypeError(
+      `${eventName} search_id must appear exactly for SEARCH_RESULTS context`,
+    );
+  }
+  if (
+    eventName === "shortlist_added" &&
+    properties.shortlist_size_bucket === "ZERO"
+  ) {
+    throw new TypeError("shortlist_added cannot result in an empty shortlist");
+  }
+}
+
+function assertPattern(value: unknown, pattern: RegExp, key: string): string {
+  if (typeof value !== "string" || !pattern.test(value)) {
+    throw new TypeError(`${key} is not a governed code`);
+  }
+  return value;
+}
+
+function assertEnum(
+  value: unknown,
+  values: ReadonlySet<string>,
+  key: string,
+): string {
+  if (typeof value !== "string" || !values.has(value)) {
+    throw new TypeError(`${key} is not an allowlisted enum value`);
+  }
+  return value;
 }
 
 function assertSessionId(value: unknown): string {

@@ -21,6 +21,9 @@ export interface AnalyticsAnonymousContext {
   readonly kind: "ANONYMOUS";
   /** Random first-party ID; creation/use remains subject to D27 cookie rules. */
   readonly anonymous_id: string;
+  /** Trusted exclusion flags; never accepted from an untrusted browser payload. */
+  readonly is_internal: boolean;
+  readonly is_test: boolean;
   readonly session_id?: string;
 }
 
@@ -47,7 +50,7 @@ export interface AnalyticsEnvelope {
   readonly environment: AnalyticsEnvironment;
   readonly event_id: string;
   readonly event_name: AnalyticsEventName;
-  readonly event_source: "CLIENT_UX" | "SERVER_DOMAIN";
+  readonly event_source: "CLIENT_UX" | "SERVER_DOMAIN" | "SERVER_QUERY";
   readonly occurred_at: string;
   readonly platform: AnalyticsPlatform;
   readonly properties: Readonly<Record<string, string>>;

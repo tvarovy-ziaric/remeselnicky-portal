@@ -17,7 +17,7 @@ import {
   assertEventName,
   assertPlatform,
   validateAnalyticsEnvelope,
-  validateProperties,
+  validateCaptureProperties,
   validateSubject,
 } from "./validation.js";
 
@@ -66,7 +66,7 @@ export function createAnalytics(
           event_source: analyticsEventCatalog[eventName].source,
           occurred_at: occurredAt.toISOString(),
           platform,
-          properties: validateProperties(eventName, record.properties),
+          properties: validateCaptureProperties(eventName, record.properties),
           schema_version: analyticsEventCatalog[eventName].schema_version,
         });
       } catch {
