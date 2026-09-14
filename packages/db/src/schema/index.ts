@@ -4,6 +4,20 @@ export {
   users,
 } from "./user.js";
 export type { NewUserRecord, UserRecord } from "./user.js";
+export { customerProfiles } from "./customer-profile.js";
+export type {
+  CustomerProfileRecord,
+  NewCustomerProfileRecord,
+} from "./customer-profile.js";
+export {
+  CRAFTSMAN_PROFILE_TYPE_VALUES,
+  craftsmanProfiles,
+  craftsmanProfileTypeEnum,
+} from "./craftsman-profile.js";
+export type {
+  CraftsmanProfileRecord,
+  NewCraftsmanProfileRecord,
+} from "./craftsman-profile.js";
 export {
   authCredentials,
   authRateLimitBuckets,
@@ -135,6 +149,20 @@ export type {
   TaxonomyProfessionRecord,
   TaxonomySpecializationRecord,
 } from "./taxonomy.js";
+export {
+  CRAFTSMAN_PROFESSION_COMMAND_KINDS,
+  craftsmanProfessionCommandKindEnum,
+  craftsmanProfessionCommands,
+  craftsmanProfessionDeclaredLevelEvents,
+  craftsmanProfessions,
+  craftsmanProfessionStateEnum,
+  professionProficiencyLevelEnum,
+} from "./craftsman-profession.js";
+export type {
+  CraftsmanProfessionCommandRecord,
+  CraftsmanProfessionDeclaredLevelEventRecord,
+  CraftsmanProfessionRecord,
+} from "./craftsman-profession.js";
 export type {
   PrivacyConsentEventRecord,
   PrivacyConsentPurposeRecord,

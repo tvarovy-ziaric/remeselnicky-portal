@@ -33,8 +33,16 @@ import {
 } from "./notification-repository.js";
 import { createProfessionTaxonomyRepository } from "./taxonomy-repository.js";
 import type { ProfessionTaxonomyPersistence } from "@portal/taxonomy";
+import { createCraftsmanProfessionRepository } from "./craftsman-profession-repository.js";
+import type { CraftsmanProfessionPersistence } from "@portal/domain";
 import { createPrivacyRepository } from "./privacy-repository.js";
 import type { PrivacyRepository } from "@portal/privacy";
+import { createCustomerProfileRepository } from "./customer-profile-repository.js";
+import { createCraftsmanProfileRepository } from "./craftsman-profile-repository.js";
+import type {
+  CraftsmanProfilePersistence,
+  CustomerProfilePersistence,
+} from "@portal/domain";
 import * as schema from "./schema/index.js";
 
 export {
@@ -97,6 +105,20 @@ export type {
   TaxonomyProfessionRecord,
   TaxonomySpecializationRecord,
 } from "./schema/index.js";
+export {
+  CRAFTSMAN_PROFESSION_COMMAND_KINDS,
+  craftsmanProfessionCommandKindEnum,
+  craftsmanProfessionCommands,
+  craftsmanProfessionDeclaredLevelEvents,
+  craftsmanProfessions,
+  craftsmanProfessionStateEnum,
+  professionProficiencyLevelEnum,
+} from "./schema/index.js";
+export type {
+  CraftsmanProfessionCommandRecord,
+  CraftsmanProfessionDeclaredLevelEventRecord,
+  CraftsmanProfessionRecord,
+} from "./schema/index.js";
 export type {
   AdminMfaChallengeRecord,
   AdminMfaFactorRecord,
@@ -147,6 +169,20 @@ export type {
   PasswordResetTokenRecord,
   PhoneVerificationChallengeRecord,
   UserRecord,
+} from "./schema/index.js";
+export { customerProfiles } from "./schema/index.js";
+export type {
+  CustomerProfileRecord,
+  NewCustomerProfileRecord,
+} from "./schema/index.js";
+export {
+  CRAFTSMAN_PROFILE_TYPE_VALUES,
+  craftsmanProfiles,
+  craftsmanProfileTypeEnum,
+} from "./schema/index.js";
+export type {
+  CraftsmanProfileRecord,
+  NewCraftsmanProfileRecord,
 } from "./schema/index.js";
 export type {
   MediaAssetRecord,
@@ -241,6 +277,15 @@ export type {
 } from "./notification-repository.js";
 export { createProfessionTaxonomyRepository } from "./taxonomy-repository.js";
 export type { ProfessionTaxonomyPersistence } from "@portal/taxonomy";
+export { createCustomerProfileRepository } from "./customer-profile-repository.js";
+export type { CustomerProfilePersistence } from "@portal/domain";
+export { createCraftsmanProfileRepository } from "./craftsman-profile-repository.js";
+export type { CraftsmanProfilePersistence } from "@portal/domain";
+export {
+  createCraftsmanProfessionRepository,
+  CraftsmanProfessionIdempotencyError,
+} from "./craftsman-profession-repository.js";
+export type { CraftsmanProfessionPersistence } from "@portal/domain";
 
 export {
   createPostgresMigrationStore,
@@ -272,6 +317,9 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly auth: AuthRepository;
   readonly adminAccess: AdminAccessRepository;
   readonly audit: AuditRepository;
+  readonly craftsmanProfiles: CraftsmanProfilePersistence;
+  readonly craftsmanProfessions: CraftsmanProfessionPersistence;
+  readonly customerProfiles: CustomerProfilePersistence;
   readonly emailVerification: EmailVerificationRepository;
   readonly media: MediaRepository;
   readonly privateMediaDelivery: PrivateMediaDeliveryRepository;
@@ -320,6 +368,9 @@ export function createDatabase(
   const auth = createAuthRepository(sql);
   const adminAccess = createAdminAccessRepository(sql);
   const audit = createAuditRepository(sql);
+  const craftsmanProfiles = createCraftsmanProfileRepository(sql);
+  const craftsmanProfessions = createCraftsmanProfessionRepository(sql);
+  const customerProfiles = createCustomerProfileRepository(sql);
   const emailVerification = createEmailVerificationRepository(sql);
   const media = createMediaRepository(sql);
   const privateMediaDelivery = createPrivateMediaDeliveryRepository(sql);
@@ -336,6 +387,9 @@ export function createDatabase(
     adminAccess,
     audit,
     auth,
+    craftsmanProfiles,
+    craftsmanProfessions,
+    customerProfiles,
     emailVerification,
     media,
     privateMediaDelivery,
