@@ -212,7 +212,11 @@ DECLARE
   owner_id uuid;
   owner_state user_account_state;
   current_revision integer;
-  current_state craftsman_service_area_revisions%ROWTYPE;
+  current_base_municipality_code text;
+  current_normal_radius_meters integer;
+  current_maximum_radius_meters integer;
+  current_travel_fee_policy text;
+  current_travel_fee_threshold_meters integer;
   current_extras jsonb;
   item jsonb;
   item_code text;
@@ -244,22 +248,31 @@ BEGIN
       RAISE EXCEPTION 'unchanged service-area command requires existing revision';
     END IF;
     NEW.resulting_revision := current_revision;
-    SELECT revision,
+    SELECT revision.base_municipality_code,
+           revision.normal_radius_meters,
+           revision.maximum_radius_meters,
+           revision.travel_fee_policy,
+           revision.travel_fee_threshold_meters,
            COALESCE(jsonb_agg(extra.municipality_code ORDER BY extra.ordinal)
              FILTER (WHERE extra.municipality_code IS NOT NULL), '[]'::jsonb)
-      INTO current_state, current_extras
+      INTO current_base_municipality_code,
+           current_normal_radius_meters,
+           current_maximum_radius_meters,
+           current_travel_fee_policy,
+           current_travel_fee_threshold_meters,
+           current_extras
     FROM craftsman_service_area_revisions revision
     LEFT JOIN craftsman_service_area_extra_municipalities extra
       ON extra.service_area_revision_id = revision.id
     WHERE revision.craftsman_profile_id = NEW.craftsman_profile_id
       AND revision.revision = current_revision
     GROUP BY revision.id;
-    IF current_state.id IS NULL
-       OR current_state.base_municipality_code IS DISTINCT FROM NEW.base_municipality_code
-       OR current_state.normal_radius_meters IS DISTINCT FROM NEW.normal_radius_meters
-       OR current_state.maximum_radius_meters IS DISTINCT FROM NEW.maximum_radius_meters
-       OR current_state.travel_fee_policy IS DISTINCT FROM NEW.travel_fee_policy
-       OR current_state.travel_fee_threshold_meters IS DISTINCT FROM NEW.travel_fee_threshold_meters
+    IF NOT FOUND
+       OR current_base_municipality_code IS DISTINCT FROM NEW.base_municipality_code
+       OR current_normal_radius_meters IS DISTINCT FROM NEW.normal_radius_meters
+       OR current_maximum_radius_meters IS DISTINCT FROM NEW.maximum_radius_meters
+       OR current_travel_fee_policy IS DISTINCT FROM NEW.travel_fee_policy
+       OR current_travel_fee_threshold_meters IS DISTINCT FROM NEW.travel_fee_threshold_meters
        OR current_extras IS DISTINCT FROM NEW.extra_municipality_codes THEN
       RAISE EXCEPTION 'unchanged service-area command must match current state exactly';
     END IF;
