@@ -218,22 +218,34 @@ async function applyCommand(
         ${resultingRevision}, ${targetState}, clock_timestamp()
       )
     `;
-    await transaction`
-      INSERT INTO customer_shortlist_entries (
-        customer_profile_id, craftsman_profile_id, state, revision,
-        latest_command_id, active_since, changed_at
-      ) SELECT
-        effect.customer_profile_id, effect.craftsman_profile_id, effect.state,
-        effect.revision, effect.command_id,
-        CASE WHEN effect.state = 'ACTIVE' THEN effect.changed_at ELSE NULL END,
-        effect.changed_at
-      FROM customer_shortlist_effects effect
-      WHERE effect.command_id = ${input.commandId}
-      ON CONFLICT (customer_profile_id, craftsman_profile_id) DO UPDATE SET
-        state = EXCLUDED.state, revision = EXCLUDED.revision,
-        latest_command_id = EXCLUDED.latest_command_id,
-        active_since = EXCLUDED.active_since, changed_at = EXCLUDED.changed_at
-    `;
+    if (current === undefined) {
+      await transaction`
+        INSERT INTO customer_shortlist_entries (
+          customer_profile_id, craftsman_profile_id, state, revision,
+          latest_command_id, active_since, changed_at
+        ) SELECT
+          effect.customer_profile_id, effect.craftsman_profile_id, effect.state,
+          effect.revision, effect.command_id,
+          CASE WHEN effect.state = 'ACTIVE' THEN effect.changed_at ELSE NULL END,
+          effect.changed_at
+        FROM customer_shortlist_effects effect
+        WHERE effect.command_id = ${input.commandId}
+      `;
+    } else {
+      await transaction`
+        UPDATE customer_shortlist_entries entry SET
+          state = effect.state, revision = effect.revision,
+          latest_command_id = effect.command_id,
+          active_since = CASE
+            WHEN effect.state = 'ACTIVE' THEN effect.changed_at ELSE NULL
+          END,
+          changed_at = effect.changed_at
+        FROM customer_shortlist_effects effect
+        WHERE effect.command_id = ${input.commandId}
+          AND entry.customer_profile_id = effect.customer_profile_id
+          AND entry.craftsman_profile_id = effect.craftsman_profile_id
+      `;
+    }
     const [size] = await transaction<{ readonly count: number }[]>`
       SELECT count(*)::integer AS count
       FROM customer_shortlist_entries

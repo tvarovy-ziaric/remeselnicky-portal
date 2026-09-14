@@ -218,6 +218,74 @@ describe("public search cards", () => {
     );
   });
 
+  it("uses the evidence-supported representative skill in explanations", () => {
+    const candidate = publicCandidate(firstId, {
+      extra: {
+        skills: [
+          {
+            canonicalCode: "SKILL:ALPHA",
+            evidenceSupported: false,
+            label: "Prvá zručnosť",
+            professionCodes: ["PROF:TILER"],
+          },
+          {
+            canonicalCode: "SKILL:ZETA",
+            evidenceSupported: true,
+            label: "Dokladovaná zručnosť",
+            professionCodes: ["PROF:TILER"],
+          },
+        ],
+      },
+    });
+    const [card] = composePublicSearchCards({
+      candidates: [candidate],
+      professionCode: "PROF:TILER",
+      ranked: [ranking(firstId, { relevantSkillSupported: true })],
+      skillCodes: ["SKILL:ALPHA", "SKILL:ZETA"],
+    });
+    expect(card?.whyMatched).toContainEqual({
+      kind: "SKILL",
+      text: "Ponúka hľadanú zručnosť Dokladovaná zručnosť",
+    });
+  });
+
+  it("omits a portfolio badge when finer requested relevance is not proven", () => {
+    const candidate = publicCandidate(firstId, {
+      extra: {
+        signals: {
+          ...publicCandidate(firstId).signals,
+          portfolio: {
+            ...publicCandidate(firstId).signals.portfolio,
+            hasVerifiedEvidence: true,
+            professionCodes: ["PROF:TILER"],
+          },
+        },
+        skills: [
+          {
+            canonicalCode: "SKILL:LARGE_FORMAT",
+            evidenceSupported: false,
+            label: "Veľkoformátová dlažba",
+            professionCodes: ["PROF:TILER"],
+          },
+        ],
+      },
+    });
+    const [card] = composePublicSearchCards({
+      candidates: [candidate],
+      professionCode: "PROF:TILER",
+      ranked: [
+        ranking(firstId, {
+          relevantSkillSupported: true,
+          verifiedPortfolioPresent: true,
+        }),
+      ],
+      skillCodes: ["SKILL:LARGE_FORMAT"],
+    });
+    expect(card?.badges).not.toContainEqual(
+      expect.objectContaining({ kind: "VERIFIED_PORTFOLIO" }),
+    );
+  });
+
   it("uses the frozen Recommended pipeline and alternate sorter over server facts", async () => {
     const source = {
       withAuthoritativeCohort: async <Result>(
@@ -432,12 +500,15 @@ function ranking(
     readonly geoBand?: RecommendedRankingResult["geo"]["band"];
     readonly qualification?: RecommendedRankingResult["qualification"];
     readonly relevantSkillSupported?: boolean;
+    readonly verifiedPortfolioPresent?: boolean;
   } = {},
 ): RecommendedRankingResult {
   const relevantSkillSupported = options.relevantSkillSupported ?? false;
+  const verifiedPortfolioPresent = options.verifiedPortfolioPresent ?? false;
   const qualification = options.qualification ?? "NOT_REGULATED";
   const supported =
     relevantSkillSupported ||
+    verifiedPortfolioPresent ||
     qualification === "REQUIRED_APPROVED" ||
     qualification === "OPTIONAL_APPROVED";
   return {
@@ -450,7 +521,8 @@ function ranking(
       professionLevelSupported: false,
       relevantSkillSupported,
       relevantSpecializationSupported: false,
-      verifiedWorkPresent: false,
+      verifiedPortfolioPresent,
+      verifiedWorkPresent: verifiedPortfolioPresent,
     },
     geo: {
       approximateDistanceKm:

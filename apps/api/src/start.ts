@@ -25,6 +25,10 @@ import {
   createPhoneVerificationPersistence,
 } from "./auth/index.js";
 import { createDatabaseFrontendErrorAdmission } from "./observability.js";
+import {
+  createDatabasePublicSearchAdmission,
+  PUBLIC_SEARCH_RATE_LIMIT_MULTIPLIER,
+} from "./public-search-cards/routes.js";
 
 const defaultPort = 3_001;
 const config = loadServerConfig();
@@ -84,7 +88,14 @@ const app = buildApi({
       repository: database.publicPortfolioDelivery,
     }),
   },
-  publicSearchCards: { searchCards: publicSearchCards },
+  publicSearchCards: {
+    admission: createDatabasePublicSearchAdmission({
+      limit: config.auth.rateLimitMax * PUBLIC_SEARCH_RATE_LIMIT_MULTIPLIER,
+      persistence: authPersistence,
+      timeWindowMs: config.auth.rateLimitWindowMs,
+    }),
+    searchCards: publicSearchCards,
+  },
   taxonomyAutocomplete: {
     autocomplete: createTaxonomyAutocompleteService(
       database.taxonomyAutocomplete,

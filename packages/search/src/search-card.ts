@@ -371,14 +371,18 @@ function projectCardChecked(
           ({ code, professionCode: linkedProfession }) =>
             code === specializationCode && linkedProfession === professionCode,
         );
-  const skill = skillCodes
-    .map((code) =>
-      candidate.skills.find(
-        ({ canonicalCode, professionCodes }) =>
-          canonicalCode === code && professionCodes.includes(professionCode),
-      ),
+  const skill = candidate.skills
+    .filter(
+      ({ canonicalCode, professionCodes }) =>
+        canonicalCode !== null &&
+        skillCodes.includes(canonicalCode) &&
+        professionCodes.includes(professionCode),
     )
-    .find((value) => value !== undefined);
+    .sort(
+      (left, right) =>
+        Number(right.evidenceSupported) - Number(left.evidenceSupported) ||
+        codePointCompare(left.canonicalCode ?? "", right.canonicalCode ?? ""),
+    )[0];
   if (
     profession === undefined ||
     !safePublicText(candidate.identity.primaryName, 1, 120) ||
@@ -403,7 +407,11 @@ function projectCardChecked(
   ) {
     return null;
   }
-  const badges = makeBadges(candidate, ranking, professionCode);
+  const badges = makeBadges(
+    ranking,
+    specializationCode !== null,
+    skillCodes.length > 0,
+  );
   const whyMatched = makeReasons(
     ranking,
     profession.label,
@@ -453,9 +461,9 @@ function projectCardChecked(
 }
 
 function makeBadges(
-  candidate: SearchableCraftsmanCandidate,
   ranking: RecommendedRankingResult,
-  professionCode: string,
+  specializationRequested: boolean,
+  skillRequested: boolean,
 ): readonly PublicSearchCardBadge[] {
   const badges: PublicSearchCardBadge[] = [];
   if (ranking.evidence.professionLevelSupported) {
@@ -486,8 +494,9 @@ function makeBadges(
     });
   }
   if (
-    candidate.signals.portfolio.hasVerifiedEvidence &&
-    candidate.signals.portfolio.professionCodes.includes(professionCode)
+    ranking.evidence.verifiedPortfolioPresent &&
+    !specializationRequested &&
+    !skillRequested
   ) {
     badges.push({
       kind: "VERIFIED_PORTFOLIO",
@@ -616,6 +625,7 @@ function validRanking(value: unknown): value is RecommendedRankingResult {
     evidence["professionLevelSupported"],
     evidence["relevantSkillSupported"],
     evidence["relevantSpecializationSupported"],
+    evidence["verifiedPortfolioPresent"],
     evidence["verifiedWorkPresent"],
   ];
   const distance = geo["approximateDistanceKm"];

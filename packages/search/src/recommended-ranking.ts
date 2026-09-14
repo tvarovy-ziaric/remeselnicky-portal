@@ -72,6 +72,7 @@ export interface RecommendedRankingResult {
     readonly professionLevelSupported: boolean;
     readonly relevantSkillSupported: boolean;
     readonly relevantSpecializationSupported: boolean;
+    readonly verifiedPortfolioPresent: boolean;
     readonly verifiedWorkPresent: boolean;
   }>;
   readonly secondary: Readonly<{
@@ -272,9 +273,10 @@ function applyQualification(
   const relevantSkillSupported =
     candidate.taxonomy.skill?.matched === true &&
     candidate.taxonomy.skill.support === "EVIDENCE_SUPPORTED";
-  const verifiedWorkPresent =
-    professionTrust.volume.verifiedJobCount > 0 ||
+  const verifiedPortfolioPresent =
     professionTrust.volume.verifiedPortfolioProjectCount > 0;
+  const verifiedWorkPresent =
+    professionTrust.volume.verifiedJobCount > 0 || verifiedPortfolioPresent;
   const approvedCredentialPresent =
     qualification === "REQUIRED_APPROVED" ||
     optionalApproved ||
@@ -298,6 +300,7 @@ function applyQualification(
       professionLevelSupported,
       relevantSkillSupported,
       relevantSpecializationSupported,
+      verifiedPortfolioPresent,
       verifiedWorkPresent,
     }),
     secondary: Object.freeze({

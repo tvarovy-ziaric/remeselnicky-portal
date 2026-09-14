@@ -57,7 +57,93 @@ describe("public search cards web boundary", () => {
       malformed({ professionCode: "PROF:TILER" }),
     ).resolves.toBeNull();
   });
+
+  it("fails closed on non-canonical identifiers and oversized response collections", async () => {
+    const malformedUuid = {
+      ...card(),
+      profileId: "------------------------------------",
+    };
+    await expect(
+      loadResponse({ items: [malformedUuid], nextCursor: null }),
+    ).resolves.toBeNull();
+
+    await expect(
+      loadResponse({
+        items: Array.from({ length: 51 }, () => card()),
+        nextCursor: null,
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      loadResponse({
+        items: [
+          {
+            ...card(),
+            professions: Array.from({ length: 21 }, (_, index) => ({
+              kind: `PROF:${index}`,
+              label: `Profesia ${index}`,
+            })),
+          },
+        ],
+        nextCursor: null,
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      loadResponse({
+        items: [
+          {
+            ...card(),
+            badges: Array.from({ length: 6 }, (_, index) => ({
+              kind: `BADGE:${index}`,
+              label: `Odznak ${index}`,
+            })),
+          },
+        ],
+        nextCursor: null,
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      loadResponse({
+        items: [
+          {
+            ...card(),
+            whyMatched: Array.from({ length: 6 }, () => ({
+              kind: "PROFESSION",
+              text: "Bezpečný dôvod zhody",
+            })),
+          },
+        ],
+        nextCursor: null,
+      }),
+    ).resolves.toBeNull();
+  });
+
+  it("relies on React text escaping at the final render boundary", () => {
+    const unsafeLooking = {
+      ...card(),
+      identity: {
+        primaryName: "<img src=x onerror=alert(1)>",
+        secondaryName: null,
+      },
+    };
+    const html = renderToStaticMarkup(
+      <PublicSearchCardList cards={[unsafeLooking]} />,
+    );
+    expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;");
+    expect(html).not.toContain("<img src=x");
+  });
 });
+
+async function loadResponse(value: unknown) {
+  return createPublicSearchCardLoader({
+    apiOrigin: "http://api:3001",
+    fetch: () =>
+      Promise.resolve(
+        new Response(JSON.stringify(value), {
+          status: 200,
+        }),
+      ),
+  })({ professionCode: "PROF:TILER" });
+}
 
 function card(): PublicSearchCardViewModel & {
   readonly indicativePrice: null;

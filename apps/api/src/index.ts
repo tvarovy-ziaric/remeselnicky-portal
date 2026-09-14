@@ -17,7 +17,13 @@ export {
 } from "./customer-shortlist/routes.js";
 export type { CustomerShortlistRouteDependencies } from "./customer-shortlist/routes.js";
 export {
+  createDatabasePublicSearchAdmission,
   PUBLIC_SEARCH_CARDS_PATH,
+  PUBLIC_SEARCH_RATE_LIMIT_MULTIPLIER,
   registerPublicSearchCardRoutes,
 } from "./public-search-cards/routes.js";
-export type { PublicSearchCardRouteDependencies } from "./public-search-cards/routes.js";
+export type {
+  PublicSearchAdmission,
+  PublicSearchCardRouteDependencies,
+  PublicSearchRateLimitPersistence,
+} from "./public-search-cards/routes.js";
