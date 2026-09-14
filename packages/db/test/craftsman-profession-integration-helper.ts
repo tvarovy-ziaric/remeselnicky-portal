@@ -166,14 +166,19 @@ export async function runCraftsmanProfessionIntegrationAssertions(
   });
   const [suspensionRace] = await Promise.all([
     repository.assign(suspendedOwnerInput),
-    sql`
-      UPDATE users
-      SET
-        account_state = 'SUSPENDED',
-        account_state_changed_at = clock_timestamp(),
-        updated_at = clock_timestamp()
-      WHERE users.id = ${raceOwner.id}
-    `,
+    sql.begin(async (transaction) => {
+      await transaction`
+        SELECT id FROM users WHERE id = ${raceOwner.id} FOR UPDATE
+      `;
+      return transaction`
+        UPDATE users
+        SET
+          account_state = 'SUSPENDED',
+          account_state_changed_at = clock_timestamp(),
+          updated_at = clock_timestamp()
+        WHERE users.id = ${raceOwner.id}
+      `;
+    }),
   ]);
   expect(["APPLIED", "PROFILE_UNAVAILABLE"]).toContain(suspensionRace.status);
   const [raceEvidence] = await sql<

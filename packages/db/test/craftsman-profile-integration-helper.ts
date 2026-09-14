@@ -336,16 +336,19 @@ async function runSuspensionEditRace(sql: Sql): Promise<void> {
   }
 
   const [suspensionResult, editResult] = await Promise.allSettled([
-    sql.begin(
-      (transaction) => transaction`
-      UPDATE users
-      SET
-        account_state = 'SUSPENDED',
-        account_state_changed_at = clock_timestamp(),
-        updated_at = clock_timestamp()
-      WHERE id = ${owner.id}
-    `,
-    ),
+    sql.begin(async (transaction) => {
+      await transaction`
+        SELECT id FROM users WHERE id = ${owner.id} FOR UPDATE
+      `;
+      return transaction`
+        UPDATE users
+        SET
+          account_state = 'SUSPENDED',
+          account_state_changed_at = clock_timestamp(),
+          updated_at = clock_timestamp()
+        WHERE id = ${owner.id}
+      `;
+    }),
     sql.begin(
       (transaction) => transaction`
       UPDATE craftsman_profiles

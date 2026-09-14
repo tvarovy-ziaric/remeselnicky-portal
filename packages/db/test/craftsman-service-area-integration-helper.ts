@@ -381,13 +381,18 @@ async function exerciseSuspensionRace(
   const command = input(owner.id, profile.id);
   const [commandResult] = await Promise.all([
     repository.replaceOwnedDraft(command),
-    sql`
-      UPDATE users
-      SET account_state = 'SUSPENDED',
-          account_state_changed_at = clock_timestamp(),
-          updated_at = clock_timestamp()
-      WHERE users.id = ${owner.id}
-    `,
+    sql.begin(async (transaction) => {
+      await transaction`
+        SELECT id FROM users WHERE id = ${owner.id} FOR UPDATE
+      `;
+      return transaction`
+        UPDATE users
+        SET account_state = 'SUSPENDED',
+            account_state_changed_at = clock_timestamp(),
+            updated_at = clock_timestamp()
+        WHERE users.id = ${owner.id}
+      `;
+    }),
   ]);
   expect(["APPLIED", "PROFILE_UNAVAILABLE"]).toContain(commandResult.status);
   const [raceEvidence] = await sql<
