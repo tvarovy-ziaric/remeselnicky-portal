@@ -210,25 +210,26 @@ async function applyCommand(
     )
   `;
   if (!unchanged) {
-    const [effect] = await transaction<{ readonly changedAt: Date }[]>`
+    await transaction`
       INSERT INTO customer_shortlist_effects (
         command_id, customer_profile_id, craftsman_profile_id, revision, state, changed_at
       ) VALUES (
         ${input.commandId}, ${input.customerProfileId}, ${input.craftsmanProfileId},
         ${resultingRevision}, ${targetState}, clock_timestamp()
-      ) RETURNING changed_at AS "changedAt"
+      )
     `;
-    if (effect === undefined)
-      throw new Error("Shortlist effect insert returned no row.");
     await transaction`
       INSERT INTO customer_shortlist_entries (
         customer_profile_id, craftsman_profile_id, state, revision,
         latest_command_id, active_since, changed_at
-      ) VALUES (
-        ${input.customerProfileId}, ${input.craftsmanProfileId}, ${targetState},
-        ${resultingRevision}, ${input.commandId},
-        ${targetState === "ACTIVE" ? effect.changedAt : null}, ${effect.changedAt}
-      ) ON CONFLICT (customer_profile_id, craftsman_profile_id) DO UPDATE SET
+      ) SELECT
+        effect.customer_profile_id, effect.craftsman_profile_id, effect.state,
+        effect.revision, effect.command_id,
+        CASE WHEN effect.state = 'ACTIVE' THEN effect.changed_at ELSE NULL END,
+        effect.changed_at
+      FROM customer_shortlist_effects effect
+      WHERE effect.command_id = ${input.commandId}
+      ON CONFLICT (customer_profile_id, craftsman_profile_id) DO UPDATE SET
         state = EXCLUDED.state, revision = EXCLUDED.revision,
         latest_command_id = EXCLUDED.latest_command_id,
         active_since = EXCLUDED.active_since, changed_at = EXCLUDED.changed_at
