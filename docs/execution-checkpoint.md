@@ -5,11 +5,11 @@ This file is the persistent implementation-status overlay for the hash-verified 
 - Updated: 2026-09-14
 - Definition: D01–D30 LOCKED and hash verified
 - Active release: R2 — Discovery
-- Last completed ticket: R2-003 — privacy-safe PostGIS distance query
-- Active tickets: R2-004 — service-radius/outside-radius matching; R2-005 — evidence-aware specialization/skill relevance; R2-006 — required credential qualification gate
-- Next dependency-satisfied candidate: R2-007 — availability soft signal/filter, after the core qualification pipeline stabilizes
+- Last completed ticket: R2-008 — cold-start-safe trust and evidence facts
+- Active tickets: R2-009 — Recommended ranking; R2-010 — Nearest/Best-rated alternate sorts; R2-011 — search cards and why-matched explanations
+- Next dependency-satisfied candidate: R2-012 — discovery query composition, after ranking and card contracts stabilize
 - Human gate: canonical Slovak profession/skill/location content still requires expert/legal/source review before activation; this does not block private supply-side implementation
-- Integrated verification: CI run 34833162665 passed quality, dependency audit, secret scan, clean PostgreSQL/PostGIS migrations 0000–0030, the live R1 authorization/privacy matrix and R2 discovery foundations
+- Integrated verification: commit `2a5c3a7`, CI run `34900591388`, passed quality, dependency audit, secret scan, clean PostgreSQL/PostGIS migrations 0000–0034 and the complete live R1/R2 integration suite
 
 ## Ticket state overlay
 
@@ -70,11 +70,16 @@ This file is the persistent implementation-status overlay for the hash-verified 
 | R2-001 | DONE     | Live approved-PUBLIC search views, strict public DTO and cold-start-safe discovery hooks passed              |
 | R2-002 | DONE     | Governed deterministic taxonomy autocomplete, privacy guards and live SQL execution passed                   |
 | R2-003 | DONE     | PostGIS distance facts, optional-location semantics and privacy-safe output passed                           |
-| R2-004 | ACTIVE   | Service-radius and explicit outside-radius matching semantics                                                |
-| R2-005 | ACTIVE   | Evidence-aware specialization and skill relevance hooks                                                      |
-| R2-006 | ACTIVE   | Required credential qualification gate                                                                       |
+| R2-004 | DONE     | Service-radius bands, explicit outside-radius opt-in and neutral missing-location behavior passed            |
+| R2-005 | DONE     | Exact-profession relevance, evidence separation and no skill-count boost passed                              |
+| R2-006 | DONE     | Governed REQUIRED/OPTIONAL qualification policy, hard gate and privacy/race tests passed                     |
+| R2-007 | DONE     | Availability overlap facts, AVAILABLE-only soft signal/filter and private-time guards passed                 |
+| R2-008 | DONE     | Sparse trust/evidence volume, quality and confidence facts with neutral cold-start semantics passed          |
+| R2-009 | ACTIVE   | Recommended categorical ranking without numeric weights or cold-start penalty                                |
+| R2-010 | ACTIVE   | Nearest and Best-rated alternate sorts with strict fact integrity                                            |
+| R2-011 | ACTIVE   | Privacy-safe result cards and categorical why-matched explanations                                           |
 
-All DONE rows above are covered by CI run `34833162665` unless a more specific earlier run is referenced in history. The run applied migrations `0000`–`0030` twice and passed the complete live PostgreSQL/PostGIS integration suite, including the R1 supply-side authorization/privacy matrix and R2 search/autocomplete/distance assertions.
+All DONE rows above are covered by CI run `34900591388` unless a more specific earlier run is referenced in history. The run applied migrations `0000`–`0034` twice and passed the complete live PostgreSQL/PostGIS integration suite, including the R1 supply-side authorization/privacy matrix and R2 search, distance, service-area, qualification, availability and trust-evidence assertions.
 
 ## Durable decisions
 
