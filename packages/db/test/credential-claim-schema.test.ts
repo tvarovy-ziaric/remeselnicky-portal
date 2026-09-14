@@ -51,7 +51,10 @@ describe("credential claim schema", () => {
 
   it("linearizes evidence attachment against canonical-object revocation", () => {
     expect(migration).toMatch(
-      /SELECT asset, object INTO asset_record, canonical_object[\s\S]*FOR UPDATE OF asset, object/u,
+      /SELECT \* INTO asset_record[\s\S]*WHERE asset\.id = NEW\.media_asset_id[\s\S]*FOR UPDATE;/u,
+    );
+    expect(migration).toMatch(
+      /SELECT \* INTO canonical_object[\s\S]*object\.revoked_at IS NULL[\s\S]*FOR UPDATE;/u,
     );
     expect(migration).toMatch(/canonical_object\.id IS NULL/u);
   });

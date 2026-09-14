@@ -394,16 +394,19 @@ BEGIN
   SELECT * INTO command_record FROM credential_claim_commands WHERE command_id = NEW.command_id;
   SELECT claim.created_by_user_id, claim.state INTO claim_owner_id, claim_state
   FROM credential_claims claim WHERE claim.id = NEW.claim_id FOR UPDATE;
-  SELECT asset, object INTO asset_record, canonical_object
+  SELECT * INTO asset_record
   FROM media_assets asset
-  JOIN media_asset_storage_objects object ON object.media_asset_id = asset.id
+  WHERE asset.id = NEW.media_asset_id
+  FOR UPDATE;
+  SELECT * INTO canonical_object
+  FROM media_asset_storage_objects object
+  WHERE object.media_asset_id = asset_record.id
     AND object.role::text = 'CANONICAL'
     AND object.storage_area::text = 'private'
     AND object.revoked_at IS NULL
-  WHERE asset.id = NEW.media_asset_id
   ORDER BY object.id
   LIMIT 1
-  FOR UPDATE OF asset, object;
+  FOR UPDATE;
   IF command_record.command_kind IS DISTINCT FROM 'ATTACH_EVIDENCE'
     OR command_record.claim_id IS DISTINCT FROM NEW.claim_id
     OR command_record.media_asset_id IS DISTINCT FROM NEW.media_asset_id
