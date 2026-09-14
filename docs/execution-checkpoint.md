@@ -5,11 +5,11 @@ This file is the persistent implementation-status overlay for the hash-verified 
 - Updated: 2026-09-14
 - Definition: D01–D30 LOCKED and hash verified
 - Active release: R1 — Supply side
-- Last completed ticket: R1-004 — Craftsman profession/proficiency relationships
-- Active tickets: R1-005 — skills/specializations; R1-006 — location/service area; R1-007 — indicative pricing
-- Next dependency-satisfied candidate: R1-008 — experience/working-since data
-- Human gate: canonical Slovak taxonomy content still requires expert/legal review before activation; this does not block private supply-side implementation
-- Integrated verification: CI run 34812163837 passed quality, dependency audit, secret scan and clean PostgreSQL/PostGIS migrations
+- Last completed ticket: R1-007 — Indicative pricing entries
+- Active tickets: R1-008 — experience/working-since; R1-012 — lightweight availability; R1-013 — portfolio core
+- Next dependency-satisfied candidate: R1-009 — credential claims and admin approval queue
+- Human gate: canonical Slovak profession/skill/location content still requires expert/legal/source review before activation; this does not block private supply-side implementation
+- Integrated verification: CI run 34815077951 passed quality, dependency audit, secret scan and clean PostgreSQL/PostGIS migrations
 
 ## Ticket state overlay
 
@@ -52,8 +52,11 @@ This file is the persistent implementation-status overlay for the hash-verified 
 | R1-002 | DONE  | Lazy private CustomerProfile, ACTIVE-owner serialization and raw-SQL privacy/history guards passed           |
 | R1-003 | DONE  | Private INDIVIDUAL/COMPANY draft, owner/revision/verification and suspension-race guards passed              |
 | R1-004 | DONE  | Taxonomy-pinned professions, declared-level history, idempotency and live PG race/SQL guards passed          |
+| R1-005 | DONE  | Governed M:N skills/specializations, retained custom wording and evidence-separation guards passed           |
+| R1-006 | DONE  | PostGIS municipality/service-area history, extensible extras and privacy/race guards passed                  |
+| R1-007 | DONE  | Optional EUR-cent pricing snapshots, profession links, archive/idempotency and public-text guards passed     |
 
-All rows above are covered by CI run `34812163837` unless a more specific earlier run is referenced in history. The run applied migrations `0000`–`0016` twice and passed the complete live PostgreSQL/PostGIS integration suite.
+All rows above are covered by CI run `34815077951` unless a more specific earlier run is referenced in history. The run applied migrations `0000`–`0019` twice and passed the complete live PostgreSQL/PostGIS integration suite.
 
 ## Durable decisions
 
