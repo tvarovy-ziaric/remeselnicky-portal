@@ -35,6 +35,7 @@
     "postgres": "3.4.9"
   },
   "devDependencies": {
+    "@portal/testing": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

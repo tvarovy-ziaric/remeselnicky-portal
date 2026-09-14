@@ -326,6 +326,9 @@ importers:
         specifier: 3.4.9
         version: 3.4.9
     devDependencies:
+      '@portal/testing':
+        specifier: workspace:*
+        version: link:../testing
       '@types/node':
         specifier: 'catalog:'
         version: 26.5.1

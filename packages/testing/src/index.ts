@@ -35,6 +35,30 @@ export {
   runConcurrentAttempts,
   verifyExactlyOnceCommand,
 } from "./concurrency.js";
+export {
+  assertNoPrivateData,
+  R1_OWNER_ACTIONS,
+  R1_OWNER_BOUNDARY_ACTORS,
+  R1_OWNER_SURFACES,
+  R1_PORTFOLIO_DELIVERY_SCENARIOS,
+  R1_PRIVILEGED_REVIEW_ACTORS,
+  R1_PRIVILEGED_REVIEW_SURFACES,
+  R1_PUBLIC_PROFILE_SCENARIOS,
+  verifyR1SupplySideMatrix,
+} from "./r1-supply-side.js";
+export type {
+  R1BoundaryProbeResult,
+  R1CommandRaceEvidence,
+  R1OwnerAction,
+  R1OwnerBoundaryActor,
+  R1OwnerSurface,
+  R1PortfolioDeliveryScenario,
+  R1PrivilegedReviewActor,
+  R1PrivilegedReviewSurface,
+  R1PublicProfileScenario,
+  R1SupplySideMatrixAdapter,
+  R1SupplySideMatrixReport,
+} from "./r1-supply-side.js";
 export type {
   ConcurrentAttemptClassification,
   ConcurrentAttemptContext,

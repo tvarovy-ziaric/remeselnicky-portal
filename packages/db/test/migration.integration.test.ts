@@ -38,6 +38,7 @@ import { runPortfolioProjectMediaIntegrationAssertions } from "./portfolio-proje
 import { runPortfolioCollaborationIntegrationAssertions } from "./portfolio-collaboration-integration-helper.js";
 import { runFeaturedProjectIntegrationAssertions } from "./featured-project-integration-helper.js";
 import { runPortfolioPublicationIntegrationAssertions } from "./portfolio-publication-integration-helper.js";
+import { runR1SupplySideIntegrationAssertions } from "./r1-supply-side-integration-helper.js";
 
 const testDatabaseUrl = process.env["TEST_DATABASE_URL"];
 const migrationsDirectory = fileURLToPath(
@@ -1671,6 +1672,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         await runPortfolioCollaborationIntegrationAssertions(sql);
         await runFeaturedProjectIntegrationAssertions(sql);
         await runPortfolioPublicationIntegrationAssertions(sql);
+        await runR1SupplySideIntegrationAssertions(sql);
 
         await adminAccess.revokePrivilegedSession(superSessionDigest);
         await expect(
