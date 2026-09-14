@@ -115,6 +115,9 @@ jobs:
       - name: Install frozen dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build database integration dependencies
+        run: pnpm --filter '@portal/db...' build
+
       - name: Apply and verify migrations on a clean database
         run: |
           pnpm --filter @portal/testing test:integration
