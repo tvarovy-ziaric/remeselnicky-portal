@@ -407,7 +407,7 @@ async function loadSourcePhotos(
       item.canonical_width AS "canonicalWidth",
       item.canonical_height AS "canonicalHeight",
       source.id AS "sourceObjectId", source.storage_area AS "storageArea",
-      source.storage_key AS "storageKey", source.byte_size AS "byteSize",
+      source.storage_key AS "storageKey", source.byte_size::integer AS "byteSize",
       source.content_sha256 AS "contentSha256"
     FROM portfolio_photo_revisions revision
     JOIN portfolio_photo_revision_items item

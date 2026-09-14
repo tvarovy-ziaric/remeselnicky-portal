@@ -190,7 +190,7 @@ async function loadSources(
       item.display_order AS "displayOrder",
       item.canonical_width AS "canonicalWidth",
       item.canonical_height AS "canonicalHeight",
-      source.id AS "sourceObjectId", source.byte_size AS "byteSize",
+      source.id AS "sourceObjectId", source.byte_size::integer AS "byteSize",
       source.content_sha256 AS "contentSha256"
     FROM portfolio_photo_revisions revision
     JOIN portfolio_photo_revision_items item
