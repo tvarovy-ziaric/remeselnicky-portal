@@ -11,6 +11,10 @@ import type {
 } from "@portal/domain";
 import { createPrivateMediaDeliveryService } from "@portal/media";
 import {
+  createCredentialQualificationPolicyService,
+  type CredentialQualificationPolicyEntrySeed,
+} from "@portal/search";
+import {
   verifyR3DatabaseSecurityMatrix,
   type R3DatabaseBoundaryProbeEvidence,
   type R3DatabaseBoundaryProbeResult,
@@ -26,6 +30,7 @@ import {
 } from "../src/conversation-attachment-repository.js";
 import { createConversationChatRepository } from "../src/conversation-chat-repository.js";
 import { createConversationRepository } from "../src/conversation-repository.js";
+import { createCredentialQualificationRepository } from "../src/credential-qualification-repository.js";
 import { createExternalPdfQuoteRepository } from "../src/quote-external-pdf-repository.js";
 import { createJobInvitationRepository } from "../src/job-invitation-repository.js";
 import { createMediaRepository } from "../src/media-repository.js";
@@ -41,6 +46,7 @@ interface SourceConversation {
   readonly competitorProviderOwnerId: UserId;
   readonly customerOwnerId: UserId;
   readonly jobRequestId: JobRequestId;
+  readonly primaryProfessionCode: string;
   readonly requestContentRevision: number;
   readonly requestVisibleVersion: number;
 }
@@ -564,6 +570,7 @@ async function findSecurityLineage(sql: Sql): Promise<{
       craftsman.owner_user_id AS "competitorProviderOwnerId",
       customer.owner_user_id AS "customerOwnerId",
       conversation.job_request_id AS "jobRequestId",
+      core.payload ->> 'primaryProfessionCode' AS "primaryProfessionCode",
       content.content_revision AS "requestContentRevision",
       content.visible_version AS "requestVisibleVersion"
     FROM current_conversations conversation
@@ -579,11 +586,18 @@ async function findSecurityLineage(sql: Sql): Promise<{
       AND request.state = 'ACTIVE'
     JOIN current_job_request_active_content_versions content
       ON content.job_request_id = request.id
+    JOIN current_job_request_active_sections core
+      ON core.job_request_id = request.id
+      AND core.section_key = 'request.core'
     WHERE conversation.access_state = 'WRITABLE'
       AND conversation.invitation_state = 'ENGAGED'
     ORDER BY conversation.created_at DESC, conversation.id DESC
   `;
   for (const source of sources) {
+    await makeRequestProfessionOptionalForFixture(
+      sql,
+      source.primaryProfessionCode,
+    );
     const target = await findTargetProvider(sql, source);
     if (target !== null) return Object.freeze({ source, target });
   }
@@ -841,6 +855,70 @@ async function ensureVerifiedCredentials(
       ),
       phone_verified_at = clock_timestamp(), updated_at = clock_timestamp()
   `;
+}
+
+async function makeRequestProfessionOptionalForFixture(
+  sql: Sql,
+  professionCode: string,
+): Promise<void> {
+  const entries = await sql<CredentialQualificationPolicyEntrySeed[]>`
+    SELECT profession_code AS "professionCode",
+      credential_type_code AS "credentialTypeCode", requirement::text AS requirement
+    FROM current_credential_qualification_policies
+    ORDER BY profession_code, credential_type_code
+  `;
+  if (
+    !entries.some(
+      (entry) =>
+        entry.professionCode === professionCode &&
+        entry.requirement === "REQUIRED",
+    )
+  ) {
+    return;
+  }
+  const [current] = await sql<
+    Array<{
+      readonly releaseId: string;
+      readonly taxonomyReleaseId: string;
+      readonly version: number;
+    }>
+  >`
+    SELECT release.release_id AS "releaseId",
+      release.taxonomy_release_id AS "taxonomyReleaseId", release.version
+    FROM credential_qualification_policy_activation_events activation
+    JOIN credential_qualification_policy_releases release
+      ON release.release_id = activation.release_id
+    ORDER BY activation.activation_sequence DESC
+    LIMIT 1
+  `;
+  if (current === undefined) {
+    throw new Error("R3-022 requires a qualification policy fixture.");
+  }
+  const nextReleaseId = randomUUID();
+  const policy = createCredentialQualificationPolicyService({
+    persistence: createCredentialQualificationRepository(sql),
+  });
+  await policy.installRelease({
+    entries: entries.map((entry) => ({
+      ...entry,
+      requirement:
+        entry.professionCode === professionCode
+          ? "OPTIONAL"
+          : entry.requirement,
+    })),
+    releaseId: nextReleaseId,
+    reviewReference: "test-review:R3-022-security-fixture",
+    supersedesReleaseId: current.releaseId,
+    taxonomyReleaseId: current.taxonomyReleaseId,
+    version: current.version + 1,
+  });
+  await policy.activateRelease({
+    activationId: randomUUID(),
+    actorReference: "test-deployment:R3-022-security-fixture",
+    previousReleaseId: current.releaseId,
+    releaseId: nextReleaseId,
+    reviewReference: "test-review:R3-022-security-fixture",
+  });
 }
 
 async function createReadyChatImage(
