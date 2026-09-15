@@ -35,7 +35,8 @@ describe("job request content schema", () => {
     expect(migration).toContain("current_skill_catalog_professions");
     expect(migration).toContain("location_municipalities");
     expect(migration).toMatch(/profession\.state = 'ACTIVE'/u);
-    expect(migration).toMatch(/location\.active/u);
+    expect(migration).toMatch(/location\.is_active/u);
+    expect(migration).not.toMatch(/municipality\.active|location\.active/u);
   });
 
   it("keeps media private, purpose-bound, and limited", async () => {

@@ -199,7 +199,7 @@ BEGIN
       municipality := candidate_payload ->> 'municipalityCode';
       IF NOT EXISTS (
         SELECT 1 FROM location_municipalities location
-        WHERE location.code = municipality AND location.active
+        WHERE location.code = municipality AND location.is_active
       ) THEN
         RETURN false;
       END IF;
@@ -454,7 +454,7 @@ AS $$
       SELECT 1 FROM location
       JOIN location_municipalities municipality
         ON municipality.code = location.payload ->> 'municipalityCode'
-       AND municipality.active
+       AND municipality.is_active
     ) THEN 'MUNICIPALITY'::job_request_submission_requirement END
   ], NULL);
 $$;
