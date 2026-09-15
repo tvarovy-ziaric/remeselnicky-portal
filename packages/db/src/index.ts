@@ -110,6 +110,7 @@ import { createJobInvitationReminderRepository } from "./job-invitation-notifica
 import { createConversationRepository } from "./conversation-repository.js";
 import { createConversationChatRepository } from "./conversation-chat-repository.js";
 import { createQuoteRepository } from "./quote-repository.js";
+import { createStructuredQuoteRepository } from "./quote-structured-repository.js";
 import {
   createConversationAttachmentMediaAccessResolver,
   createConversationAttachmentUploadAuthorization,
@@ -129,6 +130,7 @@ import type {
   ConversationPersistence,
   ConversationChatPersistence,
   QuotePersistence,
+  StructuredQuotePersistence,
 } from "@portal/domain";
 import * as schema from "./schema/index.js";
 
@@ -629,6 +631,8 @@ export { createConversationChatRepository } from "./conversation-chat-repository
 export type { ConversationChatPersistence } from "@portal/domain";
 export { createQuoteRepository } from "./quote-repository.js";
 export type { QuotePersistence } from "@portal/domain";
+export { createStructuredQuoteRepository } from "./quote-structured-repository.js";
+export type { StructuredQuotePersistence } from "@portal/domain";
 export { createJobRequestMediaUploadAuthorization } from "./job-request-media-repository.js";
 export type { JobRequestMediaUploadAuthorization } from "@portal/media";
 export { createCraftsmanProfileRepository } from "./craftsman-profile-repository.js";
@@ -790,6 +794,7 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly conversations: ConversationPersistence;
   readonly conversationChat: ConversationChatPersistence;
   readonly quotes: QuotePersistence;
+  readonly structuredQuotes: StructuredQuotePersistence;
   readonly conversationAttachmentUploads: ConversationAttachmentUploadAuthorization;
   readonly conversationAttachmentMediaAccess: MediaEntityAccessResolver;
   readonly jobRequestMedia: JobRequestMediaUploadAuthorization;
@@ -881,6 +886,7 @@ export function createDatabase(
   const conversations = createConversationRepository(sql);
   const conversationChat = createConversationChatRepository(sql);
   const quotes = createQuoteRepository(sql);
+  const structuredQuotes = createStructuredQuoteRepository(sql);
   const conversationAttachmentUploads =
     createConversationAttachmentUploadAuthorization(sql);
   const conversationAttachmentMediaAccess =
@@ -939,6 +945,7 @@ export function createDatabase(
     conversations,
     conversationChat,
     quotes,
+    structuredQuotes,
     conversationAttachmentUploads,
     conversationAttachmentMediaAccess,
     jobRequestMedia,
