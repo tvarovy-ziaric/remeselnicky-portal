@@ -66,6 +66,7 @@ import { runConversationMessagePolicyIntegrationAssertions } from "./conversatio
 import { runQuoteIntegrationAssertions } from "./quote-integration-helper.js";
 import { runStructuredQuoteIntegrationAssertions } from "./quote-structured-integration-helper.js";
 import { runExternalPdfQuoteIntegrationAssertions } from "./quote-external-pdf-integration-helper.js";
+import { runQuoteComparisonIntegrationAssertions } from "./quote-comparison-integration-helper.js";
 
 const testDatabaseUrl = process.env["TEST_DATABASE_URL"];
 const migrationsDirectory = fileURLToPath(
@@ -1746,6 +1747,10 @@ describe.skipIf(testDatabaseUrl === undefined)(
         await runConversationAttachmentIntegrationAssertions(sql);
         await runQuoteIntegrationAssertions(sql);
         await runStructuredQuoteIntegrationAssertions(sql);
+        await runQuoteComparisonIntegrationAssertions(
+          sql,
+          "PLATFORM_STRUCTURED",
+        );
         await runExternalPdfQuoteIntegrationAssertions(sql);
         await runJobRequestLifecycleIntegrationAssertions(sql);
         await runConversationReadOnlyIntegrationAssertions(sql);

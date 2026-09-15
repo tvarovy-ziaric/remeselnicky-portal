@@ -18,6 +18,7 @@ import {
 import { createPrivateMediaDeliveryRepository } from "../src/media-delivery-repository.js";
 import { createQuoteRepository } from "../src/quote-repository.js";
 import { createStructuredQuoteRepository } from "../src/quote-structured-repository.js";
+import { runQuoteComparisonIntegrationAssertions } from "./quote-comparison-integration-helper.js";
 
 interface Fixture {
   readonly conversationId: ConversationId;
@@ -349,6 +350,7 @@ export async function runExternalPdfQuoteIntegrationAssertions(
   await expectDeliveryGrant(sql, fixture.customerOwnerId, validPdf, 303);
   await expectDeliveryGrant(sql, fixture.customerOwnerId, pdfC, 404);
   await expectDeliveryGrant(sql, fixture.providerOwnerId, pdfC, 303);
+  await runQuoteComparisonIntegrationAssertions(sql, "EXTERNAL_PDF");
 
   const second = await quotes.createRevision({
     actorUserId: fixture.providerOwnerId,

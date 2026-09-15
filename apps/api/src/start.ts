@@ -128,6 +128,7 @@ const app = buildApi({
     jobRequestLifecycle: { lifecycle: jobRequestLifecycle },
     jobInvitations: { invitations: database.jobInvitations },
     conversations: { conversations: database.conversations },
+    quoteComparison: { comparison: database.quoteComparison },
     conversationChat: {
       admission: conversationWriteAdmission,
       persistence: database.conversationChat,

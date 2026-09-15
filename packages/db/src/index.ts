@@ -117,6 +117,8 @@ import {
   createQuoteDocumentMediaAccessResolver,
   createQuoteDocumentUploadAuthorization,
 } from "./quote-external-pdf-repository.js";
+import { createQuoteComparisonRepository } from "./quote-comparison-repository.js";
+export { createQuoteComparisonRepository } from "./quote-comparison-repository.js";
 import {
   createConversationAttachmentMediaAccessResolver,
   createConversationAttachmentUploadAuthorization,
@@ -136,6 +138,7 @@ import type {
   ConversationPersistence,
   ConversationChatPersistence,
   ExternalPdfQuotePersistence,
+  QuoteComparisonPersistence,
   QuotePersistence,
   StructuredQuotePersistence,
 } from "@portal/domain";
@@ -810,6 +813,7 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly quotes: QuotePersistence;
   readonly structuredQuotes: StructuredQuotePersistence;
   readonly externalPdfQuotes: ExternalPdfQuotePersistence;
+  readonly quoteComparison: QuoteComparisonPersistence;
   readonly quoteDocumentUploads: QuoteDocumentUploadAuthorization;
   readonly quoteDocumentMediaAccess: MediaEntityAccessResolver;
   readonly conversationAttachmentUploads: ConversationAttachmentUploadAuthorization;
@@ -905,6 +909,7 @@ export function createDatabase(
   const quotes = createQuoteRepository(sql);
   const structuredQuotes = createStructuredQuoteRepository(sql);
   const externalPdfQuotes = createExternalPdfQuoteRepository(sql);
+  const quoteComparison = createQuoteComparisonRepository(sql);
   const quoteDocumentUploads = createQuoteDocumentUploadAuthorization(sql);
   const quoteDocumentMediaAccess = createQuoteDocumentMediaAccessResolver(sql);
   const conversationAttachmentUploads =
@@ -967,6 +972,7 @@ export function createDatabase(
     quotes,
     structuredQuotes,
     externalPdfQuotes,
+    quoteComparison,
     quoteDocumentUploads,
     quoteDocumentMediaAccess,
     conversationAttachmentUploads,

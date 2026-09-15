@@ -49,6 +49,10 @@ import {
   registerConversationRoutes,
   type ConversationRouteDependencies,
 } from "../conversations/routes.js";
+import {
+  registerQuoteComparisonRoutes,
+  type QuoteComparisonRouteDependencies,
+} from "../quote-comparison/routes.js";
 import { createSessionGuard } from "./guard.js";
 import {
   registerDraftHandoffRoutes,
@@ -115,6 +119,10 @@ export interface AuthModuleDependencies {
   >;
   readonly jobInvitations?: Pick<JobInvitationRouteDependencies, "invitations">;
   readonly conversations?: Pick<ConversationRouteDependencies, "conversations">;
+  readonly quoteComparison?: Pick<
+    QuoteComparisonRouteDependencies,
+    "comparison"
+  >;
   readonly conversationChat?: {
     readonly admission: Exclude<
       NonNullable<ConversationRouteDependencies["chat"]>["admission"],
@@ -339,6 +347,12 @@ async function configureAuthModule(
             },
           }),
       ...dependencies.conversations,
+    });
+  }
+  if (dependencies.quoteComparison !== undefined) {
+    registerQuoteComparisonRoutes(app, {
+      guard,
+      ...dependencies.quoteComparison,
     });
   }
   if (dependencies.customerShortlist !== undefined) {
