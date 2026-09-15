@@ -29,6 +29,7 @@ import type {
   PortfolioPublicationRepository,
   PrivateMediaDeliveryRepository,
   PublicPortfolioDeliveryRepository,
+  QuoteDocumentUploadAuthorization,
 } from "@portal/media";
 import {
   createPhoneVerificationRepository,
@@ -112,6 +113,11 @@ import { createConversationChatRepository } from "./conversation-chat-repository
 import { createQuoteRepository } from "./quote-repository.js";
 import { createStructuredQuoteRepository } from "./quote-structured-repository.js";
 import {
+  createExternalPdfQuoteRepository,
+  createQuoteDocumentMediaAccessResolver,
+  createQuoteDocumentUploadAuthorization,
+} from "./quote-external-pdf-repository.js";
+import {
   createConversationAttachmentMediaAccessResolver,
   createConversationAttachmentUploadAuthorization,
 } from "./conversation-attachment-repository.js";
@@ -129,6 +135,7 @@ import type {
   JobInvitationPersistence,
   ConversationPersistence,
   ConversationChatPersistence,
+  ExternalPdfQuotePersistence,
   QuotePersistence,
   StructuredQuotePersistence,
 } from "@portal/domain";
@@ -633,6 +640,13 @@ export { createQuoteRepository } from "./quote-repository.js";
 export type { QuotePersistence } from "@portal/domain";
 export { createStructuredQuoteRepository } from "./quote-structured-repository.js";
 export type { StructuredQuotePersistence } from "@portal/domain";
+export {
+  createExternalPdfQuoteRepository,
+  createQuoteDocumentMediaAccessResolver,
+  createQuoteDocumentUploadAuthorization,
+} from "./quote-external-pdf-repository.js";
+export type { ExternalPdfQuotePersistence } from "@portal/domain";
+export type { QuoteDocumentUploadAuthorization } from "@portal/media";
 export { createJobRequestMediaUploadAuthorization } from "./job-request-media-repository.js";
 export type { JobRequestMediaUploadAuthorization } from "@portal/media";
 export { createCraftsmanProfileRepository } from "./craftsman-profile-repository.js";
@@ -795,6 +809,9 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly conversationChat: ConversationChatPersistence;
   readonly quotes: QuotePersistence;
   readonly structuredQuotes: StructuredQuotePersistence;
+  readonly externalPdfQuotes: ExternalPdfQuotePersistence;
+  readonly quoteDocumentUploads: QuoteDocumentUploadAuthorization;
+  readonly quoteDocumentMediaAccess: MediaEntityAccessResolver;
   readonly conversationAttachmentUploads: ConversationAttachmentUploadAuthorization;
   readonly conversationAttachmentMediaAccess: MediaEntityAccessResolver;
   readonly jobRequestMedia: JobRequestMediaUploadAuthorization;
@@ -887,6 +904,9 @@ export function createDatabase(
   const conversationChat = createConversationChatRepository(sql);
   const quotes = createQuoteRepository(sql);
   const structuredQuotes = createStructuredQuoteRepository(sql);
+  const externalPdfQuotes = createExternalPdfQuoteRepository(sql);
+  const quoteDocumentUploads = createQuoteDocumentUploadAuthorization(sql);
+  const quoteDocumentMediaAccess = createQuoteDocumentMediaAccessResolver(sql);
   const conversationAttachmentUploads =
     createConversationAttachmentUploadAuthorization(sql);
   const conversationAttachmentMediaAccess =
@@ -946,6 +966,9 @@ export function createDatabase(
     conversationChat,
     quotes,
     structuredQuotes,
+    externalPdfQuotes,
+    quoteDocumentUploads,
+    quoteDocumentMediaAccess,
     conversationAttachmentUploads,
     conversationAttachmentMediaAccess,
     jobRequestMedia,

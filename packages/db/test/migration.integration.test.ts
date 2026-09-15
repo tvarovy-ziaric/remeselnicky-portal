@@ -65,6 +65,7 @@ import { runConversationAttachmentIntegrationAssertions } from "./conversation-a
 import { runConversationMessagePolicyIntegrationAssertions } from "./conversation-message-policy-integration-helper.js";
 import { runQuoteIntegrationAssertions } from "./quote-integration-helper.js";
 import { runStructuredQuoteIntegrationAssertions } from "./quote-structured-integration-helper.js";
+import { runExternalPdfQuoteIntegrationAssertions } from "./quote-external-pdf-integration-helper.js";
 
 const testDatabaseUrl = process.env["TEST_DATABASE_URL"];
 const migrationsDirectory = fileURLToPath(
@@ -140,6 +141,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
           "0047_conversation_preconfirm_policy.sql",
           "0048_quote_core.sql",
           "0049_quote_platform_structured.sql",
+          "0050_quote_external_pdf.sql",
         ],
         alreadyApplied: 0,
       });
@@ -148,7 +150,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         testDatabaseUrl,
         migrationsDirectory,
       );
-      expect(secondRun).toEqual({ applied: [], alreadyApplied: 50 });
+      expect(secondRun).toEqual({ applied: [], alreadyApplied: 51 });
 
       const sql = postgres(testDatabaseUrl, { max: 5 });
       try {
@@ -194,7 +196,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         `;
 
         expect(postgis?.extversion).toMatch(/^3\./);
-        expect(ledger?.count).toBe(50);
+        expect(ledger?.count).toBe(51);
         expect(created).toMatchObject({ account_state: "ACTIVE" });
         expect(created?.id).toMatch(
           /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
@@ -829,8 +831,8 @@ describe.skipIf(testDatabaseUrl === undefined)(
           ownerUserId: registration.user.id,
           provenanceEntityId: randomUUID(),
           provenanceEntityRevision: 1,
-          provenanceEntityType: "QUOTE_REVISION",
-          purpose: "QUOTE_DOCUMENT",
+          provenanceEntityType: "JOB",
+          purpose: "JOB_DOCUMENT",
           storageObject: {
             area: "private",
             key: privateMediaKey(randomUUID()),
@@ -1744,6 +1746,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         await runConversationAttachmentIntegrationAssertions(sql);
         await runQuoteIntegrationAssertions(sql);
         await runStructuredQuoteIntegrationAssertions(sql);
+        await runExternalPdfQuoteIntegrationAssertions(sql);
         await runJobRequestLifecycleIntegrationAssertions(sql);
         await runConversationReadOnlyIntegrationAssertions(sql);
         await runConversationChatReadOnlyIntegrationAssertions(sql);

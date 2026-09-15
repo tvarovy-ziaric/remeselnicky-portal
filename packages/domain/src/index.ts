@@ -456,3 +456,4 @@ export * from "./conversation-chat.js";
 export * from "./conversation-message-policy.js";
 export * from "./quote.js";
 export * from "./quote-structured.js";
+export * from "./quote-external-pdf.js";

@@ -135,3 +135,4 @@ export type {
   ImageCanonicalizationJob,
   ImageProcessingRejectionCode,
 } from "./image-processing.js";
+export * from "./quote-document.js";

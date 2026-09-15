@@ -1,0 +1,644 @@
+import { randomUUID } from "node:crypto";
+
+import { createPrivateMediaDeliveryService } from "@portal/media";
+import {
+  ExternalPdfQuoteIdempotencyError,
+  type ConversationId,
+  type QuoteId,
+  type UserId,
+} from "@portal/domain";
+import type { Sql, TransactionSql } from "postgres";
+import { expect } from "vitest";
+
+import {
+  createExternalPdfQuoteRepository,
+  createQuoteDocumentMediaAccessResolver,
+  createQuoteDocumentUploadAuthorization,
+} from "../src/quote-external-pdf-repository.js";
+import { createPrivateMediaDeliveryRepository } from "../src/media-delivery-repository.js";
+import { createQuoteRepository } from "../src/quote-repository.js";
+
+interface Fixture {
+  readonly conversationId: ConversationId;
+  readonly customerOwnerId: UserId;
+  readonly providerOwnerId: UserId;
+  readonly requestContentRevision: number;
+  readonly requestVisibleVersion: number;
+}
+
+/** Standalone R3-017 assertions; the root migration runner owns wiring. */
+export async function runExternalPdfQuoteIntegrationAssertions(
+  sql: Sql,
+): Promise<void> {
+  const fixture = await findFixture(sql);
+  const quotes = createQuoteRepository(sql);
+  const external = createExternalPdfQuoteRepository(sql);
+  const created = await quotes.createDraft({
+    actorUserId: fixture.providerOwnerId,
+    authoringMode: "EXTERNAL_PDF",
+    commandId: randomUUID(),
+    conversationId: fixture.conversationId,
+    requestContentRevision: fixture.requestContentRevision,
+    requestVisibleVersion: fixture.requestVisibleVersion,
+  });
+  if (!("quote" in created)) throw new Error("Expected external PDF Quote.");
+  const quoteId = created.quote.id;
+  await expectRawMediaGuards(sql, fixture, quoteId);
+
+  await expect(
+    createQuoteDocumentUploadAuthorization(sql).prepareUpload({
+      actorUserId: fixture.providerOwnerId,
+      quoteId,
+      quoteRevision: 1,
+    }),
+  ).resolves.toMatchObject({ purpose: "QUOTE_DOCUMENT", status: "AUTHORIZED" });
+
+  const pdfA = await createDocument(
+    sql,
+    fixture.providerOwnerId,
+    quoteId,
+    1,
+    false,
+  );
+  await expectRawMediaIdentityMutationRejected(
+    sql,
+    pdfA,
+    fixture.customerOwnerId,
+  );
+  await expect(
+    external.saveDraft(saveInput(fixture, quoteId, 1, pdfA, 0)),
+  ).resolves.toEqual({ status: "PDF_NOT_READY" });
+  await markReady(sql, pdfA);
+  await expect(
+    sql`UPDATE media_assets SET status = 'PROCESSING' WHERE id = ${pdfA}`,
+  ).rejects.toThrow(/terminal Quote document media state is immutable/u);
+  await expectRawCommandGuards(sql, fixture, quoteId, pdfA);
+  const firstInput = saveInput(fixture, quoteId, 1, pdfA, 0);
+  await expect(external.saveDraft(firstInput)).resolves.toMatchObject({
+    revision: {
+      contentRevision: 1,
+      pdfAssetId: pdfA,
+      providerConfirmedSummaryMatchesPdf: true,
+    },
+    status: "SAVED",
+  });
+  await expect(external.saveDraft(firstInput)).resolves.toMatchObject({
+    status: "DEDUPLICATED",
+  });
+  await expect(
+    external.saveDraft({
+      ...firstInput,
+      envelope: {
+        ...firstInput.envelope,
+        totalAmountCents: 151_000,
+      },
+    }),
+  ).rejects.toBeInstanceOf(ExternalPdfQuoteIdempotencyError);
+  await sql.begin(async (transaction) => {
+    await transaction`UPDATE users SET account_state = 'SUSPENDED'
+      WHERE id = ${fixture.providerOwnerId}`;
+    await expect(
+      createExternalPdfQuoteRepository(transaction).saveDraft(firstInput),
+    ).resolves.toEqual({ status: "NOT_FOUND" });
+    await transaction`UPDATE users SET account_state = 'ACTIVE'
+      WHERE id = ${fixture.providerOwnerId}`;
+  });
+
+  await expect(
+    external.readOwned({
+      actorUserId: fixture.customerOwnerId,
+      quoteId,
+      quoteRevision: 1,
+    }),
+  ).resolves.toBeNull();
+  const outsider = randomUUID() as UserId;
+  await sql`INSERT INTO users (id) VALUES (${outsider})`;
+  await expect(
+    external.readOwned({ actorUserId: outsider, quoteId, quoteRevision: 1 }),
+  ).resolves.toBeNull();
+  await expect(
+    external.saveDraft({
+      ...saveInput(fixture, quoteId, 1, pdfA, 1),
+      actorUserId: outsider,
+    }),
+  ).resolves.toEqual({ status: "NOT_FOUND" });
+
+  const pdfB = await createDocument(
+    sql,
+    fixture.providerOwnerId,
+    quoteId,
+    1,
+    true,
+  );
+  await expect(
+    external.saveDraft(saveInput(fixture, quoteId, 1, pdfB, 1)),
+  ).resolves.toMatchObject({
+    revision: { contentRevision: 2, pdfAssetId: pdfB },
+    status: "SAVED",
+  });
+  const pdfC = await createDocument(
+    sql,
+    fixture.providerOwnerId,
+    quoteId,
+    1,
+    true,
+  );
+  const pdfD = await createDocument(
+    sql,
+    fixture.providerOwnerId,
+    quoteId,
+    1,
+    true,
+  );
+  const firstReplacement = deferred<unknown>();
+  const releaseReplacement = deferred<void>();
+  const heldReplacement = sql.begin(async (transaction) => {
+    const result = await createExternalPdfQuoteRepository(
+      transaction,
+    ).saveDraft(saveInput(fixture, quoteId, 1, pdfC, 2));
+    firstReplacement.resolve(result);
+    await releaseReplacement.promise;
+    return result;
+  });
+  await firstReplacement.promise;
+  const replacementPid = deferred<number>();
+  const blockedReplacement = sql.begin(async (transaction) => {
+    replacementPid.resolve(await backendPid(transaction));
+    return createExternalPdfQuoteRepository(transaction).saveDraft(
+      saveInput(fixture, quoteId, 1, pdfD, 2),
+    );
+  });
+  await waitForLock(sql, await replacementPid.promise);
+  releaseReplacement.resolve(undefined);
+  await expect(heldReplacement).resolves.toMatchObject({ status: "SAVED" });
+  await expect(blockedReplacement).resolves.toEqual({
+    status: "STALE_REVISION",
+  });
+  const current = await external.readOwned({
+    actorUserId: fixture.providerOwnerId,
+    quoteId,
+    quoteRevision: 1,
+  });
+  if (current === null) throw new Error("Expected current external content.");
+  expect(current.pdfAssetId).toBe(pdfC);
+  await expect(external.saveDraft(firstInput)).resolves.toMatchObject({
+    revision: { contentRevision: 1, pdfAssetId: pdfA },
+    status: "DEDUPLICATED",
+  });
+  await expect(sql<Array<{ readonly count: number }>>`
+    SELECT count(*)::integer AS count FROM quote_external_pdf_documents
+    WHERE quote_id = ${quoteId} AND quote_revision = 1
+  `).resolves.toEqual([{ count: 3 }]);
+  await expectDeliveryGrant(sql, fixture.providerOwnerId, pdfC, 303);
+  await expectDeliveryGrant(sql, fixture.customerOwnerId, pdfC, 404);
+  await expectDeliveryGrant(sql, outsider, pdfC, 404);
+
+  const expiredPdf = await createDocument(
+    sql,
+    fixture.providerOwnerId,
+    quoteId,
+    1,
+    true,
+  );
+  const saveEffect = deferred<unknown>();
+  const releaseSave = deferred<void>();
+  const heldSave = sql.begin(async (transaction) => {
+    const result = await createExternalPdfQuoteRepository(
+      transaction,
+    ).saveDraft(
+      saveInput(
+        fixture,
+        quoteId,
+        1,
+        expiredPdf,
+        3,
+        new Date("2000-01-01T00:00:00Z"),
+      ),
+    );
+    saveEffect.resolve(result);
+    await releaseSave.promise;
+    return result;
+  });
+  await saveEffect.promise;
+  const submitPid = deferred<number>();
+  const blockedSubmit = sql.begin(async (transaction) => {
+    submitPid.resolve(await backendPid(transaction));
+    return createQuoteRepository(transaction).submit({
+      actorUserId: fixture.providerOwnerId,
+      commandId: randomUUID(),
+      expectedDraftStateRevision: 1,
+      expectedSubmittedStateRevision: null,
+      quoteId,
+      revision: 1,
+    });
+  });
+  await waitForLock(sql, await submitPid.promise);
+  releaseSave.resolve(undefined);
+  await expect(heldSave).resolves.toMatchObject({ status: "SAVED" });
+  await expect(blockedSubmit).resolves.toEqual({
+    status: "AUTHORING_NOT_READY",
+  });
+
+  const validPdf = await createDocument(
+    sql,
+    fixture.providerOwnerId,
+    quoteId,
+    1,
+    true,
+  );
+  const latePdf = await createDocument(
+    sql,
+    fixture.providerOwnerId,
+    quoteId,
+    1,
+    true,
+  );
+  await external.saveDraft(saveInput(fixture, quoteId, 1, validPdf, 4));
+  const submitEffect = deferred<unknown>();
+  const releaseSubmit = deferred<void>();
+  const heldSubmit = sql.begin(async (transaction) => {
+    const result = await createQuoteRepository(transaction).submit({
+      actorUserId: fixture.providerOwnerId,
+      commandId: randomUUID(),
+      expectedDraftStateRevision: 1,
+      expectedSubmittedStateRevision: null,
+      quoteId,
+      revision: 1,
+    });
+    submitEffect.resolve(result);
+    await releaseSubmit.promise;
+    return result;
+  });
+  await submitEffect.promise;
+  const savePid = deferred<number>();
+  const blockedSave = sql.begin(async (transaction) => {
+    savePid.resolve(await backendPid(transaction));
+    return createExternalPdfQuoteRepository(transaction).saveDraft(
+      saveInput(fixture, quoteId, 1, latePdf, 5),
+    );
+  });
+  await waitForLock(sql, await savePid.promise);
+  releaseSubmit.resolve(undefined);
+  await expect(heldSubmit).resolves.toMatchObject({ status: "APPLIED" });
+  await expect(blockedSave).resolves.toEqual({ status: "READ_ONLY" });
+  await expect(
+    createDocument(sql, fixture.providerOwnerId, quoteId, 1, false),
+  ).rejects.toThrow(/exact owned Quote revision PDF provenance required/u);
+  await expect(
+    external.readOwned({
+      actorUserId: fixture.customerOwnerId,
+      quoteId,
+      quoteRevision: 1,
+    }),
+  ).resolves.toMatchObject({
+    pdfAssetId: validPdf,
+    pdfDownloadPath: `/v1/media/${validPdf}/download`,
+  });
+  await expectDeliveryGrant(sql, fixture.customerOwnerId, validPdf, 303);
+  await expectDeliveryGrant(sql, fixture.customerOwnerId, pdfC, 404);
+  await expectDeliveryGrant(sql, fixture.providerOwnerId, pdfC, 303);
+
+  const second = await quotes.createRevision({
+    actorUserId: fixture.providerOwnerId,
+    authoringMode: "EXTERNAL_PDF",
+    commandId: randomUUID(),
+    expectedSubmittedStateRevision: 2,
+    quoteId,
+    requestContentRevision: fixture.requestContentRevision,
+    requestVisibleVersion: fixture.requestVisibleVersion,
+  });
+  expect(second).toMatchObject({ quote: { currentDraft: { revision: 2 } } });
+  await expectDeliveryGrant(sql, fixture.customerOwnerId, validPdf, 303);
+  await expect(
+    external.saveDraft(saveInput(fixture, quoteId, 2, validPdf, 0)),
+  ).resolves.toEqual({ status: "PDF_NOT_READY" });
+  const secondPdf = await createDocument(
+    sql,
+    fixture.providerOwnerId,
+    quoteId,
+    2,
+    true,
+  );
+  await external.saveDraft(saveInput(fixture, quoteId, 2, secondPdf, 0));
+
+  const revokeStarted = deferred<void>();
+  const releaseRevoke = deferred<void>();
+  const revoke = sql.begin(async (transaction) => {
+    await transaction`UPDATE media_asset_storage_objects SET revoked_at = clock_timestamp()
+      WHERE media_asset_id = ${secondPdf} AND role = 'CANONICAL'`;
+    revokeStarted.resolve(undefined);
+    await releaseRevoke.promise;
+  });
+  await revokeStarted.promise;
+  const revokeSubmitPid = deferred<number>();
+  const submitAfterRevoke = sql.begin(async (transaction) => {
+    revokeSubmitPid.resolve(await backendPid(transaction));
+    return createQuoteRepository(transaction).submit({
+      actorUserId: fixture.providerOwnerId,
+      commandId: randomUUID(),
+      expectedDraftStateRevision: 1,
+      expectedSubmittedStateRevision: 2,
+      quoteId,
+      revision: 2,
+    });
+  });
+  await waitForLock(sql, await revokeSubmitPid.promise);
+  releaseRevoke.resolve(undefined);
+  await revoke;
+  await expect(submitAfterRevoke).resolves.toEqual({
+    status: "AUTHORING_NOT_READY",
+  });
+
+  const replacement = await createDocument(
+    sql,
+    fixture.providerOwnerId,
+    quoteId,
+    2,
+    true,
+  );
+  await external.saveDraft(saveInput(fixture, quoteId, 2, replacement, 1));
+  const submitStarted = deferred<unknown>();
+  const releaseSubmitted = deferred<void>();
+  const submitBeforeRevoke = sql.begin(async (transaction) => {
+    const result = await createQuoteRepository(transaction).submit({
+      actorUserId: fixture.providerOwnerId,
+      commandId: randomUUID(),
+      expectedDraftStateRevision: 1,
+      expectedSubmittedStateRevision: 2,
+      quoteId,
+      revision: 2,
+    });
+    submitStarted.resolve(result);
+    await releaseSubmitted.promise;
+    return result;
+  });
+  await submitStarted.promise;
+  const revokePid = deferred<number>();
+  const revokeAfterSubmit = sql.begin(async (transaction) => {
+    revokePid.resolve(await backendPid(transaction));
+    await transaction`UPDATE media_asset_storage_objects SET revoked_at = clock_timestamp()
+      WHERE media_asset_id = ${replacement} AND role = 'CANONICAL'`;
+  });
+  await waitForLock(sql, await revokePid.promise);
+  releaseSubmitted.resolve(undefined);
+  await expect(submitBeforeRevoke).resolves.toMatchObject({
+    status: "APPLIED",
+  });
+  await revokeAfterSubmit;
+  await expectDeliveryGrant(sql, fixture.customerOwnerId, replacement, 404);
+  const structuredEligibility = await sql<
+    Array<{ readonly eligible: boolean }>
+  >`
+    SELECT quote_revision_authoring_is_eligible(content.quote_id,
+      content.quote_revision, 'PLATFORM_STRUCTURED') AS eligible
+    FROM current_quote_structured_content content
+    ORDER BY content.valid_until NULLS LAST
+  `;
+  expect(structuredEligibility.some((item) => item.eligible)).toBe(true);
+  expect(structuredEligibility.some((item) => !item.eligible)).toBe(true);
+  await expectStructuredQuoteDocumentAllowed(sql);
+
+  await expect(sql`UPDATE quote_external_pdf_content_revisions SET total_amount_cents = 1
+    WHERE quote_id = ${quoteId}`).rejects.toThrow(/append-only/u);
+}
+
+async function expectStructuredQuoteDocumentAllowed(sql: Sql): Promise<void> {
+  const [draft] = await sql<
+    Array<{
+      readonly providerOwnerId: UserId;
+      readonly quoteId: QuoteId;
+      readonly quoteRevision: number;
+    }>
+  >`
+    SELECT craftsman.owner_user_id AS "providerOwnerId", quote.id AS "quoteId",
+      revision.revision AS "quoteRevision"
+    FROM quotes quote
+    JOIN quote_revision_identities revision ON revision.quote_id = quote.id
+      AND revision.authoring_mode = 'PLATFORM_STRUCTURED'
+    JOIN quote_revision_heads head ON head.quote_id = quote.id
+      AND head.quote_revision = revision.revision AND head.state = 'DRAFT'
+    JOIN current_conversations conversation ON conversation.id = quote.conversation_id
+      AND conversation.access_state = 'WRITABLE'
+    JOIN craftsman_profiles craftsman ON craftsman.id = conversation.craftsman_profile_id
+    JOIN users actor ON actor.id = craftsman.owner_user_id
+      AND actor.account_state = 'ACTIVE'
+    LIMIT 1
+  `;
+  if (draft === undefined)
+    throw new Error(
+      "Expected a structured Quote draft for support-document guard.",
+    );
+  await expect(
+    sql`INSERT INTO media_assets (id, owner_user_id, uploaded_by_user_id, kind,
+      purpose, status, declared_content_type, byte_size, provenance_entity_type,
+      provenance_entity_id, provenance_entity_revision)
+      VALUES (${randomUUID()}, ${draft.providerOwnerId}, ${draft.providerOwnerId},
+        'DOCUMENT', 'QUOTE_DOCUMENT', 'PROCESSING', 'application/pdf', 100,
+        'QUOTE_REVISION', ${draft.quoteId}, ${draft.quoteRevision})`,
+  ).resolves.toBeDefined();
+}
+
+async function findFixture(sql: Sql): Promise<Fixture> {
+  const [row] = await sql<Fixture[]>`
+    SELECT conversation.id AS "conversationId", customer.owner_user_id AS "customerOwnerId",
+      craftsman.owner_user_id AS "providerOwnerId", provenance.content_revision AS "requestContentRevision",
+      provenance.visible_version AS "requestVisibleVersion"
+    FROM current_conversations conversation
+    JOIN customer_profiles customer ON customer.id = conversation.customer_profile_id
+    JOIN craftsman_profiles craftsman ON craftsman.id = conversation.craftsman_profile_id
+    JOIN LATERAL (SELECT content_revision, visible_version
+      FROM job_request_active_content_revisions item
+      WHERE item.job_request_id = conversation.job_request_id
+      ORDER BY content_revision DESC LIMIT 1) provenance ON true
+    WHERE conversation.access_state = 'WRITABLE' AND conversation.invitation_state = 'ENGAGED'
+      AND NOT EXISTS (SELECT 1 FROM quotes quote WHERE quote.conversation_id = conversation.id)
+    LIMIT 1`;
+  if (row === undefined)
+    throw new Error("R3-017 requires fresh ENGAGED fixture.");
+  return row;
+}
+
+async function createDocument(
+  sql: Sql,
+  owner: UserId,
+  quoteId: QuoteId,
+  revision: number,
+  ready: boolean,
+): Promise<string> {
+  const assetId = randomUUID();
+  await sql`INSERT INTO media_assets (id, owner_user_id, uploaded_by_user_id, kind,
+    purpose, status, declared_content_type, byte_size, provenance_entity_type,
+    provenance_entity_id, provenance_entity_revision)
+    VALUES (${assetId}, ${owner}, ${owner}, 'DOCUMENT', 'QUOTE_DOCUMENT',
+      'PROCESSING', 'application/pdf', 100, 'QUOTE_REVISION', ${quoteId}, ${revision})`;
+  if (ready) await markReady(sql, assetId);
+  return assetId;
+}
+
+async function expectRawMediaGuards(
+  sql: Sql,
+  fixture: Fixture,
+  quoteId: QuoteId,
+): Promise<void> {
+  for (const row of [
+    { owner: fixture.customerOwnerId, provenance: quoteId },
+    { owner: fixture.providerOwnerId, provenance: randomUUID() },
+  ]) {
+    await expect(sql`INSERT INTO media_assets (id, owner_user_id,
+      uploaded_by_user_id, kind, purpose, status, declared_content_type,
+      byte_size, provenance_entity_type, provenance_entity_id,
+      provenance_entity_revision) VALUES (${randomUUID()}, ${row.owner},
+      ${row.owner}, 'DOCUMENT', 'QUOTE_DOCUMENT', 'PROCESSING',
+      'application/pdf', 100, 'QUOTE_REVISION', ${row.provenance}, 1)`).rejects.toThrow(
+      /exact owned Quote revision PDF provenance required/u,
+    );
+  }
+}
+
+async function expectRawMediaIdentityMutationRejected(
+  sql: Sql,
+  assetId: string,
+  otherOwner: UserId,
+): Promise<void> {
+  await expect(
+    sql`UPDATE media_assets SET owner_user_id = ${otherOwner}
+      WHERE id = ${assetId}`,
+  ).rejects.toThrow(/media identity is immutable/iu);
+  await expect(
+    sql`UPDATE media_assets SET provenance_entity_revision = 99
+      WHERE id = ${assetId}`,
+  ).rejects.toThrow(/media identity is immutable/iu);
+  await expect(
+    sql`UPDATE media_assets SET purpose = 'JOB_DOCUMENT'
+      WHERE id = ${assetId}`,
+  ).rejects.toThrow(/media identity is immutable/iu);
+}
+
+async function expectRawCommandGuards(
+  sql: Sql,
+  fixture: Fixture,
+  quoteId: QuoteId,
+  pdfAssetId: string,
+): Promise<void> {
+  await expect(
+    sql.begin(async (transaction) => {
+      await transaction`INSERT INTO quote_external_pdf_authoring_commands (
+      command_id, quote_id, quote_revision, actor_user_id, pdf_media_asset_id,
+      provider_confirmed_summary_matches_pdf, expected_content_revision,
+      resulting_content_revision, payload_fingerprint, created_at
+    ) VALUES (${randomUUID()}, ${quoteId}, 1, ${fixture.providerOwnerId},
+      ${pdfAssetId}, false, 0, 999, ${"f".repeat(64)},
+      '2000-01-01T00:00:00Z')`;
+    }),
+  ).rejects.toThrow(/quote_external_pdf_command_confirmation_true/u);
+
+  await expect(
+    sql.begin(async (transaction) => {
+      const [stored] = await transaction<
+        Array<{
+          readonly createdAt: Date;
+          readonly resultingContentRevision: number;
+        }>
+      >`INSERT INTO quote_external_pdf_authoring_commands (
+      command_id, quote_id, quote_revision, actor_user_id, pdf_media_asset_id,
+      provider_confirmed_summary_matches_pdf, expected_content_revision,
+      resulting_content_revision, payload_fingerprint, created_at
+    ) VALUES (${randomUUID()}, ${quoteId}, 1, ${fixture.providerOwnerId},
+      ${pdfAssetId}, true, 0, 999, ${"e".repeat(64)},
+      '2000-01-01T00:00:00Z')
+    RETURNING resulting_content_revision AS "resultingContentRevision",
+      created_at AS "createdAt"`;
+      expect(stored?.resultingContentRevision).toBe(1);
+      expect(stored?.createdAt.valueOf()).toBeGreaterThan(
+        new Date("2020-01-01").valueOf(),
+      );
+      await transaction`SET CONSTRAINTS ALL IMMEDIATE`;
+    }),
+  ).rejects.toThrow(/quote_external_pdf_command_effect_fk/u);
+}
+
+async function markReady(sql: Sql, assetId: string): Promise<void> {
+  const hash = "a".repeat(64);
+  await sql`INSERT INTO media_asset_storage_objects (media_asset_id, role, storage_area,
+    storage_key, content_type, byte_size, content_sha256)
+    VALUES (${assetId}, 'CANONICAL', 'private',
+      ${`private/2026/09/${randomUUID()}`}, 'application/pdf', 100, ${hash})`;
+  await sql`UPDATE media_assets SET status = 'READY', ready_at = clock_timestamp(),
+    status_changed_at = clock_timestamp(), updated_at = clock_timestamp(),
+    document_page_count = 1, document_content_sha256 = ${hash},
+    malware_scan_verdict = 'CLEAN', malware_scanned_at = clock_timestamp(),
+    malware_scanner_engine = 'test', malware_scanner_engine_version = '1',
+    malware_signature_version = '1' WHERE id = ${assetId}`;
+}
+
+function saveInput(
+  fixture: Fixture,
+  quoteId: QuoteId,
+  revision: number,
+  pdfAssetId: string,
+  expectedContentRevision: number,
+  validUntil: Date = new Date("2100-01-01T00:00:00Z"),
+) {
+  return {
+    actorUserId: fixture.providerOwnerId,
+    commandId: randomUUID(),
+    envelope: {
+      currency: "EUR" as const,
+      priceMode: "FIXED" as const,
+      providerConfirmedSummaryMatchesPdf: true as const,
+      totalAmountCents: 150_000,
+      validUntil,
+      vatStatus: "VAT_INCLUDED" as const,
+    },
+    expectedContentRevision,
+    pdfAssetId,
+    quoteId,
+    quoteRevision: revision,
+  };
+}
+
+async function backendPid(sql: TransactionSql): Promise<number> {
+  const [row] = await sql<
+    Array<{ readonly pid: number }>
+  >`SELECT pg_backend_pid() AS pid`;
+  if (row === undefined) throw new Error("Missing backend pid.");
+  return row.pid;
+}
+async function waitForLock(sql: Sql, pid: number): Promise<void> {
+  for (let attempt = 0; attempt < 500; attempt += 1) {
+    const [row] = await sql<Array<{ readonly wait: string | null }>>`
+      SELECT wait_event_type AS wait FROM pg_stat_activity WHERE pid = ${pid}`;
+    if (row?.wait === "Lock") return;
+    await new Promise<void>((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error(`Backend ${pid} did not reach lock barrier.`);
+}
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
+async function expectDeliveryGrant(
+  sql: Sql,
+  actorUserId: UserId,
+  mediaAssetId: string,
+  statusCode: 303 | 404,
+): Promise<void> {
+  const service = createPrivateMediaDeliveryService({
+    applicationOrigin: "https://portal.test",
+    entityAccess: createQuoteDocumentMediaAccessResolver(sql),
+    repository: createPrivateMediaDeliveryRepository(sql),
+    storage: {
+      createPrivateDownload: () =>
+        Promise.resolve({
+          expiresAt: new Date(Date.now() + 30_000),
+          url: new URL("https://storage.test/private-download"),
+        }),
+    } as never,
+  });
+  const response = await service.handleDownload({ actorUserId, mediaAssetId });
+  expect(response.statusCode).toBe(statusCode);
+}
