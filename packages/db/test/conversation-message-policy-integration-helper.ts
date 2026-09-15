@@ -101,7 +101,9 @@ export async function runConversationMessagePolicyIntegrationAssertions(
   await expect(
     sql.begin(async (transaction) => {
       await transaction`
-        CREATE OR REPLACE FUNCTION conversation_message_policy_stage(uuid)
+        CREATE OR REPLACE FUNCTION conversation_message_policy_stage(
+          target_conversation_id uuid
+        )
         RETURNS text LANGUAGE sql STABLE AS $$ SELECT NULL::text $$
       `;
       await insertRawMessageInTransaction(transaction, fixture, "Bežná správa");
