@@ -26,6 +26,12 @@ export async function runJobRequestLifecycleIntegrationAssertions(
     JOIN customer_profiles customer ON customer.id = current.customer_profile_id
     JOIN users owner ON owner.id = customer.owner_user_id
     WHERE current.state::text = 'ACTIVE' AND owner.account_state = 'ACTIVE'
+      AND EXISTS (
+        SELECT 1
+        FROM current_job_invitations invitation
+        WHERE invitation.job_request_id = current.id
+          AND invitation.state IN ('PENDING', 'ENGAGED')
+      )
     ORDER BY current.created_at DESC, current.id DESC LIMIT 1
   `;
   if (fixture === undefined) throw new Error("R3-006 requires R3-005 fixture.");
