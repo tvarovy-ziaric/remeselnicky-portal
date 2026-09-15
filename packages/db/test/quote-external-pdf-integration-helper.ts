@@ -417,8 +417,20 @@ export async function runExternalPdfQuoteIntegrationAssertions(
     secondRevision,
     true,
   );
+  const [lifecycleClock] = await sql<Array<{ validUntil: Date }>>`
+    SELECT clock_timestamp() + interval '5 seconds' AS "validUntil"
+  `;
+  if (lifecycleClock === undefined)
+    throw new Error("Expected DB lifecycle clock.");
   await external.saveDraft(
-    saveInput(fixture, quoteId, secondRevision, replacement, 1),
+    saveInput(
+      fixture,
+      quoteId,
+      secondRevision,
+      replacement,
+      1,
+      lifecycleClock.validUntil,
+    ),
   );
   const submitStarted = deferred<unknown>();
   const releaseSubmitted = deferred<void>();

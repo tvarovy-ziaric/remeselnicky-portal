@@ -52,12 +52,31 @@ describe("customer Quote comparison", () => {
       loadQuoteComparison({ fetch: fetcher, jobRequestId: "../secret" }),
     ).resolves.toEqual({ status: "UNAVAILABLE" });
   });
+
+  it("shows a prominent warning for a materially stale submitted Quote", () => {
+    const stale = fixture();
+    const html = renderToStaticMarkup(
+      <QuoteComparisonView
+        comparison={{
+          ...stale,
+          items: stale.items.map((item) => ({
+            ...item,
+            lifecycleAcceptanceEligible: false,
+            materiallyStale: true,
+          })),
+        }}
+      />,
+    );
+    expect(html).toContain('role="alert"');
+    expect(html).toContain("podstatne zmenila");
+  });
 });
 
 function fixture() {
   return serializeQuoteComparison({
     items: [
       {
+        authoringEligible: true,
         authoringMode: "EXTERNAL_PDF",
         conditionalOnInspection: null,
         conversationPath:
@@ -70,6 +89,8 @@ function fixture() {
         includedScope: null,
         inspectionConditions: null,
         materialResponsibility: null,
+        lifecycleAcceptanceEligible: true,
+        materiallyStale: false,
         pdfDownloadPath:
           "/v1/media/83000000-0000-4000-8000-000000000004/download",
         price: {

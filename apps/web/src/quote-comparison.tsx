@@ -184,6 +184,12 @@ function QuoteCard({ item }: { readonly item: QuoteComparisonCard }) {
           : "Identita neoverená"}{" "}
         · Schválené oprávnenia: {item.provider.approvedCredentialCount}
       </p>
+      {item.materiallyStale ? (
+        <p role="alert">
+          Požiadavka sa podstatne zmenila. Pred ďalším krokom musí remeselník
+          ponuku potvrdiť alebo poslať novú revíziu.
+        </p>
+      ) : null}
       <dl>
         <Fact label="Cena" value={price(item)} />
         <Fact label="Režim ceny" value={priceMode(item.price.mode)} />

@@ -119,6 +119,8 @@ import {
 } from "./quote-external-pdf-repository.js";
 import { createQuoteComparisonRepository } from "./quote-comparison-repository.js";
 export { createQuoteComparisonRepository } from "./quote-comparison-repository.js";
+import { createQuoteLifecycleRepository } from "./quote-lifecycle-repository.js";
+export { createQuoteLifecycleRepository } from "./quote-lifecycle-repository.js";
 import {
   createConversationAttachmentMediaAccessResolver,
   createConversationAttachmentUploadAuthorization,
@@ -139,6 +141,8 @@ import type {
   ConversationChatPersistence,
   ExternalPdfQuotePersistence,
   QuoteComparisonPersistence,
+  QuoteLifecyclePersistence,
+  QuoteLifecycleMaintenancePersistence,
   QuotePersistence,
   StructuredQuotePersistence,
 } from "@portal/domain";
@@ -814,6 +818,8 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly structuredQuotes: StructuredQuotePersistence;
   readonly externalPdfQuotes: ExternalPdfQuotePersistence;
   readonly quoteComparison: QuoteComparisonPersistence;
+  readonly quoteLifecycle: QuoteLifecyclePersistence &
+    QuoteLifecycleMaintenancePersistence;
   readonly quoteDocumentUploads: QuoteDocumentUploadAuthorization;
   readonly quoteDocumentMediaAccess: MediaEntityAccessResolver;
   readonly conversationAttachmentUploads: ConversationAttachmentUploadAuthorization;
@@ -910,6 +916,7 @@ export function createDatabase(
   const structuredQuotes = createStructuredQuoteRepository(sql);
   const externalPdfQuotes = createExternalPdfQuoteRepository(sql);
   const quoteComparison = createQuoteComparisonRepository(sql);
+  const quoteLifecycle = createQuoteLifecycleRepository(sql);
   const quoteDocumentUploads = createQuoteDocumentUploadAuthorization(sql);
   const quoteDocumentMediaAccess = createQuoteDocumentMediaAccessResolver(sql);
   const conversationAttachmentUploads =
@@ -973,6 +980,7 @@ export function createDatabase(
     structuredQuotes,
     externalPdfQuotes,
     quoteComparison,
+    quoteLifecycle,
     quoteDocumentUploads,
     quoteDocumentMediaAccess,
     conversationAttachmentUploads,

@@ -53,6 +53,10 @@ import {
   registerQuoteComparisonRoutes,
   type QuoteComparisonRouteDependencies,
 } from "../quote-comparison/routes.js";
+import {
+  registerQuoteLifecycleRoutes,
+  type QuoteLifecycleRouteDependencies,
+} from "../quote-lifecycle/routes.js";
 import { createSessionGuard } from "./guard.js";
 import {
   registerDraftHandoffRoutes,
@@ -123,6 +127,7 @@ export interface AuthModuleDependencies {
     QuoteComparisonRouteDependencies,
     "comparison"
   >;
+  readonly quoteLifecycle?: Pick<QuoteLifecycleRouteDependencies, "lifecycle">;
   readonly conversationChat?: {
     readonly admission: Exclude<
       NonNullable<ConversationRouteDependencies["chat"]>["admission"],
@@ -353,6 +358,13 @@ async function configureAuthModule(
     registerQuoteComparisonRoutes(app, {
       guard,
       ...dependencies.quoteComparison,
+    });
+  }
+  if (dependencies.quoteLifecycle !== undefined) {
+    registerQuoteLifecycleRoutes(app, {
+      csrfProtection: csrfProtection(app),
+      guard,
+      ...dependencies.quoteLifecycle,
     });
   }
   if (dependencies.customerShortlist !== undefined) {

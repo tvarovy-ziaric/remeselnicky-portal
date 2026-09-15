@@ -26,6 +26,10 @@ describe("Quote comparison repository", () => {
       "FOR UPDATE OF actor, customer, request",
     );
     expect(fixture.statements[1]).toContain("current_submitted_quotes");
+    expect(fixture.statements[1]).toContain("current_quote_acceptance_context");
+    expect(fixture.statements[1]).toContain(
+      "lifecycle.deadline_passed IS FALSE",
+    );
     expect(fixture.statements[1]).toContain(
       "external.provider_confirmed_summary_matches_pdf",
     );
@@ -116,10 +120,26 @@ describe("Quote comparison repository", () => {
       }),
     ).rejects.toThrow(/external PDF Quote comparison binding/u);
   });
+
+  it("keeps a materially stale submitted Quote visible as lifecycle-ineligible", async () => {
+    const fixture = scriptedSql([
+      [{ id: jobRequestId }],
+      [{ ...row(), lifecycleAcceptanceEligible: false, materiallyStale: true }],
+    ]);
+    await expect(
+      createQuoteComparisonRepository(fixture.sql).readCurrent({
+        actorUserId,
+        jobRequestId,
+      }),
+    ).resolves.toMatchObject({
+      items: [{ lifecycleAcceptanceEligible: false, materiallyStale: true }],
+    });
+  });
 });
 
 function row() {
   return {
+    authoringEligible: true,
     authoringMode: "PLATFORM_STRUCTURED",
     conditionalOnInspection: false,
     conversationPath:
@@ -140,6 +160,8 @@ function row() {
     materialAmountCents: "2000",
     materialDescription: "Materiál",
     materialResponsibility: "PROVIDER",
+    lifecycleAcceptanceEligible: true,
+    materiallyStale: false,
     otherAmountCents: null,
     otherDescription: null,
     pdfDownloadPath: null,

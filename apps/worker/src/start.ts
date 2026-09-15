@@ -80,6 +80,7 @@ const outboxWorker = createOutboxWorker({
 const processor = createInvitationNotificationProcessor({
   invitations: database.jobInvitations,
   outbox: outboxWorker,
+  quotes: database.quoteLifecycle,
   reminders: database.jobInvitationReminders,
 });
 

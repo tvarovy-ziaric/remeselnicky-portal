@@ -70,6 +70,7 @@ export interface QuoteComparisonStructuredDetails {
 }
 
 export interface QuoteComparisonCard {
+  readonly authoringEligible: boolean;
   readonly authoringMode: QuoteAuthoringMode;
   readonly conditionalOnInspection: boolean | null;
   readonly conversationPath: string;
@@ -81,6 +82,8 @@ export interface QuoteComparisonCard {
   readonly includedScope: readonly string[] | null;
   readonly inspectionConditions: string | null;
   readonly materialResponsibility: StructuredQuoteMaterialResponsibility | null;
+  readonly lifecycleAcceptanceEligible: boolean;
+  readonly materiallyStale: boolean;
   readonly pdfDownloadPath: string | null;
   readonly price: QuoteComparisonPrice;
   readonly provider: QuoteComparisonProvider;
@@ -187,6 +190,7 @@ function parseCard(value: unknown): QuoteComparisonCard {
     value,
     [
       "authoringMode",
+      "authoringEligible",
       "conditionalOnInspection",
       "conversationPath",
       "deposit",
@@ -197,6 +201,8 @@ function parseCard(value: unknown): QuoteComparisonCard {
       "includedScope",
       "inspectionConditions",
       "materialResponsibility",
+      "lifecycleAcceptanceEligible",
+      "materiallyStale",
       "pdfDownloadPath",
       "price",
       "provider",
@@ -215,6 +221,16 @@ function parseCard(value: unknown): QuoteComparisonCard {
     value.authoringMode !== "EXTERNAL_PDF"
   )
     invalid("authoringMode");
+  if (typeof value.authoringEligible !== "boolean")
+    invalid("authoringEligible");
+  if (typeof value.lifecycleAcceptanceEligible !== "boolean")
+    invalid("lifecycleAcceptanceEligible");
+  if (typeof value.materiallyStale !== "boolean") invalid("materiallyStale");
+  if (
+    value.lifecycleAcceptanceEligible &&
+    (value.materiallyStale || !value.authoringEligible)
+  )
+    invalid("lifecycleAcceptanceEligible");
   uuid(value.quoteId, "quoteId");
   positive(value.quoteRevision, "quoteRevision", Number.MAX_SAFE_INTEGER);
   const submittedAt = timestamp(value.submittedAt, "submittedAt");
@@ -276,6 +292,7 @@ function parseCard(value: unknown): QuoteComparisonCard {
   if (conversationMatch === null) invalid("conversationPath");
   uuid(conversationMatch[1], "conversationPath");
   return Object.freeze({
+    authoringEligible: value.authoringEligible,
     authoringMode: value.authoringMode,
     conditionalOnInspection: conditional,
     conversationPath: value.conversationPath,
@@ -292,6 +309,8 @@ function parseCard(value: unknown): QuoteComparisonCard {
     inspectionConditions: inspection,
     materialResponsibility:
       material as StructuredQuoteMaterialResponsibility | null,
+    lifecycleAcceptanceEligible: value.lifecycleAcceptanceEligible,
+    materiallyStale: value.materiallyStale,
     pdfDownloadPath: pdfPath,
     price,
     provider,

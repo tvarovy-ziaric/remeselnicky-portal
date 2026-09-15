@@ -11,6 +11,7 @@ const jobRequestId = "20000000-0000-4000-8000-000000000002" as never;
 
 function card(overrides: Record<string, unknown> = {}) {
   return {
+    authoringEligible: true,
     authoringMode: "PLATFORM_STRUCTURED",
     conditionalOnInspection: false,
     conversationPath:
@@ -34,6 +35,8 @@ function card(overrides: Record<string, unknown> = {}) {
     includedScope: ["Montáž"],
     inspectionConditions: null,
     materialResponsibility: "PROVIDER",
+    lifecycleAcceptanceEligible: true,
+    materiallyStale: false,
     pdfDownloadPath: null,
     price: {
       currency: "EUR",

@@ -7,6 +7,7 @@ describe("invitation notification processor", () => {
   it("schedules reminders before expiry and drains the durable outbox", async () => {
     const enqueueDueReminders = vi.fn(() => Promise.resolve([]));
     const expirePending = vi.fn(() => Promise.resolve([]));
+    const expireDueSubmitted = vi.fn(() => Promise.resolve([]));
     const results: Awaited<ReturnType<OutboxWorker["processNext"]>>[] = [
       { eventId: crypto.randomUUID(), status: "PUBLISHED" },
       { status: "IDLE" },
@@ -20,6 +21,7 @@ describe("invitation notification processor", () => {
       maintenanceIntervalMs: 60_000,
       now: () => currentTime,
       outbox: { processNext },
+      quotes: { expireDueSubmitted },
       reminders: { enqueueDueReminders },
     });
 
@@ -30,6 +32,7 @@ describe("invitation notification processor", () => {
     await expect(processor.processNext()).resolves.toEqual({ status: "idle" });
     expect(enqueueDueReminders).toHaveBeenCalledTimes(1);
     expect(expirePending).toHaveBeenCalledTimes(1);
+    expect(expireDueSubmitted).toHaveBeenCalledTimes(1);
     expect(processNext).toHaveBeenCalledTimes(2);
   });
 
@@ -39,6 +42,7 @@ describe("invitation notification processor", () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("DATABASE_UNAVAILABLE"));
     const expirePending = vi.fn(() => Promise.resolve([]));
+    const expireDueSubmitted = vi.fn(() => Promise.resolve([]));
     const processNext = vi.fn<OutboxWorker["processNext"]>(() =>
       Promise.resolve({ status: "IDLE" }),
     );
@@ -48,6 +52,7 @@ describe("invitation notification processor", () => {
       maintenanceIntervalMs: 10,
       now: () => currentTime,
       outbox: { processNext },
+      quotes: { expireDueSubmitted },
       reminders: { enqueueDueReminders },
     });
     await processor.processNext();

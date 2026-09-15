@@ -1,4 +1,7 @@
-import type { JobInvitationPersistence } from "@portal/domain";
+import type {
+  JobInvitationPersistence,
+  QuoteLifecycleMaintenancePersistence,
+} from "@portal/domain";
 import type { JobInvitationReminderStore } from "@portal/notifications";
 import type { OutboxWorker } from "@portal/outbox";
 
@@ -16,6 +19,7 @@ export function createInvitationNotificationProcessor(input: {
   readonly maintenanceIntervalMs?: number;
   readonly now?: () => number;
   readonly outbox: OutboxWorker;
+  readonly quotes: QuoteLifecycleMaintenancePersistence;
   readonly reminders: JobInvitationReminderStore;
 }): WorkerLoopProcessor {
   const interval =
@@ -35,6 +39,7 @@ export function createInvitationNotificationProcessor(input: {
       if (currentTime >= nextMaintenanceAt) {
         await input.reminders.enqueueDueReminders();
         await input.invitations.expirePending();
+        await input.quotes.expireDueSubmitted();
         nextMaintenanceAt = currentTime + interval;
       }
 

@@ -67,6 +67,7 @@ import { runQuoteIntegrationAssertions } from "./quote-integration-helper.js";
 import { runStructuredQuoteIntegrationAssertions } from "./quote-structured-integration-helper.js";
 import { runExternalPdfQuoteIntegrationAssertions } from "./quote-external-pdf-integration-helper.js";
 import { runQuoteComparisonIntegrationAssertions } from "./quote-comparison-integration-helper.js";
+import { runQuoteLifecycleIntegrationAssertions } from "./quote-lifecycle-integration-helper.js";
 
 const testDatabaseUrl = process.env["TEST_DATABASE_URL"];
 const migrationsDirectory = fileURLToPath(
@@ -143,6 +144,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
           "0048_quote_core.sql",
           "0049_quote_platform_structured.sql",
           "0050_quote_external_pdf.sql",
+          "0051_quote_lifecycle.sql",
         ],
         alreadyApplied: 0,
       });
@@ -151,7 +153,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         testDatabaseUrl,
         migrationsDirectory,
       );
-      expect(secondRun).toEqual({ applied: [], alreadyApplied: 51 });
+      expect(secondRun).toEqual({ applied: [], alreadyApplied: 52 });
 
       const sql = postgres(testDatabaseUrl, { max: 5 });
       try {
@@ -1752,6 +1754,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
           "PLATFORM_STRUCTURED",
         );
         await runExternalPdfQuoteIntegrationAssertions(sql);
+        await runQuoteLifecycleIntegrationAssertions(sql);
         await runJobRequestLifecycleIntegrationAssertions(sql);
         await runConversationReadOnlyIntegrationAssertions(sql);
         await runConversationChatReadOnlyIntegrationAssertions(sql);

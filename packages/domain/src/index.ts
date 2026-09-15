@@ -458,3 +458,4 @@ export * from "./quote.js";
 export * from "./quote-structured.js";
 export * from "./quote-external-pdf.js";
 export * from "./quote-comparison.js";
+export * from "./quote-lifecycle.js";

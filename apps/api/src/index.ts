@@ -32,6 +32,11 @@ export {
 } from "./quote-comparison/routes.js";
 export type { QuoteComparisonRouteDependencies } from "./quote-comparison/routes.js";
 export {
+  QUOTE_LIFECYCLE_PATHS,
+  registerQuoteLifecycleRoutes,
+} from "./quote-lifecycle/routes.js";
+export type { QuoteLifecycleRouteDependencies } from "./quote-lifecycle/routes.js";
+export {
   CONVERSATION_WRITE_IP_LIMIT_MULTIPLIER,
   createDatabaseConversationWriteAdmission,
 } from "./conversations/write-admission.js";

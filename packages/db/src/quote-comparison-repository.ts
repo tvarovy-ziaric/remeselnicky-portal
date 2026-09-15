@@ -8,6 +8,7 @@ import {
 import type { Sql, TransactionSql } from "postgres";
 
 interface ComparisonRow {
+  readonly authoringEligible: boolean;
   readonly authoringMode: string;
   readonly conditionalOnInspection: boolean | null;
   readonly conversationPath: string;
@@ -25,6 +26,8 @@ interface ComparisonRow {
   readonly laborAmountCents: string | null;
   readonly laborDescription: string | null;
   readonly materialResponsibility: string | null;
+  readonly lifecycleAcceptanceEligible: boolean;
+  readonly materiallyStale: boolean;
   readonly pdfDownloadPath: string | null;
   readonly priceBasis: string | null;
   readonly priceMode: string;
@@ -84,6 +87,7 @@ async function readSnapshot(
 
   const rows = await sql<ComparisonRow[]>`
     SELECT
+      lifecycle.authoring_eligible AS "authoringEligible",
       submitted.authoring_mode::text AS "authoringMode",
       CASE WHEN submitted.authoring_mode = 'PLATFORM_STRUCTURED'
         THEN structured.conditional_on_inspection ELSE NULL END AS "conditionalOnInspection",
@@ -120,6 +124,8 @@ async function readSnapshot(
         THEN structured.material_description ELSE NULL END AS "materialDescription",
       CASE WHEN submitted.authoring_mode = 'PLATFORM_STRUCTURED'
         THEN structured.material_responsibility::text ELSE external.material_responsibility::text END AS "materialResponsibility",
+      lifecycle.lifecycle_acceptance_eligible AS "lifecycleAcceptanceEligible",
+      lifecycle.materially_stale AS "materiallyStale",
       CASE WHEN submitted.authoring_mode = 'EXTERNAL_PDF'
         THEN '/v1/media/' || external.pdf_media_asset_id::text || '/download' ELSE NULL END AS "pdfDownloadPath",
       CASE WHEN submitted.authoring_mode = 'PLATFORM_STRUCTURED'
@@ -168,6 +174,10 @@ async function readSnapshot(
       CASE WHEN submitted.authoring_mode = 'PLATFORM_STRUCTURED'
         THEN structured.warranty_information ELSE NULL END AS "warrantyInformation"
     FROM current_submitted_quotes submitted
+    JOIN current_quote_acceptance_context lifecycle
+      ON lifecycle.quote_id = submitted.quote_id
+      AND lifecycle.quote_revision = submitted.revision
+      AND lifecycle.deadline_passed IS FALSE
     JOIN quotes quote ON quote.id = submitted.quote_id
     JOIN conversations conversation ON conversation.id = quote.conversation_id
       AND conversation.invitation_id = quote.invitation_id
@@ -227,6 +237,7 @@ function toCandidate(row: ComparisonRow): unknown {
   }
   const submittedAt = validDate(row.submittedAt, "submittedAt");
   return {
+    authoringEligible: row.authoringEligible,
     authoringMode: row.authoringMode,
     conditionalOnInspection: row.conditionalOnInspection,
     conversationPath: row.conversationPath,
@@ -265,6 +276,8 @@ function toCandidate(row: ComparisonRow): unknown {
     includedScope: row.includedScope,
     inspectionConditions: row.inspectionConditions,
     materialResponsibility: row.materialResponsibility,
+    lifecycleAcceptanceEligible: row.lifecycleAcceptanceEligible,
+    materiallyStale: row.materiallyStale,
     pdfDownloadPath: row.pdfDownloadPath,
     price: {
       currency: "EUR",
