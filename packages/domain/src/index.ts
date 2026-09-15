@@ -452,3 +452,4 @@ export * from "./job-request-version.js";
 export * from "./job-request-lifecycle.js";
 export * from "./job-invitation.js";
 export * from "./conversation.js";
+export * from "./conversation-chat.js";

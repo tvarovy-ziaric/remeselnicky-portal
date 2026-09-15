@@ -1,8 +1,10 @@
 import Fastify from "fastify";
+import type { onRequestHookHandler } from "fastify";
 import { describe, expect, it, vi } from "vitest";
 
 import type {
   ConversationId,
+  ConversationMessageId,
   JobInvitationId,
   JobRequestId,
   UserId,
@@ -14,6 +16,9 @@ const actorUserId = "9e200000-0000-4000-8000-000000000001" as UserId;
 const conversationId = "9e200000-0000-4000-8000-000000000002" as ConversationId;
 const invitationId = "9e200000-0000-4000-8000-000000000003" as JobInvitationId;
 const jobRequestId = "9e200000-0000-4000-8000-000000000004" as JobRequestId;
+const messageId =
+  "9e200000-0000-4000-8000-000000000007" as ConversationMessageId;
+const commandId = "9e200000-0000-4000-8000-000000000008";
 
 describe("conversation routes", () => {
   it("returns only the participant-facing conversation identity", async () => {
@@ -98,6 +103,127 @@ describe("conversation routes", () => {
       await app.close();
     }
   });
+
+  it("returns an exact allowlisted private timeline with read state", async () => {
+    const fixture = createFixture();
+    const app = Fastify();
+    registerConversationRoutes(app, fixture.dependencies);
+    const response = await app.inject({
+      method: "GET",
+      url: `${CONVERSATION_PATHS.timeline.replace(":conversationId", conversationId)}?limit=20`,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      entries: [
+        {
+          author: "COUNTERPART",
+          authorRole: "CRAFTSMAN",
+          body: "Dobrý deň",
+          createdAt: "2026-09-15T08:01:00.000Z",
+          id: messageId,
+          kind: "HUMAN_MESSAGE",
+          readByCounterpart: null,
+          replyToMessageId: null,
+          sequence: 2,
+          systemEvent: null,
+        },
+      ],
+      hasMore: false,
+      nextBeforeSequence: null,
+      participantState: {
+        archived: false,
+        lastReadAt: null,
+        lastReadSequence: 0,
+        muted: false,
+        revision: 0,
+      },
+      unreadCount: 1,
+    });
+    expect(response.body).not.toMatch(/email|phone|storage|profileId/iu);
+    await app.close();
+  });
+
+  it("protects message sends with CSRF and maps policy/read-only outcomes", async () => {
+    const fixture = createFixture();
+    const app = Fastify();
+    registerConversationRoutes(app, fixture.dependencies);
+    const url = CONVERSATION_PATHS.messages.replace(
+      ":conversationId",
+      conversationId,
+    );
+    const sent = await app.inject({
+      method: "POST",
+      payload: { body: "Dobrý deň", commandId },
+      url,
+    });
+    expect(sent.statusCode).toBe(201);
+    expect(fixture.csrfCalls()).toBe(1);
+    expect(fixture.sendMessage).toHaveBeenCalledWith({
+      actorUserId,
+      body: "Dobrý deň",
+      commandId,
+      conversationId,
+      replyToMessageId: null,
+    });
+
+    fixture.sendMessage.mockResolvedValueOnce({
+      status: "BLOCKED_BY_CONTACT_POLICY",
+    });
+    const blocked = await app.inject({
+      method: "POST",
+      payload: { body: "kontakt@example.sk", commandId },
+      url,
+    });
+    expect(blocked.statusCode).toBe(422);
+    expect(blocked.json()).toEqual({ code: "CONTACT_SHARING_NOT_AVAILABLE" });
+
+    fixture.sendMessage.mockResolvedValueOnce({ status: "READ_ONLY" });
+    const readOnly = await app.inject({
+      method: "POST",
+      payload: { body: "neskoro", commandId },
+      url,
+    });
+    expect(readOnly.statusCode).toBe(409);
+    expect(readOnly.json()).toEqual({ code: "CONVERSATION_READ_ONLY" });
+    await app.close();
+  });
+
+  it("updates local state and creates privacy-minimal reports", async () => {
+    const fixture = createFixture();
+    const app = Fastify();
+    registerConversationRoutes(app, fixture.dependencies);
+    const state = await app.inject({
+      method: "POST",
+      payload: {
+        action: "MARK_READ",
+        commandId,
+        expectedRevision: 0,
+        readThroughSequence: 2,
+      },
+      url: CONVERSATION_PATHS.state.replace(":conversationId", conversationId),
+    });
+    expect(state.statusCode).toBe(200);
+    expect(state.json()).toMatchObject({
+      participantState: { lastReadSequence: 2, revision: 1 },
+      status: "APPLIED",
+    });
+
+    const report = await app.inject({
+      method: "POST",
+      payload: { commandId, messageId, reason: "ABUSE" },
+      url: CONVERSATION_PATHS.report.replace(":conversationId", conversationId),
+    });
+    expect(report.statusCode).toBe(201);
+    expect(report.json()).toEqual({ status: "REPORTED" });
+    expect(fixture.report).toHaveBeenCalledWith({
+      actorUserId,
+      commandId,
+      conversationId,
+      messageId,
+      reason: "ABUSE",
+    });
+    await app.close();
+  });
 });
 
 function createFixture(
@@ -118,8 +244,60 @@ function createFixture(
   });
   const readOwned = vi.fn().mockResolvedValue(conversation);
   const readOwnedByInvitation = vi.fn().mockResolvedValue(conversation);
+  const entry = Object.freeze({
+    author: "COUNTERPART" as const,
+    authorRole: "CRAFTSMAN" as const,
+    body: "Dobrý deň",
+    conversationId,
+    createdAt: new Date("2026-09-15T08:01:00Z"),
+    id: messageId,
+    kind: "HUMAN_MESSAGE" as const,
+    readByCounterpart: null,
+    replyToMessageId: null,
+    sequence: 2,
+    systemEvent: null,
+  });
+  const readTimeline = vi.fn().mockResolvedValue({
+    entries: [entry],
+    hasMore: false,
+    nextBeforeSequence: null,
+    participantState: {
+      archived: false,
+      lastReadAt: null,
+      lastReadSequence: 0,
+      muted: false,
+      revision: 0,
+    },
+    unreadCount: 1,
+  });
+  const sendMessage = vi.fn().mockResolvedValue({ entry, status: "SENT" });
+  const updateParticipantState = vi.fn().mockResolvedValue({
+    participantState: {
+      archived: false,
+      lastReadAt: new Date("2026-09-15T08:02:00Z"),
+      lastReadSequence: 2,
+      muted: false,
+      revision: 1,
+    },
+    status: "APPLIED",
+  });
+  const report = vi.fn().mockResolvedValue({
+    reportId: "9e200000-0000-4000-8000-000000000009",
+    status: "REPORTED",
+  });
+  let csrfCallCount = 0;
+  const csrfProtection: onRequestHookHandler = (_request, _reply, done) => {
+    csrfCallCount += 1;
+    done();
+  };
   return {
     dependencies: {
+      chat: {
+        csrfProtection,
+        persistence: { readTimeline },
+        rateLimit: { max: 100, timeWindowMs: 60_000 },
+        service: { report, sendMessage, updateParticipantState },
+      },
       conversations: { readOwned, readOwnedByInvitation },
       guard: {
         evaluate: vi
@@ -131,7 +309,12 @@ function createFixture(
           ),
       },
     },
+    csrfCalls: () => csrfCallCount,
     readOwned,
     readOwnedByInvitation,
+    readTimeline,
+    report,
+    sendMessage,
+    updateParticipantState,
   };
 }

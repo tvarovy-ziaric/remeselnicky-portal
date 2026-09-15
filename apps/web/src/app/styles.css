@@ -577,6 +577,49 @@ p {
   margin-top: 1.5rem;
 }
 
+.conversation-timeline {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0;
+  list-style: none;
+}
+
+.conversation-timeline li {
+  max-width: 88%;
+  padding: 0.75rem 1rem;
+  border: 1px solid #d8d4c8;
+  border-radius: 0.85rem;
+  background: #f8f6ef;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.conversation-timeline .conversation-self {
+  justify-self: end;
+  background: #eef5ed;
+}
+
+.conversation-timeline .conversation-system {
+  max-width: 100%;
+  color: #55705f;
+  text-align: center;
+  background: transparent;
+  border-style: dashed;
+}
+
+.conversation-timeline article,
+.invitation-detail form {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.conversation-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-block: 1rem;
+}
+
 .invitation-inbox {
   display: grid;
   gap: 0.75rem;

@@ -115,6 +115,14 @@ export interface AuthModuleDependencies {
   >;
   readonly jobInvitations?: Pick<JobInvitationRouteDependencies, "invitations">;
   readonly conversations?: Pick<ConversationRouteDependencies, "conversations">;
+  readonly conversationChat?: {
+    readonly persistence: NonNullable<
+      ConversationRouteDependencies["chat"]
+    >["persistence"];
+    readonly service: NonNullable<
+      ConversationRouteDependencies["chat"]
+    >["service"];
+  };
   readonly emailVerification?: {
     readonly delivery?: EmailVerificationDeliveryPort;
     readonly persistence: EmailVerificationPersistence;
@@ -297,6 +305,19 @@ async function configureAuthModule(
   if (dependencies.conversations !== undefined) {
     registerConversationRoutes(app, {
       guard,
+      ...(dependencies.conversationChat === undefined
+        ? {}
+        : {
+            chat: {
+              csrfProtection: csrfProtection(app),
+              persistence: dependencies.conversationChat.persistence,
+              rateLimit: {
+                max: rateLimit.config.rateLimit.max,
+                timeWindowMs: rateLimit.config.rateLimit.timeWindow,
+              },
+              service: dependencies.conversationChat.service,
+            },
+          }),
       ...dependencies.conversations,
     });
   }

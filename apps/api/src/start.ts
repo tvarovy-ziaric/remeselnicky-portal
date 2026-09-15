@@ -3,6 +3,8 @@ import { createDatabase } from "@portal/db";
 import {
   createCustomerProfileService,
   createCustomerShortlistService,
+  createConversationChatService,
+  createPreConfirmationConversationMessageAdmission,
   createJobRequestDraftService,
   createJobRequestService,
   createJobRequestLifecycleService,
@@ -85,6 +87,10 @@ const publicDiscoveryAdmission = createDatabasePublicSearchAdmission({
   persistence: authPersistence,
   timeWindowMs: config.auth.rateLimitWindowMs,
 });
+const conversationChat = createConversationChatService({
+  admission: createPreConfirmationConversationMessageAdmission(),
+  persistence: database.conversationChat,
+});
 
 const app = buildApi({
   auth: {
@@ -118,6 +124,10 @@ const app = buildApi({
     jobRequestLifecycle: { lifecycle: jobRequestLifecycle },
     jobInvitations: { invitations: database.jobInvitations },
     conversations: { conversations: database.conversations },
+    conversationChat: {
+      persistence: database.conversationChat,
+      service: conversationChat,
+    },
     persistence: authPersistence,
   },
   database,

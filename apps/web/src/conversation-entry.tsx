@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 
+import { ConversationChat } from "./conversation-chat";
+
 export interface ConversationView {
   readonly access: "READ_ONLY" | "WRITABLE";
   readonly counterpartDisplayName: string;
@@ -61,6 +63,7 @@ export function ConversationEntry({
       <p className="privacy-note">
         Pred potvrdením zákazky nezdieľajte telefón, e-mail ani presnú adresu.
       </p>
+      <ConversationChat conversation={conversation} />
       <a href={`/invitations/${encodeURIComponent(conversation.invitationId)}`}>
         Späť na pozvanie
       </a>

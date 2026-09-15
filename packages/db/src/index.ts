@@ -106,6 +106,7 @@ import { createJobRequestLifecycleRepository } from "./job-request-lifecycle-rep
 import { createJobInvitationRepository } from "./job-invitation-repository.js";
 import { createJobInvitationReminderRepository } from "./job-invitation-notification-repository.js";
 import { createConversationRepository } from "./conversation-repository.js";
+import { createConversationChatRepository } from "./conversation-chat-repository.js";
 import type { JobInvitationReminderStore } from "@portal/notifications";
 import { createJobRequestMediaUploadAuthorization } from "./job-request-media-repository.js";
 import { createCraftsmanProfileRepository } from "./craftsman-profile-repository.js";
@@ -119,6 +120,7 @@ import type {
   JobRequestLifecyclePersistence,
   JobInvitationPersistence,
   ConversationPersistence,
+  ConversationChatPersistence,
 } from "@portal/domain";
 import * as schema from "./schema/index.js";
 
@@ -611,6 +613,8 @@ export { createJobInvitationReminderRepository } from "./job-invitation-notifica
 export type { JobInvitationPersistence } from "@portal/domain";
 export { createConversationRepository } from "./conversation-repository.js";
 export type { ConversationPersistence } from "@portal/domain";
+export { createConversationChatRepository } from "./conversation-chat-repository.js";
+export type { ConversationChatPersistence } from "@portal/domain";
 export { createJobRequestMediaUploadAuthorization } from "./job-request-media-repository.js";
 export type { JobRequestMediaUploadAuthorization } from "@portal/media";
 export { createCraftsmanProfileRepository } from "./craftsman-profile-repository.js";
@@ -770,6 +774,7 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly jobInvitations: JobInvitationPersistence;
   readonly jobInvitationReminders: JobInvitationReminderStore;
   readonly conversations: ConversationPersistence;
+  readonly conversationChat: ConversationChatPersistence;
   readonly jobRequestMedia: JobRequestMediaUploadAuthorization;
   readonly emailVerification: EmailVerificationRepository;
   readonly media: MediaRepository;
@@ -857,6 +862,7 @@ export function createDatabase(
   const jobInvitations = createJobInvitationRepository(sql);
   const jobInvitationReminders = createJobInvitationReminderRepository(sql);
   const conversations = createConversationRepository(sql);
+  const conversationChat = createConversationChatRepository(sql);
   const jobRequestMedia = createJobRequestMediaUploadAuthorization(sql);
   const emailVerification = createEmailVerificationRepository(sql);
   const media = createMediaRepository(sql);
@@ -909,6 +915,7 @@ export function createDatabase(
     jobInvitations,
     jobInvitationReminders,
     conversations,
+    conversationChat,
     jobRequestMedia,
     emailVerification,
     media,
