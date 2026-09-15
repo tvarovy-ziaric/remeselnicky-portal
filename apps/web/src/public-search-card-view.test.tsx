@@ -19,6 +19,18 @@ describe("public search cards web boundary", () => {
     expect(html).toContain("Majster Ján");
     expect(html).toContain("Prečo sa zhoduje");
     expect(html).not.toMatch(/Hodnotenie|Overené realizácie|email|telefón/iu);
+    expect(html).not.toContain("Pozvať k zákazke");
+  });
+
+  it("renders invitation selection only in an explicit request context", () => {
+    const html = renderToStaticMarkup(
+      <PublicSearchCardList
+        cards={[card()]}
+        jobRequestId="99000000-0000-4000-8000-000000000010"
+      />,
+    );
+    expect(html).toContain("Pozvať k zákazke");
+    expect(html).not.toMatch(/score|rank|credential|customerProfileId/iu);
   });
 
   it("loads with no-store and fails closed on malformed outward data", async () => {

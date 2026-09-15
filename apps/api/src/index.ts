@@ -17,6 +17,11 @@ export {
 } from "./customer-shortlist/routes.js";
 export type { CustomerShortlistRouteDependencies } from "./customer-shortlist/routes.js";
 export {
+  JOB_INVITATION_PATH,
+  registerJobInvitationRoutes,
+} from "./job-invitations/routes.js";
+export type { JobInvitationRouteDependencies } from "./job-invitations/routes.js";
+export {
   createDatabasePublicSearchAdmission,
   PUBLIC_SEARCH_CARDS_PATH,
   PUBLIC_SEARCH_RATE_LIMIT_MULTIPLIER,

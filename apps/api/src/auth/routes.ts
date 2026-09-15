@@ -41,6 +41,10 @@ import {
   registerJobRequestLifecycleRoutes,
   type JobRequestLifecycleRouteDependencies,
 } from "../job-request-lifecycle/routes.js";
+import {
+  registerJobInvitationRoutes,
+  type JobInvitationRouteDependencies,
+} from "../job-invitations/routes.js";
 import { createSessionGuard } from "./guard.js";
 import {
   registerDraftHandoffRoutes,
@@ -105,6 +109,7 @@ export interface AuthModuleDependencies {
     JobRequestLifecycleRouteDependencies,
     "lifecycle"
   >;
+  readonly jobInvitations?: Pick<JobInvitationRouteDependencies, "invitations">;
   readonly emailVerification?: {
     readonly delivery?: EmailVerificationDeliveryPort;
     readonly persistence: EmailVerificationPersistence;
@@ -271,6 +276,17 @@ async function configureAuthModule(
       csrfProtection: csrfProtection(app),
       guard,
       ...dependencies.jobRequestLifecycle,
+    });
+  }
+  if (dependencies.jobInvitations !== undefined) {
+    registerJobInvitationRoutes(app, {
+      csrfProtection: csrfProtection(app),
+      guard,
+      rateLimit: {
+        max: rateLimit.config.rateLimit.max,
+        timeWindowMs: rateLimit.config.rateLimit.timeWindow,
+      },
+      ...dependencies.jobInvitations,
     });
   }
   if (dependencies.customerShortlist !== undefined) {

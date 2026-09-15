@@ -1,6 +1,7 @@
 import Link from "next/link";
 import React from "react";
 
+import { CustomerInvitationButton } from "./customer-invitation-button";
 import { CustomerShortlistToggle } from "./customer-shortlist-toggle";
 
 export interface PublicSearchCardViewModel {
@@ -26,8 +27,10 @@ export interface PublicSearchCardViewModel {
 
 export function PublicSearchCardList({
   cards,
+  jobRequestId,
 }: {
   readonly cards: readonly PublicSearchCardViewModel[];
+  readonly jobRequestId?: string;
 }) {
   if (cards.length === 0) return <p>Nenašli sa žiadni vhodní remeselníci.</p>;
   return (
@@ -47,6 +50,12 @@ export function PublicSearchCardList({
               </Link>
             </h2>
             <CustomerShortlistToggle craftsmanProfileId={card.profileId} />
+            {jobRequestId === undefined ? null : (
+              <CustomerInvitationButton
+                craftsmanProfileId={card.profileId}
+                jobRequestId={jobRequestId}
+              />
+            )}
             {card.identity.secondaryName === null ? null : (
               <p>{card.identity.secondaryName}</p>
             )}

@@ -116,6 +116,7 @@ const app = buildApi({
     },
     jobRequestVersions: { versions: jobRequestVersions },
     jobRequestLifecycle: { lifecycle: jobRequestLifecycle },
+    jobInvitations: { invitations: database.jobInvitations },
     persistence: authPersistence,
   },
   database,

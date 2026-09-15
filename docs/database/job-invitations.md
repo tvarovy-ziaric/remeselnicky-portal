@@ -44,3 +44,20 @@ R3-010 owns participant-facing lifecycle UX.
 No invitation read model exposes competitor identities or counts. Later private
 request/conversation serializers must resolve one concrete invitation and apply
 the pre-confirmation exact-address/contact boundary again.
+
+## Customer selection boundary
+
+R3-008 exposes one authenticated command at
+`POST /v1/me/job-requests/:jobRequestId/invitations`. Its body contains only a
+client-generated command UUID and the explicitly selected public
+`CraftsmanProfile` UUID. Search rank, badges, qualification claims, distance and
+other card facts are never accepted as command authority.
+
+The route is CSRF protected, rate limited and private/no-store. The repository
+revalidates the active verified customer, ownership and current active request,
+then rechecks the target's PUBLIC/approved/non-suspended state, exact regulated
+qualification and simultaneous-active limit in the write transaction. Unknown,
+hidden and newly ineligible targets share the same outward `404` response. The
+candidate page only renders this action when it carries a canonical active
+request identifier; it never auto-invites a result or turns search into a public
+job board.

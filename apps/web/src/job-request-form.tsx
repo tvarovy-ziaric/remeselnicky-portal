@@ -325,7 +325,22 @@ export function JobRequestForm({
       />
     );
   if (status === "ACTIVE")
-    return <FormMessage title="Dopyt je odoslaný" text={notice} />;
+    return (
+      <FormMessage
+        action={
+          draft === null
+            ? undefined
+            : buildCraftsmanCandidateSearchHref({
+                jobRequestId: draft.id,
+                municipalityCode: values.municipalityCode,
+                professionCode: values.primaryProfessionCode,
+              })
+        }
+        actionLabel="Vybrať remeselníkov"
+        title="Dopyt je odoslaný"
+        text={notice}
+      />
+    );
 
   return (
     <main className="job-request-page">
@@ -971,9 +986,13 @@ function ReviewRow({
 }
 
 function FormMessage({
+  action,
+  actionLabel,
   title,
   text,
 }: {
+  readonly action?: string | null | undefined;
+  readonly actionLabel?: string;
   readonly title: string;
   readonly text: string;
 }) {
@@ -983,9 +1002,37 @@ function FormMessage({
         <p className="eyebrow">Dopyt</p>
         <h1>{title}</h1>
         <p aria-live="polite">{text}</p>
+        {action === null || action === undefined ? null : (
+          <a className="primary-action" href={action}>
+            {actionLabel ?? "Pokračovať"}
+          </a>
+        )}
       </section>
     </main>
   );
+}
+
+export function buildCraftsmanCandidateSearchHref(input: {
+  readonly jobRequestId: string;
+  readonly municipalityCode: string;
+  readonly professionCode: string;
+}): string | null {
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(
+      input.jobRequestId,
+    ) ||
+    !/^(?:PROF|TEST):[A-Z0-9][A-Z0-9_]{1,62}$/u.test(input.professionCode)
+  ) {
+    return null;
+  }
+  const parameters = new URLSearchParams({
+    jobRequestId: input.jobRequestId,
+    professionCode: input.professionCode,
+  });
+  if (input.municipalityCode !== "") {
+    parameters.set("municipalityCode", input.municipalityCode);
+  }
+  return `/remeselnici?${parameters.toString()}`;
 }
 
 function sectionFromValues(

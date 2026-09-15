@@ -19,10 +19,15 @@ export default async function CraftsmanSearchPage({
   searchParams,
 }: PageProperties) {
   const parameters = await searchParams;
-  const professionCode = parameters["professionCode"];
+  const { jobRequestId: rawJobRequestId, ...searchParameters } = parameters;
+  const professionCode = searchParameters["professionCode"];
+  const jobRequestId =
+    typeof rawJobRequestId === "string" && uuid(rawJobRequestId)
+      ? rawJobRequestId
+      : undefined;
   const page =
     typeof professionCode === "string"
-      ? await loadPublicSearchCards(parameters)
+      ? await loadPublicSearchCards(searchParameters)
       : null;
   return (
     <main>
@@ -33,9 +38,18 @@ export default async function CraftsmanSearchPage({
         <p>Výsledky sa teraz nedajú načítať. Skúste to znova neskôr.</p>
       ) : (
         <CustomerShortlistProvider>
-          <PublicSearchCardList cards={page.items} />
+          <PublicSearchCardList
+            cards={page.items}
+            {...(jobRequestId === undefined ? {} : { jobRequestId })}
+          />
         </CustomerShortlistProvider>
       )}
     </main>
+  );
+}
+
+function uuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(
+    value,
   );
 }
