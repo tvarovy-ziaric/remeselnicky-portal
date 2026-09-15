@@ -599,7 +599,7 @@ async function expectOutsiderParticipantCommandDenied(
       ${randomUUID()}, ${fixture.conversationId}, ${outsider}, 'MUTE',
       0, 1, NULL, ${"0".repeat(64)}, clock_timestamp()
     )
-  `).rejects.toThrow(/active conversation participant required/u);
+  `).rejects.toThrow(/active participant conversation required/u);
 }
 
 async function expectLegacyReminderReplayAndRollback(sql: Sql): Promise<void> {
