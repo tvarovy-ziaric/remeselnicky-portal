@@ -1717,6 +1717,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         await runJobRequestDraftIntegrationAssertions(sql);
         await runJobRequestContentIntegrationAssertions(sql);
         await runJobRequestVersionIntegrationAssertions(sql);
+        await runNotificationIntegrationAssertions(sql);
         await runJobInvitationIntegrationAssertions(sql);
         await runJobInvitationNotificationIntegrationAssertions(sql);
         await runJobRequestLifecycleIntegrationAssertions(sql);
@@ -1748,8 +1749,6 @@ describe.skipIf(testDatabaseUrl === undefined)(
             targetUserId: targetId,
           }),
         ).resolves.toBeUndefined();
-
-        await runNotificationIntegrationAssertions(sql);
 
         await expect(
           sql`
