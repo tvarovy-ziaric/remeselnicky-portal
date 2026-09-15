@@ -5,11 +5,11 @@ This file is the persistent implementation-status overlay for the hash-verified 
 - Updated: 2026-09-15
 - Definition: D01–D30 LOCKED and hash verified
 - Active release: R3 — Demand side
-- Last completed ticket: R3-010 — invitation outcome UX
-- Active ticket: R3-011 — ENGAGED-gated conversation entity
-- Next dependency-satisfied candidate: R3-012 — chat messages and read state
+- Last completed ticket: R3-011 — ENGAGED-gated conversation entity
+- Active ticket: R3-012 — chat messages, read state and participant controls
+- Next dependency-satisfied candidate: R3-013 — chat photo/document attachments and Job-document hooks
 - Human gate: canonical Slovak profession/skill/location content still requires expert/legal/source review before activation; this does not block private supply-side implementation
-- Integrated verification: commit `bca3c73`, CI run `34949128881`, passed quality, dependency audit, secret scan, clean PostgreSQL/PostGIS migrations 0000–0043 and the complete live R0/R1/R2 plus R3-001–R3-010 integration suite; invitation inbox/detail authorization, pinned request projection, approximate location, suspension denial, CSRF action boundaries and privacy negatives passed
+- Integrated verification: commits `dac0afc` and `44d89ac`, CI run `34951542511`, passed quality, dependency audit, secret scan, clean PostgreSQL/PostGIS migrations 0000–0044 and the complete live R0/R1/R2 plus R3-001–R3-011 integration suite; ENGAGED-only conversation creation, exact participant isolation, terminal read-only transition, suspension denial and append-only identity guards passed
 
 ## Ticket state overlay
 
@@ -91,9 +91,10 @@ This file is the persistent implementation-status overlay for the hash-verified 
 | R3-008 | DONE     | Explicit candidate selection, server-revalidated invitations and request-context UI/API passed                |
 | R3-009 | DONE     | Transactional invitation notifications, asynchronous delivery and configurable reminders passed               |
 | R3-010 | DONE     | Authorized invitation inbox/detail/actions, pinned safe request context and neutral outcome UX passed         |
-| R3-011 | ACTIVE   | ENGAGED-only conversation identity and participant authorization                                              |
+| R3-011 | DONE     | ENGAGED-only conversation identity, participant isolation and terminal read-only history passed               |
+| R3-012 | ACTIVE   | Chat messages, read receipts, unread state, local archive/mute and reporting                                  |
 
-All DONE rows above are covered by CI run `34949128881` unless a more specific earlier run is referenced in history. The run applied migrations `0000`–`0043` twice and passed the complete live PostgreSQL/PostGIS integration suite, including the R1 supply-side authorization/privacy matrix, full R2 discovery/shortlist assertions, and R3 request core, recovery, validated content, private media, active-version history, lifecycle, invitation eligibility, explicit selection, notification delivery, authorized outcome UX and concurrency boundaries.
+All DONE rows above are covered by CI run `34951542511` unless a more specific earlier run is referenced in history. The run applied migrations `0000`–`0044` twice and passed the complete live PostgreSQL/PostGIS integration suite, including the R1 supply-side authorization/privacy matrix, full R2 discovery/shortlist assertions, and R3 request core, recovery, validated content, private media, active-version history, lifecycle, invitation eligibility, explicit selection, notification delivery, authorized outcome UX, ENGAGED conversation identity and concurrency boundaries.
 
 ## Durable decisions
 
