@@ -53,6 +53,7 @@ import { runJobRequestVersionIntegrationAssertions } from "./job-request-version
 import { runJobRequestLifecycleIntegrationAssertions } from "./job-request-lifecycle-integration-helper.js";
 import { runJobInvitationIntegrationAssertions } from "./job-invitation-integration-helper.js";
 import { runJobInvitationNotificationIntegrationAssertions } from "./job-invitation-notification-integration-helper.js";
+import { runConversationIntegrationAssertions } from "./conversation-integration-helper.js";
 
 const testDatabaseUrl = process.env["TEST_DATABASE_URL"];
 const migrationsDirectory = fileURLToPath(
@@ -122,6 +123,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
           "0041_job_invitations.sql",
           "0042_job_invitation_auth_verification.sql",
           "0043_job_invitation_notifications.sql",
+          "0044_conversation_entity.sql",
         ],
         alreadyApplied: 0,
       });
@@ -130,7 +132,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         testDatabaseUrl,
         migrationsDirectory,
       );
-      expect(secondRun).toEqual({ applied: [], alreadyApplied: 44 });
+      expect(secondRun).toEqual({ applied: [], alreadyApplied: 45 });
 
       const sql = postgres(testDatabaseUrl, { max: 5 });
       try {
@@ -176,7 +178,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         `;
 
         expect(postgis?.extversion).toMatch(/^3\./);
-        expect(ledger?.count).toBe(44);
+        expect(ledger?.count).toBe(45);
         expect(created).toMatchObject({ account_state: "ACTIVE" });
         expect(created?.id).toMatch(
           /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
@@ -1720,6 +1722,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         await runNotificationIntegrationAssertions(sql);
         await runJobInvitationIntegrationAssertions(sql);
         await runJobInvitationNotificationIntegrationAssertions(sql);
+        await runConversationIntegrationAssertions(sql);
         await runJobRequestLifecycleIntegrationAssertions(sql);
 
         await adminAccess.revokePrivilegedSession(superSessionDigest);

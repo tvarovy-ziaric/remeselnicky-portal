@@ -45,6 +45,10 @@ import {
   registerJobInvitationRoutes,
   type JobInvitationRouteDependencies,
 } from "../job-invitations/routes.js";
+import {
+  registerConversationRoutes,
+  type ConversationRouteDependencies,
+} from "../conversations/routes.js";
 import { createSessionGuard } from "./guard.js";
 import {
   registerDraftHandoffRoutes,
@@ -110,6 +114,7 @@ export interface AuthModuleDependencies {
     "lifecycle"
   >;
   readonly jobInvitations?: Pick<JobInvitationRouteDependencies, "invitations">;
+  readonly conversations?: Pick<ConversationRouteDependencies, "conversations">;
   readonly emailVerification?: {
     readonly delivery?: EmailVerificationDeliveryPort;
     readonly persistence: EmailVerificationPersistence;
@@ -287,6 +292,12 @@ async function configureAuthModule(
         timeWindowMs: rateLimit.config.rateLimit.timeWindow,
       },
       ...dependencies.jobInvitations,
+    });
+  }
+  if (dependencies.conversations !== undefined) {
+    registerConversationRoutes(app, {
+      guard,
+      ...dependencies.conversations,
     });
   }
   if (dependencies.customerShortlist !== undefined) {

@@ -396,3 +396,4 @@ export * from "./job-request.js";
 export * from "./job-request-draft.js";
 export * from "./job-request-version.js";
 export * from "./job-invitation.js";
+export * from "./conversation.js";

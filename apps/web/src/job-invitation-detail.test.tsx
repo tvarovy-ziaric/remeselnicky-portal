@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  conversationHrefForState,
   JobInvitationDetail,
   loadJobInvitationDetail,
   submitJobInvitationAction,
@@ -19,6 +20,16 @@ describe("job invitation detail", () => {
     );
     expect(html).toContain("Načítavam pozvanie");
     expect(html).not.toMatch(/Mám záujem|Odmietnuť|ENGAGED/u);
+  });
+
+  it("exposes the conversation entry only after engagement", () => {
+    expect(conversationHrefForState(invitationId, "PENDING")).toBeNull();
+    expect(conversationHrefForState(invitationId, "ENGAGED")).toBe(
+      `/konverzacie/pozvanka/${invitationId}`,
+    );
+    expect(conversationHrefForState(invitationId, "NOT_SELECTED")).toBe(
+      `/konverzacie/pozvanka/${invitationId}`,
+    );
   });
 
   it("loads the exact safe invitation projection", async () => {

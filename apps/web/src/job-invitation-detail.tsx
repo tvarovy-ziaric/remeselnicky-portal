@@ -109,6 +109,10 @@ export function JobInvitationDetail({
     return <InvitationLoadFailure status={result.status} />;
   const invitation = result.invitation;
   const actions = availableActions(invitation.perspective, invitation.state);
+  const conversationHref = conversationHrefForState(
+    invitation.id,
+    invitation.state,
+  );
 
   async function run(action: Action) {
     setPending(true);
@@ -195,9 +199,23 @@ export function JobInvitationDetail({
           ))}
         </div>
       )}
+      {conversationHref === null ? null : (
+        <p>
+          <a href={conversationHref}>Otvoriť súkromnú konverzáciu</a>
+        </p>
+      )}
       {pending ? <p aria-live="polite">Ukladám rozhodnutie…</p> : null}
     </article>
   );
+}
+
+export function conversationHrefForState(
+  invitationId: string,
+  state: InvitationState,
+): string | null {
+  return state === "ENGAGED" || state === "NOT_SELECTED"
+    ? `/konverzacie/pozvanka/${encodeURIComponent(invitationId)}`
+    : null;
 }
 
 export async function loadJobInvitationDetail(input: {

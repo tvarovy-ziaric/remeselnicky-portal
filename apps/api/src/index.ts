@@ -22,6 +22,11 @@ export {
 } from "./job-invitations/routes.js";
 export type { JobInvitationRouteDependencies } from "./job-invitations/routes.js";
 export {
+  CONVERSATION_PATHS,
+  registerConversationRoutes,
+} from "./conversations/routes.js";
+export type { ConversationRouteDependencies } from "./conversations/routes.js";
+export {
   createDatabasePublicSearchAdmission,
   PUBLIC_SEARCH_CARDS_PATH,
   PUBLIC_SEARCH_RATE_LIMIT_MULTIPLIER,
