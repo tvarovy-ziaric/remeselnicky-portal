@@ -19,6 +19,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@portal/analytics": "workspace:*",
     "@portal/admin-auth": "workspace:*",
     "@portal/authorization": "workspace:*",
     "@fastify/cookie": "11.1.2",
@@ -37,6 +38,7 @@
     "fastify": "5.12.4"
   },
   "devDependencies": {
+    "@portal/testing": "workspace:*",
     "@types/node": "catalog:",
     "tsx": "catalog:",
     "typescript": "catalog:",

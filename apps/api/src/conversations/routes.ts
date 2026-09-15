@@ -25,6 +25,7 @@ import {
   type ConversationAttachmentUploadService,
   type PrivateMediaEndpointResponse,
 } from "@portal/media";
+import type { R3PdfDeliveryObservationPersistence } from "@portal/analytics";
 import { createAuthenticatedAuthorizationActor } from "@portal/authorization";
 
 import type {
@@ -67,6 +68,7 @@ export interface ConversationRouteDependencies {
         readonly mediaAssetId: string;
       }): Promise<PrivateMediaEndpointResponse>;
     };
+    readonly pdfDeliveryObservation?: R3PdfDeliveryObservationPersistence;
   };
   readonly conversations: Pick<
     ConversationPersistence,
@@ -451,6 +453,12 @@ function registerConversationChatRoutes(
         "x-content-type-options": "nosniff",
       });
       if (result.statusCode === 303) {
+        await chat.pdfDeliveryObservation
+          ?.recordSuccessfulDelivery({
+            actorUserId,
+            mediaAssetId: request.params.mediaAssetId,
+          })
+          .catch(() => undefined);
         return reply.code(303).send();
       }
       return reply.code(result.statusCode).send(result.body);

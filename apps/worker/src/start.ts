@@ -1,4 +1,9 @@
 import { loadServerConfig } from "@portal/config/server";
+import {
+  createNoopAnalyticsTransport,
+  createR3AnalyticsProcessor,
+  createTrustedAnalyticsPublisher,
+} from "@portal/analytics";
 import { createDatabase } from "@portal/db";
 import {
   createNotificationOutboxPublisher,
@@ -77,10 +82,26 @@ const outboxWorker = createOutboxWorker({
     },
   },
 });
+const analyticsPublisher = createTrustedAnalyticsPublisher({
+  appVersion: config.releaseRevision,
+  environment: config.environment,
+  platform: "WEB",
+  transport: createNoopAnalyticsTransport(config.environment),
+});
+const analyticsProcessor = createR3AnalyticsProcessor({
+  backoffMs: (attempt) => Math.min(60_000, 1_000 * 2 ** (attempt - 1)),
+  leaseDurationMs: 60_000,
+  publisher: analyticsPublisher,
+  store: database.r3Analytics,
+});
 const processor = createInvitationNotificationProcessor({
+  analytics: analyticsProcessor,
   demandSideNotifications: database.demandSideNotifications,
   invitations: database.jobInvitations,
   outbox: outboxWorker,
+  onAnalyticsError(error) {
+    errorTracker.capture(error, { handled: true, mechanism: "worker" });
+  },
   quotes: database.quoteLifecycle,
   reminders: database.jobInvitationReminders,
 });

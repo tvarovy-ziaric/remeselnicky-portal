@@ -41,6 +41,16 @@ export type AnyAnalyticsCaptureInput = {
   [Name in AnalyticsEventName]: AnalyticsCaptureInput<Name>;
 }[AnalyticsEventName];
 
+/** Server-only persisted observation; never deserialize this shape from a client. */
+export interface TrustedAnalyticsCaptureInput {
+  readonly event_id: string;
+  readonly event_name: AnalyticsEventName;
+  readonly occurred_at: Date;
+  readonly properties: Readonly<Record<string, unknown>>;
+  readonly schema_version: number;
+  readonly subject: AnalyticsSubject;
+}
+
 export interface AnalyticsEnvelope {
   readonly actor_context?: Readonly<Omit<AnalyticsActorContext, "kind">>;
   readonly anonymous_context?: Readonly<
@@ -100,5 +110,14 @@ export type AnalyticsReadiness =
 export interface AnalyticsPort {
   /** Resolves to a result in all cases; analytics never rejects business work. */
   capture(input: AnyAnalyticsCaptureInput): Promise<AnalyticsCaptureResult>;
+  readiness(): AnalyticsReadiness;
+}
+
+/** Server-composition-only port; never expose through an API/client dependency. */
+export interface TrustedAnalyticsPublisher {
+  /** Preserves an authoritative DB effect timestamp and exact catalog version. */
+  captureTrusted(
+    input: TrustedAnalyticsCaptureInput,
+  ): Promise<AnalyticsCaptureResult>;
   readiness(): AnalyticsReadiness;
 }

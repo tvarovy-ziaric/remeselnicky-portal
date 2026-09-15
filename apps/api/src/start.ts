@@ -130,8 +130,10 @@ const app = buildApi({
     conversations: { conversations: database.conversations },
     quoteComparison: { comparison: database.quoteComparison },
     quoteLifecycle: { lifecycle: database.quoteLifecycle },
+    r3Analytics: { observations: database.r3AnalyticsObservations },
     conversationChat: {
       admission: conversationWriteAdmission,
+      pdfDeliveryObservation: database.r3PdfDeliveryObservations,
       persistence: database.conversationChat,
       service: conversationChat,
     },

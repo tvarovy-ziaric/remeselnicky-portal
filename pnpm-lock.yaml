@@ -77,6 +77,9 @@ importers:
       '@portal/admin-auth':
         specifier: workspace:*
         version: link:../../packages/admin-auth
+      '@portal/analytics':
+        specifier: workspace:*
+        version: link:../../packages/analytics
       '@portal/authorization':
         specifier: workspace:*
         version: link:../../packages/authorization
@@ -108,6 +111,9 @@ importers:
         specifier: 5.12.4
         version: 5.12.4
     devDependencies:
+      '@portal/testing':
+        specifier: workspace:*
+        version: link:../../packages/testing
       '@types/node':
         specifier: 'catalog:'
         version: 26.5.1
@@ -166,6 +172,9 @@ importers:
 
   apps/worker:
     dependencies:
+      '@portal/analytics':
+        specifier: workspace:*
+        version: link:../../packages/analytics
       '@portal/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -313,6 +322,9 @@ importers:
       '@portal/admin-auth':
         specifier: workspace:*
         version: link:../admin-auth
+      '@portal/analytics':
+        specifier: workspace:*
+        version: link:../analytics
       '@portal/audit':
         specifier: workspace:*
         version: link:../audit

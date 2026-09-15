@@ -9,7 +9,89 @@ import {
 } from "@portal/domain";
 import Link from "next/link";
 import React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+const R3_ANALYTICS_OBSERVATION_PATH = "/v1/me/analytics/r3-observations";
+
+export async function recordQuoteComparisonObservation(input: {
+  readonly fetch: typeof fetch;
+  readonly jobRequestId: string;
+  readonly invitationId?: string;
+  readonly kind:
+    | "INVITATION_VIEWED"
+    | "QUOTE_VIEWED"
+    | "QUOTE_COMPARISON_OPENED"
+    | "QUOTE_COMPARISON_PDF_OPENED";
+  readonly quoteId?: string;
+  readonly quoteRevision?: number;
+}): Promise<void> {
+  try {
+    const session = await input.fetch("/v1/auth/session", {
+      cache: "no-store",
+      credentials: "same-origin",
+    });
+    if (!session.ok) return;
+    const body = (await session.json()) as Record<string, unknown>;
+    if (typeof body["csrfToken"] !== "string") return;
+    await input.fetch(R3_ANALYTICS_OBSERVATION_PATH, {
+      body: JSON.stringify({
+        commandId: crypto.randomUUID(),
+        jobRequestId: input.jobRequestId,
+        ...(input.invitationId === undefined
+          ? {}
+          : { invitationId: input.invitationId }),
+        kind: input.kind,
+        ...(input.quoteId === undefined ? {} : { quoteId: input.quoteId }),
+        ...(input.quoteRevision === undefined
+          ? {}
+          : { quoteRevision: input.quoteRevision }),
+      }),
+      credentials: "same-origin",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": body["csrfToken"],
+      },
+      keepalive: true,
+      method: "POST",
+    });
+  } catch {
+    // Analytics is intentionally isolated from the commercial workflow.
+  }
+}
+
+export function observeActualVisibility(
+  element: Element,
+  onVisible: () => void,
+): () => void {
+  if (
+    typeof IntersectionObserver === "undefined" ||
+    typeof document === "undefined"
+  ) {
+    return () => undefined;
+  }
+  let intersecting = false;
+  let completed = false;
+  const emit = () => {
+    if (!completed && intersecting && document.visibilityState === "visible") {
+      completed = true;
+      onVisible();
+      observer.disconnect();
+      document.removeEventListener("visibilitychange", emit);
+    }
+  };
+  const observer = new IntersectionObserver((entries) => {
+    intersecting = entries.some(
+      (entry) => entry.target === element && entry.isIntersecting,
+    );
+    emit();
+  });
+  observer.observe(element);
+  document.addEventListener("visibilitychange", emit);
+  return () => {
+    observer.disconnect();
+    document.removeEventListener("visibilitychange", emit);
+  };
+}
 
 export async function loadQuoteComparison(input: {
   readonly fetch: typeof fetch;
@@ -82,6 +164,7 @@ export function QuoteComparisonView({
   const [selected, setSelected] = useState(() =>
     comparison.items.slice(0, 3).map((item) => item.quoteId),
   );
+  const comparisonElement = useRef<HTMLElement>(null);
   useEffect(() => {
     setSelected((current) =>
       comparison.items.length <= 3
@@ -96,8 +179,18 @@ export function QuoteComparisonView({
   const visible = comparison.items.filter((item) =>
     selected.includes(item.quoteId),
   );
+  useEffect(() => {
+    if (comparisonElement.current === null) return;
+    return observeActualVisibility(comparisonElement.current, () => {
+      void recordQuoteComparisonObservation({
+        fetch,
+        jobRequestId: comparison.jobRequestId,
+        kind: "QUOTE_COMPARISON_OPENED",
+      });
+    });
+  }, [comparison.jobRequestId]);
   return (
-    <section aria-labelledby="quote-comparison-title">
+    <section aria-labelledby="quote-comparison-title" ref={comparisonElement}>
       <header>
         <h1 id="quote-comparison-title">Porovnanie ponúk</h1>
         <p>
@@ -160,7 +253,11 @@ export function QuoteComparisonView({
           }}
         >
           {visible.map((item) => (
-            <QuoteCard key={item.quoteId} item={item} />
+            <QuoteCard
+              jobRequestId={comparison.jobRequestId}
+              key={item.quoteId}
+              item={item}
+            />
           ))}
         </div>
       )}
@@ -168,9 +265,29 @@ export function QuoteComparisonView({
   );
 }
 
-function QuoteCard({ item }: { readonly item: QuoteComparisonCard }) {
+function QuoteCard({
+  item,
+  jobRequestId,
+}: {
+  readonly item: QuoteComparisonCard;
+  readonly jobRequestId: string;
+}) {
+  const cardElement = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (cardElement.current === null) return;
+    return observeActualVisibility(cardElement.current, () => {
+      void recordQuoteComparisonObservation({
+        fetch,
+        jobRequestId,
+        kind: "QUOTE_VIEWED",
+        quoteId: item.quoteId,
+        quoteRevision: item.quoteRevision,
+      });
+    });
+  }, [item.quoteId, item.quoteRevision, jobRequestId]);
   return (
     <article
+      ref={cardElement}
       style={{
         border: "1px solid #d7d7d7",
         borderRadius: "0.75rem",

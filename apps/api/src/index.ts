@@ -37,6 +37,11 @@ export {
 } from "./quote-lifecycle/routes.js";
 export type { QuoteLifecycleRouteDependencies } from "./quote-lifecycle/routes.js";
 export {
+  R3_ANALYTICS_OBSERVATION_PATH,
+  registerR3AnalyticsRoutes,
+} from "./r3-analytics/routes.js";
+export type { R3AnalyticsRouteDependencies } from "./r3-analytics/routes.js";
+export {
   CONVERSATION_WRITE_IP_LIMIT_MULTIPLIER,
   createDatabaseConversationWriteAdmission,
 } from "./conversations/write-admission.js";

@@ -1,6 +1,11 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+
+import {
+  observeActualVisibility,
+  recordQuoteComparisonObservation,
+} from "./quote-comparison";
 
 const STATES = [
   "PENDING",
@@ -98,6 +103,7 @@ export function JobInvitationDetail({
 }) {
   const [result, setResult] = useState<InvitationLoadResult | null>(null);
   const [pending, setPending] = useState(false);
+  const invitationElement = useRef<HTMLElement>(null);
   useEffect(() => {
     let active = true;
     void loadJobInvitationDetail({
@@ -112,6 +118,29 @@ export function JobInvitationDetail({
       active = false;
     };
   }, [invitationId, requestContentRevision]);
+
+  const observedInvitation =
+    result?.status === "OK" && result.invitation.perspective === "CRAFTSMAN"
+      ? result.invitation
+      : null;
+  const observedInvitationId = observedInvitation?.id;
+  const observedJobRequestId = observedInvitation?.jobRequestId;
+  useEffect(() => {
+    if (
+      invitationElement.current === null ||
+      observedInvitationId === undefined ||
+      observedJobRequestId === undefined
+    )
+      return;
+    return observeActualVisibility(invitationElement.current, () => {
+      void recordQuoteComparisonObservation({
+        fetch,
+        invitationId: observedInvitationId,
+        jobRequestId: observedJobRequestId,
+        kind: "INVITATION_VIEWED",
+      });
+    });
+  }, [observedInvitationId, observedJobRequestId]);
 
   if (result === null) return <p aria-live="polite">Načítavam pozvanie…</p>;
   if (result.status !== "OK")
@@ -153,7 +182,7 @@ export function JobInvitationDetail({
   }
 
   return (
-    <article className="invitation-detail">
+    <article className="invitation-detail" ref={invitationElement}>
       <header>
         <p className="eyebrow">Pozvanie k zákazke</p>
         <h1>{invitation.request.title}</h1>

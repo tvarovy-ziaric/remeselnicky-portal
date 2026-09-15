@@ -83,3 +83,5 @@ export type {
   SyntheticSeedPersistence,
   SyntheticSeedReport,
 } from "./model.js";
+export * from "./r3-demand-side-security.js";
+export * from "./r3-demand-side-http-security.js";

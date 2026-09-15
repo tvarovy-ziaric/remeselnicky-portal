@@ -1,7 +1,9 @@
 import {
   analyticsEventCatalog,
+  analyticsEventDefinition,
   analyticsEventNames,
   SEARCH_ANALYTICS_VERSION,
+  type AnalyticsEventDefinition,
   type AnalyticsEventName,
   type AnalyticsPropertyKind,
 } from "./catalog.js";
@@ -42,6 +44,44 @@ const shortlistSizeBuckets = new Set([
   "FIVE_TO_NINE",
   "TEN_PLUS",
 ]);
+const authoringModes = new Set(["PLATFORM_STRUCTURED", "EXTERNAL_PDF"]);
+const cancellationReasons = new Set([
+  "DUPLICATE",
+  "NO_LONGER_NEEDED",
+  "OTHER",
+  "PLANS_CHANGED",
+]);
+const declineReasons = new Set([
+  "NO_CAPACITY",
+  "NOT_MY_WORK",
+  "OTHER",
+  "TIMING",
+  "TOO_FAR",
+]);
+const draftOrigins = new Set(["INITIAL", "REVISION", "RECONFIRM"]);
+const attachmentCountBuckets = new Set(["ONE", "TWO_TO_FOUR", "FIVE_TO_TEN"]);
+const attachmentTypeBuckets = new Set(["IMAGE", "PDF", "MIXED"]);
+const effectInitiators = new Set(["SYSTEM", "USER"]);
+const invitationWithdrawalSources = new Set([
+  "CUSTOMER",
+  "CRAFTSMAN",
+  "REQUEST_CLOSED",
+]);
+const materialRevisionCountBuckets = new Set(["ONE", "TWO", "THREE_PLUS"]);
+const messageCountBuckets = new Set([
+  "TWO_TO_FOUR",
+  "FIVE_TO_NINE",
+  "TEN_PLUS",
+]);
+const photoCountBuckets = new Set(["NONE", "ONE_TO_FOUR", "FIVE_TO_TEN"]);
+const priceModes = new Set(["FIXED", "ESTIMATE", "RANGE"]);
+const profileContexts = new Set(["CUSTOMER", "CRAFTSMAN"]);
+const timingOptions = new Set([
+  "AS_SOON_AS_POSSIBLE",
+  "SPECIFIC_PERIOD",
+  "FLEXIBLE",
+  "NOT_PROVIDED",
+]);
 const professionCodePattern = /^PROF:[A-Z0-9][A-Z0-9_]{1,62}$/u;
 const specializationCodePattern = /^SPEC:[A-Z0-9][A-Z0-9_]{1,62}$/u;
 const governedLocationAreaCodePattern = /^[A-Z0-9][A-Z0-9._:-]{0,63}$/u;
@@ -78,10 +118,12 @@ export function validateAnalyticsEnvelope(value: unknown): AnalyticsEnvelope {
   );
 
   const eventName = assertEventName(envelope.event_name);
-  const definition = analyticsEventCatalog[eventName];
-  if (envelope.schema_version !== definition.schema_version) {
+  const definition = analyticsEventDefinition(
+    eventName,
+    assertSchemaVersion(envelope.schema_version),
+  );
+  if (definition === undefined)
     throw new TypeError("analytics schema_version does not match the catalog");
-  }
   if (envelope.event_source !== definition.source) {
     throw new TypeError("analytics event_source does not match the catalog");
   }
@@ -105,7 +147,12 @@ export function validateAnalyticsEnvelope(value: unknown): AnalyticsEnvelope {
   const occurredAt = assertCanonicalTimestamp(envelope.occurred_at);
   const environment = assertEnvironment(envelope.environment);
   const platform = assertPlatform(envelope.platform);
-  const properties = validateProperties(eventName, envelope.properties);
+  const properties = validatePropertiesForDefinition(
+    eventName,
+    definition,
+    envelope.properties,
+    "ENVELOPE",
+  );
 
   return Object.freeze({
     ...identity,
@@ -117,7 +164,7 @@ export function validateAnalyticsEnvelope(value: unknown): AnalyticsEnvelope {
     occurred_at: occurredAt,
     platform,
     properties,
-    schema_version: definition.schema_version,
+    schema_version: envelope.schema_version as number,
   });
 }
 
@@ -199,13 +246,45 @@ export function validateCaptureProperties(
   return validatePropertiesFor(eventName, value, "CAPTURE");
 }
 
+export function validateCapturePropertiesVersion(
+  eventName: AnalyticsEventName,
+  schemaVersion: number,
+  value: unknown,
+): Readonly<Record<string, string>> {
+  const definition = analyticsEventDefinition(eventName, schemaVersion);
+  if (definition === undefined) {
+    throw new TypeError("analytics schema_version does not match the catalog");
+  }
+  return validatePropertiesForDefinition(
+    eventName,
+    definition,
+    value,
+    "CAPTURE",
+  );
+}
+
 function validatePropertiesFor(
   eventName: AnalyticsEventName,
   value: unknown,
   representation: "CAPTURE" | "ENVELOPE",
 ): Readonly<Record<string, string>> {
-  const properties = assertPlainObject(value, "analytics properties");
   const rules = analyticsEventCatalog[eventName].properties;
+  return validatePropertiesForDefinition(
+    eventName,
+    { properties: rules },
+    value,
+    representation,
+  );
+}
+
+function validatePropertiesForDefinition(
+  eventName: AnalyticsEventName,
+  definition: Pick<AnalyticsEventDefinition, "properties">,
+  value: unknown,
+  representation: "CAPTURE" | "ENVELOPE",
+): Readonly<Record<string, string>> {
+  const properties = assertPlainObject(value, "analytics properties");
+  const rules = definition.properties;
   const keys = Object.keys(rules);
   const requiredKeys = keys.filter((key) => {
     const rule = rules[key];
@@ -347,6 +426,38 @@ function validateProperty(
       return value;
     case "SHORTLIST_SIZE_BUCKET":
       return assertEnum(value, shortlistSizeBuckets, key);
+    case "AUTHORING_MODE":
+      return assertEnum(value, authoringModes, key);
+    case "ATTACHMENT_COUNT_BUCKET":
+      return assertEnum(value, attachmentCountBuckets, key);
+    case "ATTACHMENT_TYPE_BUCKET":
+      return assertEnum(value, attachmentTypeBuckets, key);
+    case "CANCELLATION_REASON":
+      return assertEnum(value, cancellationReasons, key);
+    case "DECLINE_REASON":
+      return assertEnum(value, declineReasons, key);
+    case "DRAFT_ORIGIN":
+      return assertEnum(value, draftOrigins, key);
+    case "EFFECT_INITIATOR":
+      return assertEnum(value, effectInitiators, key);
+    case "INVITATION_WITHDRAWAL_SOURCE":
+      return assertEnum(value, invitationWithdrawalSources, key);
+    case "MATERIAL_REVISION_COUNT_BUCKET":
+      return assertEnum(value, materialRevisionCountBuckets, key);
+    case "MESSAGE_COUNT_BUCKET":
+      return assertEnum(value, messageCountBuckets, key);
+    case "PHOTO_COUNT_BUCKET":
+      return assertEnum(value, photoCountBuckets, key);
+    case "PRICE_MODE":
+      return assertEnum(value, priceModes, key);
+    case "PROFILE_CONTEXT":
+      return assertEnum(value, profileContexts, key);
+    case "TIMING_OPTION":
+      return assertEnum(value, timingOptions, key);
+    case "BOUNDED_QUOTE_COUNT":
+      return assertBoundedInteger(value, key, representation, 0, 5);
+    case "POSITIVE_INTEGER":
+      return assertBoundedInteger(value, key, representation, 1, 2_147_483_647);
     case "RESULT_POSITION":
       if (representation === "CAPTURE") {
         if (
@@ -366,6 +477,29 @@ function validateProperty(
       }
       return value;
   }
+}
+
+function assertBoundedInteger(
+  value: unknown,
+  key: string,
+  representation: "CAPTURE" | "ENVELOPE",
+  minimum: number,
+  maximum: number,
+): string {
+  const parsed =
+    representation === "CAPTURE"
+      ? value
+      : typeof value === "string" && /^\d+$/u.test(value)
+        ? Number(value)
+        : Number.NaN;
+  if (
+    !Number.isSafeInteger(parsed) ||
+    (parsed as number) < minimum ||
+    (parsed as number) > maximum
+  ) {
+    throw new TypeError(`${key} must be a bounded integer`);
+  }
+  return String(parsed);
 }
 
 function validatePropertyCoherence(
@@ -465,6 +599,17 @@ function assertCanonicalTimestamp(value: unknown): string {
     throw new TypeError("analytics occurred_at must be canonical ISO-8601 UTC");
   }
   return value;
+}
+
+function assertSchemaVersion(value: unknown): number {
+  if (
+    !Number.isSafeInteger(value) ||
+    (value as number) < 1 ||
+    (value as number) > 32_767
+  ) {
+    throw new TypeError("analytics schema_version is invalid");
+  }
+  return value as number;
 }
 
 function assertPlainObject(

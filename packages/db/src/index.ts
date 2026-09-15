@@ -109,6 +109,21 @@ import { createJobRequestLifecycleRepository } from "./job-request-lifecycle-rep
 import { createJobInvitationRepository } from "./job-invitation-repository.js";
 import { createJobInvitationReminderRepository } from "./job-invitation-notification-repository.js";
 import { createDemandSideNotificationRepository } from "./demand-side-notification-repository.js";
+import {
+  createR3AnalyticsLeaseStore,
+  createR3AnalyticsObservationRepository,
+  createR3PdfDeliveryObservationRepository,
+} from "./r3-analytics-repository.js";
+export {
+  createR3AnalyticsLeaseStore,
+  createR3AnalyticsObservationRepository,
+  createR3PdfDeliveryObservationRepository,
+} from "./r3-analytics-repository.js";
+import type {
+  R3AnalyticsLeaseStore,
+  R3AnalyticsObservationPersistence,
+  R3PdfDeliveryObservationPersistence,
+} from "@portal/analytics";
 import { createConversationRepository } from "./conversation-repository.js";
 import { createConversationChatRepository } from "./conversation-chat-repository.js";
 import { createQuoteRepository } from "./quote-repository.js";
@@ -818,6 +833,9 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly jobInvitations: JobInvitationPersistence;
   readonly jobInvitationReminders: JobInvitationReminderStore;
   readonly demandSideNotifications: DemandSideNotificationMaintenanceStore;
+  readonly r3Analytics: R3AnalyticsLeaseStore;
+  readonly r3AnalyticsObservations: R3AnalyticsObservationPersistence;
+  readonly r3PdfDeliveryObservations: R3PdfDeliveryObservationPersistence;
   readonly conversations: ConversationPersistence;
   readonly conversationChat: ConversationChatPersistence;
   readonly quotes: QuotePersistence;
@@ -917,6 +935,10 @@ export function createDatabase(
   const jobInvitations = createJobInvitationRepository(sql);
   const jobInvitationReminders = createJobInvitationReminderRepository(sql);
   const demandSideNotifications = createDemandSideNotificationRepository(sql);
+  const r3Analytics = createR3AnalyticsLeaseStore(sql);
+  const r3AnalyticsObservations = createR3AnalyticsObservationRepository(sql);
+  const r3PdfDeliveryObservations =
+    createR3PdfDeliveryObservationRepository(sql);
   const conversations = createConversationRepository(sql);
   const conversationChat = createConversationChatRepository(sql);
   const quotes = createQuoteRepository(sql);
@@ -982,6 +1004,9 @@ export function createDatabase(
     jobInvitations,
     jobInvitationReminders,
     demandSideNotifications,
+    r3Analytics,
+    r3AnalyticsObservations,
+    r3PdfDeliveryObservations,
     conversations,
     conversationChat,
     quotes,

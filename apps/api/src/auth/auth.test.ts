@@ -382,6 +382,14 @@ describe("authentication HTTP boundary", () => {
 
   it("rejects missing, wrong, and cross-session CSRF tokens", async () => {
     const fixture = createFixture({ eligible: true });
+    const unbootstrapped = await fixture.app.inject({
+      method: "POST",
+      payload: { email: "person@example.com", password: PASSWORD },
+      url: AUTH_API_PATHS.login,
+    });
+    expect(unbootstrapped.statusCode).toBe(403);
+    expect(unbootstrapped.json()).toEqual({ code: "CSRF_INVALID" });
+
     const first = await csrf(fixture.app);
     const second = await csrf(fixture.app);
     const request = (cookie: string, token?: string) =>

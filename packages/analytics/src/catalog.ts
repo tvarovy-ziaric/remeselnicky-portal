@@ -10,9 +10,32 @@ export const analyticsEventNames = [
   "registration_completed",
   "email_verification_completed",
   "phone_verification_completed",
+  "job_request_started",
   "job_request_submitted",
+  "job_request_cancelled",
+  "job_request_expired",
+  "job_request_reactivated",
+  "job_request_materially_revised",
+  "invitation_sent",
+  "invitation_received",
+  "invitation_viewed",
   "invitation_engaged",
+  "invitation_declined",
+  "invitation_expired",
+  "invitation_withdrawn",
+  "invitation_not_selected",
+  "conversation_first_message_sent",
+  "conversation_bilateral_participation_reached",
+  "conversation_attachment_ready",
+  "quote_draft_created",
   "quote_submitted",
+  "quote_revision_submitted",
+  "quote_rejected",
+  "quote_withdrawn",
+  "quote_expired",
+  "quote_viewed",
+  "quote_comparison_opened",
+  "quote_comparison_pdf_opened",
   "quote_accepted",
   "job_confirmed",
   "job_completed",
@@ -24,12 +47,27 @@ export type AnalyticsEventName = (typeof analyticsEventNames)[number];
 export const SEARCH_ANALYTICS_VERSION = "R2_SEARCH_V1" as const;
 
 export type AnalyticsPropertyKind =
+  | "AUTHORING_MODE"
+  | "ATTACHMENT_COUNT_BUCKET"
+  | "ATTACHMENT_TYPE_BUCKET"
   | "BOOLEAN"
+  | "BOUNDED_QUOTE_COUNT"
+  | "CANCELLATION_REASON"
   | "CTA_ORIGIN"
+  | "DECLINE_REASON"
+  | "DRAFT_ORIGIN"
+  | "EFFECT_INITIATOR"
   | "GOVERNED_LOCATION_AREA_CODE"
+  | "INVITATION_WITHDRAWAL_SOURCE"
   | "LOCATION_AREA_GRANULARITY"
   | "LOCATION_SCOPE"
+  | "MESSAGE_COUNT_BUCKET"
+  | "MATERIAL_REVISION_COUNT_BUCKET"
+  | "PHOTO_COUNT_BUCKET"
+  | "POSITIVE_INTEGER"
+  | "PRICE_MODE"
   | "PROFESSION_CODE"
+  | "PROFILE_CONTEXT"
   | "RESULT_COUNT_BUCKET"
   | "RESULT_POSITION"
   | "SEARCH_AVAILABILITY_COUNT_BUCKET"
@@ -37,6 +75,7 @@ export type AnalyticsPropertyKind =
   | "SEARCH_VERSION"
   | "SHORTLIST_SIZE_BUCKET"
   | "SPECIALIZATION_CODE"
+  | "TIMING_OPTION"
   | "UUID";
 
 export type AnalyticsPropertyRule =
@@ -155,20 +194,200 @@ export const analyticsEventCatalog = Object.freeze({
     "After the phone-verification transaction commits.",
     {},
   ),
+  job_request_started: definition(
+    "An authenticated customer created a new JobRequest draft.",
+    "After the first committed CREATE_DRAFT effect; retries and later autosaves do not emit it.",
+    { job_request_id: "UUID" },
+  ),
   job_request_submitted: definition(
     "A JobRequest entered its submitted state.",
     "After the JobRequest submission transaction commits.",
+    {
+      budget_provided: "BOOLEAN",
+      job_request_id: "UUID",
+      photo_count_bucket: "PHOTO_COUNT_BUCKET",
+      profession_code: "PROFESSION_CODE",
+      timing_option: "TIMING_OPTION",
+    },
+    "SERVER_DOMAIN",
+    2,
+  ),
+  job_request_cancelled: definition(
+    "An active JobRequest was cancelled by its customer.",
+    "After the cancellation revision commits.",
+    {
+      cancellation_reason_category: "CANCELLATION_REASON",
+      job_request_id: "UUID",
+    },
+  ),
+  job_request_expired: definition(
+    "An active JobRequest expired by the server clock.",
+    "After the system expiry revision commits.",
+    { effect_initiator: "EFFECT_INITIATOR", job_request_id: "UUID" },
+  ),
+  job_request_reactivated: definition(
+    "An expired JobRequest was reactivated.",
+    "After the customer reactivation revision commits.",
     { job_request_id: "UUID" },
+  ),
+  job_request_materially_revised: definition(
+    "An active JobRequest received a material visible revision.",
+    "After one request-level material revision commits; notification fanout does not multiply it.",
+    {
+      job_request_id: "UUID",
+      material_revision_count_bucket: "MATERIAL_REVISION_COUNT_BUCKET",
+      visible_version: "POSITIVE_INTEGER",
+    },
+  ),
+  invitation_sent: definition(
+    "A customer sent a JobInvitation.",
+    "After the initial PENDING invitation revision commits.",
+    { invitation_id: "UUID", job_request_id: "UUID" },
+  ),
+  invitation_received: definition(
+    "A craftsman received a JobInvitation.",
+    "Derived once from the same committed SEND effect as invitation_sent, with a distinct event ID.",
+    { invitation_id: "UUID", job_request_id: "UUID" },
+  ),
+  invitation_viewed: definition(
+    "A provider actually viewed an invitation detail.",
+    "After a consented viewport observation is reauthorized once per invitation.",
+    { invitation_id: "UUID", job_request_id: "UUID" },
+    "CLIENT_UX",
   ),
   invitation_engaged: definition(
     "An invitation entered ENGAGED.",
     "After the invitation engagement transaction commits.",
     { invitation_id: "UUID", job_request_id: "UUID" },
   ),
+  invitation_declined: definition(
+    "A craftsman explicitly declined an invitation.",
+    "After the DECLINED revision commits; optional reason is a governed category only.",
+    {
+      decline_reason_category: optional("DECLINE_REASON"),
+      invitation_id: "UUID",
+      job_request_id: "UUID",
+    },
+  ),
+  invitation_expired: definition(
+    "A pending invitation expired without response.",
+    "After the system EXPIRED revision commits.",
+    {
+      effect_initiator: "EFFECT_INITIATOR",
+      invitation_id: "UUID",
+      job_request_id: "UUID",
+    },
+  ),
+  invitation_withdrawn: definition(
+    "An invitation candidacy was withdrawn or closed.",
+    "After the corresponding WITHDRAWN revision commits.",
+    {
+      invitation_id: "UUID",
+      job_request_id: "UUID",
+      withdrawal_source: "INVITATION_WITHDRAWAL_SOURCE",
+    },
+  ),
+  invitation_not_selected: definition(
+    "An invitation entered neutral NOT_SELECTED.",
+    "After CUSTOMER_STOP or system NOT_SELECT commits.",
+    {
+      effect_initiator: "EFFECT_INITIATOR",
+      invitation_id: "UUID",
+      job_request_id: "UUID",
+    },
+  ),
+  conversation_first_message_sent: definition(
+    "The first human message in an engaged conversation was committed.",
+    "At the first HUMAN_MESSAGE effect, independently of notification mute state.",
+    {
+      conversation_id: "UUID",
+      initiator_profile_context: "PROFILE_CONTEXT",
+      invitation_id: "UUID",
+    },
+  ),
+  conversation_bilateral_participation_reached: definition(
+    "Both exact conversation parties have authored at least one human message.",
+    "At the first HUMAN_MESSAGE effect that makes participation bilateral.",
+    {
+      conversation_id: "UUID",
+      invitation_id: "UUID",
+      message_count_bucket: "MESSAGE_COUNT_BUCKET",
+    },
+  ),
+  conversation_attachment_ready: definition(
+    "A safe chat attachment became READY.",
+    "After canonical processing, with only bounded count/type buckets.",
+    {
+      attachment_count_bucket: "ATTACHMENT_COUNT_BUCKET",
+      attachment_type_bucket: "ATTACHMENT_TYPE_BUCKET",
+      conversation_id: "UUID",
+    },
+  ),
+  quote_draft_created: definition(
+    "A new immutable Quote draft revision was created.",
+    "After CREATE_DRAFT or CREATE_REVISION commits.",
+    {
+      authoring_mode: "AUTHORING_MODE",
+      draft_origin: "DRAFT_ORIGIN",
+      job_request_id: "UUID",
+      quote_id: "UUID",
+      quote_revision: "POSITIVE_INTEGER",
+    },
+  ),
   quote_submitted: definition(
-    "A Quote revision was submitted.",
-    "After the Quote submission transaction commits.",
-    { job_request_id: "UUID", quote_id: "UUID" },
+    "The first Quote revision was submitted.",
+    "After revision 1 enters SUBMITTED; later revisions use quote_revision_submitted.",
+    {
+      authoring_mode: "AUTHORING_MODE",
+      job_request_id: "UUID",
+      price_mode: optional("PRICE_MODE"),
+      quote_id: "UUID",
+      quote_revision: "POSITIVE_INTEGER",
+    },
+    "SERVER_DOMAIN",
+    2,
+  ),
+  quote_revision_submitted: definition(
+    "A later Quote revision was submitted.",
+    "After a Quote revision greater than one enters SUBMITTED.",
+    {
+      authoring_mode: "AUTHORING_MODE",
+      job_request_id: "UUID",
+      price_mode: optional("PRICE_MODE"),
+      quote_id: "UUID",
+      quote_revision: "POSITIVE_INTEGER",
+    },
+  ),
+  quote_rejected: quoteTerminalDefinition(
+    "rejected by its customer",
+    "REJECTED",
+  ),
+  quote_withdrawn: quoteTerminalDefinition(
+    "withdrawn by its provider",
+    "WITHDRAWN",
+  ),
+  quote_expired: quoteTerminalDefinition(
+    "expired by the server clock",
+    "EXPIRED",
+    { effect_initiator: "EFFECT_INITIATOR" },
+  ),
+  quote_viewed: definition(
+    "A customer actually viewed a submitted Quote revision.",
+    "After a consented visible-client observation is reauthorized and committed once per revision.",
+    quoteIdentityProperties(),
+    "CLIENT_UX",
+  ),
+  quote_comparison_opened: definition(
+    "A customer actually opened an authorized Quote comparison.",
+    "After a consented visible-client observation is reauthorized and committed once per request.",
+    { available_quote_count: "BOUNDED_QUOTE_COUNT", job_request_id: "UUID" },
+    "CLIENT_UX",
+  ),
+  quote_comparison_pdf_opened: definition(
+    "A customer opened an authorized canonical external Quote PDF.",
+    "After private delivery authorization succeeds and the consented observation commits.",
+    quoteIdentityProperties(),
+    "CLIENT_UX",
   ),
   quote_accepted: definition(
     "A Quote was accepted through the successful acceptance command.",
@@ -191,6 +410,39 @@ export const analyticsEventCatalog = Object.freeze({
     { job_id: "UUID", review_id: "UUID" },
   ),
 } satisfies Readonly<Record<AnalyticsEventName, AnalyticsEventDefinition>>);
+
+const historicalAnalyticsEventDefinitions = Object.freeze({
+  job_request_submitted: Object.freeze({
+    1: definition(
+      "A JobRequest entered its submitted state (legacy R0 schema).",
+      "Historical replay of the committed JobRequest submission effect.",
+      { job_request_id: "UUID" },
+    ),
+  }),
+  quote_submitted: Object.freeze({
+    1: definition(
+      "A Quote revision was submitted (legacy R0 schema).",
+      "Historical replay of any committed Quote revision submission.",
+      { job_request_id: "UUID", quote_id: "UUID" },
+    ),
+  }),
+});
+
+/** Exact version lookup; incompatible KPI definitions are never guessed. */
+export function analyticsEventDefinition(
+  eventName: AnalyticsEventName,
+  schemaVersion: number,
+): AnalyticsEventDefinition | undefined {
+  const current = analyticsEventCatalog[eventName];
+  if (current.schema_version === schemaVersion) return current;
+  if (eventName === "job_request_submitted" && schemaVersion === 1) {
+    return historicalAnalyticsEventDefinitions.job_request_submitted[1];
+  }
+  if (eventName === "quote_submitted" && schemaVersion === 1) {
+    return historicalAnalyticsEventDefinitions.quote_submitted[1];
+  }
+  return undefined;
+}
 
 export type AnalyticsPropertiesByName = {
   readonly public_profile_viewed: Readonly<{
@@ -240,15 +492,88 @@ export type AnalyticsPropertiesByName = {
   readonly registration_completed: Readonly<Record<string, never>>;
   readonly email_verification_completed: Readonly<Record<string, never>>;
   readonly phone_verification_completed: Readonly<Record<string, never>>;
-  readonly job_request_submitted: Readonly<{ job_request_id: string }>;
+  readonly job_request_started: Readonly<{ job_request_id: string }>;
+  readonly job_request_submitted: Readonly<{
+    budget_provided: boolean;
+    job_request_id: string;
+    photo_count_bucket: AnalyticsPhotoCountBucket;
+    profession_code: string;
+    timing_option: AnalyticsTimingOption;
+  }>;
+  readonly job_request_cancelled: Readonly<{
+    cancellation_reason_category: AnalyticsCancellationReason;
+    job_request_id: string;
+  }>;
+  readonly job_request_expired: Readonly<{
+    effect_initiator: AnalyticsEffectInitiator;
+    job_request_id: string;
+  }>;
+  readonly job_request_reactivated: Readonly<{ job_request_id: string }>;
+  readonly job_request_materially_revised: Readonly<{
+    job_request_id: string;
+    material_revision_count_bucket: AnalyticsMaterialRevisionCountBucket;
+    visible_version: number;
+  }>;
+  readonly invitation_sent: AnalyticsInvitationIdentity;
+  readonly invitation_received: AnalyticsInvitationIdentity;
+  readonly invitation_viewed: AnalyticsInvitationIdentity;
   readonly invitation_engaged: Readonly<{
     invitation_id: string;
     job_request_id: string;
   }>;
-  readonly quote_submitted: Readonly<{
-    job_request_id: string;
-    quote_id: string;
+  readonly invitation_declined: Readonly<
+    AnalyticsInvitationIdentity & {
+      decline_reason_category?: AnalyticsDeclineReason;
+    }
+  >;
+  readonly invitation_expired: Readonly<
+    AnalyticsInvitationIdentity & { effect_initiator: AnalyticsEffectInitiator }
+  >;
+  readonly invitation_withdrawn: Readonly<
+    AnalyticsInvitationIdentity & {
+      withdrawal_source: AnalyticsInvitationWithdrawalSource;
+    }
+  >;
+  readonly invitation_not_selected: Readonly<
+    AnalyticsInvitationIdentity & { effect_initiator: AnalyticsEffectInitiator }
+  >;
+  readonly conversation_first_message_sent: Readonly<{
+    conversation_id: string;
+    initiator_profile_context: AnalyticsProfileContextValue;
+    invitation_id: string;
   }>;
+  readonly conversation_bilateral_participation_reached: Readonly<{
+    conversation_id: string;
+    invitation_id: string;
+    message_count_bucket: AnalyticsMessageCountBucket;
+  }>;
+  readonly conversation_attachment_ready: Readonly<{
+    attachment_count_bucket: AnalyticsAttachmentCountBucket;
+    attachment_type_bucket: AnalyticsAttachmentTypeBucket;
+    conversation_id: string;
+  }>;
+  readonly quote_draft_created: Readonly<
+    AnalyticsQuoteIdentity & { draft_origin: AnalyticsQuoteDraftOrigin }
+  >;
+  readonly quote_submitted: Readonly<{
+    authoring_mode: AnalyticsQuoteAuthoringMode;
+    job_request_id: string;
+    price_mode?: AnalyticsQuotePriceMode;
+    quote_id: string;
+    quote_revision: number;
+  }>;
+  readonly quote_revision_submitted: AnalyticsQuoteIdentity;
+  readonly quote_rejected: AnalyticsQuoteIdentity;
+  readonly quote_withdrawn: AnalyticsQuoteIdentity;
+  readonly quote_expired: Readonly<
+    AnalyticsQuoteIdentity & { effect_initiator: AnalyticsEffectInitiator }
+  >;
+  readonly quote_viewed: AnalyticsQuoteIdentity;
+  readonly quote_comparison_opened: Readonly<{
+    available_quote_count: number;
+    job_request_id: string;
+  }>;
+  readonly quote_comparison_pdf_opened: AnalyticsQuoteIdentity;
   readonly quote_accepted: Readonly<{
     job_id: string;
     job_request_id: string;
@@ -275,20 +600,78 @@ export type AnalyticsSearchSortMode = "RECOMMENDED" | "NEAREST" | "BEST_RATED";
 export type AnalyticsCtaOrigin = "PUBLIC_PROFILE" | "SEARCH_RESULTS";
 export type AnalyticsShortlistSizeBucket =
   "ZERO" | "ONE" | "TWO_TO_FOUR" | "FIVE_TO_NINE" | "TEN_PLUS";
+export type AnalyticsPhotoCountBucket = "NONE" | "ONE_TO_FOUR" | "FIVE_TO_TEN";
+export type AnalyticsAttachmentCountBucket =
+  "ONE" | "TWO_TO_FOUR" | "FIVE_TO_TEN";
+export type AnalyticsAttachmentTypeBucket = "IMAGE" | "PDF" | "MIXED";
+export type AnalyticsMaterialRevisionCountBucket = "ONE" | "TWO" | "THREE_PLUS";
+export type AnalyticsMessageCountBucket =
+  "TWO_TO_FOUR" | "FIVE_TO_NINE" | "TEN_PLUS";
+export type AnalyticsTimingOption =
+  "AS_SOON_AS_POSSIBLE" | "SPECIFIC_PERIOD" | "FLEXIBLE" | "NOT_PROVIDED";
+export type AnalyticsCancellationReason =
+  "DUPLICATE" | "NO_LONGER_NEEDED" | "OTHER" | "PLANS_CHANGED";
+export type AnalyticsDeclineReason =
+  "NO_CAPACITY" | "NOT_MY_WORK" | "OTHER" | "TIMING" | "TOO_FAR";
+export type AnalyticsInvitationWithdrawalSource =
+  "CUSTOMER" | "CRAFTSMAN" | "REQUEST_CLOSED";
+export type AnalyticsQuoteAuthoringMode =
+  "PLATFORM_STRUCTURED" | "EXTERNAL_PDF";
+export type AnalyticsQuoteDraftOrigin = "INITIAL" | "REVISION" | "RECONFIRM";
+export type AnalyticsQuotePriceMode = "FIXED" | "ESTIMATE" | "RANGE";
+export type AnalyticsProfileContextValue = "CUSTOMER" | "CRAFTSMAN";
+export type AnalyticsEffectInitiator = "SYSTEM" | "USER";
+
+type AnalyticsInvitationIdentity = Readonly<{
+  invitation_id: string;
+  job_request_id: string;
+}>;
+type AnalyticsQuoteIdentity = Readonly<{
+  authoring_mode: AnalyticsQuoteAuthoringMode;
+  job_request_id: string;
+  price_mode?: AnalyticsQuotePriceMode;
+  quote_id: string;
+  quote_revision: number;
+}>;
 
 function definition(
   description: string,
   trigger: string,
   properties: Readonly<Record<string, AnalyticsPropertyRule>>,
   source: AnalyticsEventDefinition["source"] = "SERVER_DOMAIN",
+  schemaVersion = 1,
 ): Readonly<AnalyticsEventDefinition> {
   return Object.freeze({
     description,
     properties: Object.freeze({ ...properties }),
-    schema_version: 1,
+    schema_version: schemaVersion,
     source,
     trigger,
   });
+}
+
+function quoteIdentityProperties(): Readonly<
+  Record<string, AnalyticsPropertyRule>
+> {
+  return {
+    authoring_mode: "AUTHORING_MODE",
+    job_request_id: "UUID",
+    price_mode: optional("PRICE_MODE"),
+    quote_id: "UUID",
+    quote_revision: "POSITIVE_INTEGER",
+  };
+}
+
+function quoteTerminalDefinition(
+  description: string,
+  state: string,
+  extra: Readonly<Record<string, AnalyticsPropertyRule>> = {},
+): Readonly<AnalyticsEventDefinition> {
+  return definition(
+    `A submitted Quote revision was ${description}.`,
+    `After the authoritative ${state} state effect commits.`,
+    { ...quoteIdentityProperties(), ...extra },
+  );
 }
 
 function optional(kind: AnalyticsPropertyKind): AnalyticsPropertyRule {

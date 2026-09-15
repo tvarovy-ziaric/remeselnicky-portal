@@ -1,21 +1,45 @@
 export {
   analyticsEventCatalog,
+  analyticsEventDefinition,
   analyticsEventNames,
   SEARCH_ANALYTICS_VERSION,
   type AnalyticsAvailabilityCountBucket,
+  type AnalyticsAttachmentCountBucket,
+  type AnalyticsAttachmentTypeBucket,
+  type AnalyticsCancellationReason,
   type AnalyticsCtaOrigin,
   type AnalyticsEventDefinition,
+  type AnalyticsEffectInitiator,
   type AnalyticsEventName,
   type AnalyticsLocationAreaGranularity,
   type AnalyticsLocationScope,
+  type AnalyticsMaterialRevisionCountBucket,
+  type AnalyticsMessageCountBucket,
+  type AnalyticsPhotoCountBucket,
   type AnalyticsPropertiesByName,
   type AnalyticsPropertyKind,
   type AnalyticsPropertyRule,
   type AnalyticsResultCountBucket,
   type AnalyticsSearchSortMode,
   type AnalyticsShortlistSizeBucket,
+  type AnalyticsTimingOption,
 } from "./catalog.js";
 export { createAnalytics, type CreateAnalyticsOptions } from "./client.js";
+export { createTrustedAnalyticsPublisher } from "./client.js";
+export {
+  assertR3AnalyticsObservationInput,
+  createR3AnalyticsProcessor,
+  R3_ANALYTICS_CONSUMER_NAME,
+  type R3AnalyticsClaim,
+  type R3AnalyticsInvalidLease,
+  type R3AnalyticsLease,
+  type R3AnalyticsLeaseStore,
+  type R3AnalyticsObservationInput,
+  type R3AnalyticsObservationKind,
+  type R3AnalyticsObservationPersistence,
+  type R3PdfDeliveryObservationPersistence,
+  type R3AnalyticsProcessResult,
+} from "./r3-demand-funnel.js";
 export {
   bucketResultCount,
   bucketShortlistSize,
@@ -49,5 +73,7 @@ export type {
   AnalyticsTransport,
   AnalyticsTransportKind,
   AnyAnalyticsCaptureInput,
+  TrustedAnalyticsCaptureInput,
+  TrustedAnalyticsPublisher,
 } from "./types.js";
 export { validateAnalyticsEnvelope } from "./validation.js";

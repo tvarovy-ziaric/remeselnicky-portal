@@ -57,6 +57,10 @@ import {
   registerQuoteLifecycleRoutes,
   type QuoteLifecycleRouteDependencies,
 } from "../quote-lifecycle/routes.js";
+import {
+  registerR3AnalyticsRoutes,
+  type R3AnalyticsRouteDependencies,
+} from "../r3-analytics/routes.js";
 import { createSessionGuard } from "./guard.js";
 import {
   registerDraftHandoffRoutes,
@@ -128,6 +132,7 @@ export interface AuthModuleDependencies {
     "comparison"
   >;
   readonly quoteLifecycle?: Pick<QuoteLifecycleRouteDependencies, "lifecycle">;
+  readonly r3Analytics?: Pick<R3AnalyticsRouteDependencies, "observations">;
   readonly conversationChat?: {
     readonly admission: Exclude<
       NonNullable<ConversationRouteDependencies["chat"]>["admission"],
@@ -139,6 +144,9 @@ export interface AuthModuleDependencies {
     readonly persistence: NonNullable<
       ConversationRouteDependencies["chat"]
     >["persistence"];
+    readonly pdfDeliveryObservation?: NonNullable<
+      ConversationRouteDependencies["chat"]
+    >["pdfDeliveryObservation"];
     readonly privateMediaDelivery?: NonNullable<
       ConversationRouteDependencies["chat"]
     >["privateMediaDelivery"];
@@ -341,6 +349,13 @@ async function configureAuthModule(
                   }),
               csrfProtection: csrfProtection(app),
               persistence: dependencies.conversationChat.persistence,
+              ...(dependencies.conversationChat.pdfDeliveryObservation ===
+              undefined
+                ? {}
+                : {
+                    pdfDeliveryObservation:
+                      dependencies.conversationChat.pdfDeliveryObservation,
+                  }),
               ...(dependencies.conversationChat.privateMediaDelivery ===
               undefined
                 ? {}
@@ -365,6 +380,17 @@ async function configureAuthModule(
       csrfProtection: csrfProtection(app),
       guard,
       ...dependencies.quoteLifecycle,
+    });
+  }
+  if (dependencies.r3Analytics !== undefined) {
+    registerR3AnalyticsRoutes(app, {
+      csrfProtection: csrfProtection(app),
+      guard,
+      rateLimit: {
+        max: config.rateLimitMax,
+        timeWindowMs: config.rateLimitWindowMs,
+      },
+      ...dependencies.r3Analytics,
     });
   }
   if (dependencies.customerShortlist !== undefined) {
@@ -755,7 +781,10 @@ async function configureAuthModule(
       void reply.code(429).send({ code: "RATE_LIMITED" });
       return;
     }
-    if (details.code === "FST_CSRF_INVALID_TOKEN") {
+    if (
+      details.code === "FST_CSRF_INVALID_TOKEN" ||
+      details.code === "FST_CSRF_MISSING_SECRET"
+    ) {
       void reply.code(403).send({ code: "CSRF_INVALID" });
       return;
     }

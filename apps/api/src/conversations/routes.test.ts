@@ -209,6 +209,10 @@ describe("conversation routes", () => {
     expect(response.headers["x-content-type-options"]).toBe("nosniff");
     expect(response.headers.location).toBe("https://private.invalid/grant");
     expect(response.body).toBe("");
+    expect(fixture.recordSuccessfulDelivery).toHaveBeenCalledWith({
+      actorUserId,
+      mediaAssetId,
+    });
     await app.close();
   });
 
@@ -415,6 +419,7 @@ function createFixture(
     },
     statusCode: 303,
   });
+  const recordSuccessfulDelivery = vi.fn().mockResolvedValue(undefined);
   let csrfCallCount = 0;
   const csrfProtection: onRequestHookHandler = (_request, _reply, done) => {
     csrfCallCount += 1;
@@ -427,6 +432,7 @@ function createFixture(
         attachmentUploads: { upload: uploadAttachment },
         csrfProtection,
         persistence: { readTimeline },
+        pdfDeliveryObservation: { recordSuccessfulDelivery },
         privateMediaDelivery: { handleDownload },
         service: { report, sendMessage, updateParticipantState },
       },
@@ -446,6 +452,7 @@ function createFixture(
     readOwned,
     readOwnedByInvitation,
     readTimeline,
+    recordSuccessfulDelivery,
     report,
     sendMessage,
     uploadAttachment,

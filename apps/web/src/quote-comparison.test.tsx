@@ -5,13 +5,77 @@ import { serializeQuoteComparison } from "@portal/domain";
 
 import {
   loadQuoteComparison,
+  observeActualVisibility,
   QuoteComparisonEntry,
   QuoteComparisonView,
+  recordQuoteComparisonObservation,
 } from "./quote-comparison";
 
 const jobRequestId = "83000000-0000-4000-8000-000000000001";
 
 describe("customer Quote comparison", () => {
+  it("records only the minimal observation shape and isolates delivery failure", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(Response.json({ csrfToken: "csrf" }))
+      .mockRejectedValueOnce(new Error("analytics unavailable"));
+    await expect(
+      recordQuoteComparisonObservation({
+        fetch: fetcher,
+        jobRequestId,
+        kind: "QUOTE_COMPARISON_OPENED",
+      }),
+    ).resolves.toBeUndefined();
+    expect(fetcher.mock.calls[1]?.[0]).toBe("/v1/me/analytics/r3-observations");
+    const payload = JSON.parse(
+      (fetcher.mock.calls[1]?.[1] as RequestInit).body as string,
+    ) as Record<string, unknown>;
+    expect(Object.keys(payload).sort()).toEqual([
+      "commandId",
+      "jobRequestId",
+      "kind",
+    ]);
+    expect(JSON.stringify(payload)).not.toMatch(/price|provider|pdf|storage/iu);
+  });
+
+  it("observes a card only after viewport intersection in a visible tab", () => {
+    const target = {} as Element;
+    const documentTarget = new EventTarget() as EventTarget & {
+      visibilityState: DocumentVisibilityState;
+    };
+    documentTarget.visibilityState = "hidden";
+    let callback: IntersectionObserverCallback | undefined;
+    class Observer {
+      disconnect = vi.fn();
+      observe = vi.fn();
+      unobserve = vi.fn();
+      takeRecords = vi.fn(() => []);
+      root = null;
+      rootMargin = "0px";
+      thresholds = [0];
+      constructor(next: IntersectionObserverCallback) {
+        callback = next;
+      }
+    }
+    vi.stubGlobal("document", documentTarget);
+    vi.stubGlobal("IntersectionObserver", Observer);
+    const visible = vi.fn();
+    const cleanup = observeActualVisibility(target, visible);
+    expect(visible).not.toHaveBeenCalled();
+    callback?.(
+      [{ isIntersecting: true, target } as IntersectionObserverEntry],
+      {} as IntersectionObserver,
+    );
+    expect(visible).not.toHaveBeenCalled();
+    documentTarget.visibilityState = "visible";
+    documentTarget.dispatchEvent(new Event("visibilitychange"));
+    expect(visible).toHaveBeenCalledOnce();
+    documentTarget.dispatchEvent(new Event("visibilitychange"));
+    expect(visible).toHaveBeenCalledOnce();
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
   it("renders a private passive boundary and a responsive neutral card", () => {
     expect(
       renderToStaticMarkup(

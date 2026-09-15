@@ -16,8 +16,16 @@ describe("invitation notification processor", () => {
     const processNext = vi.fn<OutboxWorker["processNext"]>(() =>
       Promise.resolve(results.shift() ?? { status: "IDLE" }),
     );
+    const processAnalytics = vi
+      .fn()
+      .mockResolvedValueOnce({
+        eventId: crypto.randomUUID(),
+        status: "DELIVERED",
+      })
+      .mockResolvedValueOnce({ status: "IDLE" });
     let currentTime = 1_000;
     const processor = createInvitationNotificationProcessor({
+      analytics: { processNext: processAnalytics },
       demandSideNotifications: { enqueueDueUnreadChatEmails },
       invitations: { expirePending },
       maintenanceIntervalMs: 60_000,
@@ -37,6 +45,7 @@ describe("invitation notification processor", () => {
     expect(expirePending).toHaveBeenCalledTimes(1);
     expect(expireDueSubmitted).toHaveBeenCalledTimes(1);
     expect(processNext).toHaveBeenCalledTimes(2);
+    expect(processAnalytics).toHaveBeenCalledTimes(2);
   });
 
   it("reruns maintenance after the bounded interval and fails closed on errors", async () => {
@@ -66,5 +75,33 @@ describe("invitation notification processor", () => {
       "DATABASE_UNAVAILABLE",
     );
     expect(processNext).toHaveBeenCalledTimes(1);
+  });
+
+  it("never lets analytics failure interrupt notification delivery", async () => {
+    const onAnalyticsError = vi.fn();
+    const processOutbox = vi.fn().mockResolvedValue({
+      eventId: crypto.randomUUID(),
+      status: "PUBLISHED",
+    });
+    const processor = createInvitationNotificationProcessor({
+      analytics: { processNext: vi.fn().mockRejectedValue(new Error("db")) },
+      demandSideNotifications: {
+        enqueueDueUnreadChatEmails: vi.fn().mockResolvedValue(0),
+      },
+      invitations: { expirePending: vi.fn().mockResolvedValue([]) },
+      now: () => 1,
+      onAnalyticsError,
+      outbox: { processNext: processOutbox },
+      quotes: { expireDueSubmitted: vi.fn().mockResolvedValue([]) },
+      reminders: { enqueueDueReminders: vi.fn().mockResolvedValue([]) },
+    });
+    await expect(processor.processNext()).resolves.toEqual({
+      status: "succeeded",
+    });
+    await expect(processor.processNext()).resolves.toEqual({
+      status: "succeeded",
+    });
+    expect(processOutbox).toHaveBeenCalledTimes(2);
+    expect(onAnalyticsError).toHaveBeenCalledTimes(2);
   });
 });

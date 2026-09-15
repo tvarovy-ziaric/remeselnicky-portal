@@ -2,6 +2,7 @@ import type {
   JobInvitationPersistence,
   QuoteLifecycleMaintenancePersistence,
 } from "@portal/domain";
+import type { R3AnalyticsProcessResult } from "@portal/analytics";
 import type {
   DemandSideNotificationMaintenanceStore,
   JobInvitationReminderStore,
@@ -18,10 +19,14 @@ export const INVITATION_MAINTENANCE_INTERVAL_MS = 60_000;
  * provider adapter is configured.
  */
 export function createInvitationNotificationProcessor(input: {
+  readonly analytics?: Readonly<{
+    processNext(): Promise<R3AnalyticsProcessResult>;
+  }>;
   readonly demandSideNotifications: DemandSideNotificationMaintenanceStore;
   readonly invitations: Pick<JobInvitationPersistence, "expirePending">;
   readonly maintenanceIntervalMs?: number;
   readonly now?: () => number;
+  readonly onAnalyticsError?: (error: unknown) => void;
   readonly outbox: OutboxWorker;
   readonly quotes: QuoteLifecycleMaintenancePersistence;
   readonly reminders: JobInvitationReminderStore;
@@ -49,8 +54,18 @@ export function createInvitationNotificationProcessor(input: {
       }
 
       const result = await input.outbox.processNext();
+      let analytics: R3AnalyticsProcessResult | undefined;
+      try {
+        analytics = await input.analytics?.processNext();
+      } catch (error: unknown) {
+        input.onAnalyticsError?.(error);
+      }
       return Object.freeze({
-        status: result.status === "IDLE" ? "idle" : "succeeded",
+        status:
+          result.status === "IDLE" &&
+          (analytics === undefined || analytics.status === "IDLE")
+            ? "idle"
+            : "succeeded",
       });
     },
   });
