@@ -109,6 +109,7 @@ import { createJobInvitationRepository } from "./job-invitation-repository.js";
 import { createJobInvitationReminderRepository } from "./job-invitation-notification-repository.js";
 import { createConversationRepository } from "./conversation-repository.js";
 import { createConversationChatRepository } from "./conversation-chat-repository.js";
+import { createQuoteRepository } from "./quote-repository.js";
 import {
   createConversationAttachmentMediaAccessResolver,
   createConversationAttachmentUploadAuthorization,
@@ -127,6 +128,7 @@ import type {
   JobInvitationPersistence,
   ConversationPersistence,
   ConversationChatPersistence,
+  QuotePersistence,
 } from "@portal/domain";
 import * as schema from "./schema/index.js";
 
@@ -625,6 +627,8 @@ export { createConversationRepository } from "./conversation-repository.js";
 export type { ConversationPersistence } from "@portal/domain";
 export { createConversationChatRepository } from "./conversation-chat-repository.js";
 export type { ConversationChatPersistence } from "@portal/domain";
+export { createQuoteRepository } from "./quote-repository.js";
+export type { QuotePersistence } from "@portal/domain";
 export { createJobRequestMediaUploadAuthorization } from "./job-request-media-repository.js";
 export type { JobRequestMediaUploadAuthorization } from "@portal/media";
 export { createCraftsmanProfileRepository } from "./craftsman-profile-repository.js";
@@ -785,6 +789,7 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly jobInvitationReminders: JobInvitationReminderStore;
   readonly conversations: ConversationPersistence;
   readonly conversationChat: ConversationChatPersistence;
+  readonly quotes: QuotePersistence;
   readonly conversationAttachmentUploads: ConversationAttachmentUploadAuthorization;
   readonly conversationAttachmentMediaAccess: MediaEntityAccessResolver;
   readonly jobRequestMedia: JobRequestMediaUploadAuthorization;
@@ -875,6 +880,7 @@ export function createDatabase(
   const jobInvitationReminders = createJobInvitationReminderRepository(sql);
   const conversations = createConversationRepository(sql);
   const conversationChat = createConversationChatRepository(sql);
+  const quotes = createQuoteRepository(sql);
   const conversationAttachmentUploads =
     createConversationAttachmentUploadAuthorization(sql);
   const conversationAttachmentMediaAccess =
@@ -932,6 +938,7 @@ export function createDatabase(
     jobInvitationReminders,
     conversations,
     conversationChat,
+    quotes,
     conversationAttachmentUploads,
     conversationAttachmentMediaAccess,
     jobRequestMedia,

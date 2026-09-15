@@ -454,3 +454,4 @@ export * from "./job-invitation.js";
 export * from "./conversation.js";
 export * from "./conversation-chat.js";
 export * from "./conversation-message-policy.js";
+export * from "./quote.js";
