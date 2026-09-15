@@ -95,8 +95,8 @@ This file is the persistent implementation-status overlay for the hash-verified 
 | R3-012 | DONE     | Immutable chat timeline, read receipts/unread state, archive/mute/report and live isolation tests passed      |
 | R3-013 | DONE     | Private chat photo/PDF attachments, processing/delivery guards and future Job-documentation hooks passed      |
 | R3-014 | DONE     | Server/DB-enforced pre-confirmation contact/address policy, generic denial and bypass regressions passed      |
-| R3-015 | DONE     | Immutable Quote revisions, private draft/submitted isolation, CAS/idempotency and live DB guards passed      |
-| R3-016 | ACTIVE   | Native structured Quote authoring with exact immutable revision content                                      |
+| R3-015 | DONE     | Immutable Quote revisions, private draft/submitted isolation, CAS/idempotency and live DB guards passed       |
+| R3-016 | ACTIVE   | Native structured Quote authoring with exact immutable revision content                                       |
 
 All DONE rows above are covered by CI run `34962294881` unless a more specific earlier run is referenced in history. The run applied migrations `0000`–`0048` twice and passed the complete live PostgreSQL/PostGIS integration suite, including the R1 supply-side authorization/privacy matrix, full R2 discovery/shortlist assertions, and R3 request core, recovery, validated content, private media, lifecycle, invitations, conversations, immutable chat and attachments, pre-confirm privacy policy, Quote core revisions and concurrency boundaries.
 
