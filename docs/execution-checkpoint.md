@@ -5,11 +5,11 @@ This file is the persistent implementation-status overlay for the hash-verified 
 - Updated: 2026-09-15
 - Definition: D01–D30 LOCKED and hash verified
 - Active release: R3 — Demand side
-- Last completed ticket: R3-002 — server autosave and recoverable private draft sections
-- Active ticket: R3-003 — auth-boundary draft survival
-- Next dependency-satisfied candidate: R3-004 — lightweight JobRequest form and submission validation
+- Last completed ticket: R3-003 — auth-boundary local draft survival and atomic authenticated handoff
+- Active ticket: R3-004 — lightweight JobRequest form, validation, media, location, timing and budget
+- Next dependency-satisfied candidate: R3-005 — material request versioning after R3-004 content stabilizes
 - Human gate: canonical Slovak profession/skill/location content still requires expert/legal/source review before activation; this does not block private supply-side implementation
-- Integrated verification: commit `fbfc770`, CI run `34926630567`, passed quality, dependency audit, secret scan, clean PostgreSQL/PostGIS migrations 0000–0037 and the complete live R0/R1/R2 plus R3-001/R3-002 integration suite
+- Integrated verification: commit `8f1aa53`, CI run `34927499414`, passed quality, dependency audit, secret scan, clean PostgreSQL/PostGIS migrations 0000–0037 and the complete live R0/R1/R2 plus R3-001/R3-002 integration suite; API/web auth-handoff tests passed in the quality job
 
 ## Ticket state overlay
 
@@ -83,9 +83,10 @@ This file is the persistent implementation-status overlay for the hash-verified 
 | R2-014 | DONE     | Search abuse admission, response bounds and privacy/security/performance regressions passed                  |
 | R3-001 | DONE     | Private JobRequest identity, immutable DRAFT history and fail-closed ACTIVE transition passed                |
 | R3-002 | DONE     | Bounded canonical section autosave, recovery, exact replay and live PostgreSQL race/history guards passed    |
-| R3-003 | ACTIVE   | Auth-boundary local draft survival and atomic authenticated handoff                                          |
+| R3-003 | DONE     | Session-rotation-safe marker, atomic first section, retry dedupe and IndexedDB multi-tab recovery passed     |
+| R3-004 | ACTIVE   | Lightweight allowlisted request form/content validation and submission readiness                             |
 
-All DONE rows above are covered by CI run `34926630567` unless a more specific earlier run is referenced in history. The run applied migrations `0000`–`0037` twice and passed the complete live PostgreSQL/PostGIS integration suite, including the R1 supply-side authorization/privacy matrix, full R2 discovery/shortlist assertions and R3-001/R3-002 request-core and draft-recovery checks.
+All DONE rows above are covered by CI run `34927499414` unless a more specific earlier run is referenced in history. The run applied migrations `0000`–`0037` twice and passed the complete live PostgreSQL/PostGIS integration suite, including the R1 supply-side authorization/privacy matrix, full R2 discovery/shortlist assertions, R3-001/R3-002 request-core and draft-recovery checks, and the R3-003 API/web authentication-boundary suite.
 
 ## Durable decisions
 
