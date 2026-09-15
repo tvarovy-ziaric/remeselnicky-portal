@@ -13,6 +13,10 @@ import {
   type JobRequestDraftClient,
   type JobRequestEditableDraft,
 } from "./job-request-draft-client";
+import {
+  loadJobRequestTaxonomySuggestions,
+  type JobRequestTaxonomySuggestion,
+} from "./job-request-taxonomy-client";
 
 const STEPS = Object.freeze([
   { key: "request.core", label: "Čo potrebujete" },
@@ -49,7 +53,9 @@ interface EditorValues {
     | "COMBINATION";
   municipalityCode: string;
   primaryProfessionCode: string;
+  skillCodes: readonly string[];
   siteInspection: "" | "LIKELY" | "MAYBE" | "UNKNOWN";
+  specializationCode: string;
   startsOn: string;
   textClarification: string;
   timingMode: "" | "AS_SOON_AS_POSSIBLE" | "SPECIFIC_PERIOD" | "FLEXIBLE";
@@ -297,17 +303,27 @@ function renderStep(
               value={values.description}
             />
           </label>
-          <label>
-            Profesia alebo služba
-            <input
-              autoComplete="off"
-              maxLength={64}
-              onChange={update("primaryProfessionCode")}
-              placeholder="Vyberte zo spravovaných návrhov"
-              required
-              value={values.primaryProfessionCode}
-            />
-          </label>
+          <ProfessionPicker
+            selectedCode={values.primaryProfessionCode}
+            onSelect={(suggestion) =>
+              setValues((current) => ({
+                ...current,
+                primaryProfessionCode:
+                  suggestion.kind === "PROFESSION"
+                    ? suggestion.code
+                    : (suggestion.professionCodes[0] ?? ""),
+                skillCodes:
+                  suggestion.kind === "SKILL"
+                    ? [suggestion.code]
+                    : current.skillCodes,
+                specializationCode:
+                  suggestion.kind === "SPECIALIZATION"
+                    ? suggestion.code
+                    : current.specializationCode,
+                title: current.title || suggestion.label,
+              }))
+            }
+          />
           <label>
             Názov dopytu <span>(voliteľné)</span>
             <input
@@ -516,6 +532,78 @@ function renderStep(
   }
 }
 
+function ProfessionPicker({
+  onSelect,
+  selectedCode,
+}: {
+  readonly onSelect: (suggestion: JobRequestTaxonomySuggestion) => void;
+  readonly selectedCode: string;
+}) {
+  const [query, setQuery] = useState(selectedCode);
+  const [suggestions, setSuggestions] = useState<
+    readonly JobRequestTaxonomySuggestion[]
+  >([]);
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      void loadJobRequestTaxonomySuggestions(
+        query,
+        fetch,
+        controller.signal,
+      ).then(setSuggestions);
+    }, 180);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [query]);
+  return (
+    <div className="profession-picker">
+      <label>
+        Profesia alebo služba
+        <input
+          aria-describedby="profession-help"
+          autoComplete="off"
+          maxLength={120}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setSuggestions([]);
+          }}
+          placeholder="napr. oprava strechy alebo maľovanie"
+          required
+          value={query}
+        />
+      </label>
+      <p className="field-help" id="profession-help">
+        Začnite písať bežnými slovami a vyberte spravovaný návrh.
+      </p>
+      {suggestions.length > 0 ? (
+        <ul className="profession-suggestions">
+          {suggestions.map((suggestion) => (
+            <li key={`${suggestion.kind}:${suggestion.code}`}>
+              <button
+                onClick={() => {
+                  onSelect(suggestion);
+                  setQuery(suggestion.label);
+                  setSuggestions([]);
+                }}
+                type="button"
+              >
+                {suggestion.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {selectedCode === "" ? (
+        <p className="selection-state">Zatiaľ nie je vybraná žiadna služba.</p>
+      ) : (
+        <p className="selection-state">Vybraná služba: {query}</p>
+      )}
+    </div>
+  );
+}
+
 function Review({
   values,
   draft,
@@ -635,8 +723,8 @@ function sectionFromValues(
           description: nullIfEmpty(values.description),
           primaryProfessionCode: nullIfEmpty(values.primaryProfessionCode),
           relatedProfessionCodes: [],
-          skillCodes: [],
-          specializationCode: null,
+          skillCodes: values.skillCodes,
+          specializationCode: nullIfEmpty(values.specializationCode),
           title: nullIfEmpty(values.title),
         }
       : key === "request.location"
@@ -726,11 +814,13 @@ function valuesFromDraft(draft: JobRequestEditableDraft | null): EditorValues {
     ]),
     municipalityCode: stringValue(location?.["municipalityCode"]),
     primaryProfessionCode: stringValue(core?.["primaryProfessionCode"]),
+    skillCodes: arrayOfStrings(core?.["skillCodes"]),
     siteInspection: enumValue(details?.["siteInspection"], [
       "LIKELY",
       "MAYBE",
       "UNKNOWN",
     ]),
+    specializationCode: stringValue(core?.["specializationCode"]),
     startsOn: stringValue(timing?.["startsOn"]),
     textClarification: stringValue(location?.["textClarification"]),
     timingMode: enumValue(timing?.["mode"], [
@@ -831,7 +921,9 @@ const emptyValues: EditorValues = {
   materialResponsibility: "",
   municipalityCode: "",
   primaryProfessionCode: "",
+  skillCodes: [],
   siteInspection: "",
+  specializationCode: "",
   startsOn: "",
   textClarification: "",
   timingMode: "",

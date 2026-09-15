@@ -230,6 +230,45 @@ section {
   gap: 1rem;
 }
 
+.profession-picker {
+  position: relative;
+}
+
+.profession-suggestions {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0.35rem 0 0;
+  padding: 0.4rem;
+  border: 1px solid #a8b2aa;
+  border-radius: 0.6rem;
+  background: #fff;
+  box-shadow: 0 0.8rem 2rem rgb(39 51 43 / 12%);
+  list-style: none;
+}
+
+.profession-suggestions button {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border: 0;
+  border-radius: 0.4rem;
+  background: transparent;
+  color: #1f2923;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.profession-suggestions button:hover,
+.profession-suggestions button:focus-visible {
+  background: #edf3ed;
+}
+
+.selection-state {
+  margin: 0.55rem 0 0;
+  color: #55705f;
+  font-size: 0.86rem;
+}
+
 .job-request-actions {
   display: flex;
   justify-content: space-between;
