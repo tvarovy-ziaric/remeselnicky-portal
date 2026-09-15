@@ -5,11 +5,11 @@ This file is the persistent implementation-status overlay for the hash-verified 
 - Updated: 2026-09-15
 - Definition: D01–D30 LOCKED and hash verified
 - Active release: R3 — Demand side
-- Last completed ticket: R3-015 — Quote core/revisions/state machine
-- Active ticket: R3-016 — PLATFORM_STRUCTURED Quote authoring
-- Next dependency-satisfied candidate: R3-017 — EXTERNAL_PDF Quote authoring and immutable revisions
+- Last completed ticket: R3-016 — PLATFORM_STRUCTURED Quote authoring
+- Active ticket: R3-017 — EXTERNAL_PDF Quote authoring and immutable revisions
+- Next dependency-satisfied candidate: R3-018 — Quote comparison normalization/UI
 - Human gate: canonical Slovak profession/skill/location content still requires expert/legal/source review before activation; this does not block private supply-side implementation
-- Integrated verification: commits `e7eed6d`, `15a0483`, `6eda617`, `173b758` and `7ab46be`, CI run `34962294881`, passed quality, dependency audit, full-history secret scan, clean PostgreSQL/PostGIS migrations 0000–0048 and the complete live R0/R1/R2 plus R3-001–R3-015 integration suite; pre-confirm contact/address blocking, Unicode/Slovak circumvention negatives, immutable Quote lineage, private draft/customer-visible submitted isolation, exact request provenance, deferred command effects and ACTIVE/competitor/race guards passed
+- Integrated verification: commits `1b894d8`, `738fb94` and `d51ac3f`, CI run `34965705640`, passed quality, dependency audit, full-history secret scan, clean PostgreSQL/PostGIS migrations 0000–0049 and the complete live R0/R1/R2 plus R3-001–R3-016 integration suite; structured Quote normalization, immutable content revisions, exact request provenance, pre-confirm contact/address guards, DB-authoritative expiry, submit/save concurrency linearization, ACTIVE/competitor isolation and raw-SQL history guards passed
 
 ## Ticket state overlay
 
@@ -96,9 +96,10 @@ This file is the persistent implementation-status overlay for the hash-verified 
 | R3-013 | DONE     | Private chat photo/PDF attachments, processing/delivery guards and future Job-documentation hooks passed      |
 | R3-014 | DONE     | Server/DB-enforced pre-confirmation contact/address policy, generic denial and bypass regressions passed      |
 | R3-015 | DONE     | Immutable Quote revisions, private draft/submitted isolation, CAS/idempotency and live DB guards passed       |
-| R3-016 | ACTIVE   | Native structured Quote authoring with exact immutable revision content                                       |
+| R3-016 | DONE     | Native structured Quote authoring, immutable typed content and submit/save race guards passed                 |
+| R3-017 | ACTIVE   | External PDF Quote authoring, minimal structured envelope and immutable PDF revisions                         |
 
-All DONE rows above are covered by CI run `34962294881` unless a more specific earlier run is referenced in history. The run applied migrations `0000`–`0048` twice and passed the complete live PostgreSQL/PostGIS integration suite, including the R1 supply-side authorization/privacy matrix, full R2 discovery/shortlist assertions, and R3 request core, recovery, validated content, private media, lifecycle, invitations, conversations, immutable chat and attachments, pre-confirm privacy policy, Quote core revisions and concurrency boundaries.
+All DONE rows above are covered by CI run `34965705640` unless a more specific earlier run is referenced in history. The run applied migrations `0000`–`0049` twice and passed the complete live PostgreSQL/PostGIS integration suite, including the R1 supply-side authorization/privacy matrix, full R2 discovery/shortlist assertions, and R3 request core, recovery, validated content, private media, lifecycle, invitations, conversations, immutable chat and attachments, pre-confirm privacy policy, Quote core revisions, native structured authoring and concurrency boundaries.
 
 ## Durable decisions
 
