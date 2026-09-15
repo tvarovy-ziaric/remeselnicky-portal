@@ -4,6 +4,7 @@ import {
   normalizeJobRequestContentSection,
   type ConversationId,
   type ConversationParticipantState,
+  type CraftsmanProfileId,
   type JobInvitationId,
   type JobRequestCoreContent,
   type JobRequestId,
@@ -1135,6 +1136,13 @@ async function expectMaterialEditVersusInvitationLockOrder(
   `;
   expect(after?.state).toBe("NOT_SELECTED");
   await expectMaterialEventCount(sql, reverseMaterialCommandId, 0);
+  const replacement = await createJobInvitationRepository(sql).sendOwned({
+    actorUserId: fixture.customerOwnerId,
+    commandId: randomUUID(),
+    craftsmanProfileId: await loadCraftsmanProfileId(sql, fixture.invitationId),
+    jobRequestId: fixture.jobRequestId,
+  });
+  expect(replacement.status).toBe("APPLIED");
   if (revised.status !== "APPLIED" || reverseRevised.status !== "APPLIED") {
     throw new Error(
       "Material authorization race did not append exact versions.",
@@ -1155,6 +1163,21 @@ async function expectMaterialEditVersusInvitationLockOrder(
       requestContentRevision: reverseRevised.version.contentRevision,
     }),
   ).resolves.toBeNull();
+}
+
+async function loadCraftsmanProfileId(
+  sql: Sql,
+  invitationId: JobInvitationId,
+): Promise<CraftsmanProfileId> {
+  const [row] = await sql<
+    Array<{ readonly craftsmanProfileId: CraftsmanProfileId }>
+  >`
+    SELECT craftsman_profile_id AS "craftsmanProfileId"
+    FROM job_invitations
+    WHERE id = ${invitationId}
+  `;
+  if (row === undefined) throw new Error("Invitation identity is missing.");
+  return row.craftsmanProfileId;
 }
 
 async function expectMaterialEventCount(
