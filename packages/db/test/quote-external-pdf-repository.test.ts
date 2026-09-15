@@ -101,6 +101,8 @@ describe("external PDF Quote repository", () => {
       joined.indexOf("FROM quotes WHERE"),
     );
     expect(joined).not.toContain("quote_external_pdf_documents");
+    expect(joined).toContain("quote_active_participant_context(");
+    expect(joined).toContain("'CRAFTSMAN', true");
   });
 
   it("denies the R3-017 upload seam for a non-external Quote revision", async () => {
@@ -114,6 +116,32 @@ describe("external PDF Quote repository", () => {
     ).resolves.toEqual({ status: "UPLOAD_UNAVAILABLE" });
     expect(fixture.statements.join("\n")).toContain(
       "revision.authoring_mode = 'EXTERNAL_PDF'",
+    );
+  });
+
+  it("denies upload before storage when the invitation is no longer writable", async () => {
+    const fixture = scriptedSql([
+      [{ id: actorUserId }],
+      [
+        {
+          conversationId: "98600000-0000-4000-8000-000000000004",
+          invitationId: "98600000-0000-4000-8000-000000000005",
+        },
+      ],
+      [{ id: "invitation" }],
+      [{ id: "conversation" }],
+      [{ id: quoteId }],
+      [],
+    ]);
+    await expect(
+      createQuoteDocumentUploadAuthorization(fixture.sql).prepareUpload({
+        actorUserId,
+        quoteId,
+        quoteRevision: 1,
+      }),
+    ).resolves.toEqual({ status: "UPLOAD_UNAVAILABLE" });
+    expect(fixture.statements.at(-1)).toContain(
+      "quote_active_participant_context(",
     );
   });
 

@@ -386,8 +386,13 @@ export function createQuoteDocumentUploadAuthorization(
           return { status: "UPLOAD_UNAVAILABLE" } as const;
         const rows = await transaction`
           SELECT head.quote_id FROM quote_revision_heads head
+          JOIN quotes quote ON quote.id = head.quote_id
           WHERE head.quote_id = ${input.quoteId} AND head.quote_revision = ${input.quoteRevision}
-            AND head.state = 'DRAFT' FOR UPDATE
+            AND head.state = 'DRAFT'
+            AND quote_active_participant_context(
+              quote.conversation_id, ${input.actorUserId}, 'CRAFTSMAN', true
+            )
+          FOR UPDATE OF head
         `;
         if (rows.length !== 1) return { status: "UPLOAD_UNAVAILABLE" } as const;
         return Object.freeze({
