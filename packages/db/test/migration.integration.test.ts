@@ -51,6 +51,7 @@ import { runJobRequestDraftIntegrationAssertions } from "./job-request-draft-int
 import { runJobRequestContentIntegrationAssertions } from "./job-request-content-integration-helper.js";
 import { runJobRequestVersionIntegrationAssertions } from "./job-request-version-integration-helper.js";
 import { runJobRequestLifecycleIntegrationAssertions } from "./job-request-lifecycle-integration-helper.js";
+import { runJobInvitationIntegrationAssertions } from "./job-invitation-integration-helper.js";
 
 const testDatabaseUrl = process.env["TEST_DATABASE_URL"];
 const migrationsDirectory = fileURLToPath(
@@ -117,6 +118,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
           "0038_job_request_content_validation.sql",
           "0039_job_request_active_versions.sql",
           "0040_job_request_operational_lifecycle.sql",
+          "0041_job_invitations.sql",
         ],
         alreadyApplied: 0,
       });
@@ -125,7 +127,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         testDatabaseUrl,
         migrationsDirectory,
       );
-      expect(secondRun).toEqual({ applied: [], alreadyApplied: 41 });
+      expect(secondRun).toEqual({ applied: [], alreadyApplied: 42 });
 
       const sql = postgres(testDatabaseUrl, { max: 5 });
       try {
@@ -171,7 +173,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         `;
 
         expect(postgis?.extversion).toMatch(/^3\./);
-        expect(ledger?.count).toBe(41);
+        expect(ledger?.count).toBe(42);
         expect(created).toMatchObject({ account_state: "ACTIVE" });
         expect(created?.id).toMatch(
           /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
@@ -1712,6 +1714,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         await runJobRequestDraftIntegrationAssertions(sql);
         await runJobRequestContentIntegrationAssertions(sql);
         await runJobRequestVersionIntegrationAssertions(sql);
+        await runJobInvitationIntegrationAssertions(sql);
         await runJobRequestLifecycleIntegrationAssertions(sql);
 
         await adminAccess.revokePrivilegedSession(superSessionDigest);

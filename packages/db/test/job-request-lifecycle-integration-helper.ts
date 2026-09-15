@@ -115,6 +115,19 @@ export async function runJobRequestLifecycleIntegrationAssertions(
     },
     status: "APPLIED",
   });
+  const activeInvitations = await sql<{ readonly count: number }[]>`
+    SELECT count(*)::integer AS count FROM current_job_invitations
+    WHERE job_request_id = ${fixture.jobRequestId}
+      AND state IN ('PENDING', 'ENGAGED')
+  `;
+  expect(activeInvitations[0]?.count).toBe(0);
+  const requestClosures = await sql<{ readonly count: number }[]>`
+    SELECT count(*)::integer AS count FROM job_invitation_commands command
+    JOIN job_invitations invitation ON invitation.id = command.invitation_id
+    WHERE invitation.job_request_id = ${fixture.jobRequestId}
+      AND command.command_kind = 'REQUEST_CLOSED'
+  `;
+  expect(requestClosures[0]?.count).toBeGreaterThan(0);
   await expect(
     lifecycle.reactivateOwned({
       actorUserId: fixture.actorUserId,
