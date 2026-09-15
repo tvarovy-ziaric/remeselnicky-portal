@@ -3,6 +3,8 @@ import { createDatabase } from "@portal/db";
 import {
   createCustomerProfileService,
   createCustomerShortlistService,
+  createJobRequestDraftService,
+  createJobRequestService,
 } from "@portal/domain";
 import { createPublicPortfolioDeliveryResolver } from "@portal/media";
 import {
@@ -60,6 +62,13 @@ const customerShortlist = createCustomerShortlistService({
 const customerProfiles = createCustomerProfileService({
   persistence: database.customerProfiles,
 });
+const jobRequestDrafts = createJobRequestDraftService({
+  persistence: database.jobRequestDrafts,
+});
+const jobRequests = createJobRequestService({
+  customerProfiles,
+  persistence: database.jobRequests,
+});
 const publicSearchCards = createPublicSearchCardSearch(
   database.publicSearchCards,
 );
@@ -85,6 +94,12 @@ const app = buildApi({
     draftHandoff: {
       customerProfiles,
       drafts: database.jobRequestDrafts,
+    },
+    jobRequestDrafts: {
+      customerProfiles,
+      draftPersistence: database.jobRequestDrafts,
+      drafts: jobRequestDrafts,
+      requests: jobRequests,
     },
     persistence: authPersistence,
   },

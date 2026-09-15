@@ -232,6 +232,43 @@ describe("controlled media upload", () => {
     );
   });
 
+  it("accepts only PDF bytes for a job-request document purpose", async () => {
+    const { createProcessingAsset, service } = setup();
+    const provenance = createServerMediaProvenance({
+      entityId: sourceId,
+      entityRevision: 2,
+      entityType: "JOB_REQUEST",
+    });
+
+    await service.upload({
+      actor: actor(),
+      body: new Uint8Array([0x25, 0x50, 0x44, 0x46]),
+      declaredContentType: "application/pdf",
+      originalFilename: "podklady.pdf",
+      provenance,
+      purpose: "JOB_REQUEST_DOCUMENT",
+    });
+
+    expect(createProcessingAsset).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "DOCUMENT",
+        provenanceEntityId: sourceId,
+        provenanceEntityRevision: 2,
+        provenanceEntityType: "JOB_REQUEST",
+        purpose: "JOB_REQUEST_DOCUMENT",
+      }),
+    );
+    await expect(
+      service.upload({
+        actor: actor(),
+        body: new Uint8Array([1]),
+        declaredContentType: "image/jpeg",
+        provenance,
+        purpose: "JOB_REQUEST_DOCUMENT",
+      }),
+    ).rejects.toMatchObject({ code: "INVALID_CONTENT_TYPE" });
+  });
+
   it("accepts credential photos only through the private image purpose", async () => {
     const { createProcessingAsset, service } = setup();
     const provenance = createServerMediaProvenance({

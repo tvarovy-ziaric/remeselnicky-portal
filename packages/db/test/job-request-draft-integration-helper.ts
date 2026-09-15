@@ -27,8 +27,15 @@ export async function runJobRequestDraftIntegrationAssertions(
   `;
 
   const initial = normalizeJobRequestDraftSection({
-    key: "request.basics",
-    payload: { description: "Oprava strechy", urgency: "NORMAL" },
+    key: "request.core",
+    payload: {
+      description: "Oprava strechy",
+      primaryProfessionCode: null,
+      relatedProfessionCodes: [],
+      skillCodes: [],
+      specializationCode: null,
+      title: null,
+    },
     schemaVersion: 1,
   });
   const createCommand = randomUUID();
@@ -60,13 +67,18 @@ export async function runJobRequestDraftIntegrationAssertions(
   await expect(
     repository.recoverOwned({ actorUserId: owner, jobRequestId: request }),
   ).resolves.toMatchObject({
-    draft: { id: request, revision: 1, sections: [{ key: "request.basics" }] },
+    draft: { id: request, revision: 1, sections: [{ key: "request.core" }] },
     status: "OK",
   });
 
   const location = normalizeJobRequestDraftSection({
     key: "request.location",
-    payload: { municipalityCode: "TEST:MUNICIPALITY:001" },
+    payload: {
+      exactAddress: null,
+      mapPin: null,
+      municipalityCode: null,
+      textClarification: null,
+    },
     schemaVersion: 1,
   });
   await expect(
@@ -88,7 +100,12 @@ export async function runJobRequestDraftIntegrationAssertions(
       jobRequestId: request,
       section: normalizeJobRequestDraftSection({
         key: "request.location",
-        payload: { municipalityCode: "TEST:MUNICIPALITY:001" },
+        payload: {
+          exactAddress: null,
+          mapPin: null,
+          municipalityCode: null,
+          textClarification: null,
+        },
         schemaVersion: 1,
       }),
     }),
@@ -108,7 +125,12 @@ export async function runJobRequestDraftIntegrationAssertions(
       jobRequestId: request,
       section: normalizeJobRequestDraftSection({
         key: "request.location",
-        payload: { municipalityCode: "TEST:MUNICIPALITY:999" },
+        payload: {
+          exactAddress: null,
+          mapPin: null,
+          municipalityCode: null,
+          textClarification: "Iný zámer",
+        },
         schemaVersion: 1,
       }),
     }),
@@ -121,8 +143,13 @@ export async function runJobRequestDraftIntegrationAssertions(
       expectedRevision: 2,
       jobRequestId: request,
       section: normalizeJobRequestDraftSection({
-        key: "request.schedule",
-        payload: { window: "FLEXIBLE" },
+        key: "request.timing",
+        payload: {
+          completionDeadline: null,
+          endsOn: null,
+          mode: "FLEXIBLE",
+          startsOn: null,
+        },
         schemaVersion: 1,
       }),
     }),
@@ -132,8 +159,13 @@ export async function runJobRequestDraftIntegrationAssertions(
       expectedRevision: 2,
       jobRequestId: request,
       section: normalizeJobRequestDraftSection({
-        key: "request.materials",
-        payload: { suppliedByCustomer: false },
+        key: "request.details",
+        payload: {
+          approximateQuantity: null,
+          customRequirements: null,
+          materialResponsibility: "CRAFTSMAN_PROVIDES",
+          siteInspection: null,
+        },
         schemaVersion: 1,
       }),
     }),
@@ -144,12 +176,12 @@ export async function runJobRequestDraftIntegrationAssertions(
   ]);
 
   const nearBoundary = normalizeJobRequestDraftSection({
-    key: "request.boundary",
+    key: "request.details",
     payload: {
-      a: "a".repeat(7_900),
-      b: "b".repeat(7_900),
-      c: "c".repeat(7_900),
-      d: "d".repeat(7_900),
+      approximateQuantity: null,
+      customRequirements: "a".repeat(1_900),
+      materialResponsibility: "COMBINATION",
+      siteInspection: "MAYBE",
     },
     schemaVersion: 1,
   });

@@ -352,6 +352,7 @@ function allowedGrantsForPurpose(
 ): ReadonlySet<PrivateMediaAccessGrant> {
   switch (purpose) {
     case "JOB_REQUEST_IMAGE":
+    case "JOB_REQUEST_DOCUMENT":
       return new Set(["INVITED_PROVIDER"]);
     case "JOB_IMAGE":
     case "JOB_DOCUMENT":

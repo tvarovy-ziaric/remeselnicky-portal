@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { AUTH_API_PATHS } from "@portal/contracts";
 import {
   JobRequestDraftIdempotencyError,
+  normalizeJobRequestContentSection,
   normalizeJobRequestDraftSection,
   type CustomerProfileService,
   type JobRequestDraftPersistence,
@@ -181,11 +182,19 @@ function normalizePreAuthHandoffSection(input: {
   if (description.length < 1 || description.length > 4_000) {
     throw new TypeError("Invalid pre-authentication draft section.");
   }
-  return normalizeJobRequestDraftSection({
+  const content = normalizeJobRequestContentSection({
     key: input.key,
-    payload: { description },
+    payload: {
+      description,
+      primaryProfessionCode: null,
+      relatedProfessionCodes: [],
+      skillCodes: [],
+      specializationCode: null,
+      title: null,
+    },
     schemaVersion: input.schemaVersion,
   });
+  return normalizeJobRequestDraftSection(content);
 }
 
 async function requireActiveActor(

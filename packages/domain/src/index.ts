@@ -447,3 +447,4 @@ export type {
 } from "./craftsman-trust-evidence.js";
 export * from "./job-request.js";
 export * from "./job-request-draft.js";
+export * from "./job-request-content.js";

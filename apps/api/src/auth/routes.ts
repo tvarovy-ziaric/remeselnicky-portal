@@ -29,6 +29,10 @@ import {
   registerCustomerShortlistRoutes,
   type CustomerShortlistRouteDependencies,
 } from "../customer-shortlist/routes.js";
+import {
+  registerJobRequestDraftRoutes,
+  type JobRequestDraftRouteDependencies,
+} from "../job-request-drafts/routes.js";
 import { createSessionGuard } from "./guard.js";
 import {
   registerDraftHandoffRoutes,
@@ -80,6 +84,10 @@ export interface AuthModuleDependencies {
   readonly draftHandoff?: Pick<
     DraftHandoffRouteDependencies,
     "customerProfiles" | "drafts"
+  >;
+  readonly jobRequestDrafts?: Pick<
+    JobRequestDraftRouteDependencies,
+    "customerProfiles" | "draftPersistence" | "drafts" | "requests"
   >;
   readonly emailVerification?: {
     readonly delivery?: EmailVerificationDeliveryPort;
@@ -226,6 +234,13 @@ async function configureAuthModule(
         timeWindowMs: rateLimit.config.rateLimit.timeWindow,
       },
       ...dependencies.draftHandoff,
+    });
+  }
+  if (dependencies.jobRequestDrafts !== undefined) {
+    registerJobRequestDraftRoutes(app, {
+      csrfProtection: csrfProtection(app),
+      guard,
+      ...dependencies.jobRequestDrafts,
     });
   }
   if (dependencies.customerShortlist !== undefined) {

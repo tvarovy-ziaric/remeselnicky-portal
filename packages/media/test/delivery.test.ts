@@ -267,6 +267,7 @@ describe("private media delivery", () => {
 
   it.each([
     ["JOB_REQUEST_IMAGE", "INVITED_PROVIDER"],
+    ["JOB_REQUEST_DOCUMENT", "INVITED_PROVIDER"],
     ["JOB_DOCUMENT", "JOB_CUSTOMER"],
     ["JOB_IMAGE", "JOB_PRIMARY_PROVIDER"],
     ["JOB_IMAGE", "JOB_EXECUTION_PARTICIPANT"],
@@ -310,6 +311,7 @@ describe("private media delivery", () => {
 
   it.each([
     ["JOB_REQUEST_IMAGE", "JOB_EXECUTION_PARTICIPANT"],
+    ["JOB_REQUEST_DOCUMENT", "JOB_CUSTOMER"],
     ["JOB_DOCUMENT", "INVITED_PROVIDER"],
     ["CHAT_DOCUMENT", "JOB_EXECUTION_PARTICIPANT"],
     ["QUOTE_DOCUMENT", "CONVERSATION_MEMBER"],
