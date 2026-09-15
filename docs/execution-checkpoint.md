@@ -5,11 +5,11 @@ This file is the persistent implementation-status overlay for the hash-verified 
 - Updated: 2026-09-15
 - Definition: D01–D30 LOCKED and hash verified
 - Active release: R3 — Demand side
-- Last completed ticket: R3-001 — private JobRequest DRAFT/ACTIVE core and state history
-- Active ticket: R3-002 — server autosave and draft recovery
-- Next dependency-satisfied candidate: R3-003 — auth-boundary draft survival, after autosave/recovery stabilizes
+- Last completed ticket: R3-002 — server autosave and recoverable private draft sections
+- Active ticket: R3-003 — auth-boundary draft survival
+- Next dependency-satisfied candidate: R3-004 — lightweight JobRequest form and submission validation
 - Human gate: canonical Slovak profession/skill/location content still requires expert/legal/source review before activation; this does not block private supply-side implementation
-- Integrated verification: commit `b6095dc`, CI run `34907529214`, passed quality, dependency audit, secret scan, clean PostgreSQL/PostGIS migrations 0000–0036 and the complete live R0/R1/R2 plus R3-001 integration suite
+- Integrated verification: commit `fbfc770`, CI run `34926630567`, passed quality, dependency audit, secret scan, clean PostgreSQL/PostGIS migrations 0000–0037 and the complete live R0/R1/R2 plus R3-001/R3-002 integration suite
 
 ## Ticket state overlay
 
@@ -82,9 +82,10 @@ This file is the persistent implementation-status overlay for the hash-verified 
 | R2-013 | DONE     | Privacy-minimal discovery and shortlist analytics catalog tests passed                                       |
 | R2-014 | DONE     | Search abuse admission, response bounds and privacy/security/performance regressions passed                  |
 | R3-001 | DONE     | Private JobRequest identity, immutable DRAFT history and fail-closed ACTIVE transition passed                |
-| R3-002 | ACTIVE   | Server autosave and recoverable private draft sections                                                       |
+| R3-002 | DONE     | Bounded canonical section autosave, recovery, exact replay and live PostgreSQL race/history guards passed    |
+| R3-003 | ACTIVE   | Auth-boundary local draft survival and atomic authenticated handoff                                          |
 
-All DONE rows above are covered by CI run `34907529214` unless a more specific earlier run is referenced in history. The run applied migrations `0000`–`0036` twice and passed the complete live PostgreSQL/PostGIS integration suite, including the R1 supply-side authorization/privacy matrix, full R2 discovery/shortlist assertions and R3-001 request-core checks.
+All DONE rows above are covered by CI run `34926630567` unless a more specific earlier run is referenced in history. The run applied migrations `0000`–`0037` twice and passed the complete live PostgreSQL/PostGIS integration suite, including the R1 supply-side authorization/privacy matrix, full R2 discovery/shortlist assertions and R3-001/R3-002 request-core and draft-recovery checks.
 
 ## Durable decisions
 
