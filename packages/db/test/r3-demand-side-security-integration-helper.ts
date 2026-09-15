@@ -511,7 +511,8 @@ async function createSecurityFixture(sql: Sql): Promise<SecurityFixture> {
     throw new Error("R3-022 target conversation was not created.");
   }
 
-  const messageBody = `R3-022 private message ${randomUUID()}`;
+  const messageBody =
+    "Súkromná skúšobná správa pre bezpečnostnú maticu dopytovej strany.";
   const sentMessage = await createConversationChatRepository(sql).sendMessage({
     actorUserId: target.ownerUserId,
     body: messageBody,
