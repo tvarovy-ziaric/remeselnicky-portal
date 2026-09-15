@@ -36,10 +36,10 @@ intent fails closed.
 ## Runtime work
 
 `expirePending()` claims at most 100 due invitations with row locks and appends
-system-only `EXPIRE` commands. R3-009 will schedule this worker and deliver
-reminders/notifications; opening/view telemetry remains an event, not a business
-state. R3-008 owns candidate-list selection and the customer invitation API, and
-R3-010 owns participant-facing lifecycle UX.
+system-only `EXPIRE` commands. The deployed worker schedules this operation;
+opening/view telemetry remains an event, not a business state. R3-008 owns
+candidate-list selection and the customer invitation API, and R3-010 owns
+participant-facing lifecycle UX.
 
 No invitation read model exposes competitor identities or counts. Later private
 request/conversation serializers must resolve one concrete invitation and apply
@@ -61,3 +61,31 @@ hidden and newly ineligible targets share the same outward `404` response. The
 candidate page only renders this action when it carries a canonical active
 request identifier; it never auto-invites a result or turns search into a public
 job board.
+
+## Transactional notifications and reminders
+
+Migration `0043_job_invitation_notifications.sql` captures a privacy-minimal
+outbox event in the same transaction as every `SEND` and `EXPIRE` revision.
+`SEND` maps to an `IMPORTANT` in-app + email notification for the invited
+craftsman. `EXPIRE` maps to a non-urgent in-app notification for the customer.
+Notification delivery never controls or rolls back invitation state.
+
+The worker periodically calls `enqueueDueReminders()`. PostgreSQL selects only
+current `PENDING` invitations whose deadline is inside the offline-configured
+`job_invitation_runtime_policy.warning_lead_days` window. A stable outbox
+idempotency key allows at most one expiry reminder for an invitation even when
+workers overlap or restart. Setting the warning lead to zero disables reminders;
+the timing is operational policy rather than a domain constant.
+
+Outbox payloads contain only the recipient UUID, invitation revision and, for
+reminder validation, a canonical UTC expiry timestamp. Rendered notification
+payloads omit the timestamp and contain no request description, exact address,
+contact, decline note, competing provider or commercial data. The deep link is
+an opaque invitation path and must re-run current authorization when R3-010
+renders it.
+
+The PostgreSQL outbox worker creates the canonical in-app record plus an
+idempotent queued email delivery. Until a production email provider/account is
+selected, the delivery row remains queued; it is not silently discarded or
+falsely marked delivered. Provider selection and credentials remain an explicit
+production HUMAN GATE.

@@ -25,6 +25,11 @@ export {
   PermanentEmailDeliveryError,
   RetryableEmailDeliveryError,
 } from "./email-worker.js";
+export {
+  JOB_INVITATION_NOTIFICATION_EVENT_NAMES,
+  mapJobInvitationNotificationEvent,
+} from "./job-invitation.js";
+export type { JobInvitationReminderStore } from "./job-invitation.js";
 export type {
   ClaimEmailDeliveryOptions,
   EmailDelivery,

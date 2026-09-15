@@ -3,15 +3,18 @@ import type {
   QueueMetricSnapshot,
   StructuredLogger,
 } from "@portal/observability";
-import type { JobProcessResult, QueueWorker } from "@portal/queue";
 import type { QueueTelemetryEvent, QueueTelemetrySink } from "@portal/queue";
+
+export interface WorkerLoopProcessor {
+  processNext(): Promise<{ readonly status: string }>;
+}
 
 export interface WorkerLoopOptions {
   readonly heartbeat?: () => void;
   readonly metrics?: PortalMetrics;
   readonly now?: () => number;
   readonly pollIntervalMs?: number;
-  readonly processor: QueueWorker;
+  readonly processor: WorkerLoopProcessor;
   readonly queueMetrics?: {
     snapshot(now: number): Promise<QueueMetricSnapshot>;
   };
@@ -87,7 +90,7 @@ export async function runWorkerLoop(options: WorkerLoopOptions): Promise<void> {
 
   while (!options.signal.aborted) {
     options.heartbeat?.();
-    const result: JobProcessResult = await options.processor.processNext();
+    const result = await options.processor.processNext();
     options.heartbeat?.();
     if (options.queueMetrics !== undefined && options.metrics !== undefined) {
       try {

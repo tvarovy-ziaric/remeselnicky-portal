@@ -1,6 +1,9 @@
-import { randomUUID } from "node:crypto";
-
 import { loadServerConfig } from "@portal/config/server";
+import { createDatabase } from "@portal/db";
+import {
+  createNotificationOutboxPublisher,
+  mapJobInvitationNotificationEvent,
+} from "@portal/notifications";
 import {
   createCentralErrorTracker,
   createLoggerErrorTransport,
@@ -9,21 +12,17 @@ import {
   createStreamDestination,
   createStructuredLogger,
 } from "@portal/observability";
-import {
-  createQueueWorker,
-  InMemoryQueue,
-  NonRetryableJobError,
-} from "@portal/queue";
+import { createOutboxWorker } from "@portal/outbox";
 
-import {
-  createWorkerQueueTelemetrySink,
-  createWorkerReadiness,
-  runWorkerLoop,
-} from "./service.js";
+import { createInvitationNotificationProcessor } from "./notification-delivery.js";
+import { createWorkerReadiness, runWorkerLoop } from "./service.js";
 import { runWorker } from "./worker.js";
 
 const config = loadServerConfig();
 const result = runWorker(config.observability);
+const database = createDatabase({
+  connectionString: config.secrets.databaseUrl,
+});
 const observabilityContext = {
   ...config.observability,
   service: "worker",
@@ -47,14 +46,41 @@ const monitoringServer = createMonitoringServer({
   },
 });
 const abortController = new AbortController();
-const queue = new InMemoryQueue<Readonly<Record<string, unknown>>>();
-const processor = createQueueWorker({
-  backoff: { baseDelayMs: 1_000, maxDelayMs: 60_000 },
-  createRunId: randomUUID,
-  handler: () =>
-    Promise.reject(new NonRetryableJobError("UNREGISTERED_JOB_TYPE")),
-  queue,
-  telemetry: createWorkerQueueTelemetrySink(logger, metrics),
+const notificationPublisher = createNotificationOutboxPublisher({
+  claims: database.outbox.consumerClaims,
+  mapper: mapJobInvitationNotificationEvent,
+  notifications: database.notifications.writer,
+  transactions: database.outbox.transactions,
+});
+const outboxWorker = createOutboxWorker({
+  backoffMs: (attempt) => Math.min(60_000, 1_000 * 2 ** (attempt - 1)),
+  leaseDurationMs: 60_000,
+  maxAttempts: 10,
+  publisher: notificationPublisher,
+  store: database.outbox,
+  telemetry: {
+    record(event) {
+      const fields = {
+        attempt: event.attempt,
+        errorCode: event.errorCode,
+        eventId: event.eventId,
+        eventName: event.eventName,
+        outcome: event.outcome,
+      };
+      if (event.outcome === "TERMINAL_FAILURE") {
+        logger.error("outbox_terminal_failure", fields);
+      } else if (event.outcome === "RETRY_SCHEDULED") {
+        logger.warn("outbox_retry_scheduled", fields);
+      } else {
+        logger.info("outbox_published", fields);
+      }
+    },
+  },
+});
+const processor = createInvitationNotificationProcessor({
+  invitations: database.jobInvitations,
+  outbox: outboxWorker,
+  reminders: database.jobInvitationReminders,
 });
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
@@ -70,7 +96,6 @@ try {
     heartbeat: () => readiness.heartbeat(),
     metrics,
     processor,
-    queueMetrics: queue,
     signal: abortController.signal,
   });
 } catch (error: unknown) {
@@ -80,4 +105,5 @@ try {
   readiness.stop();
   metrics.setWorkerReady(false);
   await monitoringServer.close();
+  await database.close();
 }

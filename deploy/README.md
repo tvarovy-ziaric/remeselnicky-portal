@@ -31,10 +31,11 @@ registry, ingress, certificate, database, or secret-management vendor.
   The staging workflow supplies `staging`; a production go/no-go build must
   explicitly supply `production`.
 
-The worker remains at zero replicas until a durable production queue adapter is
-configured. Its long-running loop and internal monitoring endpoints are ready;
-when enabled, scrape and health traffic uses service port `9465`. API metrics use
-internal service port `9464`. Neither monitoring port is exposed by Ingress.
+The worker runs one replica against the PostgreSQL transactional outbox. It
+creates canonical in-app records and queued email deliveries; an approved email
+provider adapter and its credentials remain a separate production gate. Scrape
+and health traffic uses service port `9465`. API metrics use internal service
+port `9464`. Neither monitoring port is exposed by Ingress.
 
 ## Staging CI contract
 

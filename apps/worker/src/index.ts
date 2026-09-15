@@ -6,3 +6,7 @@ export {
   type WorkerLoopOptions,
   type WorkerReadiness,
 } from "./service.js";
+export {
+  createInvitationNotificationProcessor,
+  INVITATION_MAINTENANCE_INTERVAL_MS,
+} from "./notification-delivery.js";

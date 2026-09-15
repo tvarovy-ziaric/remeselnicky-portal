@@ -22,8 +22,11 @@
   "dependencies": {
     "@portal/config": "workspace:*",
     "@portal/contracts": "workspace:*",
+    "@portal/db": "workspace:*",
     "@portal/domain": "workspace:*",
+    "@portal/notifications": "workspace:*",
     "@portal/observability": "workspace:*",
+    "@portal/outbox": "workspace:*",
     "@portal/queue": "workspace:*"
   },
   "devDependencies": {

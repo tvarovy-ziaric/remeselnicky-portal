@@ -172,12 +172,21 @@ importers:
       '@portal/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@portal/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@portal/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@portal/notifications':
+        specifier: workspace:*
+        version: link:../../packages/notifications
       '@portal/observability':
         specifier: workspace:*
         version: link:../../packages/observability
+      '@portal/outbox':
+        specifier: workspace:*
+        version: link:../../packages/outbox
       '@portal/queue':
         specifier: workspace:*
         version: link:../../packages/queue

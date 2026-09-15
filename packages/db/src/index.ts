@@ -104,6 +104,8 @@ import { createJobRequestDraftRepository } from "./job-request-draft-repository.
 import { createJobRequestVersionRepository } from "./job-request-version-repository.js";
 import { createJobRequestLifecycleRepository } from "./job-request-lifecycle-repository.js";
 import { createJobInvitationRepository } from "./job-invitation-repository.js";
+import { createJobInvitationReminderRepository } from "./job-invitation-notification-repository.js";
+import type { JobInvitationReminderStore } from "@portal/notifications";
 import { createJobRequestMediaUploadAuthorization } from "./job-request-media-repository.js";
 import { createCraftsmanProfileRepository } from "./craftsman-profile-repository.js";
 import type {
@@ -603,6 +605,7 @@ export type { JobRequestVersionPersistence } from "@portal/domain";
 export { createJobRequestLifecycleRepository } from "./job-request-lifecycle-repository.js";
 export type { JobRequestLifecyclePersistence } from "@portal/domain";
 export { createJobInvitationRepository } from "./job-invitation-repository.js";
+export { createJobInvitationReminderRepository } from "./job-invitation-notification-repository.js";
 export type { JobInvitationPersistence } from "@portal/domain";
 export { createJobRequestMediaUploadAuthorization } from "./job-request-media-repository.js";
 export type { JobRequestMediaUploadAuthorization } from "@portal/media";
@@ -761,6 +764,7 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly jobRequestVersions: JobRequestVersionPersistence;
   readonly jobRequestLifecycle: JobRequestLifecyclePersistence;
   readonly jobInvitations: JobInvitationPersistence;
+  readonly jobInvitationReminders: JobInvitationReminderStore;
   readonly jobRequestMedia: JobRequestMediaUploadAuthorization;
   readonly emailVerification: EmailVerificationRepository;
   readonly media: MediaRepository;
@@ -846,6 +850,7 @@ export function createDatabase(
   const jobRequestVersions = createJobRequestVersionRepository(sql);
   const jobRequestLifecycle = createJobRequestLifecycleRepository(sql);
   const jobInvitations = createJobInvitationRepository(sql);
+  const jobInvitationReminders = createJobInvitationReminderRepository(sql);
   const jobRequestMedia = createJobRequestMediaUploadAuthorization(sql);
   const emailVerification = createEmailVerificationRepository(sql);
   const media = createMediaRepository(sql);
@@ -896,6 +901,7 @@ export function createDatabase(
     jobRequestVersions,
     jobRequestLifecycle,
     jobInvitations,
+    jobInvitationReminders,
     jobRequestMedia,
     emailVerification,
     media,

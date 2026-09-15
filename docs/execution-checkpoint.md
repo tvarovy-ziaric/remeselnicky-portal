@@ -89,7 +89,7 @@ This file is the persistent implementation-status overlay for the hash-verified 
 | R3-006 | DONE     | Configurable active limit/warnings, expiry, extension/reactivation, cancellation and clean duplication passed |
 | R3-007 | DONE     | JobInvitation lifecycle, exact request-version provenance and max-five active invitations passed              |
 | R3-008 | DONE     | Explicit candidate selection, server-revalidated invitations and request-context UI/API passed                |
-| R3-009 | ACTIVE   | Transactional invitation notifications, asynchronous delivery and configurable reminders                     |
+| R3-009 | ACTIVE   | Transactional invitation notifications, asynchronous delivery and configurable reminders                      |
 
 All DONE rows above are covered by CI run `34944267513` unless a more specific earlier run is referenced in history. The run applied migrations `0000`–`0042` twice and passed the complete live PostgreSQL/PostGIS integration suite, including the R1 supply-side authorization/privacy matrix, full R2 discovery/shortlist assertions, and R3 request core, recovery, validated content, private media, active-version history, lifecycle, invitation eligibility, explicit selection and concurrency boundaries.
 
