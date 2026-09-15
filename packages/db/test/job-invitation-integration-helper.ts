@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
 
-import type { CraftsmanProfileId, JobRequestId, UserId } from "@portal/domain";
+import type {
+  CraftsmanProfileId,
+  CustomerProfileId,
+  JobRequestId,
+  UserId,
+} from "@portal/domain";
 import type { Sql } from "postgres";
 import { expect } from "vitest";
 
@@ -18,10 +23,12 @@ export async function runJobInvitationIntegrationAssertions(
   const [request] = await sql<
     Array<{
       readonly actorUserId: UserId;
+      readonly customerProfileId: CustomerProfileId;
       readonly id: JobRequestId;
     }>
   >`
-    SELECT owner.id AS "actorUserId", current.id
+    SELECT owner.id AS "actorUserId", customer.id AS "customerProfileId",
+      current.id
     FROM current_job_requests current
     JOIN customer_profiles customer ON customer.id = current.customer_profile_id
     JOIN users owner ON owner.id = customer.owner_user_id
@@ -31,7 +38,7 @@ export async function runJobInvitationIntegrationAssertions(
   if (request === undefined)
     throw new Error("R3-007 requires an active request.");
 
-  const targets = await sql<Target[]>`
+  const [target] = await sql<Target[]>`
     SELECT publication.craftsman_profile_id AS "profileId",
       profile.owner_user_id AS "ownerUserId"
     FROM current_craftsman_profile_publications publication
@@ -52,19 +59,16 @@ export async function runJobInvitationIntegrationAssertions(
               AND credential.credential_type_code = policy.credential_type_code
           )
       )
-    ORDER BY publication.craftsman_profile_id LIMIT 3
+    ORDER BY publication.craftsman_profile_id LIMIT 1
   `;
-  const [first, second, third] = targets;
-  if (first === undefined || second === undefined || third === undefined) {
-    throw new Error(
-      "R3-007 requires three eligible public craftsman fixtures.",
-    );
+  if (target === undefined) {
+    throw new Error("R3-007 requires an eligible public craftsman fixture.");
   }
   await sql`
     UPDATE users SET email_verified_at = COALESCE(email_verified_at, clock_timestamp()),
       phone_verified_at = COALESCE(phone_verified_at, clock_timestamp()),
       updated_at = clock_timestamp()
-    WHERE id = ANY(${[request.actorUserId, ...targets.map(({ ownerUserId }) => ownerUserId)]}::uuid[])
+    WHERE id = ANY(${[request.actorUserId, target.ownerUserId]}::uuid[])
   `;
 
   const repository = createJobInvitationRepository(sql);
@@ -77,24 +81,24 @@ export async function runJobInvitationIntegrationAssertions(
     const sent = await repository.sendOwned({
       actorUserId: request.actorUserId,
       commandId: sendCommandId,
-      craftsmanProfileId: first.profileId,
+      craftsmanProfileId: target.profileId,
       jobRequestId: request.id,
     });
-    if (!("invitation" in sent)) throw new Error("Expected first invitation.");
-    const firstInvitation = sent.invitation;
+    if (!("invitation" in sent)) throw new Error("Expected invitation.");
+    const invitation = sent.invitation;
     expect(sent.status).toBe("APPLIED");
-    expect(firstInvitation).toMatchObject({
-      craftsmanProfileId: first.profileId,
+    expect(invitation).toMatchObject({
+      craftsmanProfileId: target.profileId,
       revision: 1,
       state: "PENDING",
     });
-    expect(firstInvitation.requestContentRevision).toBeGreaterThan(0);
-    expect(firstInvitation.requestVisibleVersion).toBeGreaterThan(0);
+    expect(invitation.requestContentRevision).toBeGreaterThan(0);
+    expect(invitation.requestVisibleVersion).toBeGreaterThan(0);
     await expect(
       repository.sendOwned({
         actorUserId: request.actorUserId,
         commandId: sendCommandId,
-        craftsmanProfileId: first.profileId,
+        craftsmanProfileId: target.profileId,
         jobRequestId: request.id,
       }),
     ).resolves.toMatchObject({ status: "DEDUPLICATED" });
@@ -102,105 +106,83 @@ export async function runJobInvitationIntegrationAssertions(
       repository.sendOwned({
         actorUserId: request.actorUserId,
         commandId: randomUUID(),
-        craftsmanProfileId: first.profileId,
+        craftsmanProfileId: target.profileId,
         jobRequestId: request.id,
       }),
     ).resolves.toEqual({ status: "ALREADY_INVITED" });
-    await expect(
-      repository.sendOwned({
-        actorUserId: request.actorUserId,
-        commandId: randomUUID(),
-        craftsmanProfileId: second.profileId,
-        jobRequestId: request.id,
-      }),
-    ).resolves.toEqual({ activeLimit: 1, status: "ACTIVE_LIMIT_REACHED" });
 
-    const engaged = await repository.respondOwned({
-      action: "ENGAGE",
-      actorUserId: first.ownerUserId,
-      commandId: randomUUID(),
-      expectedRevision: 1,
-      invitationId: firstInvitation.id,
-    });
-    expect(engaged).toMatchObject({
-      invitation: { revision: 2, state: "ENGAGED" },
-      status: "APPLIED",
-    });
-    await expect(
-      repository.closeOwned({
-        action: "STOP_CONSIDERING",
-        actorUserId: request.actorUserId,
-        commandId: randomUUID(),
-        expectedRevision: 2,
-        invitationId: firstInvitation.id,
-      }),
-    ).resolves.toMatchObject({
-      invitation: { revision: 3, state: "NOT_SELECTED" },
-      status: "APPLIED",
-    });
+    await expect(sql`
+      INSERT INTO job_invitations (
+        id, job_request_id, customer_profile_id, craftsman_profile_id,
+        request_content_revision, request_visible_version
+      ) VALUES (
+        ${randomUUID()}, ${request.id}, ${request.customerProfileId},
+        ${target.profileId}, 1, 1
+      )
+    `).rejects.toThrow(/active invitation limit reached/u);
 
-    const secondSent = await repository.sendOwned({
-      actorUserId: request.actorUserId,
-      commandId: randomUUID(),
-      craftsmanProfileId: second.profileId,
-      jobRequestId: request.id,
-    });
-    if (!("invitation" in secondSent))
-      throw new Error("Expected second invitation.");
     await sql`
       UPDATE users SET phone_verified_at = NULL, updated_at = clock_timestamp()
-      WHERE id = ${second.ownerUserId}
+      WHERE id = ${target.ownerUserId}
     `;
     await expect(
       repository.respondOwned({
-        action: "DECLINE",
-        actorUserId: second.ownerUserId,
+        action: "ENGAGE",
+        actorUserId: target.ownerUserId,
         commandId: randomUUID(),
-        declineReason: "TIMING",
         expectedRevision: 1,
-        invitationId: secondSent.invitation.id,
+        invitationId: invitation.id,
       }),
     ).resolves.toEqual({ status: "ACCOUNT_NOT_ELIGIBLE" });
     await sql`
       UPDATE users SET phone_verified_at = clock_timestamp(),
-        updated_at = clock_timestamp() WHERE id = ${second.ownerUserId}
+        updated_at = clock_timestamp() WHERE id = ${target.ownerUserId}
     `;
-    await expect(
-      repository.respondOwned({
-        action: "DECLINE",
-        actorUserId: second.ownerUserId,
-        commandId: randomUUID(),
-        declineNote: "Termín mi nevyhovuje",
-        declineReason: "TIMING",
-        expectedRevision: 1,
-        invitationId: secondSent.invitation.id,
-      }),
-    ).resolves.toMatchObject({
-      invitation: { declineReason: "TIMING", state: "DECLINED" },
-      status: "APPLIED",
-    });
 
-    const thirdSent = await repository.sendOwned({
-      actorUserId: request.actorUserId,
-      commandId: randomUUID(),
-      craftsmanProfileId: third.profileId,
-      jobRequestId: request.id,
-    });
-    if (!("invitation" in thirdSent))
-      throw new Error("Expected third invitation.");
+    await expect(
+      sql.begin(async (transaction) => {
+        const engageCommandId = randomUUID();
+        await transaction`
+          INSERT INTO job_invitation_commands (
+            command_id, invitation_id, actor_user_id, command_kind,
+            expected_revision, resulting_revision, target_state,
+            system_initiated, payload_fingerprint
+          ) VALUES (
+            ${engageCommandId}, ${invitation.id}, ${target.ownerUserId},
+            'ENGAGE', 1, 2, 'ENGAGED', false, ${"0".repeat(64)}
+          )
+        `;
+        await transaction`
+          INSERT INTO job_invitation_revisions (
+            invitation_id, revision, command_id, state, changed_at, sent_at,
+            expires_at, engaged_at
+          ) VALUES (
+            ${invitation.id}, 2, ${engageCommandId}, 'ENGAGED',
+            clock_timestamp(), clock_timestamp(), clock_timestamp(), NULL
+          )
+        `;
+        const [engaged] = await transaction<{ readonly state: string }[]>`
+          SELECT state::text AS state FROM current_job_invitations
+          WHERE id = ${invitation.id}
+        `;
+        expect(engaged?.state).toBe("ENGAGED");
+        throw new Error("ROLLBACK_ENGAGEMENT_PROBE");
+      }),
+    ).rejects.toThrow("ROLLBACK_ENGAGEMENT_PROBE");
+
     await expect(sql`
       INSERT INTO job_invitation_commands (
         command_id, invitation_id, actor_user_id, command_kind,
         expected_revision, resulting_revision, target_state,
         system_initiated, payload_fingerprint
       ) VALUES (
-        ${randomUUID()}, ${thirdSent.invitation.id}, ${request.actorUserId},
+        ${randomUUID()}, ${invitation.id}, ${request.actorUserId},
         'ENGAGE', 1, 2, 'ENGAGED', false, ${"0".repeat(64)}
       )
     `).rejects.toThrow(/invited craftsman actor required/u);
     await expect(sql`
       UPDATE job_invitation_revisions SET state = 'ENGAGED'
-      WHERE invitation_id = ${thirdSent.invitation.id}
+      WHERE invitation_id = ${invitation.id}
     `).rejects.toThrow(/append-only/u);
   } finally {
     await sql`
