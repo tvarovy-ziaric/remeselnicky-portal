@@ -793,7 +793,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
           provenanceEntityId: null,
           provenanceEntityRevision: null,
           provenanceEntityType: null,
-          purpose: "CHAT_DOCUMENT",
+          purpose: "JOB_DOCUMENT",
           storageObject: {
             area: "private",
             key: privateMediaKey(randomUUID()),
@@ -923,7 +923,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
           provenanceEntityId: null,
           provenanceEntityRevision: null,
           provenanceEntityType: null,
-          purpose: "CHAT_DOCUMENT",
+          purpose: "JOB_DOCUMENT",
           storageObject: {
             area: "private",
             key: privateMediaKey(randomUUID()),
