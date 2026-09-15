@@ -65,6 +65,7 @@ describe("job invitation repository", () => {
       }),
     ).resolves.toEqual({ status: "ACCOUNT_NOT_ELIGIBLE" });
     expect(harness.statements).toHaveLength(1);
+    expect(harness.statements[0]).toContain("JOIN auth_credentials credential");
     expect(harness.statements[0]).toContain("phone_verified_at IS NOT NULL");
   });
 

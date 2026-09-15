@@ -75,12 +75,8 @@ export async function runJobInvitationIntegrationAssertions(
   if (target === undefined) {
     throw new Error("R3-007 requires an eligible public craftsman fixture.");
   }
-  await sql`
-    UPDATE users SET email_verified_at = COALESCE(email_verified_at, clock_timestamp()),
-      phone_verified_at = COALESCE(phone_verified_at, clock_timestamp()),
-      updated_at = clock_timestamp()
-    WHERE id = ANY(${[request.actorUserId, target.ownerUserId]}::uuid[])
-  `;
+  await verifyFixtureUser(sql, request.actorUserId);
+  await verifyFixtureUser(sql, target.ownerUserId);
 
   const repository = createJobInvitationRepository(sql);
   await sql`
@@ -133,8 +129,9 @@ export async function runJobInvitationIntegrationAssertions(
     `).rejects.toThrow(/active invitation limit reached/u);
 
     await sql`
-      UPDATE users SET phone_verified_at = NULL, updated_at = clock_timestamp()
-      WHERE id = ${target.ownerUserId}
+      UPDATE auth_credentials SET phone_verified_at = NULL,
+        normalized_phone = NULL, updated_at = clock_timestamp()
+      WHERE user_id = ${target.ownerUserId}
     `;
     await expect(
       repository.respondOwned({
@@ -145,10 +142,7 @@ export async function runJobInvitationIntegrationAssertions(
         invitationId: invitation.id,
       }),
     ).resolves.toEqual({ status: "ACCOUNT_NOT_ELIGIBLE" });
-    await sql`
-      UPDATE users SET phone_verified_at = clock_timestamp(),
-        updated_at = clock_timestamp() WHERE id = ${target.ownerUserId}
-    `;
+    await verifyFixtureUser(sql, target.ownerUserId);
 
     await expect(
       sql.begin(async (transaction) => {
@@ -267,4 +261,27 @@ async function makeRequestProfessionOptionalForFixture(
     releaseId: nextReleaseId,
     reviewReference: "test-review:R3-007-invitation-fixture",
   });
+}
+
+async function verifyFixtureUser(sql: Sql, userId: UserId): Promise<void> {
+  await sql`
+    INSERT INTO auth_credentials (
+      user_id, normalized_email, password_hash, email_verified_at,
+      normalized_phone, phone_verified_at
+    ) VALUES (
+      ${userId}, ${`${userId}@example.test`},
+      'test-fixture-password-hash', clock_timestamp(),
+      '+4219' || lpad(
+        (abs(hashtextextended(${userId}::text, 41007)) % 100000000)::text,
+        8, '0'
+      ), clock_timestamp()
+    )
+    ON CONFLICT (user_id) DO UPDATE SET
+      email_verified_at = clock_timestamp(),
+      normalized_phone = COALESCE(
+        auth_credentials.normalized_phone, EXCLUDED.normalized_phone
+      ),
+      phone_verified_at = clock_timestamp(),
+      updated_at = clock_timestamp()
+  `;
 }

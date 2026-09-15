@@ -316,11 +316,12 @@ async function lockVerifiedCustomer(sql: TransactionSql, actorUserId: UserId) {
   const [row] = await sql<{ readonly customerProfileId: string }[]>`
     SELECT customer.id AS "customerProfileId"
     FROM users actor
+    JOIN auth_credentials credential ON credential.user_id = actor.id
     JOIN customer_profiles customer ON customer.owner_user_id = actor.id
     WHERE actor.id = ${actorUserId} AND actor.account_state = 'ACTIVE'
-      AND actor.email_verified_at IS NOT NULL
-      AND actor.phone_verified_at IS NOT NULL
-    FOR UPDATE OF actor, customer
+      AND credential.email_verified_at IS NOT NULL
+      AND credential.phone_verified_at IS NOT NULL
+    FOR UPDATE OF actor, credential, customer
   `;
   return row === undefined
     ? null
@@ -329,9 +330,12 @@ async function lockVerifiedCustomer(sql: TransactionSql, actorUserId: UserId) {
 
 async function actorIsVerified(sql: TransactionSql, actorUserId: UserId) {
   const rows = await sql`
-    SELECT id FROM users WHERE id = ${actorUserId}
-      AND account_state = 'ACTIVE' AND email_verified_at IS NOT NULL
-      AND phone_verified_at IS NOT NULL FOR UPDATE
+    SELECT actor.id FROM users actor
+    JOIN auth_credentials credential ON credential.user_id = actor.id
+    WHERE actor.id = ${actorUserId} AND actor.account_state = 'ACTIVE'
+      AND credential.email_verified_at IS NOT NULL
+      AND credential.phone_verified_at IS NOT NULL
+    FOR UPDATE OF actor, credential
   `;
   return rows.length === 1;
 }

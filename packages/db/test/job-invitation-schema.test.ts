@@ -6,6 +6,13 @@ const migration = readFileSync(
   new URL("../migrations/0041_job_invitations.sql", import.meta.url),
   "utf8",
 );
+const verificationRepair = readFileSync(
+  new URL(
+    "../migrations/0042_job_invitation_auth_verification.sql",
+    import.meta.url,
+  ),
+  "utf8",
+);
 
 describe("job invitation schema", () => {
   it("keeps one immutable invitation lineage and exact version provenance", () => {
@@ -26,6 +33,10 @@ describe("job invitation schema", () => {
     expect(migration).toContain("current_searchable_craftsman_credentials");
     expect(migration).toContain("actor_email_verified IS NULL");
     expect(migration).toContain("actor_phone_verified IS NULL");
+    expect(verificationRepair).toContain("JOIN auth_credentials credential");
+    expect(verificationRepair).toContain(
+      "credential.email_verified_at, credential.phone_verified_at",
+    );
     expect(migration).toContain("current.state IN ('PENDING', 'ENGAGED')");
   });
 
