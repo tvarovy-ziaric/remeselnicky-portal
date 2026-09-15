@@ -6,9 +6,14 @@ import type {
   JobRequestId,
   UserId,
 } from "@portal/domain";
+import {
+  createCredentialQualificationPolicyService,
+  type CredentialQualificationPolicyEntrySeed,
+} from "@portal/search";
 import type { Sql } from "postgres";
 import { expect } from "vitest";
 
+import { createCredentialQualificationRepository } from "../src/credential-qualification-repository.js";
 import { createJobInvitationRepository } from "../src/job-invitation-repository.js";
 
 interface Target {
@@ -25,18 +30,26 @@ export async function runJobInvitationIntegrationAssertions(
       readonly actorUserId: UserId;
       readonly customerProfileId: CustomerProfileId;
       readonly id: JobRequestId;
+      readonly primaryProfessionCode: string;
     }>
   >`
     SELECT owner.id AS "actorUserId", customer.id AS "customerProfileId",
-      current.id
+      current.id, core.payload ->> 'primaryProfessionCode' AS "primaryProfessionCode"
     FROM current_job_requests current
     JOIN customer_profiles customer ON customer.id = current.customer_profile_id
     JOIN users owner ON owner.id = customer.owner_user_id
+    JOIN current_job_request_active_sections core
+      ON core.job_request_id = current.id AND core.section_key = 'request.core'
     WHERE current.state::text = 'ACTIVE' AND owner.account_state = 'ACTIVE'
     ORDER BY current.created_at DESC, current.id DESC LIMIT 1
   `;
   if (request === undefined)
     throw new Error("R3-007 requires an active request.");
+
+  await makeRequestProfessionOptionalForFixture(
+    sql,
+    request.primaryProfessionCode,
+  );
 
   const [target] = await sql<Target[]>`
     SELECT publication.craftsman_profile_id AS "profileId",
@@ -44,13 +57,11 @@ export async function runJobInvitationIntegrationAssertions(
     FROM current_craftsman_profile_publications publication
     JOIN craftsman_profiles profile
       ON profile.id = publication.craftsman_profile_id
-    JOIN current_job_request_active_sections core
-      ON core.job_request_id = ${request.id} AND core.section_key = 'request.core'
     WHERE publication.effectively_public
       AND publication.owner_user_id <> ${request.actorUserId}
       AND NOT EXISTS (
         SELECT 1 FROM current_credential_qualification_policies policy
-        WHERE policy.profession_code = core.payload ->> 'primaryProfessionCode'
+        WHERE policy.profession_code = ${request.primaryProfessionCode}
           AND policy.requirement = 'REQUIRED'
           AND NOT EXISTS (
             SELECT 1 FROM current_searchable_craftsman_credentials credential
@@ -190,4 +201,70 @@ export async function runJobInvitationIntegrationAssertions(
         updated_at = clock_timestamp() WHERE singleton
     `;
   }
+}
+
+async function makeRequestProfessionOptionalForFixture(
+  sql: Sql,
+  professionCode: string,
+): Promise<void> {
+  const entries = await sql<CredentialQualificationPolicyEntrySeed[]>`
+    SELECT profession_code AS "professionCode",
+      credential_type_code AS "credentialTypeCode", requirement::text AS requirement
+    FROM current_credential_qualification_policies
+    ORDER BY profession_code, credential_type_code
+  `;
+  if (
+    !entries.some(
+      (entry) =>
+        entry.professionCode === professionCode &&
+        entry.requirement === "REQUIRED",
+    )
+  ) {
+    return;
+  }
+
+  const [current] = await sql<
+    Array<{
+      readonly releaseId: string;
+      readonly taxonomyReleaseId: string;
+      readonly version: number;
+    }>
+  >`
+    SELECT release.release_id AS "releaseId",
+      release.taxonomy_release_id AS "taxonomyReleaseId", release.version
+    FROM credential_qualification_policy_activation_events activation
+    JOIN credential_qualification_policy_releases release
+      ON release.release_id = activation.release_id
+    ORDER BY activation.activation_sequence DESC
+    LIMIT 1
+  `;
+  if (current === undefined) {
+    throw new Error("R3-007 requires a qualification policy fixture.");
+  }
+
+  const nextReleaseId = randomUUID();
+  const policy = createCredentialQualificationPolicyService({
+    persistence: createCredentialQualificationRepository(sql),
+  });
+  await policy.installRelease({
+    entries: entries.map((entry) => ({
+      ...entry,
+      requirement:
+        entry.professionCode === professionCode
+          ? "OPTIONAL"
+          : entry.requirement,
+    })),
+    releaseId: nextReleaseId,
+    reviewReference: "test-review:R3-007-invitation-fixture",
+    supersedesReleaseId: current.releaseId,
+    taxonomyReleaseId: current.taxonomyReleaseId,
+    version: current.version + 1,
+  });
+  await policy.activateRelease({
+    activationId: randomUUID(),
+    actorReference: "test-deployment:R3-007-invitation-fixture",
+    previousReleaseId: current.releaseId,
+    releaseId: nextReleaseId,
+    reviewReference: "test-review:R3-007-invitation-fixture",
+  });
 }
