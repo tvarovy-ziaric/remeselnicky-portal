@@ -425,6 +425,7 @@ async function createSecurityFixture(sql: Sql): Promise<SecurityFixture> {
   const { source, target } = await findSecurityLineage(sql);
   await ensureVerifiedCredentials(sql, source.customerOwnerId);
   await ensureVerifiedCredentials(sql, target.ownerUserId);
+  await ensureComparableSubmittedQuotes(sql, source);
 
   const invitations = createJobInvitationRepository(sql);
   const pendingInvitation =
@@ -591,15 +592,6 @@ async function findSecurityLineage(sql: Sql): Promise<{
       AND core.section_key = 'request.core'
     WHERE conversation.access_state = 'WRITABLE'
       AND conversation.invitation_state = 'ENGAGED'
-      AND NOT EXISTS (
-        SELECT 1
-        FROM current_submitted_quotes submitted
-        JOIN quotes submitted_quote ON submitted_quote.id = submitted.quote_id
-        JOIN job_invitations submitted_invitation
-          ON submitted_invitation.id = submitted_quote.invitation_id
-        WHERE submitted_invitation.job_request_id = request.id
-          AND submitted.authoring_mode = 'EXTERNAL_PDF'
-      )
     ORDER BY conversation.created_at DESC, conversation.id DESC
   `;
   for (const source of sources) {
@@ -978,6 +970,97 @@ async function createReadyChatImage(
     assetId: processing.id,
     storageKey: canonicalStorageKey,
   });
+}
+
+async function ensureComparableSubmittedQuotes(
+  sql: Sql,
+  source: SourceConversation,
+): Promise<void> {
+  const invalidQuotes = await sql<
+    Array<{
+      readonly ownerUserId: UserId;
+      readonly quoteId: QuoteId;
+      readonly stateRevision: number;
+    }>
+  >`
+    SELECT craftsman.owner_user_id AS "ownerUserId",
+      submitted.quote_id AS "quoteId",
+      submitted.state_revision AS "stateRevision"
+    FROM current_submitted_quotes submitted
+    JOIN current_quote_acceptance_context lifecycle
+      ON lifecycle.quote_id = submitted.quote_id
+      AND lifecycle.quote_revision = submitted.revision
+      AND lifecycle.deadline_passed IS FALSE
+    JOIN quotes quote ON quote.id = submitted.quote_id
+    JOIN job_invitations invitation ON invitation.id = quote.invitation_id
+      AND invitation.job_request_id = ${source.jobRequestId}
+    JOIN craftsman_profiles craftsman
+      ON craftsman.id = invitation.craftsman_profile_id
+    JOIN users owner ON owner.id = craftsman.owner_user_id
+      AND owner.account_state = 'ACTIVE'
+    WHERE submitted.authoring_mode = 'EXTERNAL_PDF'
+      AND NOT quote_revision_authoring_is_eligible(
+        submitted.quote_id, submitted.revision, submitted.authoring_mode
+      )
+      AND quote_active_participant_context(
+        quote.conversation_id, craftsman.owner_user_id, 'CRAFTSMAN', true
+      )
+    ORDER BY submitted.quote_id
+  `;
+  for (const invalid of invalidQuotes) {
+    await ensureVerifiedCredentials(sql, invalid.ownerUserId);
+    const quotes = createQuoteRepository(sql);
+    const revision = await quotes.createRevision({
+      actorUserId: invalid.ownerUserId,
+      authoringMode: "EXTERNAL_PDF",
+      commandId: randomUUID(),
+      expectedSubmittedStateRevision: invalid.stateRevision,
+      quoteId: invalid.quoteId,
+      requestContentRevision: source.requestContentRevision,
+      requestVisibleVersion: source.requestVisibleVersion,
+    });
+    if (!("quote" in revision) || revision.quote.currentDraft === null) {
+      throw new Error(
+        `R3-022 could not replace an unavailable PDF: ${revision.status}`,
+      );
+    }
+    const quoteRevision = revision.quote.currentDraft.revision;
+    const assetId = await createReadyQuotePdf(
+      sql,
+      invalid.ownerUserId,
+      invalid.quoteId,
+      quoteRevision,
+      "e",
+    );
+    const external = await createExternalPdfQuoteRepository(sql).saveDraft(
+      externalContentInput(
+        invalid.ownerUserId,
+        invalid.quoteId,
+        quoteRevision,
+        assetId,
+        0,
+      ),
+    );
+    if (external.status !== "SAVED") {
+      throw new Error(
+        `R3-022 unavailable PDF replacement failed: ${external.status}`,
+      );
+    }
+    const submitted = await quotes.submit({
+      actorUserId: invalid.ownerUserId,
+      commandId: randomUUID(),
+      expectedDraftStateRevision: revision.quote.currentDraft.stateRevision,
+      expectedSubmittedStateRevision:
+        revision.quote.currentSubmitted?.stateRevision ?? null,
+      quoteId: invalid.quoteId,
+      revision: quoteRevision,
+    });
+    if (submitted.status !== "APPLIED") {
+      throw new Error(
+        `R3-022 unavailable PDF resubmission failed: ${submitted.status}`,
+      );
+    }
+  }
 }
 
 async function createQuoteHistory(
