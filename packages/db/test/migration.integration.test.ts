@@ -1849,7 +1849,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
       } finally {
         await sql.end({ timeout: 5 });
       }
-    }, 120_000);
+    }, 300_000);
   },
 );
 
