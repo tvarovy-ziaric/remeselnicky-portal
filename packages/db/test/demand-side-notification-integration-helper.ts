@@ -423,9 +423,16 @@ async function publishExistingWorkflowEvents(
   expect(
     rows.some((row) => row.eventName === "job_request.materially_updated"),
   ).toBe(true);
-  expect(rows.filter((row) => row.eventName === "quote.expired")).toHaveLength(
-    2,
-  );
+  const expiryRows = rows.filter((row) => row.eventName === "quote.expired");
+  expect(expiryRows.length).toBeGreaterThanOrEqual(2);
+  const expiryCountByQuote = new Map<string, number>();
+  for (const row of expiryRows) {
+    expiryCountByQuote.set(
+      row.entityId,
+      (expiryCountByQuote.get(row.entityId) ?? 0) + 1,
+    );
+  }
+  for (const count of expiryCountByQuote.values()) expect(count).toBe(2);
   for (const row of rows) {
     const delivery = {
       attempt: 1,
@@ -440,18 +447,32 @@ async function publishExistingWorkflowEvents(
 }
 
 async function expectQuoteExpiryAudiencePaths(sql: Sql): Promise<void> {
-  const rows = await sql<Array<{ readonly path: string }>>`
-    SELECT notification.deep_link_path AS path
+  const rows = await sql<
+    Array<{
+      readonly path: string;
+      readonly quoteId: string;
+      readonly recipientUserId: string;
+    }>
+  >`
+    SELECT notification.deep_link_path AS path,
+      notification.recipient_user_id AS "recipientUserId",
+      event.entity_id AS "quoteId"
     FROM notifications notification
     JOIN domain_outbox_events event
       ON event.event_id = notification.domain_event_id
     WHERE event.event_name = 'quote.expired'
     ORDER BY notification.recipient_user_id
   `;
-  expect(rows).toHaveLength(2);
+  expect(rows.length).toBeGreaterThanOrEqual(2);
+  const recipientsByQuote = new Map<string, Set<string>>();
   for (const row of rows) {
     expect(row.path).toMatch(/^\/konverzacie\/pozvanka\/[0-9a-f-]{36}$/u);
+    const recipients = recipientsByQuote.get(row.quoteId) ?? new Set<string>();
+    recipients.add(row.recipientUserId);
+    recipientsByQuote.set(row.quoteId, recipients);
   }
+  for (const recipients of recipientsByQuote.values())
+    expect(recipients.size).toBe(2);
 }
 
 async function expectAuthoritativeRecipients(sql: Sql): Promise<void> {
