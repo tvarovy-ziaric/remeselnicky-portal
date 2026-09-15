@@ -121,21 +121,16 @@ const fixedClock = new Date("2099-01-01T00:00:00.000Z");
 export async function runR3DemandSideSecurityIntegrationAssertions(
   sql: Sql,
 ): Promise<R3StageOneSecurityReport> {
-  const startedAt = Date.now();
-  reportLiveProgress("fixture:start", startedAt);
   const fixture = await createSecurityFixture(sql);
-  reportLiveProgress("fixture:complete", startedAt);
   return verifyR3DatabaseSecurityMatrix(
-    createLiveDatabaseAdapter(sql, fixture, startedAt),
+    createLiveDatabaseAdapter(sql, fixture),
   );
 }
 
 function createLiveDatabaseAdapter(
   sql: Sql,
   fixture: SecurityFixture,
-  startedAt: number,
 ): R3DatabaseSecurityMatrixAdapter {
-  let evaluatedAttempts = 0;
   return Object.freeze({
     competitorMarkers: fixture.competitorMarkers,
     privateMarkers: fixture.privateMarkers,
@@ -146,13 +141,6 @@ function createLiveDatabaseAdapter(
           evaluation: "NOT_EVALUATED" as const,
           reason: unsupportedReason,
         });
-      }
-      evaluatedAttempts += 1;
-      if (evaluatedAttempts === 1 || evaluatedAttempts % 10 === 0) {
-        reportLiveProgress(
-          `probe:${evaluatedAttempts}:${testCase.id}`,
-          startedAt,
-        );
       }
       const actorUserId = actorId(fixture.actors, testCase.actor);
       const suspend = suspendedActor(testCase.actor);
@@ -165,11 +153,6 @@ function createLiveDatabaseAdapter(
       }
     },
   });
-}
-
-function reportLiveProgress(label: string, startedAt: number): void {
-  if (process.env["CI"] !== "true") return;
-  process.stderr.write(`[r3-security] ${label} ${Date.now() - startedAt}ms\n`);
 }
 
 function unsupportedLiveCase(testCase: R3DatabaseSecurityCase): string | null {
