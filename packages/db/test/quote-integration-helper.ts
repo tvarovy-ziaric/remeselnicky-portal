@@ -30,7 +30,9 @@ export async function runQuoteIntegrationAssertions(sql: Sql): Promise<void> {
       // authoring schema: this replacement and all test data roll back.
       await transaction`
         CREATE OR REPLACE FUNCTION quote_revision_authoring_is_eligible(
-          uuid, integer, quote_authoring_mode
+          target_quote_id uuid,
+          target_quote_revision integer,
+          target_mode quote_authoring_mode
         ) RETURNS boolean LANGUAGE sql STABLE SECURITY INVOKER
         SET search_path = public, pg_temp AS 'SELECT true;'
       `;
