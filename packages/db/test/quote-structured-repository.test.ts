@@ -130,6 +130,28 @@ describe("structured Quote repository", () => {
       "current_quote_structured_content content\n  WHERE",
     );
   });
+
+  it("maps a submit-won database race to READ_ONLY", async () => {
+    const fixture = scriptedSql([
+      [],
+      [{ id: actorUserId }],
+      [
+        {
+          conversationId: "98300000-0000-4000-8000-000000000004",
+          invitationId: "98300000-0000-4000-8000-000000000005",
+        },
+      ],
+      [{ id: "98300000-0000-4000-8000-000000000005" }],
+      [{ id: "98300000-0000-4000-8000-000000000004" }],
+      [{ id: quoteId }],
+      [],
+      new Error("editable PLATFORM_STRUCTURED Quote draft required"),
+    ]);
+
+    await expect(
+      createStructuredQuoteRepository(fixture.sql).saveDraft(saveInput()),
+    ).resolves.toEqual({ status: "READ_ONLY" });
+  });
 });
 
 function saveInput() {
@@ -206,12 +228,15 @@ function contentRow() {
   };
 }
 
-function scriptedSql(results: unknown[][]) {
+function scriptedSql(results: Array<unknown[] | Error>) {
   const statements: string[] = [];
   let beginCount = 0;
   const query = ((strings: TemplateStringsArray) => {
     statements.push(strings.join("?"));
-    return Promise.resolve(results.shift() ?? []);
+    const result = results.shift() ?? [];
+    return result instanceof Error
+      ? Promise.reject(result)
+      : Promise.resolve(result);
   }) as unknown as Sql;
   Object.assign(query, {
     begin: (

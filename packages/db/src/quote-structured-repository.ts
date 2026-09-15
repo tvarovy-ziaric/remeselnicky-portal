@@ -167,7 +167,11 @@ async function saveDraft(
     if (/owned structured Quote context required/u.test(message)) {
       return Object.freeze({ status: "NOT_FOUND" });
     }
-    if (/writable structured Quote context|required.*draft/u.test(message)) {
+    if (
+      /writable structured Quote context|editable PLATFORM_STRUCTURED Quote draft required|required.*draft/u.test(
+        message,
+      )
+    ) {
       return Object.freeze({ status: "READ_ONLY" });
     }
     if (/content revision is stale/u.test(message)) {
