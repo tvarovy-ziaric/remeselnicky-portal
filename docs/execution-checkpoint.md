@@ -5,11 +5,11 @@ This file is the persistent implementation-status overlay for the hash-verified 
 - Updated: 2026-09-15
 - Definition: D01–D30 LOCKED and hash verified
 - Active release: R3 — Demand side
-- Last completed ticket: R3-013 — chat photo/document attachments and Job-document hooks
-- Active ticket: R3-014 — pre-confirmation contact/address protection in chat
-- Next dependency-satisfied candidate: R3-015 — Quote core/revisions/state machine
+- Last completed ticket: R3-015 — Quote core/revisions/state machine
+- Active ticket: R3-016 — PLATFORM_STRUCTURED Quote authoring
+- Next dependency-satisfied candidate: R3-017 — EXTERNAL_PDF Quote authoring and immutable revisions
 - Human gate: canonical Slovak profession/skill/location content still requires expert/legal/source review before activation; this does not block private supply-side implementation
-- Integrated verification: commits `fb5baec`, `ecb0cf4` and `bc7335c`, CI run `34959293790`, passed quality, dependency audit, secret scan, clean PostgreSQL/PostGIS migrations 0000–0046 and the complete live R0/R1/R2 plus R3-001–R3-013 integration suite; private image/PDF attachment provenance, immutable per-message limits, central processing states, ACTIVE membership delivery, future-Job media hooks, layered abuse admission and suspend/close races passed
+- Integrated verification: commits `e7eed6d`, `15a0483`, `6eda617`, `173b758` and `7ab46be`, CI run `34962294881`, passed quality, dependency audit, full-history secret scan, clean PostgreSQL/PostGIS migrations 0000–0048 and the complete live R0/R1/R2 plus R3-001–R3-015 integration suite; pre-confirm contact/address blocking, Unicode/Slovak circumvention negatives, immutable Quote lineage, private draft/customer-visible submitted isolation, exact request provenance, deferred command effects and ACTIVE/competitor/race guards passed
 
 ## Ticket state overlay
 
@@ -94,9 +94,11 @@ This file is the persistent implementation-status overlay for the hash-verified 
 | R3-011 | DONE     | ENGAGED-only conversation identity, participant isolation and terminal read-only history passed               |
 | R3-012 | DONE     | Immutable chat timeline, read receipts/unread state, archive/mute/report and live isolation tests passed      |
 | R3-013 | DONE     | Private chat photo/PDF attachments, processing/delivery guards and future Job-documentation hooks passed      |
-| R3-014 | ACTIVE   | Server/DB-enforced pre-confirmation contact and exact-address protection in chat                              |
+| R3-014 | DONE     | Server/DB-enforced pre-confirmation contact/address policy, generic denial and bypass regressions passed      |
+| R3-015 | DONE     | Immutable Quote revisions, private draft/submitted isolation, CAS/idempotency and live DB guards passed      |
+| R3-016 | ACTIVE   | Native structured Quote authoring with exact immutable revision content                                      |
 
-All DONE rows above are covered by CI run `34959293790` unless a more specific earlier run is referenced in history. The run applied migrations `0000`–`0046` twice and passed the complete live PostgreSQL/PostGIS integration suite, including the R1 supply-side authorization/privacy matrix, full R2 discovery/shortlist assertions, and R3 request core, recovery, validated content, private media, active-version history, lifecycle, invitation eligibility, explicit selection, notification delivery, authorized outcome UX, ENGAGED conversation identity, immutable chat, reporting, private conversation attachments and concurrency boundaries.
+All DONE rows above are covered by CI run `34962294881` unless a more specific earlier run is referenced in history. The run applied migrations `0000`–`0048` twice and passed the complete live PostgreSQL/PostGIS integration suite, including the R1 supply-side authorization/privacy matrix, full R2 discovery/shortlist assertions, and R3 request core, recovery, validated content, private media, lifecycle, invitations, conversations, immutable chat and attachments, pre-confirm privacy policy, Quote core revisions and concurrency boundaries.
 
 ## Durable decisions
 
