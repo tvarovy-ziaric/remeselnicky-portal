@@ -58,6 +58,10 @@ import {
   type QuoteLifecycleRouteDependencies,
 } from "../quote-lifecycle/routes.js";
 import {
+  registerQuoteAuthoringRoutes,
+  type QuoteAuthoringRouteDependencies,
+} from "../quotes/routes.js";
+import {
   registerR3AnalyticsRoutes,
   type R3AnalyticsRouteDependencies,
 } from "../r3-analytics/routes.js";
@@ -132,6 +136,10 @@ export interface AuthModuleDependencies {
     "comparison"
   >;
   readonly quoteLifecycle?: Pick<QuoteLifecycleRouteDependencies, "lifecycle">;
+  readonly quoteAuthoring?: Pick<
+    QuoteAuthoringRouteDependencies,
+    "core" | "externalPdf" | "structured"
+  >;
   readonly r3Analytics?: Pick<R3AnalyticsRouteDependencies, "observations">;
   readonly conversationChat?: {
     readonly admission: Exclude<
@@ -380,6 +388,13 @@ async function configureAuthModule(
       csrfProtection: csrfProtection(app),
       guard,
       ...dependencies.quoteLifecycle,
+    });
+  }
+  if (dependencies.quoteAuthoring !== undefined) {
+    registerQuoteAuthoringRoutes(app, {
+      csrfProtection: csrfProtection(app),
+      guard,
+      ...dependencies.quoteAuthoring,
     });
   }
   if (dependencies.r3Analytics !== undefined) {

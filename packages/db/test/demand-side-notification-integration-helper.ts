@@ -1002,6 +1002,15 @@ async function expectMaterialEditVersusInvitationLockOrder(
   if (invitation?.state !== "ENGAGED") {
     throw new Error("Material lock-order invitation must be ENGAGED.");
   }
+  const [eligibleRecipients] = await sql<Array<{ readonly count: number }>>`
+    SELECT count(*)::integer AS count
+    FROM current_job_invitations candidate
+    WHERE candidate.job_request_id = ${fixture.jobRequestId}
+      AND candidate.state IN ('PENDING', 'ENGAGED')
+  `;
+  if ((eligibleRecipients?.count ?? 0) < 1) {
+    throw new Error("Material lock-order request has no eligible recipients.");
+  }
 
   const gateReady = deferred<void>();
   const releaseGate = deferred<void>();
@@ -1078,7 +1087,11 @@ async function expectMaterialEditVersusInvitationLockOrder(
     WHERE id = ${fixture.invitationId}
   `;
   expect(afterRollback?.state).toBe("ENGAGED");
-  await expectMaterialEventCount(sql, materialCommandId, 1);
+  await expectMaterialEventCount(
+    sql,
+    materialCommandId,
+    eligibleRecipients?.count ?? 0,
+  );
 
   const reverseCurrent = await reader.readActiveOwned({
     actorUserId: fixture.customerOwnerId,
@@ -1172,7 +1185,11 @@ async function expectMaterialEditVersusInvitationLockOrder(
     WHERE id = ${fixture.invitationId}
   `;
   expect(after?.state).toBe("NOT_SELECTED");
-  await expectMaterialEventCount(sql, reverseMaterialCommandId, 0);
+  await expectMaterialEventCount(
+    sql,
+    reverseMaterialCommandId,
+    (eligibleRecipients?.count ?? 0) - 1,
+  );
   await createReplacementInvitationFixture(sql, fixture);
   if (revised.status !== "APPLIED" || reverseRevised.status !== "APPLIED") {
     throw new Error(

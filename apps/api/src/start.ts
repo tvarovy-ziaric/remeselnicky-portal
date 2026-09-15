@@ -8,6 +8,8 @@ import {
   createJobRequestService,
   createJobRequestLifecycleService,
   createJobRequestVersionService,
+  createQuoteService,
+  createStructuredQuoteService,
 } from "@portal/domain";
 import { createPublicPortfolioDeliveryResolver } from "@portal/media";
 import {
@@ -95,6 +97,10 @@ const conversationWriteAdmission = createDatabaseConversationWriteAdmission({
   persistence: authPersistence,
   timeWindowMs: config.auth.rateLimitWindowMs,
 });
+const quoteAuthoring = createQuoteService({ persistence: database.quotes });
+const structuredQuoteAuthoring = createStructuredQuoteService({
+  persistence: database.structuredQuotes,
+});
 
 const app = buildApi({
   auth: {
@@ -130,6 +136,11 @@ const app = buildApi({
     conversations: { conversations: database.conversations },
     quoteComparison: { comparison: database.quoteComparison },
     quoteLifecycle: { lifecycle: database.quoteLifecycle },
+    quoteAuthoring: {
+      core: quoteAuthoring,
+      externalPdf: database.externalPdfQuotes,
+      structured: structuredQuoteAuthoring,
+    },
     r3Analytics: { observations: database.r3AnalyticsObservations },
     conversationChat: {
       admission: conversationWriteAdmission,

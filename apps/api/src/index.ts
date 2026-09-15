@@ -37,6 +37,11 @@ export {
 } from "./quote-lifecycle/routes.js";
 export type { QuoteLifecycleRouteDependencies } from "./quote-lifecycle/routes.js";
 export {
+  QUOTE_AUTHORING_PATHS,
+  registerQuoteAuthoringRoutes,
+} from "./quotes/routes.js";
+export type { QuoteAuthoringRouteDependencies } from "./quotes/routes.js";
+export {
   R3_ANALYTICS_OBSERVATION_PATH,
   registerR3AnalyticsRoutes,
 } from "./r3-analytics/routes.js";
