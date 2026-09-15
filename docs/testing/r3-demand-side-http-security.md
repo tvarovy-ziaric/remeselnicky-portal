@@ -31,29 +31,28 @@ guard and return `AUTHENTICATION_REQUIRED`, rather than proving only an earlier
 CSRF rejection. Credentialed CORS is checked for the configured origin and an
 attacker origin.
 
-A focused transport test also covers the already-existing Quote lifecycle
-context, provider-only withdraw and reconfirm commands, suspended-provider
-denial, CSRF no-effect behavior and the absence of a public system-expiry route.
-It does not add or infer Quote authoring rules.
+A focused transport test covers Quote core and both authoring modes through the
+production routes: exact provider/customer reads, provider-only draft creation,
+structured and external-envelope saves, submission, competitor and suspended
+account denial, writable-versus-terminal behavior, and missing/invalid CSRF
+with unchanged effect counts. A second focused test covers Quote lifecycle
+context, provider-only withdraw and reconfirm commands and the absence of a
+public system-expiry route. Repository authorization remains Stage 1 evidence;
+these focused tests prove the Fastify transport and composition boundary.
 
 ## Explicitly not evaluated
 
 The report retains these production seams as `NOT_EVALUATED`:
 
-- Quote core HTTP;
-- platform-structured Quote authoring HTTP;
-- external-PDF Quote authoring HTTP;
 - production composition of private-media delivery;
 - job-request private-media delivery;
 - browser/staging E2E.
 
-The repositories and media resolvers behind those boundaries have Stage 1
-live-PostgreSQL coverage, but there are no corresponding composed production
-HTTP endpoints for this adapter to exercise. The production API currently also
-does not compose the existing private-media delivery port. Marking those rows as
-passed would therefore be synthetic evidence. Browser and staging execution
-remains follow-up work when those production seams and a browser fixture runner
-exist.
+The media repositories and resolvers behind those boundaries have Stage 1
+live-PostgreSQL coverage, but the production API still does not compose the
+private-media delivery port. Marking those rows as passed would therefore be
+synthetic evidence. Browser and staging execution remains follow-up work when a
+real storage composition and browser fixture runner exist.
 
 R4 acceptance, Job creation, post-confirmation contact/address disclosure and
 new lifecycle mutations remain outside R3-022.

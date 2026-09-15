@@ -7,13 +7,19 @@ import type {
   ConversationChatService,
   ConversationId,
   ConversationPersistence,
+  ExternalPdfQuotePersistence,
+  ExternalPdfQuoteRevision,
   JobInvitationDetail,
   JobInvitationId,
   JobInvitationPersistence,
   JobRequestId,
+  Quote,
   QuoteComparisonPersistence,
   QuoteId,
   QuoteLifecyclePersistence,
+  QuotePersistence,
+  StructuredQuoteContentRevision,
+  StructuredQuotePersistence,
   UserAccountState,
   UserId,
 } from "@portal/domain";
@@ -41,6 +47,7 @@ import { CONVERSATION_PATHS } from "../conversations/routes.js";
 import { JOB_INVITATION_PATHS } from "../job-invitations/routes.js";
 import { QUOTE_COMPARISON_PATH } from "../quote-comparison/routes.js";
 import { QUOTE_LIFECYCLE_PATHS } from "../quote-lifecycle/routes.js";
+import { QUOTE_AUTHORING_PATHS } from "../quotes/routes.js";
 
 const now = new Date("2026-09-15T12:00:00.000Z");
 const appOrigin = "https://portal.example.test";
@@ -65,13 +72,139 @@ describe("R3 Fastify/session/CSRF security adapter", () => {
       status: "FASTIFY_TRANSPORT_VERIFIED",
     });
     expect(report.missingProductionSeams).toEqual([
-      "QUOTE_CORE_HTTP",
-      "QUOTE_STRUCTURED_AUTHORING_HTTP",
-      "QUOTE_EXTERNAL_PDF_AUTHORING_HTTP",
       "PRIVATE_MEDIA_PRODUCTION_COMPOSITION",
       "JOB_REQUEST_PRIVATE_MEDIA_DELIVERY",
       "BROWSER_STAGING_E2E",
     ]);
+  });
+
+  it("covers Quote core and both authoring-mode transports with exact actor, state and CSRF boundaries", async () => {
+    const fixture = await createFixture();
+    const target = fixture.targets.EXACT_OWN;
+    const provider = requiredSession(fixture, "PROVIDER_OWNER");
+    const customer = requiredSession(fixture, "CUSTOMER_OWNER");
+    const competitor = requiredSession(fixture, "COMPETING_PROVIDER");
+    const suspended = requiredSession(fixture, "SUSPENDED_PROVIDER_OWNER");
+    const quotePath = authoringPath(QUOTE_AUTHORING_PATHS.quote, target);
+    const structuredPath = authoringPath(
+      QUOTE_AUTHORING_PATHS.structured,
+      target,
+    );
+    const externalPath = authoringPath(QUOTE_AUTHORING_PATHS.external, target);
+
+    await expectStatus(fixture, provider, "GET", quotePath, 200);
+    await expectStatus(
+      fixture,
+      provider,
+      "GET",
+      authoringPath(QUOTE_AUTHORING_PATHS.byInvitation, target),
+      200,
+    );
+    await expectStatus(fixture, provider, "GET", structuredPath, 200);
+    await expectStatus(fixture, provider, "GET", externalPath, 200);
+    await expectStatus(fixture, competitor, "GET", quotePath, 404, "NOT_FOUND");
+    await expectStatus(
+      fixture,
+      suspended,
+      "GET",
+      quotePath,
+      403,
+      "ACCOUNT_NOT_ACTIVE",
+    );
+
+    const createBody = {
+      authoringMode: "PLATFORM_STRUCTURED",
+      commandId: randomUUID(),
+      requestContentRevision: 2,
+      requestVisibleVersion: 1,
+    };
+    const createPath = authoringPath(QUOTE_AUTHORING_PATHS.create, target);
+    const before = fixture.ports.quoteEffects;
+    await expectStatus(
+      fixture,
+      { cookie: provider.cookie },
+      "POST",
+      createPath,
+      403,
+      "CSRF_INVALID",
+      createBody,
+    );
+    await expectStatus(
+      fixture,
+      { ...provider, csrfToken: "wrong-token" },
+      "POST",
+      createPath,
+      403,
+      "CSRF_INVALID",
+      createBody,
+    );
+    expect(fixture.ports.quoteEffects).toBe(before);
+    await expectStatus(fixture, provider, "POST", createPath, 201, undefined, {
+      ...createBody,
+      commandId: randomUUID(),
+    });
+    expect(fixture.ports.quoteEffects).toBe(before + 1);
+    await expectStatus(
+      fixture,
+      customer,
+      "POST",
+      createPath,
+      404,
+      "NOT_FOUND",
+      { ...createBody, commandId: randomUUID() },
+    );
+
+    await expectStatus(
+      fixture,
+      provider,
+      "POST",
+      structuredPath,
+      200,
+      undefined,
+      structuredSaveBody(),
+    );
+    await expectStatus(
+      fixture,
+      competitor,
+      "POST",
+      structuredPath,
+      404,
+      "NOT_FOUND",
+      structuredSaveBody(),
+    );
+    await expectStatus(
+      fixture,
+      provider,
+      "POST",
+      externalPath,
+      200,
+      undefined,
+      externalSaveBody(),
+    );
+
+    await expectStatus(
+      fixture,
+      provider,
+      "POST",
+      authoringPath(QUOTE_AUTHORING_PATHS.submit, target),
+      200,
+      undefined,
+      {
+        commandId: randomUUID(),
+        expectedDraftStateRevision: 1,
+        expectedSubmittedStateRevision: null,
+      },
+    );
+    fixture.ports.state = "TERMINAL_LINEAGE";
+    await expectStatus(
+      fixture,
+      provider,
+      "POST",
+      createPath,
+      409,
+      "READ_ONLY",
+      { ...createBody, commandId: randomUUID() },
+    );
   });
 
   it("covers existing Quote lifecycle transport without inventing authoring endpoints", async () => {
@@ -316,6 +449,7 @@ class TestAuthPersistence implements AuthPersistence {
 class BoundaryPorts {
   public messageEffects = 0;
   public lifecycleEffects = 0;
+  public quoteEffects = 0;
   public state: R3SecurityState = "WRITABLE";
 
   public constructor(
@@ -410,6 +544,89 @@ class BoundaryPorts {
     },
   };
 
+  public readonly quotes: QuotePersistence = {
+    createDraft: (input) =>
+      this.providerCommand(
+        input.actorUserId,
+        this.targetFor("conversationId", input.conversationId),
+      ),
+    createRevision: (input) =>
+      this.providerCommand(
+        input.actorUserId,
+        this.targetFor("quoteId", input.quoteId),
+      ),
+    readOwned: (input) => this.readQuote(input.actorUserId, input.quoteId),
+    readOwnedByInvitation: (input) => {
+      const target = this.targetFor("invitationId", input.invitationId);
+      return Promise.resolve(
+        this.canReadBilateral(input.actorUserId, target)
+          ? quote(this.targets[target], this.role(input.actorUserId, target))
+          : null,
+      );
+    },
+    reject: (input) => {
+      const target = this.targetFor("quoteId", input.quoteId);
+      if (this.role(input.actorUserId, target) !== "CUSTOMER")
+        return Promise.resolve({ status: "NOT_FOUND" });
+      this.quoteEffects += 1;
+      return Promise.resolve({
+        quote: quote(this.targets[target], "CUSTOMER"),
+        status: "APPLIED",
+      });
+    },
+    submit: (input) =>
+      this.providerCommand(
+        input.actorUserId,
+        this.targetFor("quoteId", input.quoteId),
+      ),
+  };
+
+  public readonly structured: StructuredQuotePersistence = {
+    readOwned: (input) => {
+      const target = this.targetFor("quoteId", input.quoteId);
+      return Promise.resolve(
+        this.canReadBilateral(input.actorUserId, target)
+          ? structuredContent(input.quoteId)
+          : null,
+      );
+    },
+    saveDraft: (input) => {
+      const target = this.targetFor("quoteId", input.quoteId);
+      if (this.role(input.actorUserId, target) !== "PROVIDER")
+        return Promise.resolve({ status: "NOT_FOUND" });
+      if (this.state === "TERMINAL_LINEAGE")
+        return Promise.resolve({ status: "READ_ONLY" });
+      this.quoteEffects += 1;
+      return Promise.resolve({
+        content: structuredContent(input.quoteId),
+        status: "SAVED",
+      });
+    },
+  };
+
+  public readonly externalPdf: ExternalPdfQuotePersistence = {
+    readOwned: (input) => {
+      const target = this.targetFor("quoteId", input.quoteId);
+      return Promise.resolve(
+        this.canReadBilateral(input.actorUserId, target)
+          ? externalContent(input.quoteId)
+          : null,
+      );
+    },
+    saveDraft: (input) => {
+      const target = this.targetFor("quoteId", input.quoteId);
+      if (this.role(input.actorUserId, target) !== "PROVIDER")
+        return Promise.resolve({ status: "NOT_FOUND" });
+      if (this.state === "TERMINAL_LINEAGE")
+        return Promise.resolve({ status: "READ_ONLY" });
+      this.quoteEffects += 1;
+      return Promise.resolve({
+        revision: externalContent(input.quoteId),
+        status: "SAVED",
+      });
+    },
+  };
+
   public readonly lifecycle: QuoteLifecyclePersistence = {
     readOwnedContext: (input) => {
       const target = this.targetFor("quoteId", input.quoteId);
@@ -456,6 +673,29 @@ class BoundaryPorts {
         ? conversation(this.targets[target], actorUserId, target, this.state)
         : null,
     );
+  }
+
+  private readQuote(
+    actorUserId: UserId,
+    quoteId: QuoteId,
+  ): Promise<Quote | null> {
+    const target = this.targetFor("quoteId", quoteId);
+    const role = this.role(actorUserId, target);
+    return Promise.resolve(
+      role === null ? null : quote(this.targets[target], role),
+    );
+  }
+
+  private providerCommand(actorUserId: UserId, target: R3SecurityTarget) {
+    if (this.role(actorUserId, target) !== "PROVIDER")
+      return Promise.resolve({ status: "NOT_FOUND" as const });
+    if (this.state === "TERMINAL_LINEAGE")
+      return Promise.resolve({ status: "READ_ONLY" as const });
+    this.quoteEffects += 1;
+    return Promise.resolve({
+      quote: quote(this.targets[target], "PROVIDER"),
+      status: "APPLIED" as const,
+    });
   }
 
   private canReadBilateral(
@@ -529,6 +769,11 @@ async function createFixture(): Promise<Fixture> {
       jobInvitations: { invitations: ports.invitations },
       persistence: auth,
       quoteComparison: { comparison: ports.comparison },
+      quoteAuthoring: {
+        core: ports.quotes,
+        externalPdf: ports.externalPdf,
+        structured: ports.structured,
+      },
       quoteLifecycle: { lifecycle: ports.lifecycle },
     },
     database: { ping: () => Promise.resolve() },
@@ -875,6 +1120,131 @@ function lifecycleContext(quoteId: QuoteId) {
   };
 }
 
+function quote(target: TargetIds, role: "CUSTOMER" | "PROVIDER" | null): Quote {
+  const revision = {
+    authoringMode: "PLATFORM_STRUCTURED" as const,
+    changedAt: now,
+    createdAt: now,
+    rejectionReason: null,
+    requestContentRevision: 2,
+    requestVisibleVersion: 1,
+    revision: 1,
+    state: "DRAFT" as const,
+    stateRevision: 1,
+    submittedAt: null,
+  };
+  return {
+    conversationId: target.conversationId,
+    createdAt: now,
+    currentDraft: revision,
+    currentSubmitted: null,
+    id: target.quoteId,
+    invitationId: target.invitationId,
+    jobRequestId: target.jobRequestId,
+    participantRole: role === "CUSTOMER" ? "CUSTOMER" : "CRAFTSMAN",
+    revisions: [revision],
+  };
+}
+
+function structuredContent(quoteId: QuoteId): StructuredQuoteContentRevision {
+  const emptyComponent = { amountCents: null, description: null };
+  return {
+    changedAt: now,
+    components: {
+      labor: emptyComponent,
+      material: emptyComponent,
+      other: emptyComponent,
+      transport: emptyComponent,
+    },
+    conditionalOnInspection: false,
+    contentRevision: 1,
+    currency: "EUR",
+    depositAmountCents: null,
+    depositMode: null,
+    depositNotes: null,
+    depositPercentageBasisPoints: null,
+    estimatedDurationDays: null,
+    estimatedStartOn: null,
+    excludedScope: [],
+    includedScope: [],
+    inspectionConditions: null,
+    materialResponsibility: "PROVIDER",
+    priceBasis: "Cena za celé dielo",
+    priceMode: "FIXED",
+    providerNotes: null,
+    quoteId,
+    quoteRevision: 1,
+    rangeMaximumCents: null,
+    rangeMinimumCents: null,
+    summary: "Bezpečný súhrn ponuky",
+    title: "Ponuka remeselníka",
+    totalAmountCents: 100_000,
+    validUntil: null,
+    vatStatus: "VAT_INCLUDED",
+    warrantyInformation: null,
+  };
+}
+
+function externalContent(quoteId: QuoteId): ExternalPdfQuoteRevision {
+  return {
+    confirmedAt: now,
+    contentRevision: 1,
+    currency: "EUR",
+    depositAmountCents: null,
+    depositMode: null,
+    depositPercentageBasisPoints: null,
+    estimatedDurationDays: null,
+    estimatedStartOn: null,
+    materialResponsibility: null,
+    pdfAssetId: uuid(950),
+    pdfDownloadPath: `/v1/media/${uuid(950)}/download`,
+    priceMode: "FIXED",
+    providerConfirmedSummaryMatchesPdf: true,
+    quoteId,
+    quoteRevision: 1,
+    rangeMaximumCents: null,
+    rangeMinimumCents: null,
+    savedAt: now,
+    totalAmountCents: 100_000,
+    validUntil: null,
+    vatStatus: "VAT_INCLUDED",
+  };
+}
+
+function structuredSaveBody() {
+  return {
+    commandId: randomUUID(),
+    content: {
+      components: {},
+      conditionalOnInspection: false,
+      currency: "EUR",
+      materialResponsibility: "PROVIDER",
+      priceBasis: "Cena za celé dielo",
+      priceMode: "FIXED",
+      summary: "Bezpečný súhrn ponuky",
+      title: "Ponuka remeselníka",
+      totalAmountCents: 100_000,
+      vatStatus: "VAT_INCLUDED",
+    },
+    expectedContentRevision: 0,
+  };
+}
+
+function externalSaveBody() {
+  return {
+    commandId: randomUUID(),
+    envelope: {
+      currency: "EUR",
+      priceMode: "FIXED",
+      providerConfirmedSummaryMatchesPdf: true,
+      totalAmountCents: 100_000,
+      vatStatus: "VAT_INCLUDED",
+    },
+    expectedContentRevision: 0,
+    pdfAssetId: uuid(950),
+  };
+}
+
 const R3_SECURITY_ACTOR_ORDER = [
   "CUSTOMER_OWNER",
   "PROVIDER_OWNER",
@@ -936,6 +1306,23 @@ function conversationPath(
 
 function lifecyclePath(template: string, quoteId: QuoteId): string {
   return template.replace(":quoteId", quoteId);
+}
+
+function authoringPath(template: string, target: TargetIds): string {
+  return template
+    .replace(":conversationId", target.conversationId)
+    .replace(":invitationId", target.invitationId)
+    .replace(":quoteId", target.quoteId)
+    .replace(":quoteRevision", "1");
+}
+
+function requiredSession(
+  fixture: Fixture,
+  actor: R3SecurityActor,
+): SessionHandle {
+  const session = fixture.sessions[actor];
+  if (session === undefined) throw new Error(`Missing ${actor} session.`);
+  return session;
 }
 
 function responseCookie(header: string | string[] | undefined): string {
