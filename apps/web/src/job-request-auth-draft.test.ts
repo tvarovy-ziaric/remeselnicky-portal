@@ -119,7 +119,7 @@ describe("authentication-boundary job request draft", () => {
 
 function section(description: string) {
   return {
-    key: "request.basics",
+    key: "request.core",
     payload: { description },
     schemaVersion: 1,
   } as const;

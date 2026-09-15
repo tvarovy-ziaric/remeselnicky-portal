@@ -91,7 +91,7 @@ describe("authentication HTTP boundary", () => {
     const authCsrf = registered.json<{ csrfToken: string }>().csrfToken;
     const payload = {
       section: {
-        key: "request.basics",
+        key: "request.core",
         payload: { description: "Oprava strechy" },
         schemaVersion: 1,
       },
@@ -159,11 +159,58 @@ describe("authentication HTTP boundary", () => {
       },
       method: "POST",
       payload: {
-        section: { key: "request.basics", payload: {}, schemaVersion: 1 },
+        section: {
+          key: "request.core",
+          payload: { description: "Oprava strechy" },
+          schemaVersion: 1,
+        },
       },
       url: AUTH_API_PATHS.draftHandoffConsume,
     });
     expect(response.statusCode).toBe(401);
+    expect(fixture.draftCreations).toHaveLength(0);
+  });
+
+  it("rejects non-allowlisted pre-auth draft content before persistence", async () => {
+    const fixture = createFixture({ draftHandoff: true, eligible: true });
+    const anonymous = await csrf(fixture.app);
+    const armed = await fixture.app.inject({
+      headers: {
+        cookie: anonymous.cookie,
+        "x-csrf-token": anonymous.token,
+      },
+      method: "POST",
+      url: AUTH_API_PATHS.draftHandoffArm,
+    });
+    const registered = await fixture.app.inject({
+      headers: {
+        cookie: responseCookie(armed.headers["set-cookie"]),
+        "x-csrf-token": anonymous.token,
+      },
+      method: "POST",
+      payload: {
+        adultAttested: true,
+        email: "person@example.com",
+        password: PASSWORD,
+      },
+      url: AUTH_API_PATHS.register,
+    });
+    const response = await fixture.app.inject({
+      headers: {
+        cookie: responseCookie(registered.headers["set-cookie"]),
+        "x-csrf-token": registered.json<{ csrfToken: string }>().csrfToken,
+      },
+      method: "POST",
+      payload: {
+        section: {
+          key: "request.unreviewed",
+          payload: { arbitrary: "content" },
+          schemaVersion: 1,
+        },
+      },
+      url: AUTH_API_PATHS.draftHandoffConsume,
+    });
+    expect(response.statusCode).toBe(400);
     expect(fixture.draftCreations).toHaveLength(0);
   });
 

@@ -117,7 +117,7 @@ export function registerDraftHandoffRoutes(
       try {
         const customer =
           await dependencies.customerProfiles.ensureForCustomerUse(actor);
-        const section = normalizeJobRequestDraftSection(request.body.section);
+        const section = normalizePreAuthHandoffSection(request.body.section);
         const result =
           await dependencies.drafts.createDraftWithInitialSectionOwned({
             actorUserId: actor,
@@ -154,6 +154,38 @@ export function registerDraftHandoffRoutes(
       }
     },
   );
+}
+
+function normalizePreAuthHandoffSection(input: {
+  readonly key: string;
+  readonly payload: unknown;
+  readonly schemaVersion: number;
+}) {
+  if (
+    input.key !== "request.core" ||
+    input.schemaVersion !== 1 ||
+    typeof input.payload !== "object" ||
+    input.payload === null ||
+    Array.isArray(input.payload)
+  ) {
+    throw new TypeError("Invalid pre-authentication draft section.");
+  }
+  const payload = input.payload as Record<string, unknown>;
+  if (
+    Object.keys(payload).length !== 1 ||
+    typeof payload["description"] !== "string"
+  ) {
+    throw new TypeError("Invalid pre-authentication draft section.");
+  }
+  const description = payload["description"].trim();
+  if (description.length < 1 || description.length > 4_000) {
+    throw new TypeError("Invalid pre-authentication draft section.");
+  }
+  return normalizeJobRequestDraftSection({
+    key: input.key,
+    payload: { description },
+    schemaVersion: input.schemaVersion,
+  });
 }
 
 async function requireActiveActor(
