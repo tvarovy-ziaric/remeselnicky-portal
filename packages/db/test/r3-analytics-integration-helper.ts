@@ -353,11 +353,11 @@ async function assertConsentedObservation(sql: Sql): Promise<void> {
   const [policy] = await sql<{ policyVersionId: string }[]>`
     SELECT policy_version_id AS "policyVersionId"
     FROM privacy_policy_versions
-    WHERE optional_consent_purpose = 'NON_ESSENTIAL_ANALYTICS'
-      AND legal_review_state = 'APPROVED'
-      AND effective_from <= CURRENT_TIMESTAMP
-      AND (effective_until IS NULL OR effective_until > CURRENT_TIMESTAMP)
-    ORDER BY version DESC LIMIT 1
+    WHERE policy_kind = 'OPTIONAL_CONSENT_TEXT'
+      AND optional_consent_purpose = 'NON_ESSENTIAL_ANALYTICS'
+      AND review_state = 'APPROVED'
+      AND effective_at <= CURRENT_TIMESTAMP
+    ORDER BY effective_at DESC, created_at DESC, policy_version_id DESC LIMIT 1
   `;
   if (policy === undefined) return;
   const [consent] = await sql<{ action: string; revision: number }[]>`
@@ -549,11 +549,11 @@ async function assertInvitationViewAuthorization(sql: Sql): Promise<void> {
   const [policy] = await sql<{ policyVersionId: string }[]>`
     SELECT policy_version_id AS "policyVersionId"
     FROM privacy_policy_versions
-    WHERE optional_consent_purpose = 'NON_ESSENTIAL_ANALYTICS'
-      AND legal_review_state = 'APPROVED'
-      AND effective_from <= CURRENT_TIMESTAMP
-      AND (effective_until IS NULL OR effective_until > CURRENT_TIMESTAMP)
-    ORDER BY version DESC LIMIT 1
+    WHERE policy_kind = 'OPTIONAL_CONSENT_TEXT'
+      AND optional_consent_purpose = 'NON_ESSENTIAL_ANALYTICS'
+      AND review_state = 'APPROVED'
+      AND effective_at <= CURRENT_TIMESTAMP
+    ORDER BY effective_at DESC, created_at DESC, policy_version_id DESC LIMIT 1
   `;
   expect(policy).toBeDefined();
   if (policy === undefined) {
@@ -768,11 +768,11 @@ async function assertRevokedExternalPdfDenied(
   const [policy] = await sql<{ policyVersionId: string }[]>`
     SELECT policy_version_id AS "policyVersionId"
     FROM privacy_policy_versions
-    WHERE optional_consent_purpose = 'NON_ESSENTIAL_ANALYTICS'
-      AND legal_review_state = 'APPROVED'
-      AND effective_from <= CURRENT_TIMESTAMP
-      AND (effective_until IS NULL OR effective_until > CURRENT_TIMESTAMP)
-    ORDER BY version DESC LIMIT 1
+    WHERE policy_kind = 'OPTIONAL_CONSENT_TEXT'
+      AND optional_consent_purpose = 'NON_ESSENTIAL_ANALYTICS'
+      AND review_state = 'APPROVED'
+      AND effective_at <= CURRENT_TIMESTAMP
+    ORDER BY effective_at DESC, created_at DESC, policy_version_id DESC LIMIT 1
   `;
   expect(policy).toBeDefined();
   if (policy === undefined) {
