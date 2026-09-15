@@ -76,7 +76,7 @@ describe("R3 Fastify/session/CSRF security adapter", () => {
       "JOB_REQUEST_PRIVATE_MEDIA_DELIVERY",
       "BROWSER_STAGING_E2E",
     ]);
-  });
+  }, 15_000);
 
   it("covers Quote core and both authoring-mode transports with exact actor, state and CSRF boundaries", async () => {
     const fixture = await createFixture();

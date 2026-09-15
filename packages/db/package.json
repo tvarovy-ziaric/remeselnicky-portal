@@ -30,9 +30,10 @@
     "@portal/media": "workspace:*",
     "@portal/notifications": "workspace:*",
     "@portal/outbox": "workspace:*",
-    "@portal/taxonomy": "workspace:*",
     "@portal/privacy": "workspace:*",
+    "@portal/queue": "workspace:*",
     "@portal/search": "workspace:*",
+    "@portal/taxonomy": "workspace:*",
     "drizzle-orm": "0.45.2",
     "postgres": "3.4.9"
   },

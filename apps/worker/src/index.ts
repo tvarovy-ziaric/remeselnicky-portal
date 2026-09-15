@@ -10,3 +10,4 @@ export {
   createInvitationNotificationProcessor,
   INVITATION_MAINTENANCE_INTERVAL_MS,
 } from "./notification-delivery.js";
+export { createMediaProcessingWorker } from "./media-processing.js";

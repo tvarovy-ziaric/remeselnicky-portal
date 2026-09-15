@@ -74,6 +74,7 @@ import {
   runR3AnalyticsPostLifecycleAssertions,
 } from "./r3-analytics-integration-helper.js";
 import { runR3DemandSideSecurityIntegrationAssertions } from "./r3-demand-side-security-integration-helper.js";
+import { runMediaProcessingQueueIntegrationAssertions } from "./media-processing-queue-integration-helper.js";
 
 const testDatabaseUrl = process.env["TEST_DATABASE_URL"];
 const migrationsDirectory = fileURLToPath(
@@ -153,6 +154,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
           "0051_quote_lifecycle.sql",
           "0052_demand_side_notifications.sql",
           "0053_r3_analytics_funnel.sql",
+          "0054_media_processing_queue.sql",
         ],
         alreadyApplied: 0,
       });
@@ -161,7 +163,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         testDatabaseUrl,
         migrationsDirectory,
       );
-      expect(secondRun).toEqual({ applied: [], alreadyApplied: 54 });
+      expect(secondRun).toEqual({ applied: [], alreadyApplied: 55 });
 
       const sql = postgres(testDatabaseUrl, { max: 5 });
       try {
@@ -207,7 +209,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         `;
 
         expect(postgis?.extversion).toMatch(/^3\./);
-        expect(ledger?.count).toBe(54);
+        expect(ledger?.count).toBe(55);
         expect(created).toMatchObject({ account_state: "ACTIVE" });
         expect(created?.id).toMatch(
           /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
@@ -1770,6 +1772,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         await runR3AnalyticsPostLifecycleAssertions(sql);
         await runConversationReadOnlyIntegrationAssertions(sql);
         await runConversationChatReadOnlyIntegrationAssertions(sql);
+        await runMediaProcessingQueueIntegrationAssertions(sql);
 
         await adminAccess.revokePrivilegedSession(superSessionDigest);
         await expect(

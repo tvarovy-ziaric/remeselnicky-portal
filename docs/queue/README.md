@@ -37,7 +37,11 @@ must be protected and privacy-reviewed.
 ## Adapter boundary
 
 `InMemoryQueue` is for deterministic tests and single-process development. It
-is not durable and must not back staging or production workloads. A later
-infrastructure decision may add a Redis, PostgreSQL, or managed queue adapter
-without changing handler semantics. Choosing or provisioning that vendor is
-outside R0-021.
+must not back staging or production workloads. Media processing uses a durable
+PostgreSQL adapter: asset creation and job creation share one transaction,
+workers claim through bounded leases with `FOR UPDATE SKIP LOCKED`, and stale
+attempts cannot acknowledge or rewrite a newer delivery. The adapter keeps
+only opaque asset identity, kind and machine outcome metadata. Other queue
+consumers may still adopt a different durable implementation without changing
+the common handler contract; choosing or provisioning an external queue vendor
+remains outside R0-021.

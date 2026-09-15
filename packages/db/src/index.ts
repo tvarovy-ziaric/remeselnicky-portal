@@ -17,6 +17,7 @@ import {
   createMediaRepository,
   type MediaRepository,
 } from "./media-repository.js";
+import { createMediaProcessingQueue } from "./media-processing-queue.js";
 import { createPrivateMediaDeliveryRepository } from "./media-delivery-repository.js";
 import {
   createPortfolioPublicationRepository,
@@ -608,6 +609,7 @@ export type {
   VerifyPhoneOtpResult,
 } from "./phone-verification-repository.js";
 export { createMediaRepository } from "./media-repository.js";
+export { createMediaProcessingQueue } from "./media-processing-queue.js";
 export { createPrivateMediaDeliveryRepository } from "./media-delivery-repository.js";
 export {
   createConversationAttachmentMediaAccessResolver,
@@ -851,6 +853,7 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly jobRequestMedia: JobRequestMediaUploadAuthorization;
   readonly emailVerification: EmailVerificationRepository;
   readonly media: MediaRepository;
+  readonly mediaProcessingQueue: ReturnType<typeof createMediaProcessingQueue>;
   readonly privateMediaDelivery: PrivateMediaDeliveryRepository;
   readonly notifications: NotificationRepository;
   readonly outbox: OutboxRepository;
@@ -955,6 +958,7 @@ export function createDatabase(
   const jobRequestMedia = createJobRequestMediaUploadAuthorization(sql);
   const emailVerification = createEmailVerificationRepository(sql);
   const media = createMediaRepository(sql);
+  const mediaProcessingQueue = createMediaProcessingQueue(sql);
   const privateMediaDelivery = createPrivateMediaDeliveryRepository(sql);
   const notifications = createNotificationRepository(sql);
   const outbox = createOutboxRepository(sql);
@@ -1021,6 +1025,7 @@ export function createDatabase(
     jobRequestMedia,
     emailVerification,
     media,
+    mediaProcessingQueue,
     privateMediaDelivery,
     notifications,
     outbox,

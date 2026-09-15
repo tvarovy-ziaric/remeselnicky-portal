@@ -187,6 +187,9 @@ importers:
       '@portal/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@portal/media':
+        specifier: workspace:*
+        version: link:../../packages/media
       '@portal/notifications':
         specifier: workspace:*
         version: link:../../packages/notifications
@@ -346,6 +349,9 @@ importers:
       '@portal/privacy':
         specifier: workspace:*
         version: link:../privacy
+      '@portal/queue':
+        specifier: workspace:*
+        version: link:../queue
       '@portal/search':
         specifier: workspace:*
         version: link:../search

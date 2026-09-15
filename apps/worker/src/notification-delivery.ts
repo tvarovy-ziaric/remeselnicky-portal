@@ -8,6 +8,7 @@ import type {
   JobInvitationReminderStore,
 } from "@portal/notifications";
 import type { OutboxWorker } from "@portal/outbox";
+import type { QueueWorker } from "@portal/queue";
 
 import type { WorkerLoopProcessor } from "./service.js";
 
@@ -25,6 +26,7 @@ export function createInvitationNotificationProcessor(input: {
   readonly demandSideNotifications: DemandSideNotificationMaintenanceStore;
   readonly invitations: Pick<JobInvitationPersistence, "expirePending">;
   readonly maintenanceIntervalMs?: number;
+  readonly mediaProcessing?: QueueWorker;
   readonly now?: () => number;
   readonly onAnalyticsError?: (error: unknown) => void;
   readonly outbox: OutboxWorker;
@@ -54,6 +56,7 @@ export function createInvitationNotificationProcessor(input: {
       }
 
       const result = await input.outbox.processNext();
+      const media = await input.mediaProcessing?.processNext();
       let analytics: R3AnalyticsProcessResult | undefined;
       try {
         analytics = await input.analytics?.processNext();
@@ -63,6 +66,7 @@ export function createInvitationNotificationProcessor(input: {
       return Object.freeze({
         status:
           result.status === "IDLE" &&
+          (media === undefined || media.status === "idle") &&
           (analytics === undefined || analytics.status === "IDLE")
             ? "idle"
             : "succeeded",

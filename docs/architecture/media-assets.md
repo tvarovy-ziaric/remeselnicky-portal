@@ -28,6 +28,15 @@ document validation and malware scanning belong to R0-019.
 Authorization-checked downloads belong to R0-020. Until then, `PROCESSING`
 files are not counterpart-visible.
 
+Every committed `PROCESSING` asset now creates one durable PostgreSQL media
+job in the same transaction as its metadata. The job contains only the opaque
+asset ID and `IMAGE`/`DOCUMENT` kind. A bounded lease with `SKIP LOCKED`
+claiming supports concurrent workers and crash recovery; exact-attempt
+acknowledge/retry/terminal transitions prevent a stale worker from completing
+a newer lease. Successful and terminal rows remain as idempotency and
+operational evidence. Queue history is append-protected and contains no
+filename, owner, storage key, hash, provenance or file bytes.
+
 ## Object-storage runtime adapter
 
 The runtime adapter speaks the S3 protocol without selecting a hosting vendor.

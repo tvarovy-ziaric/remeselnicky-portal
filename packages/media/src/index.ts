@@ -136,3 +136,11 @@ export type {
   ImageProcessingRejectionCode,
 } from "./image-processing.js";
 export * from "./quote-document.js";
+export {
+  MEDIA_PROCESSING_MAX_ATTEMPTS,
+  createMediaProcessingDispatcher,
+} from "./processing-queue.js";
+export type {
+  MediaProcessingDispatcher,
+  MediaProcessingJob,
+} from "./processing-queue.js";

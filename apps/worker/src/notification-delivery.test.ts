@@ -23,12 +23,24 @@ describe("invitation notification processor", () => {
         status: "DELIVERED",
       })
       .mockResolvedValueOnce({ status: "IDLE" });
+    const processMedia = vi
+      .fn()
+      .mockResolvedValueOnce({
+        attempt: 1,
+        correlationId: crypto.randomUUID(),
+        eventId: crypto.randomUUID(),
+        jobId: crypto.randomUUID(),
+        runId: crypto.randomUUID(),
+        status: "succeeded" as const,
+      })
+      .mockResolvedValueOnce({ status: "idle" as const });
     let currentTime = 1_000;
     const processor = createInvitationNotificationProcessor({
       analytics: { processNext: processAnalytics },
       demandSideNotifications: { enqueueDueUnreadChatEmails },
       invitations: { expirePending },
       maintenanceIntervalMs: 60_000,
+      mediaProcessing: { processNext: processMedia },
       now: () => currentTime,
       outbox: { processNext },
       quotes: { expireDueSubmitted },
@@ -46,6 +58,7 @@ describe("invitation notification processor", () => {
     expect(expireDueSubmitted).toHaveBeenCalledTimes(1);
     expect(processNext).toHaveBeenCalledTimes(2);
     expect(processAnalytics).toHaveBeenCalledTimes(2);
+    expect(processMedia).toHaveBeenCalledTimes(2);
   });
 
   it("reruns maintenance after the bounded interval and fails closed on errors", async () => {
