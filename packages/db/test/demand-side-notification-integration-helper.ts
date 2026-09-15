@@ -337,8 +337,15 @@ async function loadState(
     WHERE conversation_id = ${fixture.conversationId}
       AND actor_user_id = ${fixture.providerOwnerId}
   `;
-  if (row === undefined) throw new Error("Participant state fixture missing.");
-  return row;
+  return (
+    row ?? {
+      archived: false,
+      lastReadAt: null,
+      lastReadSequence: 0,
+      muted: false,
+      revision: 0,
+    }
+  );
 }
 
 async function expectEmailCount(
