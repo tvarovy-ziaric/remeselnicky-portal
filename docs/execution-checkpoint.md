@@ -5,11 +5,11 @@ This file is the persistent implementation-status overlay for the hash-verified 
 - Updated: 2026-09-15
 - Definition: D01–D30 LOCKED and hash verified
 - Active release: R3 — Demand side
-- Last completed ticket: R3-008 — candidate list to customer-selected invitations
-- Active ticket: R3-009 — invitation notifications and reminders
-- Next dependency-satisfied candidate: R3-010 — invitation outcome UX
+- Last completed ticket: R3-009 — invitation notifications and reminders
+- Active ticket: R3-010 — invitation outcome UX
+- Next dependency-satisfied candidate: R3-011 — ENGAGED-gated conversation entity
 - Human gate: canonical Slovak profession/skill/location content still requires expert/legal/source review before activation; this does not block private supply-side implementation
-- Integrated verification: commit `07d97df`, CI run `34944267513`, passed quality, dependency audit, secret scan, clean PostgreSQL/PostGIS migrations 0000–0042 and the complete live R0/R1/R2 plus R3-001–R3-008 integration suite; explicit customer selection, server-revalidated invitation eligibility, CSRF/auth boundaries, bounded invite results and request-context UI passed
+- Integrated verification: commit `6b860d0`, CI run `34945904007`, passed quality, dependency audit, secret scan, clean PostgreSQL/PostGIS migrations 0000–0043 and the complete live R0/R1/R2 plus R3-001–R3-009 integration suite; transactional invitation events, idempotent reminder scheduling, in-app/email fan-out and worker integration passed
 
 ## Ticket state overlay
 
@@ -89,9 +89,10 @@ This file is the persistent implementation-status overlay for the hash-verified 
 | R3-006 | DONE     | Configurable active limit/warnings, expiry, extension/reactivation, cancellation and clean duplication passed |
 | R3-007 | DONE     | JobInvitation lifecycle, exact request-version provenance and max-five active invitations passed              |
 | R3-008 | DONE     | Explicit candidate selection, server-revalidated invitations and request-context UI/API passed                |
-| R3-009 | ACTIVE   | Transactional invitation notifications, asynchronous delivery and configurable reminders                      |
+| R3-009 | DONE     | Transactional invitation notifications, asynchronous delivery and configurable reminders passed               |
+| R3-010 | ACTIVE   | Authorized invitation inbox/detail/actions and neutral outcome UX                                             |
 
-All DONE rows above are covered by CI run `34944267513` unless a more specific earlier run is referenced in history. The run applied migrations `0000`–`0042` twice and passed the complete live PostgreSQL/PostGIS integration suite, including the R1 supply-side authorization/privacy matrix, full R2 discovery/shortlist assertions, and R3 request core, recovery, validated content, private media, active-version history, lifecycle, invitation eligibility, explicit selection and concurrency boundaries.
+All DONE rows above are covered by CI run `34945904007` unless a more specific earlier run is referenced in history. The run applied migrations `0000`–`0043` twice and passed the complete live PostgreSQL/PostGIS integration suite, including the R1 supply-side authorization/privacy matrix, full R2 discovery/shortlist assertions, and R3 request core, recovery, validated content, private media, active-version history, lifecycle, invitation eligibility, explicit selection, transactional notification delivery and concurrency boundaries.
 
 ## Durable decisions
 
