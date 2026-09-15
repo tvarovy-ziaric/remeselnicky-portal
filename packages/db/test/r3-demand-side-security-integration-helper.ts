@@ -94,8 +94,13 @@ interface ActorRow {
 }
 
 interface TargetProviderRow {
+  readonly invitationId: JobInvitationId | null;
+  readonly invitationRevision: number | null;
+  readonly invitationState: "ENGAGED" | "PENDING" | null;
   readonly ownerUserId: UserId;
   readonly profileId: CraftsmanProfileId;
+  readonly requestContentRevision: number | null;
+  readonly requestVisibleVersion: number | null;
 }
 
 const fixedClock = new Date("2099-01-01T00:00:00.000Z");
@@ -411,33 +416,66 @@ function privateStorage() {
 }
 
 async function createSecurityFixture(sql: Sql): Promise<SecurityFixture> {
-  const source = await findSourceConversation(sql);
-  const target = await findTargetProvider(sql, source);
+  const { source, target } = await findSecurityLineage(sql);
   await ensureVerifiedCredentials(sql, source.customerOwnerId);
   await ensureVerifiedCredentials(sql, target.ownerUserId);
 
   const invitations = createJobInvitationRepository(sql);
-  const sent = await invitations.sendOwned({
-    actorUserId: source.customerOwnerId,
-    commandId: randomUUID(),
-    craftsmanProfileId: target.profileId,
-    jobRequestId: source.jobRequestId,
-  });
-  if (!("invitation" in sent)) {
-    throw new Error(`R3-022 target invitation failed: ${sent.status}`);
+  const pendingInvitation =
+    target.invitationId === null
+      ? await invitations.sendOwned({
+          actorUserId: source.customerOwnerId,
+          commandId: randomUUID(),
+          craftsmanProfileId: target.profileId,
+          jobRequestId: source.jobRequestId,
+        })
+      : null;
+  if (pendingInvitation !== null && !("invitation" in pendingInvitation)) {
+    throw new Error(
+      `R3-022 target invitation failed: ${pendingInvitation.status}`,
+    );
   }
-  const engaged = await invitations.respondOwned({
-    action: "ENGAGE",
-    actorUserId: target.ownerUserId,
-    commandId: randomUUID(),
-    expectedRevision: sent.invitation.revision,
-    invitationId: sent.invitation.id,
-  });
-  if (!("invitation" in engaged)) {
-    throw new Error(`R3-022 target engagement failed: ${engaged.status}`);
+  const invitationId =
+    target.invitationId ??
+    (pendingInvitation !== null && "invitation" in pendingInvitation
+      ? pendingInvitation.invitation.id
+      : null);
+  const invitationRevision =
+    target.invitationRevision ??
+    (pendingInvitation !== null && "invitation" in pendingInvitation
+      ? pendingInvitation.invitation.revision
+      : null);
+  if (invitationId === null || invitationRevision === null) {
+    throw new Error("R3-022 target invitation identity is missing.");
+  }
+  const engagement =
+    target.invitationState === "ENGAGED"
+      ? null
+      : await invitations.respondOwned({
+          action: "ENGAGE",
+          actorUserId: target.ownerUserId,
+          commandId: randomUUID(),
+          expectedRevision: invitationRevision,
+          invitationId,
+        });
+  if (engagement !== null && !("invitation" in engagement)) {
+    throw new Error(`R3-022 target engagement failed: ${engagement.status}`);
+  }
+  const requestContentRevision =
+    target.requestContentRevision ??
+    (pendingInvitation !== null && "invitation" in pendingInvitation
+      ? pendingInvitation.invitation.requestContentRevision
+      : null);
+  const requestVisibleVersion =
+    target.requestVisibleVersion ??
+    (pendingInvitation !== null && "invitation" in pendingInvitation
+      ? pendingInvitation.invitation.requestVisibleVersion
+      : null);
+  if (requestContentRevision === null || requestVisibleVersion === null) {
+    throw new Error("R3-022 target request provenance is missing.");
   }
   const [conversation] = await sql<{ readonly id: ConversationId }[]>`
-    SELECT id FROM conversations WHERE invitation_id = ${sent.invitation.id}
+    SELECT id FROM conversations WHERE invitation_id = ${invitationId}
   `;
   if (conversation === undefined) {
     throw new Error("R3-022 target conversation was not created.");
@@ -464,8 +502,8 @@ async function createSecurityFixture(sql: Sql): Promise<SecurityFixture> {
     conversationId: conversation.id,
     customerOwnerId: source.customerOwnerId,
     providerOwnerId: target.ownerUserId,
-    requestContentRevision: sent.invitation.requestContentRevision,
-    requestVisibleVersion: sent.invitation.requestVisibleVersion,
+    requestContentRevision,
+    requestVisibleVersion,
   });
   const actors = await findBoundaryActors(sql, {
     competingProviderId: source.competitorProviderOwnerId,
@@ -503,7 +541,7 @@ async function createSecurityFixture(sql: Sql): Promise<SecurityFixture> {
     competitorInvitationId: source.competitorInvitationId,
     conversationId: conversation.id,
     externalRevision: quoteFixture.externalRevision,
-    invitationId: sent.invitation.id,
+    invitationId,
     jobRequestId: source.jobRequestId,
     messageBody,
     messageId: sentMessage.entry.id,
@@ -516,8 +554,11 @@ async function createSecurityFixture(sql: Sql): Promise<SecurityFixture> {
   });
 }
 
-async function findSourceConversation(sql: Sql): Promise<SourceConversation> {
-  const [row] = await sql<SourceConversation[]>`
+async function findSecurityLineage(sql: Sql): Promise<{
+  readonly source: SourceConversation;
+  readonly target: TargetProviderRow;
+}> {
+  const sources = await sql<SourceConversation[]>`
     SELECT conversation.id AS "competitorConversationId",
       conversation.invitation_id AS "competitorInvitationId",
       craftsman.owner_user_id AS "competitorProviderOwnerId",
@@ -538,110 +579,92 @@ async function findSourceConversation(sql: Sql): Promise<SourceConversation> {
       AND request.state = 'ACTIVE'
     JOIN current_job_request_active_content_versions content
       ON content.job_request_id = request.id
-    JOIN current_job_request_active_sections core
-      ON core.job_request_id = request.id
-      AND core.section_key = 'request.core'
-    CROSS JOIN job_invitation_runtime_policy policy
     WHERE conversation.access_state = 'WRITABLE'
       AND conversation.invitation_state = 'ENGAGED'
-      AND (
-        SELECT count(*) FROM current_job_invitations active_invitation
-        WHERE active_invitation.job_request_id = request.id
-          AND active_invitation.state IN ('PENDING', 'ENGAGED')
-      ) < policy.active_invitation_limit
-      AND EXISTS (
-        SELECT 1
-        FROM current_craftsman_profile_publications publication
-        JOIN craftsman_profiles candidate
-          ON candidate.id = publication.craftsman_profile_id
-        JOIN users candidate_actor
-          ON candidate_actor.id = candidate.owner_user_id
-          AND candidate_actor.account_state = 'ACTIVE'
-        JOIN auth_credentials candidate_credential
-          ON candidate_credential.user_id = candidate_actor.id
-          AND candidate_credential.email_verified_at IS NOT NULL
-          AND candidate_credential.phone_verified_at IS NOT NULL
-        WHERE publication.effectively_public
-          AND candidate.owner_user_id NOT IN (
-            customer.owner_user_id, craftsman.owner_user_id
-          )
-          AND NOT EXISTS (
-            SELECT 1 FROM job_invitations existing
-            WHERE existing.job_request_id = request.id
-              AND existing.craftsman_profile_id = candidate.id
-          )
-          AND NOT EXISTS (
-            SELECT 1 FROM current_credential_qualification_policies qualification
-            WHERE qualification.profession_code =
-                core.payload ->> 'primaryProfessionCode'
-              AND qualification.requirement = 'REQUIRED'
-              AND NOT EXISTS (
-                SELECT 1 FROM current_searchable_craftsman_credentials qualified
-                WHERE qualified.craftsman_profile_id = candidate.id
-                  AND qualified.profession_code = qualification.profession_code
-                  AND qualified.credential_type_code =
-                    qualification.credential_type_code
-              )
-          )
-      )
     ORDER BY conversation.created_at DESC, conversation.id DESC
-    LIMIT 1
   `;
-  if (row === undefined) {
-    throw new Error(
-      "R3-022 requires an ACTIVE request with a writable ENGAGED conversation and invitation capacity.",
-    );
+  for (const source of sources) {
+    const target = await findTargetProvider(sql, source);
+    if (target !== null) return Object.freeze({ source, target });
   }
-  return row;
+  throw new Error(
+    "R3-022 requires an ACTIVE request with two isolated provider lineages.",
+  );
 }
 
 async function findTargetProvider(
   sql: Sql,
   source: SourceConversation,
-): Promise<TargetProviderRow> {
+): Promise<TargetProviderRow | null> {
   const [row] = await sql<TargetProviderRow[]>`
-    SELECT publication.craftsman_profile_id AS "profileId",
-      profile.owner_user_id AS "ownerUserId"
-    FROM current_craftsman_profile_publications publication
-    JOIN craftsman_profiles profile
-      ON profile.id = publication.craftsman_profile_id
-    JOIN users actor ON actor.id = profile.owner_user_id
-      AND actor.account_state = 'ACTIVE'
-    JOIN auth_credentials credential ON credential.user_id = actor.id
-      AND credential.email_verified_at IS NOT NULL
-      AND credential.phone_verified_at IS NOT NULL
-    JOIN current_job_request_active_sections core
-      ON core.job_request_id = ${source.jobRequestId}
-      AND core.section_key = 'request.core'
-    WHERE publication.effectively_public
-      AND profile.owner_user_id NOT IN (
-        ${source.customerOwnerId}, ${source.competitorProviderOwnerId}
-      )
-      AND NOT EXISTS (
-        SELECT 1 FROM job_invitations existing
-        WHERE existing.job_request_id = ${source.jobRequestId}
-          AND existing.craftsman_profile_id = profile.id
-      )
-      AND NOT EXISTS (
-        SELECT 1 FROM current_credential_qualification_policies policy
-        WHERE policy.profession_code = core.payload ->> 'primaryProfessionCode'
-          AND policy.requirement = 'REQUIRED'
-          AND NOT EXISTS (
-            SELECT 1 FROM current_searchable_craftsman_credentials qualified
-            WHERE qualified.craftsman_profile_id = profile.id
-              AND qualified.profession_code = policy.profession_code
-              AND qualified.credential_type_code = policy.credential_type_code
-          )
-      )
-    ORDER BY profile.id
+    WITH candidates AS (
+      SELECT invitation.craftsman_profile_id AS "profileId",
+        profile.owner_user_id AS "ownerUserId",
+        invitation.id AS "invitationId", invitation.revision AS "invitationRevision",
+        invitation.state::text AS "invitationState",
+        invitation.request_content_revision AS "requestContentRevision",
+        invitation.request_visible_version AS "requestVisibleVersion", 0 AS priority
+      FROM current_job_invitations invitation
+      JOIN craftsman_profiles profile
+        ON profile.id = invitation.craftsman_profile_id
+      JOIN users actor ON actor.id = profile.owner_user_id
+        AND actor.account_state = 'ACTIVE'
+      JOIN auth_credentials credential ON credential.user_id = actor.id
+        AND credential.email_verified_at IS NOT NULL
+        AND credential.phone_verified_at IS NOT NULL
+      WHERE invitation.job_request_id = ${source.jobRequestId}
+        AND invitation.state IN ('PENDING', 'ENGAGED')
+        AND profile.owner_user_id NOT IN (
+          ${source.customerOwnerId}, ${source.competitorProviderOwnerId}
+        )
+      UNION ALL
+      SELECT publication.craftsman_profile_id, profile.owner_user_id,
+        NULL::uuid, NULL::integer, NULL::text, NULL::integer, NULL::integer, 1
+      FROM current_craftsman_profile_publications publication
+      JOIN craftsman_profiles profile
+        ON profile.id = publication.craftsman_profile_id
+      JOIN users actor ON actor.id = profile.owner_user_id
+        AND actor.account_state = 'ACTIVE'
+      JOIN auth_credentials credential ON credential.user_id = actor.id
+        AND credential.email_verified_at IS NOT NULL
+        AND credential.phone_verified_at IS NOT NULL
+      JOIN current_job_request_active_sections core
+        ON core.job_request_id = ${source.jobRequestId}
+        AND core.section_key = 'request.core'
+      CROSS JOIN job_invitation_runtime_policy runtime_policy
+      WHERE publication.effectively_public
+        AND profile.owner_user_id NOT IN (
+          ${source.customerOwnerId}, ${source.competitorProviderOwnerId}
+        )
+        AND (
+          SELECT count(*) FROM current_job_invitations active_invitation
+          WHERE active_invitation.job_request_id = ${source.jobRequestId}
+            AND active_invitation.state IN ('PENDING', 'ENGAGED')
+        ) < runtime_policy.active_invitation_limit
+        AND NOT EXISTS (
+          SELECT 1 FROM job_invitations existing
+          WHERE existing.job_request_id = ${source.jobRequestId}
+            AND existing.craftsman_profile_id = profile.id
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM current_credential_qualification_policies policy
+          WHERE policy.profession_code = core.payload ->> 'primaryProfessionCode'
+            AND policy.requirement = 'REQUIRED'
+            AND NOT EXISTS (
+              SELECT 1 FROM current_searchable_craftsman_credentials qualified
+              WHERE qualified.craftsman_profile_id = profile.id
+                AND qualified.profession_code = policy.profession_code
+                AND qualified.credential_type_code = policy.credential_type_code
+            )
+        )
+    )
+    SELECT "profileId", "ownerUserId", "invitationId", "invitationRevision",
+      "invitationState", "requestContentRevision", "requestVisibleVersion"
+    FROM candidates
+    ORDER BY priority, "profileId"
     LIMIT 1
   `;
-  if (row === undefined) {
-    throw new Error(
-      "R3-022 requires a second eligible provider not already invited to the source request.",
-    );
-  }
-  return row;
+  return row ?? null;
 }
 
 async function findBoundaryActors(
