@@ -22,6 +22,7 @@ import { createConversationChatRepository } from "../src/conversation-chat-repos
 import { createDemandSideNotificationRepository } from "../src/demand-side-notification-repository.js";
 import { createJobInvitationRepository } from "../src/job-invitation-repository.js";
 import { createJobRequestLifecycleRepository } from "../src/job-request-lifecycle-repository.js";
+import { createJobRequestRepository } from "../src/job-request-repository.js";
 import { createJobRequestVersionRepository } from "../src/job-request-version-repository.js";
 import { createNotificationRepository } from "../src/notification-repository.js";
 import { createOutboxRepository } from "../src/outbox-repository.js";
@@ -1136,13 +1137,7 @@ async function expectMaterialEditVersusInvitationLockOrder(
   `;
   expect(after?.state).toBe("NOT_SELECTED");
   await expectMaterialEventCount(sql, reverseMaterialCommandId, 0);
-  const replacement = await createJobInvitationRepository(sql).sendOwned({
-    actorUserId: fixture.customerOwnerId,
-    commandId: randomUUID(),
-    craftsmanProfileId: await loadCraftsmanProfileId(sql, fixture.invitationId),
-    jobRequestId: fixture.jobRequestId,
-  });
-  expect(replacement.status).toBe("APPLIED");
+  await createReplacementInvitationFixture(sql, fixture);
   if (revised.status !== "APPLIED" || reverseRevised.status !== "APPLIED") {
     throw new Error(
       "Material authorization race did not append exact versions.",
@@ -1165,19 +1160,52 @@ async function expectMaterialEditVersusInvitationLockOrder(
   ).resolves.toBeNull();
 }
 
-async function loadCraftsmanProfileId(
+async function createReplacementInvitationFixture(
   sql: Sql,
-  invitationId: JobInvitationId,
-): Promise<CraftsmanProfileId> {
-  const [row] = await sql<
+  fixture: ConversationFixture,
+): Promise<void> {
+  const [identity] = await sql<
     Array<{ readonly craftsmanProfileId: CraftsmanProfileId }>
   >`
     SELECT craftsman_profile_id AS "craftsmanProfileId"
     FROM job_invitations
-    WHERE id = ${invitationId}
+    WHERE id = ${fixture.invitationId}
   `;
-  if (row === undefined) throw new Error("Invitation identity is missing.");
-  return row.craftsmanProfileId;
+  if (identity === undefined) {
+    throw new Error("Invitation identity is missing.");
+  }
+  const duplicate = await createJobRequestLifecycleRepository(
+    sql,
+  ).duplicateOwned({
+    actorUserId: fixture.customerOwnerId,
+    commandId: randomUUID(),
+    sourceJobRequestId: fixture.jobRequestId,
+  });
+  if (!("jobRequestId" in duplicate)) {
+    throw new Error("Could not create downstream lifecycle fixture.");
+  }
+  const activated = await createJobRequestRepository(sql).activateOwned({
+    actorUserId: fixture.customerOwnerId,
+    commandId: randomUUID(),
+    expectedRevision: duplicate.revision,
+    jobRequestId: duplicate.jobRequestId,
+  });
+  if (activated.status !== "APPLIED") {
+    throw new Error(
+      `Could not activate lifecycle fixture: ${activated.status}.`,
+    );
+  }
+  const invitation = await createJobInvitationRepository(sql).sendOwned({
+    actorUserId: fixture.customerOwnerId,
+    commandId: randomUUID(),
+    craftsmanProfileId: identity.craftsmanProfileId,
+    jobRequestId: duplicate.jobRequestId,
+  });
+  if (invitation.status !== "APPLIED") {
+    throw new Error(
+      `Could not invite lifecycle fixture: ${invitation.status}.`,
+    );
+  }
 }
 
 async function expectMaterialEventCount(
