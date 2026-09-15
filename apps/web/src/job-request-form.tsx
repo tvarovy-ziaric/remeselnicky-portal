@@ -18,6 +18,7 @@ import {
   createJobRequestDraftClient,
   type JobRequestDraftClient,
   type JobRequestEditableDraft,
+  type JobRequestMediaStatus,
 } from "./job-request-draft-client";
 import {
   loadJobRequestTaxonomySuggestions,
@@ -62,6 +63,8 @@ interface EditorValues {
     | "ADVICE_NEEDED"
     | "COMBINATION";
   municipalityCode: string;
+  documentMediaAssetIds: readonly string[];
+  photoMediaAssetIds: readonly string[];
   primaryProfessionCode: string;
   skillCodes: readonly string[];
   siteInspection: "" | "LIKELY" | "MAYBE" | "UNKNOWN";
@@ -88,8 +91,15 @@ export function JobRequestForm({
   const [step, setStep] = useState(0);
   const [reviewing, setReviewing] = useState(false);
   const [notice, setNotice] = useState("");
+  const [mediaBusy, setMediaBusy] = useState(false);
+  const [mediaStatuses, setMediaStatuses] = useState<
+    readonly JobRequestMediaStatus[]
+  >([]);
   const savedFingerprints = useRef(new Map<string, string>());
   const blockedAutosaveFingerprint = useRef<string | null>(null);
+  const hasProcessingMedia = mediaStatuses.some(
+    (item) => item.status === "PROCESSING",
+  );
 
   useEffect(() => {
     let active = true;
@@ -119,11 +129,7 @@ export function JobRequestForm({
     if (status !== "READY" || csrfToken === "") return false;
     let section: JobRequestContentSection;
     try {
-      section = sectionFromValues(
-        STEPS[step]?.key ?? "request.core",
-        values,
-        draft,
-      );
+      section = sectionFromValues(STEPS[step]?.key ?? "request.core", values);
     } catch {
       setNotice(
         "Skontrolujte označené údaje. Rozpočet musí byť celé alebo desatinné eurové číslo.",
@@ -165,11 +171,7 @@ export function JobRequestForm({
     if (status !== "READY" || reviewing) return;
     let section: JobRequestContentSection;
     try {
-      section = sectionFromValues(
-        STEPS[step]?.key ?? "request.core",
-        values,
-        draft,
-      );
+      section = sectionFromValues(STEPS[step]?.key ?? "request.core", values);
     } catch {
       return;
     }
@@ -193,6 +195,82 @@ export function JobRequestForm({
     }, 900);
     return () => window.clearTimeout(timer);
   }, [draft, reviewing, saveCurrent, status, step, values]);
+
+  const refreshMedia = useCallback(async () => {
+    if (draft === null) return;
+    const result = await client.listMedia(draft);
+    if (result.status !== "OK") return;
+    setMediaStatuses((current) =>
+      sameMediaStatuses(current, result.uploads) ? current : result.uploads,
+    );
+    const readyPhotos = result.uploads
+      .filter((item) => item.kind === "IMAGE" && item.status === "READY")
+      .map((item) => item.assetId)
+      .slice(0, 10);
+    const readyDocuments = result.uploads
+      .filter((item) => item.kind === "DOCUMENT" && item.status === "READY")
+      .map((item) => item.assetId);
+    setValues((current) =>
+      sameStrings(current.photoMediaAssetIds, readyPhotos) &&
+      sameStrings(current.documentMediaAssetIds, readyDocuments)
+        ? current
+        : {
+            ...current,
+            documentMediaAssetIds: readyDocuments,
+            photoMediaAssetIds: readyPhotos,
+          },
+    );
+  }, [client, draft]);
+
+  useEffect(() => {
+    if (draft === null || step !== 5 || reviewing) return;
+    void refreshMedia();
+    if (!hasProcessingMedia) return;
+    const timer = window.setInterval(() => void refreshMedia(), 2_500);
+    return () => window.clearInterval(timer);
+  }, [draft, hasProcessingMedia, refreshMedia, reviewing, step]);
+
+  const uploadMedia = async (
+    files: FileList | null,
+    kind: "DOCUMENT" | "IMAGE",
+  ) => {
+    if (draft === null || files === null || files.length === 0 || mediaBusy) {
+      return;
+    }
+    if (
+      kind === "IMAGE" &&
+      values.photoMediaAssetIds.length +
+        mediaStatuses.filter(
+          (item) => item.kind === "IMAGE" && item.status === "PROCESSING",
+        ).length +
+        files.length >
+        10
+    ) {
+      setNotice("K jednému dopytu môžete pridať najviac 10 fotografií.");
+      return;
+    }
+    setMediaBusy(true);
+    setNotice("");
+    let accepted = 0;
+    for (const file of Array.from(files)) {
+      const result = await client.uploadMedia(draft, file, kind, csrfToken);
+      if (result.status === "PROCESSING") {
+        accepted += 1;
+        setMediaStatuses((current) =>
+          current.some((item) => item.assetId === result.asset.assetId)
+            ? current
+            : Object.freeze([...current, result.asset]),
+        );
+      }
+    }
+    setMediaBusy(false);
+    setNotice(
+      accepted === files.length
+        ? "Prílohy sa bezpečne spracúvajú. Pripoja sa po úspešnej kontrole."
+        : "Niektoré prílohy sa nepodarilo bezpečne nahrať. Skúste ich znova.",
+    );
+    await refreshMedia();
+  };
 
   const continueForward = async () => {
     if (!(await saveCurrent())) return;
@@ -282,7 +360,9 @@ export function JobRequestForm({
                 STEPS[step]?.key ?? "request.core",
                 values,
                 setValues,
-                draft,
+                mediaStatuses,
+                mediaBusy,
+                uploadMedia,
               )}
             </div>
             <div className="job-request-actions">
@@ -310,7 +390,6 @@ export function JobRequestForm({
         ) : (
           <Review
             values={values}
-            draft={draft}
             onEdit={(index) => {
               setReviewing(false);
               setStep(index);
@@ -331,7 +410,12 @@ function renderStep(
   key: JobRequestContentSectionKey,
   values: EditorValues,
   setValues: React.Dispatch<React.SetStateAction<EditorValues>>,
-  draft: JobRequestEditableDraft | null,
+  mediaStatuses: readonly JobRequestMediaStatus[],
+  mediaBusy: boolean,
+  uploadMedia: (
+    files: FileList | null,
+    kind: "DOCUMENT" | "IMAGE",
+  ) => Promise<void>,
 ) {
   const update =
     (field: keyof EditorValues) =>
@@ -358,6 +442,14 @@ function renderStep(
             />
           </label>
           <ProfessionPicker
+            onClear={() =>
+              setValues((current) => ({
+                ...current,
+                primaryProfessionCode: "",
+                skillCodes: [],
+                specializationCode: "",
+              }))
+            }
             selectedCode={values.primaryProfessionCode}
             onSelect={(suggestion) =>
               setValues((current) => ({
@@ -393,6 +485,12 @@ function renderStep(
         <fieldset>
           <legend>Kde je práca</legend>
           <MunicipalityPicker
+            onClear={() =>
+              setValues((current) => ({
+                ...current,
+                municipalityCode: "",
+              }))
+            }
             selectedCode={values.municipalityCode}
             onSelect={(suggestion) =>
               setValues((current) => ({
@@ -556,13 +654,14 @@ function renderStep(
         </fieldset>
       );
     case "request.media": {
-      const media = sectionPayload(draft, "request.media");
-      const photos = Array.isArray(media?.["photoMediaAssetIds"])
-        ? media["photoMediaAssetIds"].length
-        : 0;
-      const documents = Array.isArray(media?.["documentMediaAssetIds"])
-        ? media["documentMediaAssetIds"].length
-        : 0;
+      const photos = values.photoMediaAssetIds.length;
+      const documents = values.documentMediaAssetIds.length;
+      const processing = mediaStatuses.filter(
+        (item) => item.status === "PROCESSING",
+      ).length;
+      const rejected = mediaStatuses.filter(
+        (item) => item.status === "REJECTED",
+      ).length;
       return (
         <fieldset>
           <legend>Fotky a dokumenty</legend>
@@ -575,10 +674,46 @@ function renderStep(
             <br />
             Pripojené dokumenty: {documents}
           </p>
+          <div className="field-grid">
+            <label>
+              Pridať fotografie
+              <input
+                accept="image/jpeg,image/png,image/heic,image/heif"
+                disabled={mediaBusy}
+                multiple
+                onChange={(event) => {
+                  void uploadMedia(event.target.files, "IMAGE");
+                  event.target.value = "";
+                }}
+                type="file"
+              />
+            </label>
+            <label>
+              Pridať PDF dokumenty
+              <input
+                accept="application/pdf"
+                disabled={mediaBusy}
+                multiple
+                onChange={(event) => {
+                  void uploadMedia(event.target.files, "DOCUMENT");
+                  event.target.value = "";
+                }}
+                type="file"
+              />
+            </label>
+          </div>
           <p className="field-help">
-            Súbory zostávajú súkromné. Bezpečné nahrávanie sa sprístupní po
-            uložení dopytu.
+            Súbory zostávajú súkromné. Fotografie a PDF sa pred pripojením
+            automaticky bezpečne skontrolujú.
           </p>
+          {processing > 0 ? (
+            <p className="selection-state">Spracúva sa: {processing}</p>
+          ) : null}
+          {rejected > 0 ? (
+            <p className="selection-state">
+              Odmietnuté bezpečnostnou kontrolou: {rejected}
+            </p>
+          ) : null}
         </fieldset>
       );
     }
@@ -586,9 +721,11 @@ function renderStep(
 }
 
 function ProfessionPicker({
+  onClear,
   onSelect,
   selectedCode,
 }: {
+  readonly onClear: () => void;
   readonly onSelect: (suggestion: JobRequestTaxonomySuggestion) => void;
   readonly selectedCode: string;
 }) {
@@ -596,6 +733,11 @@ function ProfessionPicker({
   const [suggestions, setSuggestions] = useState<
     readonly JobRequestTaxonomySuggestion[]
   >([]);
+  useEffect(() => {
+    if (selectedCode !== "") {
+      setQuery((current) => current || selectedCode);
+    }
+  }, [selectedCode]);
   useEffect(() => {
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
@@ -619,6 +761,7 @@ function ProfessionPicker({
           autoComplete="off"
           maxLength={120}
           onChange={(event) => {
+            onClear();
             setQuery(event.target.value);
             setSuggestions([]);
           }}
@@ -658,9 +801,11 @@ function ProfessionPicker({
 }
 
 function MunicipalityPicker({
+  onClear,
   onSelect,
   selectedCode,
 }: {
+  readonly onClear: () => void;
   readonly onSelect: (suggestion: JobRequestMunicipalitySuggestion) => void;
   readonly selectedCode: string;
 }) {
@@ -668,6 +813,11 @@ function MunicipalityPicker({
   const [suggestions, setSuggestions] = useState<
     readonly JobRequestMunicipalitySuggestion[]
   >([]);
+  useEffect(() => {
+    if (selectedCode !== "") {
+      setQuery((current) => current || selectedCode);
+    }
+  }, [selectedCode]);
   useEffect(() => {
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
@@ -691,6 +841,7 @@ function MunicipalityPicker({
           autoComplete="address-level2"
           maxLength={80}
           onChange={(event) => {
+            onClear();
             setQuery(event.target.value);
             setSuggestions([]);
           }}
@@ -734,13 +885,11 @@ function MunicipalityPicker({
 
 function Review({
   values,
-  draft,
   onEdit,
   onSubmit,
   disabled,
 }: {
   readonly values: EditorValues;
-  readonly draft: JobRequestEditableDraft | null;
   readonly onEdit: (index: number) => void;
   readonly onSubmit: () => void;
   readonly disabled: boolean;
@@ -775,7 +924,7 @@ function Review({
       />
       <ReviewRow
         label="Prílohy"
-        value={`${attachmentCount(draft)} pripojených`}
+        value={`${values.photoMediaAssetIds.length + values.documentMediaAssetIds.length} pripojených`}
         onEdit={() => onEdit(5)}
       />
       <p className="privacy-note">
@@ -842,9 +991,7 @@ function FormMessage({
 function sectionFromValues(
   key: JobRequestContentSectionKey,
   values: EditorValues,
-  draft: JobRequestEditableDraft | null,
 ): JobRequestContentSection {
-  const existing = sectionPayload(draft, key);
   const payload: unknown =
     key === "request.core"
       ? {
@@ -881,12 +1028,8 @@ function sectionFromValues(
                   siteInspection: nullIfEmpty(values.siteInspection),
                 }
               : {
-                  documentMediaAssetIds: arrayOfStrings(
-                    existing?.["documentMediaAssetIds"],
-                  ),
-                  photoMediaAssetIds: arrayOfStrings(
-                    existing?.["photoMediaAssetIds"],
-                  ),
+                  documentMediaAssetIds: values.documentMediaAssetIds,
+                  photoMediaAssetIds: values.photoMediaAssetIds,
                 };
   return normalizeJobRequestContentSection({ key, payload, schemaVersion: 1 });
 }
@@ -923,6 +1066,7 @@ function valuesFromDraft(draft: JobRequestEditableDraft | null): EditorValues {
   const timing = sectionPayload(draft, "request.timing");
   const budget = sectionPayload(draft, "request.budget");
   const details = sectionPayload(draft, "request.details");
+  const media = sectionPayload(draft, "request.media");
   return {
     ...emptyValues,
     approximateQuantity: stringValue(details?.["approximateQuantity"]),
@@ -932,6 +1076,7 @@ function valuesFromDraft(draft: JobRequestEditableDraft | null): EditorValues {
     completionDeadline: stringValue(timing?.["completionDeadline"]),
     customRequirements: stringValue(details?.["customRequirements"]),
     description: stringValue(core?.["description"]),
+    documentMediaAssetIds: arrayOfStrings(media?.["documentMediaAssetIds"]),
     endsOn: stringValue(timing?.["endsOn"]),
     exactAddress: stringValue(location?.["exactAddress"]),
     materialResponsibility: enumValue(details?.["materialResponsibility"], [
@@ -942,6 +1087,7 @@ function valuesFromDraft(draft: JobRequestEditableDraft | null): EditorValues {
     ]),
     municipalityCode: stringValue(location?.["municipalityCode"]),
     primaryProfessionCode: stringValue(core?.["primaryProfessionCode"]),
+    photoMediaAssetIds: arrayOfStrings(media?.["photoMediaAssetIds"]),
     skillCodes: arrayOfStrings(core?.["skillCodes"]),
     siteInspection: enumValue(details?.["siteInspection"], [
       "LIKELY",
@@ -994,17 +1140,33 @@ function replaceSection(
   );
 }
 
-function attachmentCount(draft: JobRequestEditableDraft | null): number {
-  const media = sectionPayload(draft, "request.media");
-  return (
-    arrayOfStrings(media?.["photoMediaAssetIds"]).length +
-    arrayOfStrings(media?.["documentMediaAssetIds"]).length
-  );
-}
 function arrayOfStrings(value: unknown): readonly string[] {
   return Array.isArray(value) && value.every((item) => typeof item === "string")
     ? value
     : [];
+}
+function sameStrings(
+  left: readonly string[],
+  right: readonly string[],
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every((value, index) => value === right[index])
+  );
+}
+function sameMediaStatuses(
+  left: readonly JobRequestMediaStatus[],
+  right: readonly JobRequestMediaStatus[],
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every(
+      (value, index) =>
+        value.assetId === right[index]?.assetId &&
+        value.kind === right[index]?.kind &&
+        value.status === right[index]?.status,
+    )
+  );
 }
 function nullIfEmpty(value: string): string | null {
   const trimmed = value.trim();
@@ -1054,11 +1216,13 @@ const emptyValues: EditorValues = {
   completionDeadline: "",
   customRequirements: "",
   description: "",
+  documentMediaAssetIds: [],
   endsOn: "",
   exactAddress: "",
   materialResponsibility: "",
   municipalityCode: "",
   primaryProfessionCode: "",
+  photoMediaAssetIds: [],
   skillCodes: [],
   siteInspection: "",
   specializationCode: "",

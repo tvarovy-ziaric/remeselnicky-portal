@@ -171,6 +171,46 @@ describe("job request draft client", () => {
     expect(firstBody.commandId).toBe(commandId);
     expect(secondBody.commandId).toBe(commandId);
   });
+
+  it("uploads binary media without filename metadata and validates status polling", async () => {
+    const assetId = "97000000-0000-4000-8000-000000000114";
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        Response.json(
+          { assetId, kind: "IMAGE", status: "PROCESSING" },
+          { status: 202 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          uploads: [{ assetId, kind: "IMAGE", status: "READY" }],
+        }),
+      );
+    const client = createJobRequestDraftClient({ fetch: fetcher });
+    const draft = { id: draftId, revision: 3, sections: [] } as const;
+    const file = new Blob([new Uint8Array([0xff, 0xd8, 0xff])], {
+      type: "image/jpeg",
+    });
+    await expect(
+      client.uploadMedia(draft, file, "IMAGE", csrfToken),
+    ).resolves.toEqual({
+      asset: { assetId, kind: "IMAGE", status: "PROCESSING" },
+      status: "PROCESSING",
+    });
+    const [, uploadOptions] = fetcher.mock.calls[0] ?? [];
+    expect(uploadOptions?.body).toBe(file);
+    expect(uploadOptions?.headers).toMatchObject({
+      "content-type": "image/jpeg",
+      "x-csrf-token": csrfToken,
+      "x-job-request-revision": "3",
+    });
+    expect(JSON.stringify(uploadOptions?.headers)).not.toMatch(/filename/iu);
+    await expect(client.listMedia(draft)).resolves.toEqual({
+      status: "OK",
+      uploads: [{ assetId, kind: "IMAGE", status: "READY" }],
+    });
+  });
 });
 
 function core(description: string) {

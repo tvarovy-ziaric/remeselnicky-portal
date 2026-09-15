@@ -42,6 +42,16 @@ export type {
   MediaUploadRejectionCode,
   OrphanedPrivateObjectObserver,
 } from "./upload.js";
+export { createJobRequestMediaUploadService } from "./job-request-upload.js";
+export type {
+  JobRequestMediaKind,
+  JobRequestMediaProcessingDispatcher,
+  JobRequestMediaUploadStatus,
+  JobRequestMediaUploadAuthorization,
+  JobRequestMediaUploadResult,
+  JobRequestMediaUploadService,
+  PrepareJobRequestMediaUploadResult,
+} from "./job-request-upload.js";
 export {
   IMAGE_CANONICALIZATION_JOB_NAME,
   IMAGE_PROCESSING_LIMITS,

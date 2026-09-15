@@ -9,6 +9,7 @@ import {
   type JobRequestId,
   type UserId,
 } from "@portal/domain";
+import type { JobRequestMediaUploadService } from "@portal/media";
 
 import {
   JOB_REQUEST_DRAFT_PATHS,
@@ -142,6 +143,91 @@ describe("job request draft routes", () => {
       code: "NOT_READY",
       missingRequirements: ["MUNICIPALITY"],
     });
+    await app.close();
+  });
+
+  it("accepts only private binary uploads at the current owned revision", async () => {
+    const fixture = createFixture();
+    const upload = vi.fn<JobRequestMediaUploadService["upload"]>(() =>
+      Promise.resolve({
+        assetId: "91000000-0000-4000-8000-000000000005",
+        kind: "IMAGE",
+        status: "PROCESSING",
+      }),
+    );
+    const list = vi.fn<JobRequestMediaUploadService["list"]>(() =>
+      Promise.resolve({
+        status: "OK",
+        uploads: [
+          {
+            assetId: "91000000-0000-4000-8000-000000000005",
+            kind: "IMAGE",
+            status: "PROCESSING",
+          },
+        ],
+      }),
+    );
+    const app = Fastify();
+    registerJobRequestDraftRoutes(app, {
+      ...fixture.dependencies,
+      mediaUploads: { list, upload },
+    });
+    const response = await app.inject({
+      headers: {
+        "content-type": "image/jpeg",
+        "x-job-request-revision": "3",
+      },
+      method: "POST",
+      payload: Buffer.from([0xff, 0xd8, 0xff, 0x00]),
+      url: `/v1/me/job-request-drafts/${requestId}/media/photos`,
+    });
+    expect(response.statusCode).toBe(202);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.json()).toEqual({
+      assetId: "91000000-0000-4000-8000-000000000005",
+      kind: "IMAGE",
+      status: "PROCESSING",
+    });
+    expect(JSON.stringify(response.json())).not.toMatch(/storage|filename/iu);
+    expect(upload).toHaveBeenCalledWith(
+      expect.objectContaining({
+        expectedRevision: 3,
+        jobRequestId: requestId,
+        mediaKind: "IMAGE",
+      }),
+    );
+    const statusResponse = await app.inject({
+      method: "GET",
+      url: `/v1/me/job-request-drafts/${requestId}/media`,
+    });
+    expect(statusResponse.statusCode).toBe(200);
+    expect(statusResponse.json()).toEqual({
+      uploads: [
+        {
+          assetId: "91000000-0000-4000-8000-000000000005",
+          kind: "IMAGE",
+          status: "PROCESSING",
+        },
+      ],
+    });
+    await app.close();
+  });
+
+  it("fails closed when upload infrastructure or revision metadata is unavailable", async () => {
+    const fixture = createFixture();
+    const app = Fastify();
+    registerJobRequestDraftRoutes(app, fixture.dependencies);
+    const unavailable = await app.inject({
+      headers: {
+        "content-type": "application/pdf",
+        "x-job-request-revision": "2",
+      },
+      method: "POST",
+      payload: Buffer.from("%PDF-1.7\n%%EOF"),
+      url: `/v1/me/job-request-drafts/${requestId}/media/documents`,
+    });
+    expect(unavailable.statusCode).toBe(503);
+    expect(unavailable.json()).toEqual({ code: "UPLOAD_UNAVAILABLE" });
     await app.close();
   });
 });

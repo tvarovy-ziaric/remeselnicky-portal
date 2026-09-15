@@ -10,7 +10,9 @@ describe("JobRequestForm", () => {
     const client: JobRequestDraftClient = {
       activate: vi.fn(),
       load: vi.fn(),
+      listMedia: vi.fn(),
       save: vi.fn(),
+      uploadMedia: vi.fn(),
     };
     const html = renderToStaticMarkup(<JobRequestForm client={client} />);
 

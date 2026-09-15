@@ -44,11 +44,21 @@ Taxonomy and municipality codes are syntactically validated here; the future
 server adapter must additionally resolve them against the currently governed
 catalog in the same authorization-aware command boundary.
 
-Media UUIDs are references only. The API/persistence integration must verify
-ACTIVE ownership, private media eligibility, canonical processing state and
-attachment purpose rather than treating UUID possession as authority. Exact
-location and request text must never enter logs, analytics, URLs, notification
-previews or public serializers.
+Media UUIDs are references only. The upload API accepts allowlisted binary
+image/PDF bodies without placing filenames in URLs or response payloads. A
+server-only repository locks the current ACTIVE customer, owned request and
+exact DRAFT revision before minting `JOB_REQUEST` provenance. Storage keys are
+never returned. Status polling returns only asset ID, kind and
+`PROCESSING/READY/REJECTED`; the form adds only READY assets to the revisioned
+media section. The existing database trigger revalidates ownership, purpose,
+kind, READY state and exact request provenance when that section is saved.
+
+The production route is fail-closed with `503 UPLOAD_UNAVAILABLE` until an
+approved private object-storage adapter and durable processing queue are
+injected. Choosing/provisioning those external accounts remains the existing
+R0 infrastructure HUMAN GATE; the route and UI do not fall back to public or
+unscanned storage. Exact location and request text must never enter logs,
+analytics, URLs, notification previews or public serializers.
 
 R3-003 can pass any normalized section directly to
 `CREATE_DRAFT_WITH_SECTION`; ordinary form changes pass the same section shape

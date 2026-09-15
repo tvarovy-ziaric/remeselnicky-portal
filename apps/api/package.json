@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@portal/admin-auth": "workspace:*",
+    "@portal/authorization": "workspace:*",
     "@fastify/cookie": "11.1.2",
     "@fastify/cors": "11.3.0",
     "@fastify/csrf-protection": "8.0.1",

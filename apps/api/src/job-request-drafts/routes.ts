@@ -1,3 +1,4 @@
+import { createAuthenticatedAuthorizationActor } from "@portal/authorization";
 import {
   JobRequestContentValidationError,
   JobRequestDraftIdempotencyError,
@@ -11,6 +12,12 @@ import {
   type JobRequestService,
   type UserId,
 } from "@portal/domain";
+import {
+  MEDIA_UPLOAD_LIMITS,
+  MediaUploadRejectedError,
+  type JobRequestMediaKind,
+  type JobRequestMediaUploadService,
+} from "@portal/media";
 import type {
   FastifyInstance,
   FastifyReply,
@@ -22,6 +29,8 @@ export const JOB_REQUEST_DRAFT_PATHS = Object.freeze({
   activate: "/v1/me/job-request-drafts/:jobRequestId/activate",
   autosave: "/v1/me/job-request-drafts/:jobRequestId/sections",
   collection: "/v1/me/job-request-drafts",
+  media: "/v1/me/job-request-drafts/:jobRequestId/media/:mediaKind",
+  mediaCollection: "/v1/me/job-request-drafts/:jobRequestId/media",
   recover: "/v1/me/job-request-drafts/:jobRequestId",
 } as const);
 
@@ -44,6 +53,7 @@ export interface JobRequestDraftRouteDependencies {
   >;
   readonly drafts: JobRequestDraftService;
   readonly guard: Guard;
+  readonly mediaUploads?: JobRequestMediaUploadService;
   readonly requests: JobRequestService;
 }
 
@@ -51,6 +61,7 @@ export function registerJobRequestDraftRoutes(
   app: FastifyInstance,
   dependencies: JobRequestDraftRouteDependencies,
 ): void {
+  registerPrivateMediaBodyParsers(app);
   app.addHook("onSend", (request, reply, payload, done) => {
     if (request.url.startsWith("/v1/me/job-request-drafts")) {
       void reply.header("cache-control", "no-store");
@@ -110,6 +121,37 @@ export function registerJobRequestDraftRoutes(
           })),
         },
       });
+    },
+  );
+
+  app.get<{ Params: { jobRequestId: string } }>(
+    JOB_REQUEST_DRAFT_PATHS.mediaCollection,
+    { schema: { params: requestParamsSchema } },
+    async (request, reply) => {
+      const actor = await requireActiveActor(
+        request,
+        reply,
+        dependencies.guard,
+      );
+      if (actor === undefined) return;
+      if (dependencies.mediaUploads === undefined) {
+        return reply.code(503).send({ code: "UPLOAD_UNAVAILABLE" });
+      }
+      try {
+        const result = await dependencies.mediaUploads.list({
+          actor: createAuthenticatedAuthorizationActor({
+            accountState: "ACTIVE",
+            id: actor,
+          }),
+          jobRequestId: request.params.jobRequestId,
+        });
+        if (result.status !== "OK") {
+          return reply.code(404).send({ code: "UPLOAD_UNAVAILABLE" });
+        }
+        return reply.send({ uploads: result.uploads });
+      } catch {
+        return reply.code(503).send({ code: "UPLOAD_UNAVAILABLE" });
+      }
     },
   );
 
@@ -224,6 +266,60 @@ export function registerJobRequestDraftRoutes(
       }
     },
   );
+
+  app.post<{
+    Body: Buffer;
+    Headers: { "x-job-request-revision"?: string };
+    Params: { jobRequestId: string; mediaKind: "documents" | "photos" };
+  }>(
+    JOB_REQUEST_DRAFT_PATHS.media,
+    {
+      ...writeOptions,
+      bodyLimit: MEDIA_UPLOAD_LIMITS.documentMaxBytes,
+      schema: { params: mediaParamsSchema },
+    },
+    async (request, reply) => {
+      const actor = await requireActiveActor(
+        request,
+        reply,
+        dependencies.guard,
+      );
+      if (actor === undefined) return;
+      if (dependencies.mediaUploads === undefined) {
+        return reply.code(503).send({ code: "UPLOAD_UNAVAILABLE" });
+      }
+      const expectedRevision = parsePositiveIntegerHeader(
+        request.headers["x-job-request-revision"],
+      );
+      if (expectedRevision === null || !Buffer.isBuffer(request.body)) {
+        return reply.code(400).send({ code: "INVALID_FILE" });
+      }
+      const mediaKind: JobRequestMediaKind =
+        request.params.mediaKind === "photos" ? "IMAGE" : "DOCUMENT";
+      try {
+        const result = await dependencies.mediaUploads.upload({
+          actor: createAuthenticatedAuthorizationActor({
+            accountState: "ACTIVE",
+            id: actor,
+          }),
+          body: request.body,
+          declaredContentType: request.headers["content-type"] ?? "",
+          expectedRevision,
+          jobRequestId: request.params.jobRequestId,
+          mediaKind,
+        });
+        if (result.status !== "PROCESSING") {
+          return reply.code(404).send({ code: "UPLOAD_UNAVAILABLE" });
+        }
+        return reply.code(202).send(result);
+      } catch (error: unknown) {
+        if (error instanceof MediaUploadRejectedError) {
+          return reply.code(400).send({ code: "INVALID_FILE" });
+        }
+        return reply.code(503).send({ code: "UPLOAD_UNAVAILABLE" });
+      }
+    },
+  );
 }
 
 interface SectionInput {
@@ -244,6 +340,33 @@ interface CommandBody {
 
 interface AutosaveBody extends CommandBody {
   readonly section: SectionInput;
+}
+
+const privateMediaContentTypes = [
+  "application/pdf",
+  "image/heic",
+  "image/heif",
+  "image/jpeg",
+  "image/png",
+] as const;
+
+function registerPrivateMediaBodyParsers(app: FastifyInstance): void {
+  for (const contentType of privateMediaContentTypes) {
+    if (app.hasContentTypeParser(contentType)) continue;
+    app.addContentTypeParser(
+      contentType,
+      { parseAs: "buffer" },
+      (_request, body, done) => done(null, body),
+    );
+  }
+}
+
+function parsePositiveIntegerHeader(value: unknown): number | null {
+  if (typeof value !== "string" || !/^[1-9][0-9]{0,8}$/u.test(value)) {
+    return null;
+  }
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) ? parsed : null;
 }
 
 function sendDraftWriteResult(
@@ -337,6 +460,16 @@ const requestParamsSchema = {
   additionalProperties: false,
   properties: { jobRequestId: uuid },
   required: ["jobRequestId"],
+  type: "object",
+} as const;
+
+const mediaParamsSchema = {
+  additionalProperties: false,
+  properties: {
+    jobRequestId: { format: "uuid", type: "string" },
+    mediaKind: { enum: ["documents", "photos"], type: "string" },
+  },
+  required: ["jobRequestId", "mediaKind"],
   type: "object",
 } as const;
 const sectionSchema = {

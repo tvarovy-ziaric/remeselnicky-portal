@@ -39,17 +39,46 @@ export type JobRequestActivationResult = Readonly<
     }
 >;
 
+export interface JobRequestMediaStatus {
+  readonly assetId: string;
+  readonly kind: "DOCUMENT" | "IMAGE";
+  readonly status: "PROCESSING" | "READY" | "REJECTED";
+}
+
+export type JobRequestMediaListResult = Readonly<
+  | { readonly status: "UNAVAILABLE" }
+  | {
+      readonly status: "OK";
+      readonly uploads: readonly JobRequestMediaStatus[];
+    }
+>;
+
+export type JobRequestMediaUploadResult = Readonly<
+  | { readonly status: "UNAVAILABLE" }
+  | {
+      readonly asset: JobRequestMediaStatus;
+      readonly status: "PROCESSING";
+    }
+>;
+
 export interface JobRequestDraftClient {
   activate(
     draft: JobRequestEditableDraft,
     csrfToken: string,
   ): Promise<JobRequestActivationResult>;
   load(): Promise<JobRequestDraftLoadResult>;
+  listMedia(draft: JobRequestEditableDraft): Promise<JobRequestMediaListResult>;
   save(
     draft: JobRequestEditableDraft | null,
     section: JobRequestDraftSectionInput,
     csrfToken: string,
   ): Promise<JobRequestDraftWriteResult>;
+  uploadMedia(
+    draft: JobRequestEditableDraft,
+    file: Blob,
+    kind: "DOCUMENT" | "IMAGE",
+    csrfToken: string,
+  ): Promise<JobRequestMediaUploadResult>;
 }
 
 export function createJobRequestDraftClient(
@@ -186,6 +215,38 @@ export function createJobRequestDraftClient(
         return Object.freeze({ status: "UNAVAILABLE" as const });
       }
     },
+    async listMedia(draft) {
+      if (!uuid(draft.id))
+        return Object.freeze({ status: "UNAVAILABLE" as const });
+      try {
+        const response = await fetcher(
+          `/v1/me/job-request-drafts/${draft.id}/media`,
+          {
+            cache: "no-store",
+            credentials: "same-origin",
+            headers: { accept: "application/json" },
+          },
+        );
+        const body: unknown = await response.json();
+        if (!response.ok || !record(body) || !Array.isArray(body["uploads"])) {
+          return Object.freeze({ status: "UNAVAILABLE" as const });
+        }
+        const uploads = body["uploads"];
+        if (uploads.length > 138) {
+          return Object.freeze({ status: "UNAVAILABLE" as const });
+        }
+        const parsed = uploads.map(parseMediaStatus);
+        if (parsed.some((item) => item === null)) {
+          return Object.freeze({ status: "UNAVAILABLE" as const });
+        }
+        return Object.freeze({
+          status: "OK" as const,
+          uploads: Object.freeze(parsed as JobRequestMediaStatus[]),
+        });
+      } catch {
+        return Object.freeze({ status: "UNAVAILABLE" as const });
+      }
+    },
     async save(draft, section, csrfToken) {
       if (!csrf(csrfToken))
         return Object.freeze({ status: "UNAVAILABLE" as const });
@@ -245,6 +306,47 @@ export function createJobRequestDraftClient(
           revision: body["revision"],
           status: "SAVED" as const,
         });
+      } catch {
+        return Object.freeze({ status: "UNAVAILABLE" as const });
+      }
+    },
+    async uploadMedia(draft, file, kind, csrfToken) {
+      if (
+        !uuid(draft.id) ||
+        !positiveInteger(draft.revision) ||
+        !csrf(csrfToken) ||
+        !(file instanceof Blob) ||
+        !validMediaContentType(file.type, kind)
+      ) {
+        return Object.freeze({ status: "UNAVAILABLE" as const });
+      }
+      try {
+        const response = await fetcher(
+          `/v1/me/job-request-drafts/${draft.id}/media/${kind === "IMAGE" ? "photos" : "documents"}`,
+          {
+            body: file,
+            cache: "no-store",
+            credentials: "same-origin",
+            headers: {
+              accept: "application/json",
+              "content-type": file.type,
+              "x-csrf-token": csrfToken,
+              "x-job-request-revision": String(draft.revision),
+            },
+            method: "POST",
+          },
+        );
+        const body: unknown = await response.json();
+        const asset = parseMediaStatus(body);
+        if (
+          response.status !== 202 ||
+          asset === null ||
+          asset.status !== "PROCESSING" ||
+          asset.kind !== kind
+        ) {
+          return Object.freeze({ status: "UNAVAILABLE" as const });
+        }
+        return Object.freeze({ asset, status: "PROCESSING" as const });
       } catch {
         return Object.freeze({ status: "UNAVAILABLE" as const });
       }
@@ -327,4 +429,31 @@ function stringArray(value: unknown): value is readonly string[] {
     value.length <= 16 &&
     value.every((item) => typeof item === "string" && item.length <= 64)
   );
+}
+
+function parseMediaStatus(value: unknown): JobRequestMediaStatus | null {
+  if (
+    !record(value) ||
+    !uuid(value["assetId"]) ||
+    !["DOCUMENT", "IMAGE"].includes(String(value["kind"])) ||
+    !["PROCESSING", "READY", "REJECTED"].includes(String(value["status"]))
+  ) {
+    return null;
+  }
+  return Object.freeze({
+    assetId: value["assetId"],
+    kind: value["kind"] as "DOCUMENT" | "IMAGE",
+    status: value["status"] as "PROCESSING" | "READY" | "REJECTED",
+  });
+}
+
+function validMediaContentType(
+  contentType: string,
+  kind: "DOCUMENT" | "IMAGE",
+): boolean {
+  return kind === "DOCUMENT"
+    ? contentType === "application/pdf"
+    : ["image/heic", "image/heif", "image/jpeg", "image/png"].includes(
+        contentType,
+      );
 }
