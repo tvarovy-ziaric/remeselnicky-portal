@@ -23,6 +23,7 @@ export async function runR3AnalyticsIntegrationAssertions(
   `;
   expect(subject).toBeDefined();
   if (subject === undefined) return;
+  await ensureAnalyticsConsentPolicy(sql);
   const [sourceCount] = await sql<{ count: number }[]>`
     SELECT count(*)::integer AS count FROM domain_outbox_events
     WHERE event_name LIKE 'r3.analytics.%'
@@ -162,6 +163,30 @@ export async function runR3AnalyticsIntegrationAssertions(
 
   await assertInvitationViewAuthorization(sql);
   await assertConsentedObservation(sql);
+}
+
+async function ensureAnalyticsConsentPolicy(sql: Sql): Promise<void> {
+  const [existing] = await sql<{ policyVersionId: string }[]>`
+    SELECT policy_version_id AS "policyVersionId"
+    FROM privacy_policy_versions
+    WHERE policy_kind = 'OPTIONAL_CONSENT_TEXT'
+      AND optional_consent_purpose = 'NON_ESSENTIAL_ANALYTICS'
+      AND review_state = 'APPROVED'
+      AND effective_at <= CURRENT_TIMESTAMP
+    ORDER BY effective_at DESC, created_at DESC, policy_version_id DESC LIMIT 1
+  `;
+  if (existing !== undefined) return;
+  const policyVersionId = randomUUID();
+  await sql`
+    INSERT INTO privacy_policy_versions (
+      policy_version_id, policy_kind, optional_consent_purpose,
+      version_label, content_sha256, review_state, effective_at
+    ) VALUES (
+      ${policyVersionId}, 'OPTIONAL_CONSENT_TEXT',
+      'NON_ESSENTIAL_ANALYTICS', ${`r3-analytics-${policyVersionId}`},
+      ${"c".repeat(64)}, 'APPROVED', CURRENT_TIMESTAMP
+    )
+  `;
 }
 
 async function createCommittedQuoteRejectionEffect(sql: Sql): Promise<void> {
