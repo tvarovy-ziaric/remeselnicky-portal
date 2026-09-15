@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import type { JobInvitationId, UserId } from "@portal/domain";
+import type { ConversationId, JobInvitationId, UserId } from "@portal/domain";
 import type { Sql } from "postgres";
 import { expect } from "vitest";
 
@@ -105,24 +105,6 @@ export async function runConversationIntegrationAssertions(
     }),
   ).resolves.toMatchObject({ status: "DEDUPLICATED" });
 
-  const closed = await invitations.closeOwned({
-    action: "STOP_CONSIDERING",
-    actorUserId: invitation.customerOwnerId,
-    commandId: randomUUID(),
-    expectedRevision: invitation.revision + 1,
-    invitationId: invitation.id,
-  });
-  expect(closed).toMatchObject({
-    invitation: { state: "NOT_SELECTED" },
-    status: "APPLIED",
-  });
-  await expect(
-    conversations.readOwned({
-      actorUserId: invitation.customerOwnerId,
-      conversationId: customerView.id,
-    }),
-  ).resolves.toMatchObject({ access: "READ_ONLY" });
-
   await sql`
     UPDATE users SET account_state = 'SUSPENDED',
       account_state_changed_at = clock_timestamp(),
@@ -149,4 +131,35 @@ export async function runConversationIntegrationAssertions(
   await expect(
     sql`DELETE FROM conversations WHERE id = ${customerView.id}`,
   ).rejects.toThrow(/append-only/u);
+}
+
+/** Runs after the request lifecycle helper closes its engaged invitation. */
+export async function runConversationReadOnlyIntegrationAssertions(
+  sql: Sql,
+): Promise<void> {
+  const [fixture] = await sql<
+    Array<{
+      readonly actorUserId: UserId;
+      readonly conversationId: string;
+    }>
+  >`
+    SELECT customer.owner_user_id AS "actorUserId",
+      conversation.id AS "conversationId"
+    FROM current_conversations conversation
+    JOIN customer_profiles customer
+      ON customer.id = conversation.customer_profile_id
+    WHERE conversation.access_state = 'READ_ONLY'
+      AND conversation.invitation_state IN ('WITHDRAWN', 'NOT_SELECTED')
+    ORDER BY conversation.created_at DESC, conversation.id DESC
+    LIMIT 1
+  `;
+  if (fixture === undefined) {
+    throw new Error("R3-011 requires terminal conversation history.");
+  }
+  await expect(
+    createConversationRepository(sql).readOwned({
+      actorUserId: fixture.actorUserId,
+      conversationId: fixture.conversationId as ConversationId,
+    }),
+  ).resolves.toMatchObject({ access: "READ_ONLY" });
 }

@@ -53,7 +53,10 @@ import { runJobRequestVersionIntegrationAssertions } from "./job-request-version
 import { runJobRequestLifecycleIntegrationAssertions } from "./job-request-lifecycle-integration-helper.js";
 import { runJobInvitationIntegrationAssertions } from "./job-invitation-integration-helper.js";
 import { runJobInvitationNotificationIntegrationAssertions } from "./job-invitation-notification-integration-helper.js";
-import { runConversationIntegrationAssertions } from "./conversation-integration-helper.js";
+import {
+  runConversationIntegrationAssertions,
+  runConversationReadOnlyIntegrationAssertions,
+} from "./conversation-integration-helper.js";
 
 const testDatabaseUrl = process.env["TEST_DATABASE_URL"];
 const migrationsDirectory = fileURLToPath(
@@ -1724,6 +1727,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         await runJobInvitationNotificationIntegrationAssertions(sql);
         await runConversationIntegrationAssertions(sql);
         await runJobRequestLifecycleIntegrationAssertions(sql);
+        await runConversationReadOnlyIntegrationAssertions(sql);
 
         await adminAccess.revokePrivilegedSession(superSessionDigest);
         await expect(
