@@ -10,6 +10,7 @@ import {
   timestamp,
   unique,
   uuid,
+  varchar,
 } from "drizzle-orm/pg-core";
 
 import { customerProfiles } from "./customer-profile.js";
@@ -18,7 +19,13 @@ import { users } from "./user.js";
 export const jobRequestState = pgEnum("job_request_state", ["DRAFT", "ACTIVE"]);
 export const jobRequestCommandKind = pgEnum("job_request_command_kind", [
   "CREATE_DRAFT",
+  "CREATE_DRAFT_WITH_SECTION",
   "ACTIVATE",
+  "AUTOSAVE",
+]);
+export const jobRequestCommandResult = pgEnum("job_request_command_result", [
+  "APPLIED",
+  "UNCHANGED",
 ]);
 export const jobRequestSubmissionRequirement = pgEnum(
   "job_request_submission_requirement",
@@ -59,10 +66,16 @@ export const jobRequestCommands = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
     commandKind: jobRequestCommandKind("command_kind").notNull(),
+    resultKind: jobRequestCommandResult("result_kind")
+      .notNull()
+      .default("APPLIED"),
     expectedRevision: integer("expected_revision").notNull(),
     resultingRevision: integer("resulting_revision").notNull(),
     targetState: jobRequestState("target_state").notNull(),
     submissionEligibilityRevision: integer("submission_eligibility_revision"),
+    draftSectionKey: varchar("draft_section_key", { length: 64 }),
+    draftSectionSchemaVersion: integer("draft_section_schema_version"),
+    draftPayloadFingerprint: char("draft_payload_fingerprint", { length: 64 }),
     payloadFingerprint: char("payload_fingerprint", { length: 64 }).notNull(),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .notNull()
@@ -71,19 +84,49 @@ export const jobRequestCommands = pgTable(
   (table) => [
     check(
       "job_request_commands_revisions_valid",
-      sql`${table.expectedRevision} >= 0 AND ${table.resultingRevision} = ${table.expectedRevision} + 1`,
+      sql`${table.expectedRevision} >= 0 AND (
+        (${table.resultKind} = 'APPLIED'
+          AND ${table.resultingRevision} = ${table.expectedRevision} + 1)
+        OR (${table.resultKind} = 'UNCHANGED'
+          AND ${table.commandKind} = 'AUTOSAVE'
+          AND ${table.resultingRevision} = ${table.expectedRevision})
+      )`,
     ),
     check(
       "job_request_commands_kind_state_valid",
       sql`(${table.commandKind} = 'CREATE_DRAFT'
+          AND ${table.resultKind} = 'APPLIED'
           AND ${table.expectedRevision} = 0
           AND ${table.resultingRevision} = 1
           AND ${table.targetState} = 'DRAFT'
-          AND ${table.submissionEligibilityRevision} IS NULL)
+          AND ${table.submissionEligibilityRevision} IS NULL
+          AND ${table.draftSectionKey} IS NULL
+          AND ${table.draftSectionSchemaVersion} IS NULL
+          AND ${table.draftPayloadFingerprint} IS NULL)
         OR (${table.commandKind} = 'ACTIVATE'
+          AND ${table.resultKind} = 'APPLIED'
           AND ${table.expectedRevision} > 0
           AND ${table.targetState} = 'ACTIVE'
-          AND ${table.submissionEligibilityRevision} = ${table.expectedRevision})`,
+          AND ${table.submissionEligibilityRevision} = ${table.expectedRevision}
+          AND ${table.draftSectionKey} IS NULL
+          AND ${table.draftSectionSchemaVersion} IS NULL
+          AND ${table.draftPayloadFingerprint} IS NULL)
+        OR (${table.commandKind} = 'CREATE_DRAFT_WITH_SECTION'
+          AND ${table.resultKind} = 'APPLIED'
+          AND ${table.expectedRevision} = 0
+          AND ${table.resultingRevision} = 1
+          AND ${table.targetState} = 'DRAFT'
+          AND ${table.submissionEligibilityRevision} IS NULL
+          AND ${table.draftSectionKey} ~ '^[a-z][a-z0-9._-]{0,63}$'
+          AND ${table.draftSectionSchemaVersion} BETWEEN 1 AND 65535
+          AND ${table.draftPayloadFingerprint} ~ '^[0-9a-f]{64}$')
+        OR (${table.commandKind} = 'AUTOSAVE'
+          AND ${table.expectedRevision} > 0
+          AND ${table.targetState} = 'DRAFT'
+          AND ${table.submissionEligibilityRevision} IS NULL
+          AND ${table.draftSectionKey} ~ '^[a-z][a-z0-9._-]{0,63}$'
+          AND ${table.draftSectionSchemaVersion} BETWEEN 1 AND 65535
+          AND ${table.draftPayloadFingerprint} ~ '^[0-9a-f]{64}$')`,
     ),
     check(
       "job_request_commands_fingerprint_sha256",
