@@ -37,6 +37,10 @@ import {
   registerJobRequestVersionRoutes,
   type JobRequestVersionRouteDependencies,
 } from "../job-request-versions/routes.js";
+import {
+  registerJobRequestLifecycleRoutes,
+  type JobRequestLifecycleRouteDependencies,
+} from "../job-request-lifecycle/routes.js";
 import { createSessionGuard } from "./guard.js";
 import {
   registerDraftHandoffRoutes,
@@ -96,6 +100,10 @@ export interface AuthModuleDependencies {
   readonly jobRequestVersions?: Pick<
     JobRequestVersionRouteDependencies,
     "versions"
+  >;
+  readonly jobRequestLifecycle?: Pick<
+    JobRequestLifecycleRouteDependencies,
+    "lifecycle"
   >;
   readonly emailVerification?: {
     readonly delivery?: EmailVerificationDeliveryPort;
@@ -256,6 +264,13 @@ async function configureAuthModule(
       csrfProtection: csrfProtection(app),
       guard,
       ...dependencies.jobRequestVersions,
+    });
+  }
+  if (dependencies.jobRequestLifecycle !== undefined) {
+    registerJobRequestLifecycleRoutes(app, {
+      csrfProtection: csrfProtection(app),
+      guard,
+      ...dependencies.jobRequestLifecycle,
     });
   }
   if (dependencies.customerShortlist !== undefined) {

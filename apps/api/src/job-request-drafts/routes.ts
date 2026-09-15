@@ -260,6 +260,12 @@ export function registerJobRequestDraftRoutes(
             missingRequirements: result.missingRequirements ?? [],
           });
         }
+        if (result.status === "ACTIVE_LIMIT_REACHED") {
+          return reply.code(409).send({
+            activeLimit: result.activeLimit,
+            code: "ACTIVE_LIMIT_REACHED",
+          });
+        }
         return sendDomainDenial(reply, result.status);
       } catch (error: unknown) {
         return sendCommandError(reply, error);

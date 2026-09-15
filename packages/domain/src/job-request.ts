@@ -11,7 +11,12 @@ export type JobRequestId = EntityId & {
   readonly [jobRequestIdBrand]: "JobRequestId";
 };
 
-export const JOB_REQUEST_STATES = Object.freeze(["DRAFT", "ACTIVE"] as const);
+export const JOB_REQUEST_STATES = Object.freeze([
+  "DRAFT",
+  "ACTIVE",
+  "EXPIRED",
+  "CANCELLED",
+] as const);
 export const JOB_REQUEST_SUBMISSION_REQUIREMENTS = Object.freeze([
   "PRIMARY_PROFESSION",
   "DESCRIPTION",
@@ -54,9 +59,11 @@ export type JobRequestCommandResult = Readonly<
       readonly status: "APPLIED" | "DEDUPLICATED";
     }
   | {
+      readonly activeLimit?: number;
       readonly missingRequirements?: readonly JobRequestSubmissionRequirement[];
       readonly status:
         | "ACCOUNT_NOT_ACTIVE"
+        | "ACTIVE_LIMIT_REACHED"
         | "INVALID_TRANSITION"
         | "NOT_FOUND"
         | "NOT_READY"
@@ -112,9 +119,13 @@ export function createJobRequestService(input: {
 
 export function transitionJobRequest(
   current: JobRequestState,
-  command: "ACTIVATE",
+  command: "ACTIVATE" | "CANCEL" | "EXPIRE" | "EXTEND" | "REACTIVATE",
 ): JobRequestState | null {
   if (command === "ACTIVATE" && current === "DRAFT") return "ACTIVE";
+  if (command === "EXTEND" && current === "ACTIVE") return "ACTIVE";
+  if (command === "EXPIRE" && current === "ACTIVE") return "EXPIRED";
+  if (command === "REACTIVATE" && current === "EXPIRED") return "ACTIVE";
+  if (command === "CANCEL" && current === "ACTIVE") return "CANCELLED";
   return null;
 }
 

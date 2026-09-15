@@ -85,6 +85,13 @@ export function createJobRequestRepository(sql: Sql): JobRequestPersistence {
             status: "NOT_READY" as const,
           });
         }
+        const policy = await lockActiveLimit(transaction, customerProfileId);
+        if (policy.count >= policy.limit) {
+          return Object.freeze({
+            activeLimit: policy.limit,
+            status: "ACTIVE_LIMIT_REACHED" as const,
+          });
+        }
 
         await insertCommand(transaction, {
           actorUserId: input.actorUserId,
@@ -162,6 +169,28 @@ export function createJobRequestRepository(sql: Sql): JobRequestPersistence {
       });
     },
   });
+}
+
+async function lockActiveLimit(
+  sql: TransactionSql,
+  customerProfileId: CustomerProfileId,
+): Promise<{ readonly count: number; readonly limit: number }> {
+  await sql`
+    SELECT pg_advisory_xact_lock(
+      hashtextextended(${customerProfileId}::text, 40006)
+    )
+  `;
+  const [row] = await sql<{ readonly count: number; readonly limit: number }[]>`
+    SELECT policy.active_request_limit AS limit,
+      count(current.id)::integer AS count
+    FROM job_request_runtime_policy policy
+    LEFT JOIN current_job_requests current
+      ON current.customer_profile_id = ${customerProfileId}
+     AND current.state::text = 'ACTIVE'
+    GROUP BY policy.active_request_limit
+  `;
+  if (row === undefined) throw new Error("Job request runtime policy missing.");
+  return row;
 }
 
 async function lockCommand(

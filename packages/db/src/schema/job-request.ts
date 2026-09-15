@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   check,
   char,
   index,
@@ -16,13 +17,26 @@ import {
 import { customerProfiles } from "./customer-profile.js";
 import { users } from "./user.js";
 
-export const jobRequestState = pgEnum("job_request_state", ["DRAFT", "ACTIVE"]);
+export const jobRequestState = pgEnum("job_request_state", [
+  "DRAFT",
+  "ACTIVE",
+  "EXPIRED",
+  "CANCELLED",
+]);
 export const jobRequestCommandKind = pgEnum("job_request_command_kind", [
   "CREATE_DRAFT",
   "CREATE_DRAFT_WITH_SECTION",
   "ACTIVATE",
   "AUTOSAVE",
+  "EXTEND",
+  "EXPIRE",
+  "REACTIVATE",
+  "CANCEL",
 ]);
+export const jobRequestCancellationReason = pgEnum(
+  "job_request_cancellation_reason",
+  ["DUPLICATE", "NO_LONGER_NEEDED", "OTHER", "PLANS_CHANGED"],
+);
 export const jobRequestCommandResult = pgEnum("job_request_command_result", [
   "APPLIED",
   "UNCHANGED",
@@ -62,9 +76,11 @@ export const jobRequestCommands = pgTable(
     customerProfileId: uuid("customer_profile_id")
       .notNull()
       .references(() => customerProfiles.id, { onDelete: "restrict" }),
-    actorUserId: uuid("actor_user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "restrict" }),
+    actorUserId: uuid("actor_user_id").references(() => users.id, {
+      onDelete: "restrict",
+    }),
+    systemInitiated: boolean("system_initiated").notNull().default(false),
+    cancellationReason: jobRequestCancellationReason("cancellation_reason"),
     commandKind: jobRequestCommandKind("command_kind").notNull(),
     resultKind: jobRequestCommandResult("result_kind")
       .notNull()
@@ -126,7 +142,43 @@ export const jobRequestCommands = pgTable(
           AND ${table.submissionEligibilityRevision} IS NULL
           AND ${table.draftSectionKey} ~ '^[a-z][a-z0-9._-]{0,63}$'
           AND ${table.draftSectionSchemaVersion} BETWEEN 1 AND 65535
-          AND ${table.draftPayloadFingerprint} ~ '^[0-9a-f]{64}$')`,
+          AND ${table.draftPayloadFingerprint} ~ '^[0-9a-f]{64}$')
+        OR (${table.commandKind} = 'EXTEND'
+          AND ${table.resultKind} = 'APPLIED'
+          AND ${table.expectedRevision} > 0
+          AND ${table.targetState} = 'ACTIVE'
+          AND ${table.submissionEligibilityRevision} IS NULL
+          AND ${table.draftSectionKey} IS NULL
+          AND ${table.draftSectionSchemaVersion} IS NULL
+          AND ${table.draftPayloadFingerprint} IS NULL
+          AND ${table.cancellationReason} IS NULL)
+        OR (${table.commandKind} = 'EXPIRE'
+          AND ${table.resultKind} = 'APPLIED'
+          AND ${table.expectedRevision} > 0
+          AND ${table.targetState} = 'EXPIRED'
+          AND ${table.submissionEligibilityRevision} IS NULL
+          AND ${table.draftSectionKey} IS NULL
+          AND ${table.draftSectionSchemaVersion} IS NULL
+          AND ${table.draftPayloadFingerprint} IS NULL
+          AND ${table.cancellationReason} IS NULL)
+        OR (${table.commandKind} = 'REACTIVATE'
+          AND ${table.resultKind} = 'APPLIED'
+          AND ${table.expectedRevision} > 0
+          AND ${table.targetState} = 'ACTIVE'
+          AND ${table.submissionEligibilityRevision} > 0
+          AND ${table.draftSectionKey} IS NULL
+          AND ${table.draftSectionSchemaVersion} IS NULL
+          AND ${table.draftPayloadFingerprint} IS NULL
+          AND ${table.cancellationReason} IS NULL)
+        OR (${table.commandKind} = 'CANCEL'
+          AND ${table.resultKind} = 'APPLIED'
+          AND ${table.expectedRevision} > 0
+          AND ${table.targetState} = 'CANCELLED'
+          AND ${table.submissionEligibilityRevision} IS NULL
+          AND ${table.draftSectionKey} IS NULL
+          AND ${table.draftSectionSchemaVersion} IS NULL
+          AND ${table.draftPayloadFingerprint} IS NULL
+          AND ${table.cancellationReason} IS NOT NULL)`,
     ),
     check(
       "job_request_commands_fingerprint_sha256",
@@ -164,6 +216,8 @@ export const jobRequestRevisions = pgTable(
       mode: "date",
       withTimezone: true,
     }),
+    expiresAt: timestamp("expires_at", { mode: "date", withTimezone: true }),
+    cancellationReason: jobRequestCancellationReason("cancellation_reason"),
   },
   (table) => [
     primaryKey({ columns: [table.jobRequestId, table.revision] }),
@@ -171,8 +225,18 @@ export const jobRequestRevisions = pgTable(
     check("job_request_revisions_positive", sql`${table.revision} > 0`),
     check(
       "job_request_revisions_activation_consistent",
-      sql`(${table.state} = 'DRAFT' AND ${table.activatedAt} IS NULL)
-        OR (${table.state} = 'ACTIVE' AND ${table.activatedAt} IS NOT NULL)`,
+      sql`(${table.state} = 'DRAFT' AND ${table.activatedAt} IS NULL
+          AND ${table.expiresAt} IS NULL
+          AND ${table.cancellationReason} IS NULL)
+        OR (${table.state} = 'ACTIVE' AND ${table.activatedAt} IS NOT NULL
+          AND ${table.expiresAt} IS NOT NULL
+          AND ${table.cancellationReason} IS NULL)
+        OR (${table.state} = 'EXPIRED' AND ${table.activatedAt} IS NOT NULL
+          AND ${table.expiresAt} IS NOT NULL
+          AND ${table.cancellationReason} IS NULL)
+        OR (${table.state} = 'CANCELLED' AND ${table.activatedAt} IS NOT NULL
+          AND ${table.expiresAt} IS NULL
+          AND ${table.cancellationReason} IS NOT NULL)`,
     ),
   ],
 );

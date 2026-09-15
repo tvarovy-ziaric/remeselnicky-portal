@@ -102,6 +102,7 @@ import { createCustomerShortlistRepository } from "./customer-shortlist-reposito
 import { createJobRequestRepository } from "./job-request-repository.js";
 import { createJobRequestDraftRepository } from "./job-request-draft-repository.js";
 import { createJobRequestVersionRepository } from "./job-request-version-repository.js";
+import { createJobRequestLifecycleRepository } from "./job-request-lifecycle-repository.js";
 import { createJobRequestMediaUploadAuthorization } from "./job-request-media-repository.js";
 import { createCraftsmanProfileRepository } from "./craftsman-profile-repository.js";
 import type {
@@ -111,6 +112,7 @@ import type {
   JobRequestPersistence,
   JobRequestDraftPersistence,
   JobRequestVersionPersistence,
+  JobRequestLifecyclePersistence,
 } from "@portal/domain";
 import * as schema from "./schema/index.js";
 
@@ -596,6 +598,8 @@ export { createJobRequestDraftRepository } from "./job-request-draft-repository.
 export type { JobRequestDraftPersistence } from "@portal/domain";
 export { createJobRequestVersionRepository } from "./job-request-version-repository.js";
 export type { JobRequestVersionPersistence } from "@portal/domain";
+export { createJobRequestLifecycleRepository } from "./job-request-lifecycle-repository.js";
+export type { JobRequestLifecyclePersistence } from "@portal/domain";
 export { createJobRequestMediaUploadAuthorization } from "./job-request-media-repository.js";
 export type { JobRequestMediaUploadAuthorization } from "@portal/media";
 export { createCraftsmanProfileRepository } from "./craftsman-profile-repository.js";
@@ -751,6 +755,7 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly jobRequests: JobRequestPersistence;
   readonly jobRequestDrafts: JobRequestDraftPersistence;
   readonly jobRequestVersions: JobRequestVersionPersistence;
+  readonly jobRequestLifecycle: JobRequestLifecyclePersistence;
   readonly jobRequestMedia: JobRequestMediaUploadAuthorization;
   readonly emailVerification: EmailVerificationRepository;
   readonly media: MediaRepository;
@@ -834,6 +839,7 @@ export function createDatabase(
   const jobRequests = createJobRequestRepository(sql);
   const jobRequestDrafts = createJobRequestDraftRepository(sql);
   const jobRequestVersions = createJobRequestVersionRepository(sql);
+  const jobRequestLifecycle = createJobRequestLifecycleRepository(sql);
   const jobRequestMedia = createJobRequestMediaUploadAuthorization(sql);
   const emailVerification = createEmailVerificationRepository(sql);
   const media = createMediaRepository(sql);
@@ -882,6 +888,7 @@ export function createDatabase(
     jobRequests,
     jobRequestDrafts,
     jobRequestVersions,
+    jobRequestLifecycle,
     jobRequestMedia,
     emailVerification,
     media,

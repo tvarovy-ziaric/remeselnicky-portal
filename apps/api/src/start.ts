@@ -5,6 +5,7 @@ import {
   createCustomerShortlistService,
   createJobRequestDraftService,
   createJobRequestService,
+  createJobRequestLifecycleService,
   createJobRequestVersionService,
 } from "@portal/domain";
 import { createPublicPortfolioDeliveryResolver } from "@portal/media";
@@ -73,6 +74,9 @@ const jobRequests = createJobRequestService({
 const jobRequestVersions = createJobRequestVersionService({
   persistence: database.jobRequestVersions,
 });
+const jobRequestLifecycle = createJobRequestLifecycleService({
+  persistence: database.jobRequestLifecycle,
+});
 const publicSearchCards = createPublicSearchCardSearch(
   database.publicSearchCards,
 );
@@ -111,6 +115,7 @@ const app = buildApi({
       requests: jobRequests,
     },
     jobRequestVersions: { versions: jobRequestVersions },
+    jobRequestLifecycle: { lifecycle: jobRequestLifecycle },
     persistence: authPersistence,
   },
   database,

@@ -117,6 +117,8 @@ describe("job request repository", () => {
       [draftRow()],
       [{ missing: [] }],
       [],
+      [{ count: 0, limit: 5 }],
+      [],
       [],
       [activeRow()],
     ]);
@@ -133,7 +135,31 @@ describe("job request repository", () => {
       jobRequest: activeRow(),
       status: "APPLIED",
     });
-    expect(harness.statements[6]).toContain("submission_eligibility_revision");
+    expect(harness.statements[8]).toContain("submission_eligibility_revision");
+  });
+
+  it("returns the authoritative active-request limit before activation", async () => {
+    const harness = transactionHarness([
+      [{ customerProfileId: customer }],
+      [],
+      [],
+      [{}],
+      [draftRow()],
+      [{ missing: [] }],
+      [],
+      [{ count: 5, limit: 5 }],
+    ]);
+    await expect(
+      createJobRequestRepository(harness.sql).activateOwned({
+        actorUserId: actor,
+        commandId,
+        expectedRevision: 1,
+        jobRequestId: request,
+      }),
+    ).resolves.toEqual({ activeLimit: 5, status: "ACTIVE_LIMIT_REACHED" });
+    expect(harness.statements.join("\n")).not.toContain(
+      "INSERT INTO job_request_commands",
+    );
   });
 
   it("denies stale or foreign requests without recording a command", async () => {
