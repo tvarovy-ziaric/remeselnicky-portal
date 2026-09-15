@@ -870,6 +870,17 @@ async function expectMaterialEditVersusCancellationLockOrder(
   const runOrdering = async (
     order: "EDIT_FIRST" | "CANCEL_FIRST",
   ): Promise<void> => {
+    const [eligibleRecipients] = await sql<Array<{ readonly count: number }>>`
+      SELECT count(*)::integer AS count
+      FROM current_job_invitations invitation
+      WHERE invitation.job_request_id = ${fixture.jobRequestId}
+        AND invitation.state IN ('PENDING', 'ENGAGED')
+    `;
+    if ((eligibleRecipients?.count ?? 0) < 1) {
+      throw new Error(
+        "Cancellation lock-order request has no eligible recipients.",
+      );
+    }
     const current = await reader.readActiveOwned({
       actorUserId: fixture.customerOwnerId,
       jobRequestId: fixture.jobRequestId,
@@ -953,7 +964,11 @@ async function expectMaterialEditVersusCancellationLockOrder(
     await expect(cancel).rejects.toThrow(`ROLLBACK_${order}_CANCELLATION`);
     const [edited] = await Promise.all([edit, gate]);
     expect(edited.status).toBe("APPLIED");
-    await expectMaterialEventCount(sql, editCommandId, 1);
+    await expectMaterialEventCount(
+      sql,
+      editCommandId,
+      eligibleRecipients?.count ?? 0,
+    );
   };
 
   await runOrdering("EDIT_FIRST");
