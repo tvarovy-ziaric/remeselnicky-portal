@@ -17,6 +17,10 @@ import {
   loadJobRequestTaxonomySuggestions,
   type JobRequestTaxonomySuggestion,
 } from "./job-request-taxonomy-client";
+import {
+  loadJobRequestMunicipalitySuggestions,
+  type JobRequestMunicipalitySuggestion,
+} from "./job-request-municipality-client";
 
 const STEPS = Object.freeze([
   { key: "request.core", label: "Čo potrebujete" },
@@ -338,16 +342,15 @@ function renderStep(
       return (
         <fieldset>
           <legend>Kde je práca</legend>
-          <label>
-            Obec
-            <input
-              autoComplete="address-level2"
-              maxLength={64}
-              onChange={update("municipalityCode")}
-              required
-              value={values.municipalityCode}
-            />
-          </label>
+          <MunicipalityPicker
+            selectedCode={values.municipalityCode}
+            onSelect={(suggestion) =>
+              setValues((current) => ({
+                ...current,
+                municipalityCode: suggestion.code,
+              }))
+            }
+          />
           <label>
             Presná adresa <span>(voliteľná a súkromná)</span>
             <input
@@ -599,6 +602,81 @@ function ProfessionPicker({
         <p className="selection-state">Zatiaľ nie je vybraná žiadna služba.</p>
       ) : (
         <p className="selection-state">Vybraná služba: {query}</p>
+      )}
+    </div>
+  );
+}
+
+function MunicipalityPicker({
+  onSelect,
+  selectedCode,
+}: {
+  readonly onSelect: (suggestion: JobRequestMunicipalitySuggestion) => void;
+  readonly selectedCode: string;
+}) {
+  const [query, setQuery] = useState(selectedCode);
+  const [suggestions, setSuggestions] = useState<
+    readonly JobRequestMunicipalitySuggestion[]
+  >([]);
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      void loadJobRequestMunicipalitySuggestions(
+        query,
+        fetch,
+        controller.signal,
+      ).then(setSuggestions);
+    }, 180);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [query]);
+  return (
+    <div className="profession-picker">
+      <label>
+        Obec
+        <input
+          aria-describedby="municipality-help"
+          autoComplete="address-level2"
+          maxLength={80}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setSuggestions([]);
+          }}
+          placeholder="Začnite písať názov obce"
+          required
+          value={query}
+        />
+      </label>
+      <p className="field-help" id="municipality-help">
+        Presnú adresu nemusíte uviesť. Na odoslanie stačí obec.
+      </p>
+      {suggestions.length > 0 ? (
+        <ul className="profession-suggestions">
+          {suggestions.map((suggestion) => (
+            <li key={suggestion.code}>
+              <button
+                onClick={() => {
+                  onSelect(suggestion);
+                  setQuery(suggestion.name);
+                  setSuggestions([]);
+                }}
+                type="button"
+              >
+                {suggestion.name}
+                <small>
+                  {suggestion.districtName}, {suggestion.regionName}
+                </small>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {selectedCode === "" ? (
+        <p className="selection-state">Zatiaľ nie je vybraná žiadna obec.</p>
+      ) : (
+        <p className="selection-state">Vybraná obec: {query}</p>
       )}
     </div>
   );

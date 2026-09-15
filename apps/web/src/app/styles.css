@@ -258,6 +258,13 @@ section {
   cursor: pointer;
 }
 
+.profession-suggestions small {
+  display: block;
+  margin-top: 0.2rem;
+  color: #66756b;
+  font-weight: 500;
+}
+
 .profession-suggestions button:hover,
 .profession-suggestions button:focus-visible {
   background: #edf3ed;

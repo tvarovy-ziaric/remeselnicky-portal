@@ -35,20 +35,18 @@ describe("job request taxonomy suggestions", () => {
   });
 
   it("does not call the API for an empty query and fails closed on corrupt output", async () => {
-    const fetcher = vi
-      .fn<typeof fetch>()
-      .mockResolvedValue(
-        Response.json({
-          suggestions: [
-            {
-              code: "PROF:BAD",
-              kind: "PROFESSION",
-              label: "Kontakt test@example.test",
-              professionCodes: [],
-            },
-          ],
-        }),
-      );
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json({
+        suggestions: [
+          {
+            code: "PROF:BAD",
+            kind: "PROFESSION",
+            label: "Kontakt test@example.test",
+            professionCodes: [],
+          },
+        ],
+      }),
+    );
     await expect(
       loadJobRequestTaxonomySuggestions(" ", fetcher),
     ).resolves.toEqual([]);

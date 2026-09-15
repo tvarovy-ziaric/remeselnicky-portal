@@ -81,6 +81,10 @@ import type {
   PublicCraftsmanProfilePersistence,
 } from "@portal/domain";
 import { createTaxonomyAutocompleteRepository } from "./taxonomy-autocomplete-repository.js";
+import {
+  createMunicipalityAutocompleteRepository,
+  type MunicipalityAutocompletePersistence,
+} from "./municipality-autocomplete-repository.js";
 import { createCredentialQualificationRepository } from "./credential-qualification-repository.js";
 import type {
   CredentialQualificationPolicyPersistence,
@@ -682,6 +686,11 @@ export {
   nodeMigrationFileSystem,
   runMigrations,
 } from "./migrator.js";
+export {
+  createMunicipalityAutocompleteRepository,
+  type MunicipalityAutocompletePersistence,
+  type MunicipalitySuggestion,
+} from "./municipality-autocomplete-repository.js";
 export type {
   AppliedMigration,
   Migration,
@@ -726,6 +735,7 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly craftsmanTrustEvidence: CraftsmanTrustEvidencePersistence;
   readonly publicSearchCards: ReturnType<typeof createPublicSearchCardSource>;
   readonly taxonomyAutocomplete: TaxonomyAutocompletePersistence;
+  readonly municipalityAutocomplete: MunicipalityAutocompletePersistence;
   readonly credentialQualifications: CredentialQualificationPolicyPersistence;
   readonly credentialClaims: CredentialClaimRepository;
   readonly customerProfiles: CustomerProfilePersistence;
@@ -805,6 +815,8 @@ export function createDatabase(
   const craftsmanTrustEvidence = createCraftsmanTrustEvidenceRepository(sql);
   const publicSearchCards = createPublicSearchCardSource(sql);
   const taxonomyAutocomplete = createTaxonomyAutocompleteRepository(sql);
+  const municipalityAutocomplete =
+    createMunicipalityAutocompleteRepository(sql);
   const credentialQualifications = createCredentialQualificationRepository(sql);
   const credentialClaims = createCredentialClaimRepository(sql);
   const customerProfiles = createCustomerProfileRepository(sql);
@@ -850,6 +862,7 @@ export function createDatabase(
     craftsmanTrustEvidence,
     publicSearchCards,
     taxonomyAutocomplete,
+    municipalityAutocomplete,
     credentialQualifications,
     credentialClaims,
     customerProfiles,

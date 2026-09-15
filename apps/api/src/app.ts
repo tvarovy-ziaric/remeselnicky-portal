@@ -26,6 +26,10 @@ import {
   registerPublicSearchCardRoutes,
   type PublicSearchCardRouteDependencies,
 } from "./public-search-cards/routes.js";
+import {
+  registerMunicipalityAutocompleteRoutes,
+  type MunicipalityAutocompleteRouteDependencies,
+} from "./municipality-autocomplete/routes.js";
 
 export interface ApiDependencies {
   readonly auth?: AuthModuleDependencies;
@@ -35,6 +39,7 @@ export interface ApiDependencies {
   readonly publicPortfolioMedia?: PublicPortfolioMediaRouteDependencies;
   readonly publicSearchCards?: PublicSearchCardRouteDependencies;
   readonly taxonomyAutocomplete?: TaxonomyAutocompleteRouteDependencies;
+  readonly municipalityAutocomplete?: MunicipalityAutocompleteRouteDependencies;
 }
 
 export function buildApi(dependencies: ApiDependencies): FastifyInstance {
@@ -66,6 +71,12 @@ export function buildApi(dependencies: ApiDependencies): FastifyInstance {
   }
   if (dependencies.taxonomyAutocomplete !== undefined) {
     registerTaxonomyAutocompleteRoutes(app, dependencies.taxonomyAutocomplete);
+  }
+  if (dependencies.municipalityAutocomplete !== undefined) {
+    registerMunicipalityAutocompleteRoutes(
+      app,
+      dependencies.municipalityAutocomplete,
+    );
   }
 
   app.get("/", () => ({

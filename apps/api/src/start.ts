@@ -72,6 +72,11 @@ const jobRequests = createJobRequestService({
 const publicSearchCards = createPublicSearchCardSearch(
   database.publicSearchCards,
 );
+const publicDiscoveryAdmission = createDatabasePublicSearchAdmission({
+  limit: config.auth.rateLimitMax * PUBLIC_SEARCH_RATE_LIMIT_MULTIPLIER,
+  persistence: authPersistence,
+  timeWindowMs: config.auth.rateLimitWindowMs,
+});
 
 const app = buildApi({
   auth: {
@@ -111,17 +116,17 @@ const app = buildApi({
     }),
   },
   publicSearchCards: {
-    admission: createDatabasePublicSearchAdmission({
-      limit: config.auth.rateLimitMax * PUBLIC_SEARCH_RATE_LIMIT_MULTIPLIER,
-      persistence: authPersistence,
-      timeWindowMs: config.auth.rateLimitWindowMs,
-    }),
+    admission: publicDiscoveryAdmission,
     searchCards: publicSearchCards,
   },
   taxonomyAutocomplete: {
     autocomplete: createTaxonomyAutocompleteService(
       database.taxonomyAutocomplete,
     ),
+  },
+  municipalityAutocomplete: {
+    admission: publicDiscoveryAdmission,
+    municipalities: database.municipalityAutocomplete,
   },
   observability: {
     appOrigin: config.appOrigin,
