@@ -98,7 +98,7 @@ This file is the persistent implementation-status overlay for the hash-verified 
 | R3-015 | DONE     | Immutable Quote revisions, private draft/submitted isolation, CAS/idempotency and live DB guards passed       |
 | R3-016 | DONE     | Native structured Quote authoring, immutable typed content and submit/save race guards passed                 |
 | R3-017 | DONE     | External PDF Quote authoring, minimal structured envelope and immutable PDF revisions passed live PG CI       |
-| R3-018 | ACTIVE   | Neutral structured/PDF Quote normalization, comparison DTO and responsive customer UI                        |
+| R3-018 | ACTIVE   | Neutral structured/PDF Quote normalization, comparison DTO and responsive customer UI                         |
 
 All DONE rows above are covered by CI run `34971113537` unless a more specific earlier run is referenced in history. The run applied migrations `0000`–`0050` twice and passed the complete live PostgreSQL/PostGIS integration suite, including the R1 supply-side authorization/privacy matrix, full R2 discovery/shortlist assertions, and R3 request core, recovery, validated content, private media, lifecycle, invitations, conversations, immutable chat and attachments, pre-confirm privacy policy, Quote core revisions, native structured authoring, external-PDF authoring/delivery and concurrency boundaries.
 
