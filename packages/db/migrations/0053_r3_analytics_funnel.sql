@@ -894,9 +894,8 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-CREATE CONSTRAINT TRIGGER z_r3_analytics_observation_capture
+CREATE TRIGGER z_r3_analytics_observation_capture
 AFTER INSERT ON r3_analytics_observation_commands
-DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION capture_r3_analytics_observation();
 
 CREATE FUNCTION reject_r3_analytics_mutation()

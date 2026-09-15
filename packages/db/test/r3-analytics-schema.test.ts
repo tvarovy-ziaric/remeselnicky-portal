@@ -45,6 +45,12 @@ describe("0053 R3 analytics funnel schema", () => {
     expect(migration).toContain("NEW.source_event_id := gen_random_uuid()");
     expect(migration).toContain("REFERENCES domain_outbox_events(event_id)");
     expect(migration).toContain("NEW.observed_at := clock_timestamp()");
+    expect(migration).toMatch(
+      /CREATE TRIGGER z_r3_analytics_observation_capture\s+AFTER INSERT ON r3_analytics_observation_commands/u,
+    );
+    expect(migration).not.toMatch(
+      /CREATE CONSTRAINT TRIGGER z_r3_analytics_observation_capture/u,
+    );
   });
 
   it("classifies TEST before current admin INTERNAL and defaults only absence to REAL", () => {
