@@ -251,16 +251,40 @@ export async function runConversationChatReadOnlyIntegrationAssertions(
     conversationId: fixture.conversationId,
   });
   expect(history?.entries.length).toBeGreaterThan(0);
+  if (history === null) {
+    throw new Error("Expected readable terminal conversation history.");
+  }
+  let archivedState = history.participantState;
+  if (!archivedState.archived) {
+    const archived = await chat.updateParticipantState({
+      action: "ARCHIVE",
+      actorUserId: fixture.customerOwnerId,
+      commandId: randomUUID(),
+      conversationId: fixture.conversationId,
+      expectedRevision: archivedState.revision,
+    });
+    if (
+      archived.status !== "APPLIED" ||
+      !("participantState" in archived) ||
+      !archived.participantState.archived
+    ) {
+      throw new Error("Expected terminal conversation to be archivable.");
+    }
+    archivedState = archived.participantState;
+  }
   await expect(
     chat.updateParticipantState({
       action: "UNARCHIVE",
       actorUserId: fixture.customerOwnerId,
       commandId: randomUUID(),
       conversationId: fixture.conversationId,
-      expectedRevision: 3,
+      expectedRevision: archivedState.revision,
     }),
   ).resolves.toMatchObject({
-    participantState: { archived: false, revision: 4 },
+    participantState: {
+      archived: false,
+      revision: archivedState.revision + 1,
+    },
     status: "APPLIED",
   });
 }
