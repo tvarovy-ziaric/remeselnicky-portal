@@ -7,9 +7,14 @@ registry, ingress, certificate, database, or secret-management vendor.
 ## Required platform contracts
 
 - Supply `portal-runtime-secrets` independently in each namespace with
-  `DATABASE_URL` and `SESSION_SECRET`. Never commit rendered Secrets. Runtime
+  `DATABASE_URL`, `SESSION_SECRET`, `OBJECT_STORAGE_ACCESS_KEY_ID` and
+  `OBJECT_STORAGE_SECRET_ACCESS_KEY`. Never commit rendered Secrets. Runtime
   database credentials must be least-privilege and different per environment;
   production `DATABASE_URL` must enable TLS.
+- Replace the object-storage endpoint, public media origin, provider region and
+  container placeholders independently in staging and production. The private
+  and public-derivative containers must be distinct, credentials must be scoped
+  to only the configured containers, and both service origins must use HTTPS.
 - Supply `portal-tls` in staging and production. Configure the cluster's
   default Ingress class to redirect or reject plaintext HTTP. Replace the
   reserved `.invalid` hosts with environment-specific DNS names before use.

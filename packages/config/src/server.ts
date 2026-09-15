@@ -65,6 +65,24 @@ const serverEnvironmentSchema = z
     PHONE_OTP_TTL_SECONDS: boundedIntegerEnvironmentValue(600, 60, 3_600),
     PHONE_OTP_VERIFY_LIMIT: boundedIntegerEnvironmentValue(10, 1, 100),
     PHONE_OTP_WINDOW_SECONDS: boundedIntegerEnvironmentValue(900, 60, 3_600),
+    OBJECT_STORAGE_ACCESS_KEY_ID: z.string().min(1).max(256).optional(),
+    OBJECT_STORAGE_ENDPOINT: z.string().url().optional(),
+    OBJECT_STORAGE_FORCE_PATH_STYLE: z
+      .enum(["true", "false"])
+      .optional()
+      .transform((value) => value === "true"),
+    OBJECT_STORAGE_PRIVATE_CONTAINER: z.string().min(3).max(63).optional(),
+    OBJECT_STORAGE_PUBLIC_BASE_URL: z.string().url().optional(),
+    OBJECT_STORAGE_PUBLIC_DERIVATIVE_CONTAINER: z
+      .string()
+      .min(3)
+      .max(63)
+      .optional(),
+    OBJECT_STORAGE_REGION: z
+      .string()
+      .regex(/^[a-z0-9][a-z0-9-]{0,62}$/u)
+      .optional(),
+    OBJECT_STORAGE_SECRET_ACCESS_KEY: z.string().min(1).max(1_024).optional(),
     PORT: portSchema.optional(),
     RELEASE_REVISION: z.string().trim().min(1),
     SESSION_SECRET: z.string().min(32),
@@ -100,8 +118,75 @@ const serverEnvironmentSchema = z
       });
     }
 
-    if (environment.APP_ENV !== "production") {
+    const storageFields = [
+      "OBJECT_STORAGE_ACCESS_KEY_ID",
+      "OBJECT_STORAGE_ENDPOINT",
+      "OBJECT_STORAGE_PRIVATE_CONTAINER",
+      "OBJECT_STORAGE_PUBLIC_BASE_URL",
+      "OBJECT_STORAGE_PUBLIC_DERIVATIVE_CONTAINER",
+      "OBJECT_STORAGE_REGION",
+      "OBJECT_STORAGE_SECRET_ACCESS_KEY",
+    ] as const;
+    const configuredStorageFields = storageFields.filter(
+      (field) => environment[field] !== undefined,
+    );
+    if (
+      configuredStorageFields.length > 0 &&
+      configuredStorageFields.length !== storageFields.length
+    ) {
+      for (const field of storageFields) {
+        if (environment[field] === undefined) {
+          context.addIssue({
+            code: "custom",
+            message: "is required when object storage is configured",
+            path: [field],
+          });
+        }
+      }
+    }
+
+    if (
+      environment.OBJECT_STORAGE_PRIVATE_CONTAINER !== undefined &&
+      environment.OBJECT_STORAGE_PRIVATE_CONTAINER ===
+        environment.OBJECT_STORAGE_PUBLIC_DERIVATIVE_CONTAINER
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "must differ from the private container",
+        path: ["OBJECT_STORAGE_PUBLIC_DERIVATIVE_CONTAINER"],
+      });
+    }
+
+    if (environment.APP_ENV === "development") {
       return;
+    }
+
+    if (configuredStorageFields.length !== storageFields.length) {
+      context.addIssue({
+        code: "custom",
+        message: "is required outside development and test",
+        path: ["OBJECT_STORAGE_ENDPOINT"],
+      });
+    }
+
+    for (const [field, rawUrl] of [
+      ["OBJECT_STORAGE_ENDPOINT", environment.OBJECT_STORAGE_ENDPOINT],
+      [
+        "OBJECT_STORAGE_PUBLIC_BASE_URL",
+        environment.OBJECT_STORAGE_PUBLIC_BASE_URL,
+      ],
+    ] as const) {
+      const url = rawUrl === undefined ? undefined : parseUrl(rawUrl);
+      if (
+        url !== undefined &&
+        (url.protocol !== "https:" || isLocalHostname(url.hostname))
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: "must be a non-local HTTPS URL outside development and test",
+          path: [field],
+        });
+      }
     }
 
     const appOrigin = parseUrl(environment.APP_ORIGIN);
@@ -143,6 +228,26 @@ const serverEnvironmentSchema = z
         path: ["SESSION_SECRET"],
       });
     }
+    if (
+      environment.OBJECT_STORAGE_ACCESS_KEY_ID !== undefined &&
+      isPlaceholder(environment.OBJECT_STORAGE_ACCESS_KEY_ID)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "must not be a placeholder outside development and test",
+        path: ["OBJECT_STORAGE_ACCESS_KEY_ID"],
+      });
+    }
+    if (
+      environment.OBJECT_STORAGE_SECRET_ACCESS_KEY !== undefined &&
+      isPlaceholder(environment.OBJECT_STORAGE_SECRET_ACCESS_KEY)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "must not be a placeholder outside development and test",
+        path: ["OBJECT_STORAGE_SECRET_ACCESS_KEY"],
+      });
+    }
   });
 
 const placeholderValues = new Set([
@@ -165,6 +270,19 @@ export interface ObservabilityContext {
 export interface ServerSecrets {
   readonly databaseUrl: string;
   readonly sessionSecret: string;
+  readonly storage?: Readonly<{
+    readonly accessKeyId: string;
+    readonly secretAccessKey: string;
+  }>;
+}
+
+export interface ObjectStorageServerConfig {
+  readonly endpoint: string;
+  readonly forcePathStyle: boolean;
+  readonly privateContainer: string;
+  readonly publicBaseUrl: string;
+  readonly publicDerivativeContainer: string;
+  readonly region: string;
 }
 
 export interface AuthServerConfig {
@@ -194,6 +312,7 @@ export interface ServerConfig {
   readonly auth: AuthServerConfig;
   readonly environment: DeploymentEnvironment;
   readonly observability: ObservabilityContext;
+  readonly objectStorage: ObjectStorageServerConfig | undefined;
   readonly port: number | undefined;
   readonly releaseRevision: string;
   readonly secrets: ServerSecrets;
@@ -226,6 +345,7 @@ export function parseServerConfig(
     environment: result.data.APP_ENV,
     releaseRevision: result.data.RELEASE_REVISION,
   });
+  const objectStorage = parseObjectStorageConfig(result.data);
 
   return Object.freeze({
     adminAccess: Object.freeze({
@@ -255,11 +375,59 @@ export function parseServerConfig(
     }),
     environment: result.data.APP_ENV,
     observability,
+    objectStorage: objectStorage?.config,
     port: result.data.PORT,
     releaseRevision: result.data.RELEASE_REVISION,
     secrets: Object.freeze({
       databaseUrl: result.data.DATABASE_URL,
       sessionSecret: result.data.SESSION_SECRET,
+      ...(objectStorage === undefined
+        ? {}
+        : {
+            storage: Object.freeze({
+              accessKeyId: objectStorage.secrets.accessKeyId,
+              secretAccessKey: objectStorage.secrets.secretAccessKey,
+            }),
+          }),
+    }),
+  });
+}
+
+function parseObjectStorageConfig(
+  environment: z.output<typeof serverEnvironmentSchema>,
+):
+  | Readonly<{
+      readonly config: ObjectStorageServerConfig;
+      readonly secrets: Readonly<{
+        readonly accessKeyId: string;
+        readonly secretAccessKey: string;
+      }>;
+    }>
+  | undefined {
+  if (
+    environment.OBJECT_STORAGE_ACCESS_KEY_ID === undefined ||
+    environment.OBJECT_STORAGE_ENDPOINT === undefined ||
+    environment.OBJECT_STORAGE_PRIVATE_CONTAINER === undefined ||
+    environment.OBJECT_STORAGE_PUBLIC_BASE_URL === undefined ||
+    environment.OBJECT_STORAGE_PUBLIC_DERIVATIVE_CONTAINER === undefined ||
+    environment.OBJECT_STORAGE_REGION === undefined ||
+    environment.OBJECT_STORAGE_SECRET_ACCESS_KEY === undefined
+  ) {
+    return undefined;
+  }
+  return Object.freeze({
+    config: Object.freeze({
+      endpoint: environment.OBJECT_STORAGE_ENDPOINT,
+      forcePathStyle: environment.OBJECT_STORAGE_FORCE_PATH_STYLE,
+      privateContainer: environment.OBJECT_STORAGE_PRIVATE_CONTAINER,
+      publicBaseUrl: environment.OBJECT_STORAGE_PUBLIC_BASE_URL,
+      publicDerivativeContainer:
+        environment.OBJECT_STORAGE_PUBLIC_DERIVATIVE_CONTAINER,
+      region: environment.OBJECT_STORAGE_REGION,
+    }),
+    secrets: Object.freeze({
+      accessKeyId: environment.OBJECT_STORAGE_ACCESS_KEY_ID,
+      secretAccessKey: environment.OBJECT_STORAGE_SECRET_ACCESS_KEY,
     }),
   });
 }

@@ -13,6 +13,12 @@ configMapGenerator:
       - APP_ORIGIN=https://portal.invalid
       - NEXT_PUBLIC_APP_ENV=production
       - NEXT_PUBLIC_RELEASE_REVISION=release-revision
+      - OBJECT_STORAGE_ENDPOINT=https://objects.portal.invalid
+      - OBJECT_STORAGE_FORCE_PATH_STYLE=false
+      - OBJECT_STORAGE_PRIVATE_CONTAINER=portal-production-private
+      - OBJECT_STORAGE_PUBLIC_BASE_URL=https://media.portal.invalid/
+      - OBJECT_STORAGE_PUBLIC_DERIVATIVE_CONTAINER=portal-production-public
+      - OBJECT_STORAGE_REGION=provider-region
       - PORT=3001
       - RELEASE_REVISION=release-revision
 generatorOptions:

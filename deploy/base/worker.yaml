@@ -41,6 +41,16 @@ spec:
                 secretKeyRef:
                   name: portal-runtime-secrets
                   key: SESSION_SECRET
+            - name: OBJECT_STORAGE_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: portal-runtime-secrets
+                  key: OBJECT_STORAGE_ACCESS_KEY_ID
+            - name: OBJECT_STORAGE_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: portal-runtime-secrets
+                  key: OBJECT_STORAGE_SECRET_ACCESS_KEY
           ports:
             - name: monitoring
               containerPort: 9465

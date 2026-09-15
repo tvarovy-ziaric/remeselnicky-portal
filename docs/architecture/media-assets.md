@@ -28,6 +28,25 @@ document validation and malware scanning belong to R0-019.
 Authorization-checked downloads belong to R0-020. Until then, `PROCESSING`
 files are not counterpart-visible.
 
+## Object-storage runtime adapter
+
+The runtime adapter speaks the S3 protocol without selecting a hosting vendor.
+Staging and production configuration must provide an HTTPS endpoint, region,
+separate private and public-derivative containers, a public derivative origin,
+and container-scoped credentials through the secret manager. Object keys remain
+server-generated and purpose-prefixed; caller filenames never become keys.
+
+Private processing reads request at most the configured byte ceiling plus one
+sentinel byte and also validate provider range metadata. Streaming stops as soon
+as the ceiling is exceeded. Private delivery uses a signed `GetObject` request
+whose lifetime is rounded down and capped by the central 300-second storage
+boundary; the media delivery service applies its stricter 60-second cap and
+reauthorizes after signing. Public URLs are derived only for objects already
+stored in the public-derivative container, and revocation deletes that exact
+derivative. Choosing and provisioning the S3-compatible service, bucket policy,
+malware scanner and environment credentials remains a D30 staging/production
+gate rather than a code-level default.
+
 ## Image canonicalization (R0-018)
 
 Image jobs carry only an opaque `MediaAsset` ID. The worker reloads the current

@@ -13,6 +13,12 @@ configMapGenerator:
       - APP_ORIGIN=https://staging.portal.invalid
       - NEXT_PUBLIC_APP_ENV=staging
       - NEXT_PUBLIC_RELEASE_REVISION=release-revision
+      - OBJECT_STORAGE_ENDPOINT=https://objects.staging.invalid
+      - OBJECT_STORAGE_FORCE_PATH_STYLE=false
+      - OBJECT_STORAGE_PRIVATE_CONTAINER=portal-staging-private
+      - OBJECT_STORAGE_PUBLIC_BASE_URL=https://media.staging.invalid/
+      - OBJECT_STORAGE_PUBLIC_DERIVATIVE_CONTAINER=portal-staging-public
+      - OBJECT_STORAGE_REGION=provider-region
       - PORT=3001
       - RELEASE_REVISION=release-revision
 generatorOptions:

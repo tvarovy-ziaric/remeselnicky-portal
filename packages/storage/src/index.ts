@@ -1,5 +1,11 @@
 import { randomUUID } from "node:crypto";
 
+export {
+  createS3CompatibleObjectStorageAdapter,
+  type S3CompatibleStorageConfig,
+  type S3CompatibleStorageOperations,
+} from "./s3-compatible.js";
+
 export const storageAreas = {
   private: "private",
   publicDerivative: "public-derivative",

@@ -8,6 +8,13 @@ const productionEnvironment = {
   APP_ORIGIN: "https://portal.example",
   DATABASE_URL:
     "postgresql://portal:strong-database-password@db.example/portal?sslmode=require",
+  OBJECT_STORAGE_ACCESS_KEY_ID: "portal-staging-access",
+  OBJECT_STORAGE_ENDPOINT: "https://objects.example",
+  OBJECT_STORAGE_PRIVATE_CONTAINER: "portal-private",
+  OBJECT_STORAGE_PUBLIC_BASE_URL: "https://cdn.example/assets/",
+  OBJECT_STORAGE_PUBLIC_DERIVATIVE_CONTAINER: "portal-public",
+  OBJECT_STORAGE_REGION: "eu-central-1",
+  OBJECT_STORAGE_SECRET_ACCESS_KEY: "portal-storage-secret-value",
   PORT: "3001",
   RELEASE_REVISION: "git-a1b2c3d4",
   SESSION_SECRET: "s".repeat(48),
@@ -28,6 +35,14 @@ describe("server configuration", () => {
       environment: "production",
       releaseRevision: "git-a1b2c3d4",
     });
+    expect(config.objectStorage).toEqual({
+      endpoint: "https://objects.example",
+      forcePathStyle: false,
+      privateContainer: "portal-private",
+      publicBaseUrl: "https://cdn.example/assets/",
+      publicDerivativeContainer: "portal-public",
+      region: "eu-central-1",
+    });
     expect(config.auth).toEqual({
       cookieName: "__Host-portal.sid",
       cookieSecure: true,
@@ -43,6 +58,10 @@ describe("server configuration", () => {
       trustProxyHops: 1,
     });
     expect(config.secrets.databaseUrl).toBe(productionEnvironment.DATABASE_URL);
+    expect(config.secrets.storage).toEqual({
+      accessKeyId: "portal-staging-access",
+      secretAccessKey: "portal-storage-secret-value",
+    });
   });
 
   it("supports bounded auth timing overrides without exposing secrets", () => {
@@ -80,6 +99,40 @@ describe("server configuration", () => {
     });
   });
 
+  it("requires a complete isolated storage configuration outside local tests", () => {
+    const withoutStorage = { ...productionEnvironment } as Record<
+      string,
+      string | undefined
+    >;
+    for (const field of Object.keys(withoutStorage)) {
+      if (field.startsWith("OBJECT_STORAGE_")) delete withoutStorage[field];
+    }
+    expect(() =>
+      parseServerConfig({ ...withoutStorage, APP_ENV: "staging" }),
+    ).toThrow(/OBJECT_STORAGE_ENDPOINT/u);
+  });
+
+  it("rejects partial, shared-container and insecure non-local storage", () => {
+    expect(() =>
+      parseServerConfig({
+        ...productionEnvironment,
+        OBJECT_STORAGE_SECRET_ACCESS_KEY: undefined,
+      }),
+    ).toThrow(/OBJECT_STORAGE_SECRET_ACCESS_KEY/u);
+    expect(() =>
+      parseServerConfig({
+        ...productionEnvironment,
+        OBJECT_STORAGE_PUBLIC_DERIVATIVE_CONTAINER: "portal-private",
+      }),
+    ).toThrow(/OBJECT_STORAGE_PUBLIC_DERIVATIVE_CONTAINER/u);
+    expect(() =>
+      parseServerConfig({
+        ...productionEnvironment,
+        OBJECT_STORAGE_ENDPOINT: "http://objects.example",
+      }),
+    ).toThrow(/OBJECT_STORAGE_ENDPOINT/u);
+  });
+
   it.each([
     ["ADMIN_MFA_CHALLENGE_TTL_SECONDS", "59"],
     ["ADMIN_PRIVILEGED_SESSION_TTL_SECONDS", "43201"],
@@ -114,6 +167,23 @@ describe("server configuration", () => {
       cookieSecure: false,
       trustProxyHops: 0,
     });
+    expect(config.objectStorage).toEqual(
+      expect.objectContaining({ endpoint: "https://objects.example" }),
+    );
+  });
+
+  it("allows local development to start without storage composition", () => {
+    const environment = { ...productionEnvironment } as Record<
+      string,
+      string | undefined
+    >;
+    environment.APP_ENV = "development";
+    environment.APP_ORIGIN = "http://portal.localhost";
+    environment.DATABASE_URL = "postgresql://portal:password@localhost/portal";
+    for (const field of Object.keys(environment)) {
+      if (field.startsWith("OBJECT_STORAGE_")) delete environment[field];
+    }
+    expect(parseServerConfig(environment).objectStorage).toBeUndefined();
   });
 
   it("rejects admin reauthentication windows longer than privileged sessions", () => {
