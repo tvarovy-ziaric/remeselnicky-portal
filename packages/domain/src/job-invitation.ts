@@ -48,6 +48,73 @@ export interface JobInvitation {
   readonly state: JobInvitationState;
 }
 
+export interface JobInvitationListItem {
+  readonly changedAt: Date;
+  readonly counterpartDisplayName: string;
+  readonly expiresAt: Date;
+  readonly id: JobInvitationId;
+  readonly jobRequestId: JobRequestId;
+  readonly perspective: "CRAFTSMAN" | "CUSTOMER";
+  readonly requestTitle: string;
+  readonly revision: number;
+  readonly state: JobInvitationState;
+}
+
+/** Explicit pre-confirmation projection; exact address, map pin and contacts are absent. */
+export interface JobInvitationRequestBrief {
+  readonly approximateDistanceKm: number | null;
+  readonly budget: JobInvitationRequestBudget;
+  readonly description: string;
+  readonly details: JobInvitationRequestDetails;
+  readonly documentMediaAssetIds: readonly string[];
+  readonly municipalityCode: string;
+  readonly photoMediaAssetIds: readonly string[];
+  readonly primaryProfessionCode: string;
+  readonly relatedProfessionCodes: readonly string[];
+  readonly skillCodes: readonly string[];
+  readonly specializationCode: string | null;
+  readonly timing: JobInvitationRequestTiming;
+  readonly title: string;
+}
+
+export interface JobInvitationRequestBudget {
+  readonly currency: "EUR";
+  readonly maximumAmountCents: number | null;
+  readonly minimumAmountCents: number | null;
+  readonly mode: "RANGE" | "UNKNOWN" | "UP_TO" | null;
+}
+
+export interface JobInvitationRequestTiming {
+  readonly completionDeadline: string | null;
+  readonly endsOn: string | null;
+  readonly mode: "AS_SOON_AS_POSSIBLE" | "FLEXIBLE" | "SPECIFIC_PERIOD" | null;
+  readonly startsOn: string | null;
+}
+
+export interface JobInvitationRequestDetails {
+  readonly approximateQuantity: string | null;
+  readonly customRequirements: string | null;
+  readonly materialResponsibility:
+    | "ADVICE_NEEDED"
+    | "COMBINATION"
+    | "CRAFTSMAN_PROVIDES"
+    | "CUSTOMER_PROVIDES"
+    | null;
+  readonly siteInspection: "LIKELY" | "MAYBE" | "UNKNOWN" | null;
+}
+
+export interface JobInvitationDetail extends JobInvitationListItem {
+  readonly competitionDisclosure: "CUSTOMER_MAY_CONTACT_OTHERS";
+  readonly customerTrust: Readonly<{
+    readonly permittedReviewComments: readonly string[];
+    readonly rating: number | null;
+    readonly reviewCount: number;
+  }>;
+  readonly request: JobInvitationRequestBrief;
+  readonly requestContentRevision: number;
+  readonly requestVisibleVersion: number;
+}
+
 export interface SendJobInvitationInput {
   readonly actorUserId: UserId;
   readonly commandId: string;
@@ -97,6 +164,15 @@ export interface JobInvitationPersistence {
     input: CloseJobInvitationInput,
   ): Promise<JobInvitationCommandResult>;
   expirePending(): Promise<readonly JobInvitationId[]>;
+  listOwned(input: {
+    readonly actorUserId: UserId;
+    readonly jobRequestId?: JobRequestId;
+    readonly limit: number;
+  }): Promise<readonly JobInvitationListItem[]>;
+  readOwned(input: {
+    readonly actorUserId: UserId;
+    readonly invitationId: JobInvitationId;
+  }): Promise<JobInvitationDetail | null>;
   respondOwned(
     input: RespondToJobInvitationInput,
   ): Promise<JobInvitationCommandResult>;

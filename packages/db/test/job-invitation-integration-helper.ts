@@ -101,6 +101,50 @@ export async function runJobInvitationIntegrationAssertions(
     });
     expect(invitation.requestContentRevision).toBeGreaterThan(0);
     expect(invitation.requestVisibleVersion).toBeGreaterThan(0);
+    const craftsmanDetail = await repository.readOwned({
+      actorUserId: target.ownerUserId,
+      invitationId: invitation.id,
+    });
+    expect(craftsmanDetail).toMatchObject({
+      perspective: "CRAFTSMAN",
+      requestContentRevision: invitation.requestContentRevision,
+      requestVisibleVersion: invitation.requestVisibleVersion,
+      request: {
+        primaryProfessionCode: request.primaryProfessionCode,
+      },
+    });
+    expect(JSON.stringify(craftsmanDetail)).not.toMatch(
+      /exactAddress|mapPin|phone|email|competitor/iu,
+    );
+    await expect(
+      repository.listOwned({
+        actorUserId: request.actorUserId,
+        jobRequestId: request.id,
+        limit: 10,
+      }),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        id: invitation.id,
+        perspective: "CUSTOMER",
+        state: "PENDING",
+      }),
+    ]);
+    await sql`
+      UPDATE users SET account_state = 'SUSPENDED',
+        updated_at = clock_timestamp()
+      WHERE id = ${target.ownerUserId}
+    `;
+    await expect(
+      repository.readOwned({
+        actorUserId: target.ownerUserId,
+        invitationId: invitation.id,
+      }),
+    ).resolves.toBeNull();
+    await sql`
+      UPDATE users SET account_state = 'ACTIVE',
+        updated_at = clock_timestamp()
+      WHERE id = ${target.ownerUserId}
+    `;
     await expect(
       repository.sendOwned({
         actorUserId: request.actorUserId,

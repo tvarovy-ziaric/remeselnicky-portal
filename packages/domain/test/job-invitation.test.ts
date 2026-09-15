@@ -20,6 +20,9 @@ describe("job invitation", () => {
     expect(transitionJobInvitation("PENDING", "ENGAGE")).toBe("ENGAGED");
     expect(transitionJobInvitation("PENDING", "DECLINE")).toBe("DECLINED");
     expect(transitionJobInvitation("PENDING", "EXPIRE")).toBe("EXPIRED");
+    expect(transitionJobInvitation("PENDING", "CUSTOMER_WITHDRAW")).toBe(
+      "WITHDRAWN",
+    );
     expect(transitionJobInvitation("ENGAGED", "CUSTOMER_STOP")).toBe(
       "NOT_SELECTED",
     );

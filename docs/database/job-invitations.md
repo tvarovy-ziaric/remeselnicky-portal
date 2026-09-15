@@ -37,9 +37,36 @@ intent fails closed.
 
 `expirePending()` claims at most 100 due invitations with row locks and appends
 system-only `EXPIRE` commands. The deployed worker schedules this operation;
-opening/view telemetry remains an event, not a business state. R3-008 owns
-candidate-list selection and the customer invitation API, and R3-010 owns
-participant-facing lifecycle UX.
+opening/view telemetry remains an event, not a business state.
+
+R3-010 adds the private `/pozvanky` inbox and `/invitations/:id` detail route.
+Every read requires the current ACTIVE account and exact customer/craftsman
+ownership. A profile becoming non-public does not sever an existing invitation;
+an account suspension blocks both reads and new actions while preserving the
+history. The detail is reconstructed from section revisions at the invitation's
+pinned content revision, not from the request's newest mutable context.
+
+The pre-confirmation serializer exposes the profession, description, governed
+municipality, approximate distance, timing, budget, material/inspection facts
+and opaque photo/document asset identifiers. It structurally omits the exact
+address, map pin, customer contact data and every competitor identity/count.
+Location clarification is private at this stage. Title, description and custom
+requirements also pass a fail-closed pre-confirmation address/contact detector;
+suspicious free text is omitted or replaced by a generic safe explanation.
+Customer trust fields are explicit but neutral (`rating: null`, zero reviews and
+no comments) until verified Job reviews exist; the UX does not invent trust.
+Private object bytes still require the separate short-lived server-authorized
+media grant and its storage provider. Opening the detail performs only a GET and
+never changes the business state.
+
+The action API exposes the locked transitions only: craftsman
+`ENGAGE`/`DECLINE`/withdraw and customer pending-withdraw/stop-considering.
+Writes are CSRF protected, rate limited, optimistic-revision checked,
+idempotent, and revalidate verified ACTIVE ownership in the transaction.
+`DECLINED`, `EXPIRED`, `WITHDRAWN` and `NOT_SELECTED` remain neutral labels and
+have no reputation side effect. Customer list rows show state and the last
+domain activity timestamp; a Quote-submitted marker is intentionally absent
+until the authoritative Quote aggregate exists.
 
 No invitation read model exposes competitor identities or counts. Later private
 request/conversation serializers must resolve one concrete invitation and apply

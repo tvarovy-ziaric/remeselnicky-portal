@@ -4,10 +4,12 @@ import {
   JOB_INVITATION_DEFAULT_ACTIVE_LIMIT,
   JOB_INVITATION_DECLINE_REASONS,
   JOB_INVITATION_STATES,
+  JOB_REQUEST_CONTENT_SECTION_KEYS,
   JobInvitationIdempotencyError,
   assertCloseJobInvitationInput,
   assertRespondToJobInvitationInput,
   assertSendJobInvitationInput,
+  normalizeJobRequestContentSection,
   transitionJobInvitation,
   type CloseJobInvitationInput,
   type CraftsmanProfileId,
@@ -16,9 +18,18 @@ import {
   type JobInvitationCommandResult,
   type JobInvitationDeclineReason,
   type JobInvitationId,
+  type JobInvitationDetail,
+  type JobInvitationListItem,
   type JobInvitationPersistence,
   type JobInvitationState,
+  type JobRequestBudgetContent,
+  type JobRequestContentPayload,
+  type JobRequestCoreContent,
+  type JobRequestDetailsContent,
   type JobRequestId,
+  type JobRequestLocationContent,
+  type JobRequestMediaContent,
+  type JobRequestTimingContent,
   type RespondToJobInvitationInput,
   type SendJobInvitationInput,
   type UserId,
@@ -59,6 +70,30 @@ interface InvitationRow {
   readonly revision: number;
   readonly sentAt: Date;
   readonly state: string;
+}
+
+interface InvitationListRow {
+  readonly changedAt: Date;
+  readonly craftsmanDisplayName: string | null;
+  readonly customerProfileId: string;
+  readonly expiresAt: Date;
+  readonly id: string;
+  readonly jobRequestId: string;
+  readonly perspective: string;
+  readonly requestTitle: string | null;
+  readonly revision: number;
+  readonly state: string;
+}
+
+interface InvitationDetailContextRow extends InvitationListRow {
+  readonly requestContentRevision: number;
+  readonly requestVisibleVersion: number;
+}
+
+interface InvitationSectionRow {
+  readonly payload: unknown;
+  readonly sectionKey: string;
+  readonly sectionSchemaVersion: number;
 }
 
 export function createJobInvitationRepository(
@@ -122,6 +157,148 @@ export function createJobInvitationRepository(
           expired.push(candidate.id);
         }
         return Object.freeze(expired);
+      });
+    },
+    async listOwned(input: {
+      readonly actorUserId: UserId;
+      readonly jobRequestId?: JobRequestId;
+      readonly limit: number;
+    }): Promise<readonly JobInvitationListItem[]> {
+      assertReadListInput(input);
+      const rows = await sql<InvitationListRow[]>`
+        SELECT invitation.id,
+          invitation.job_request_id AS "jobRequestId",
+          invitation.customer_profile_id AS "customerProfileId",
+          current.revision, current.state::text AS state,
+          current.changed_at AS "changedAt", current.expires_at AS "expiresAt",
+          CASE WHEN customer.owner_user_id = ${input.actorUserId}
+            THEN 'CUSTOMER' ELSE 'CRAFTSMAN' END AS perspective,
+          core.payload ->> 'title' AS "requestTitle",
+          CASE WHEN craftsman.profile_type = 'COMPANY'
+            THEN craftsman.official_company_name
+            ELSE COALESCE(craftsman.nickname,
+              NULLIF(concat_ws(' ', craftsman.real_first_name,
+                craftsman.real_last_name), ''))
+          END AS "craftsmanDisplayName"
+        FROM job_invitations invitation
+        JOIN current_job_invitations current ON current.id = invitation.id
+        JOIN customer_profiles customer
+          ON customer.id = invitation.customer_profile_id
+        JOIN craftsman_profiles craftsman
+          ON craftsman.id = invitation.craftsman_profile_id
+        JOIN users actor ON actor.id = ${input.actorUserId}
+          AND actor.account_state = 'ACTIVE'
+        LEFT JOIN LATERAL (
+          SELECT section.payload
+          FROM job_request_active_section_revisions section
+          WHERE section.job_request_id = invitation.job_request_id
+            AND section.section_key = 'request.core'
+            AND section.content_revision <= invitation.request_content_revision
+          ORDER BY section.content_revision DESC LIMIT 1
+        ) core ON true
+        WHERE (customer.owner_user_id = actor.id
+            OR craftsman.owner_user_id = actor.id)
+          AND (${input.jobRequestId ?? null}::uuid IS NULL
+            OR invitation.job_request_id = ${input.jobRequestId ?? null})
+        ORDER BY current.changed_at DESC, invitation.id DESC
+        LIMIT ${input.limit}
+      `;
+      return Object.freeze(rows.map(toListItem));
+    },
+    async readOwned(input: {
+      readonly actorUserId: UserId;
+      readonly invitationId: JobInvitationId;
+    }): Promise<JobInvitationDetail | null> {
+      assertReadDetailInput(input);
+      return sql.begin(async (transaction) => {
+        const activeActors = await transaction`
+          SELECT id FROM users
+          WHERE id = ${input.actorUserId} AND account_state = 'ACTIVE'
+          FOR UPDATE
+        `;
+        if (activeActors.length !== 1) return null;
+        const [context] = await transaction<InvitationDetailContextRow[]>`
+          SELECT invitation.id,
+            invitation.job_request_id AS "jobRequestId",
+            invitation.customer_profile_id AS "customerProfileId",
+            invitation.request_content_revision AS "requestContentRevision",
+            invitation.request_visible_version AS "requestVisibleVersion",
+            current.revision, current.state::text AS state,
+            current.changed_at AS "changedAt", current.expires_at AS "expiresAt",
+            CASE WHEN customer.owner_user_id = ${input.actorUserId}
+              THEN 'CUSTOMER' ELSE 'CRAFTSMAN' END AS perspective,
+            core.payload ->> 'title' AS "requestTitle",
+            CASE WHEN craftsman.profile_type = 'COMPANY'
+              THEN craftsman.official_company_name
+              ELSE COALESCE(craftsman.nickname,
+                NULLIF(concat_ws(' ', craftsman.real_first_name,
+                  craftsman.real_last_name), ''))
+            END AS "craftsmanDisplayName"
+          FROM job_invitations invitation
+          JOIN current_job_invitations current ON current.id = invitation.id
+          JOIN customer_profiles customer
+            ON customer.id = invitation.customer_profile_id
+          JOIN craftsman_profiles craftsman
+            ON craftsman.id = invitation.craftsman_profile_id
+          JOIN users actor ON actor.id = ${input.actorUserId}
+            AND actor.account_state = 'ACTIVE'
+          LEFT JOIN LATERAL (
+            SELECT section.payload
+            FROM job_request_active_section_revisions section
+            WHERE section.job_request_id = invitation.job_request_id
+              AND section.section_key = 'request.core'
+              AND section.content_revision <= invitation.request_content_revision
+            ORDER BY section.content_revision DESC LIMIT 1
+          ) core ON true
+          WHERE invitation.id = ${input.invitationId}
+            AND (customer.owner_user_id = actor.id
+              OR craftsman.owner_user_id = actor.id)
+          FOR UPDATE OF invitation, customer, craftsman
+        `;
+        if (context === undefined) return null;
+        const sections = await transaction<InvitationSectionRow[]>`
+          SELECT DISTINCT ON (section.section_key)
+            section.section_key AS "sectionKey",
+            section.section_schema_version AS "sectionSchemaVersion",
+            section.payload
+          FROM job_request_active_section_revisions section
+          WHERE section.job_request_id = ${context.jobRequestId}
+            AND section.content_revision <= ${context.requestContentRevision}
+          ORDER BY section.section_key, section.content_revision DESC
+        `;
+        const provisional = toDetail(context, sections, null);
+        const [distance] = await transaction<
+          Array<{ readonly approximateDistanceKm: number }>
+        >`
+          SELECT round(ST_Distance(
+            origin.centroid::geography, base.centroid::geography
+          ) / 1000.0)::integer AS "approximateDistanceKm"
+          FROM job_invitations invitation
+          JOIN current_craftsman_service_areas area
+            ON area.craftsman_profile_id = invitation.craftsman_profile_id
+          JOIN location_municipalities base
+            ON base.code = area.base_municipality_code AND base.is_active
+          JOIN location_municipalities origin
+            ON origin.code = ${provisional.request.municipalityCode}
+            AND origin.is_active
+          WHERE invitation.id = ${input.invitationId}
+        `;
+        const approximateDistanceKm = distance?.approximateDistanceKm ?? null;
+        if (
+          approximateDistanceKm !== null &&
+          (!Number.isSafeInteger(approximateDistanceKm) ||
+            approximateDistanceKm < 0 ||
+            approximateDistanceKm > 1_000)
+        ) {
+          throw new Error("Corrupt invitation distance fact.");
+        }
+        return Object.freeze({
+          ...provisional,
+          request: Object.freeze({
+            ...provisional.request,
+            approximateDistanceKm,
+          }),
+        });
       });
     },
     respondOwned(input: RespondToJobInvitationInput) {
@@ -614,6 +791,193 @@ function toInvitation(row: InvitationRow): JobInvitation {
     sentAt: row.sentAt,
     state: row.state as JobInvitationState,
   });
+}
+
+function toListItem(row: InvitationListRow): JobInvitationListItem {
+  if (
+    !isUuid(row.id) ||
+    !isUuid(row.jobRequestId) ||
+    !isUuid(row.customerProfileId) ||
+    !JOB_INVITATION_STATES.some((state) => state === row.state) ||
+    (row.perspective !== "CUSTOMER" && row.perspective !== "CRAFTSMAN") ||
+    !(row.changedAt instanceof Date) ||
+    !(row.expiresAt instanceof Date) ||
+    !Number.isSafeInteger(row.revision) ||
+    row.revision < 1
+  ) {
+    throw new Error("Corrupt job invitation list row.");
+  }
+  const counterpartDisplayName =
+    row.perspective === "CUSTOMER"
+      ? safeDisplayName(row.craftsmanDisplayName, "Remeselník")
+      : `Zákazník ${row.customerProfileId.slice(0, 8).toUpperCase()}`;
+  return Object.freeze({
+    changedAt: row.changedAt,
+    counterpartDisplayName,
+    expiresAt: row.expiresAt,
+    id: row.id as JobInvitationId,
+    jobRequestId: row.jobRequestId as JobRequestId,
+    perspective: row.perspective,
+    requestTitle: safeDisplayName(row.requestTitle, "Dopyt"),
+    revision: row.revision,
+    state: row.state as JobInvitationState,
+  });
+}
+
+function toDetail(
+  context: InvitationDetailContextRow,
+  rows: readonly InvitationSectionRow[],
+  approximateDistanceKm: number | null,
+): JobInvitationDetail {
+  if (
+    !Number.isSafeInteger(context.requestContentRevision) ||
+    context.requestContentRevision < 1 ||
+    !Number.isSafeInteger(context.requestVisibleVersion) ||
+    context.requestVisibleVersion < 1
+  ) {
+    throw new Error("Corrupt invitation request-version provenance.");
+  }
+  const sections = new Map<string, JobRequestContentPayload>(
+    rows.map((row) => {
+      if (
+        !JOB_REQUEST_CONTENT_SECTION_KEYS.some((key) => key === row.sectionKey)
+      ) {
+        throw new Error("Corrupt invitation request section key.");
+      }
+      const normalized = normalizeJobRequestContentSection({
+        key: row.sectionKey,
+        payload: row.payload,
+        schemaVersion: row.sectionSchemaVersion,
+      });
+      return [normalized.key, normalized.payload] as const;
+    }),
+  );
+  const core = sections.get("request.core") as
+    JobRequestCoreContent | undefined;
+  const location = sections.get("request.location") as
+    JobRequestLocationContent | undefined;
+  if (
+    core?.description === null ||
+    core === undefined ||
+    core.primaryProfessionCode === null ||
+    location?.municipalityCode === null ||
+    location === undefined
+  ) {
+    throw new Error("Invitation references an invalid request brief.");
+  }
+  const timing = (sections.get("request.timing") ?? {
+    completionDeadline: null,
+    endsOn: null,
+    mode: null,
+    startsOn: null,
+  }) as JobRequestTimingContent;
+  const budget = (sections.get("request.budget") ?? {
+    currency: "EUR",
+    maximumAmountCents: null,
+    minimumAmountCents: null,
+    mode: null,
+  }) as JobRequestBudgetContent;
+  const details = (sections.get("request.details") ?? {
+    approximateQuantity: null,
+    customRequirements: null,
+    materialResponsibility: null,
+    siteInspection: null,
+  }) as JobRequestDetailsContent;
+  const media = (sections.get("request.media") ?? {
+    documentMediaAssetIds: [],
+    photoMediaAssetIds: [],
+  }) as JobRequestMediaContent;
+  const description = preConfirmationText(core.description);
+  return Object.freeze({
+    ...toListItem(context),
+    competitionDisclosure: "CUSTOMER_MAY_CONTACT_OTHERS" as const,
+    customerTrust: Object.freeze({
+      permittedReviewComments: Object.freeze([]),
+      rating: null,
+      reviewCount: 0,
+    }),
+    request: Object.freeze({
+      approximateDistanceKm,
+      budget: Object.freeze({ ...budget }),
+      description:
+        description ??
+        "Podrobnosti sú skryté do potvrdenia pracovného kontextu.",
+      details: Object.freeze({
+        ...details,
+        customRequirements: preConfirmationText(details.customRequirements),
+      }),
+      documentMediaAssetIds: Object.freeze([...media.documentMediaAssetIds]),
+      municipalityCode: location.municipalityCode,
+      photoMediaAssetIds: Object.freeze([...media.photoMediaAssetIds]),
+      primaryProfessionCode: core.primaryProfessionCode,
+      relatedProfessionCodes: Object.freeze([...core.relatedProfessionCodes]),
+      skillCodes: Object.freeze([...core.skillCodes]),
+      specializationCode: core.specializationCode,
+      timing: Object.freeze({ ...timing }),
+      title: preConfirmationText(core.title) ?? "Dopyt",
+    }),
+    requestContentRevision: context.requestContentRevision,
+    requestVisibleVersion: context.requestVisibleVersion,
+  });
+}
+
+function assertReadListInput(input: {
+  readonly actorUserId: UserId;
+  readonly jobRequestId?: JobRequestId;
+  readonly limit: number;
+}): void {
+  if (
+    !isUuid(input.actorUserId) ||
+    (input.jobRequestId !== undefined && !isUuid(input.jobRequestId)) ||
+    !Number.isSafeInteger(input.limit) ||
+    input.limit < 1 ||
+    input.limit > 100
+  ) {
+    throw new TypeError("Invalid job invitation list input.");
+  }
+}
+
+function assertReadDetailInput(input: {
+  readonly actorUserId: UserId;
+  readonly invitationId: JobInvitationId;
+}): void {
+  if (!isUuid(input.actorUserId) || !isUuid(input.invitationId)) {
+    throw new TypeError("Invalid job invitation detail input.");
+  }
+}
+
+function safeDisplayName(value: string | null, fallback: string): string {
+  if (
+    value === null ||
+    value.trim() !== value ||
+    value.length < 1 ||
+    value.length > 200 ||
+    [...value].some((character) => {
+      const codePoint = character.codePointAt(0);
+      return codePoint !== undefined && (codePoint < 32 || codePoint === 127);
+    })
+  ) {
+    return fallback;
+  }
+  return value;
+}
+
+function preConfirmationText(value: string | null): string | null {
+  if (value === null) return null;
+  if (
+    /\b[^\s@]+@[^\s@]+\.[a-z]{2,}\b/iu.test(value) ||
+    /(^|[^0-9])(?:\+|00)?[0-9](?:[\s()./-]*[0-9]){6,}([^0-9]|$)/u.test(value) ||
+    /(?:https?:\/\/|www\.|\b(?:adresa|ulica|ul\.|číslo domu|súpisné číslo)\b)/iu.test(
+      value,
+    ) ||
+    /\b\d{3}\s?\d{2}\b/u.test(value) ||
+    /\b[A-ZÁÄČĎÉÍĹĽŇÓÔŔŠŤÚÝŽ][\p{L}-]{2,}\s+\d{1,4}(?:\/\d{1,4})?\b/u.test(
+      value,
+    )
+  ) {
+    return null;
+  }
+  return value;
 }
 
 function isUuid(value: unknown): value is string {
