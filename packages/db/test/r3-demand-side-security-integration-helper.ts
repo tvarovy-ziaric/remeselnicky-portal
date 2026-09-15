@@ -591,6 +591,15 @@ async function findSecurityLineage(sql: Sql): Promise<{
       AND core.section_key = 'request.core'
     WHERE conversation.access_state = 'WRITABLE'
       AND conversation.invitation_state = 'ENGAGED'
+      AND NOT EXISTS (
+        SELECT 1
+        FROM current_submitted_quotes submitted
+        JOIN quotes submitted_quote ON submitted_quote.id = submitted.quote_id
+        JOIN job_invitations submitted_invitation
+          ON submitted_invitation.id = submitted_quote.invitation_id
+        WHERE submitted_invitation.job_request_id = request.id
+          AND submitted.authoring_mode = 'EXTERNAL_PDF'
+      )
     ORDER BY conversation.created_at DESC, conversation.id DESC
   `;
   for (const source of sources) {
