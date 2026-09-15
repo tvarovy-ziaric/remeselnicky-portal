@@ -6,7 +6,6 @@ import {
   assertConversationReportInput,
   assertConversationTimelineReadInput,
   createConversationChatService,
-  createPreConfirmationConversationMessageAdmission,
   normalizeConversationMessageSendInput,
   type ConversationChatPersistence,
   type ConversationId,
@@ -43,30 +42,10 @@ describe("conversation chat domain", () => {
     },
   );
 
-  it.each([
-    "Napíš na meno@example.sk",
-    "Volaj +421 900 123 456",
-    "PSČ je 811 01",
-    "Adresa: Hlavná 12",
-  ])(
-    "blocks obvious pre-confirmation contact or address text",
-    async (body) => {
-      await expect(
-        createPreConfirmationConversationMessageAdmission().evaluate({ body }),
-      ).resolves.toBe("BLOCK");
-    },
-  );
-
-  it("allows ordinary text and general link handling to remain a UI concern", async () => {
-    await expect(
-      createPreConfirmationConversationMessageAdmission().evaluate({
-        body: "Pozrite si technický list https://example.org/material.pdf",
-      }),
-    ).resolves.toBe("ALLOW");
-  });
-
-  it("does not call persistence when admission blocks the message", async () => {
-    const sendMessage = vi.fn();
+  it("delegates policy and idempotency decisions to authoritative persistence", async () => {
+    const sendMessage = vi
+      .fn()
+      .mockResolvedValue({ status: "BLOCKED_BY_CONTACT_POLICY" });
     const persistence: ConversationChatPersistence = {
       readTimeline: vi.fn(),
       report: vi.fn(),
@@ -74,7 +53,6 @@ describe("conversation chat domain", () => {
       updateParticipantState: vi.fn(),
     };
     const service = createConversationChatService({
-      admission: { evaluate: () => Promise.resolve("BLOCK") },
       persistence,
     });
     await expect(
@@ -85,7 +63,9 @@ describe("conversation chat domain", () => {
         conversationId,
       }),
     ).resolves.toEqual({ status: "BLOCKED_BY_CONTACT_POLICY" });
-    expect(sendMessage).not.toHaveBeenCalled();
+    expect(sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ body: "kontakt" }),
+    );
   });
 
   it("validates read, state and privacy-minimal report inputs", () => {

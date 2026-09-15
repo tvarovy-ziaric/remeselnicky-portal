@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   ConversationChat,
+  ConversationNotice,
+  PRE_CONFIRM_CONTACT_WARNING,
   loadConversationTimeline,
   mutateConversation,
   uploadConversationAttachment,
@@ -127,6 +129,16 @@ describe("conversation chat UI boundary", () => {
         kind: "MESSAGE",
       }),
     ).resolves.toEqual({ status: "CONTACT_BLOCKED" });
+  });
+
+  it("renders the pre-confirm warning accessibly without echoing contact text", () => {
+    const html = renderToStaticMarkup(
+      <ConversationNotice notice={PRE_CONFIRM_CONTACT_WARNING} />,
+    );
+    expect(html).toContain('role="alert"');
+    expect(html).toContain('aria-live="assertive"');
+    expect(html).toContain("Text zostal v poli");
+    expect(html).not.toContain("kontakt@example.sk");
   });
 
   it("sends only category and message id in a report", async () => {

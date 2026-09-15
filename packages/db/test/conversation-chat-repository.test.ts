@@ -134,6 +134,148 @@ describe("conversation chat repository", () => {
     ).rejects.toBeInstanceOf(ConversationChatIdempotencyError);
   });
 
+  it("uses only a server-resolved PRE_CONFIRM stage and retains no blocked command", async () => {
+    const fixture = scriptedSql([
+      [],
+      [{ id: actorUserId }],
+      [{ id: conversationId }],
+      [participant("WRITABLE")],
+      [],
+      [{ stage: "PRE_CONFIRM" }],
+    ]);
+    await expect(
+      createConversationChatRepository(fixture.sql).sendMessage({
+        actorUserId,
+        body: "Napíšte mi na meno@example.sk",
+        commandId,
+        conversationId,
+      }),
+    ).resolves.toEqual({ status: "BLOCKED_BY_CONTACT_POLICY" });
+    expect(fixture.statements).toHaveLength(6);
+    expect(fixture.statements.at(-1)).toContain(
+      "conversation_message_policy_stage",
+    );
+    expect(fixture.statements.join("\n")).not.toContain(
+      "INSERT INTO conversation_message_commands",
+    );
+  });
+
+  it("allows ordinary content at POST_CONFIRM without client-authored policy fields", async () => {
+    const fixture = scriptedSql([
+      [],
+      [{ id: actorUserId }],
+      [{ id: conversationId }],
+      [participant("WRITABLE")],
+      [],
+      [{ stage: "POST_CONFIRM" }],
+      [{ resultingMessageId: messageId }],
+      [],
+      [humanEntry()],
+    ]);
+    await expect(
+      createConversationChatRepository(fixture.sql).sendMessage({
+        actorUserId,
+        body: "Kontakt po potvrdení: meno@example.sk",
+        commandId,
+        conversationId,
+      }),
+    ).resolves.toMatchObject({ status: "SENT" });
+    const insert = fixture.statements.find((statement) =>
+      statement.includes("INSERT INTO conversation_message_commands"),
+    );
+    expect(insert).toBeDefined();
+    expect(insert).not.toMatch(/policy_stage|policy_version/u);
+  });
+
+  it("replays an accepted command before evaluating a newer policy", async () => {
+    const body = "Pôvodne prijatá správa";
+    const fixture = scriptedSql([
+      [],
+      [{ id: actorUserId }],
+      [{ id: conversationId }],
+      [participant("WRITABLE")],
+      [
+        {
+          actorUserId,
+          conversationId,
+          payloadFingerprint: messageFingerprint(body),
+          resultingMessageId: messageId,
+        },
+      ],
+      [humanEntry()],
+    ]);
+    await expect(
+      createConversationChatRepository(fixture.sql).sendMessage({
+        actorUserId,
+        body,
+        commandId,
+        conversationId,
+      }),
+    ).resolves.toMatchObject({ status: "DEDUPLICATED" });
+    expect(fixture.statements.join("\n")).not.toContain(
+      "conversation_message_policy_stage",
+    );
+  });
+
+  it("fails closed when the server policy stage is missing or corrupt", async () => {
+    for (const stage of [null, "UNKNOWN"]) {
+      const fixture = scriptedSql([
+        [],
+        [{ id: actorUserId }],
+        [{ id: conversationId }],
+        [participant("WRITABLE")],
+        [],
+        [{ stage }],
+      ]);
+      await expect(
+        createConversationChatRepository(fixture.sql).sendMessage({
+          actorUserId,
+          body: "Bežná správa",
+          commandId,
+          conversationId,
+        }),
+      ).rejects.toThrow("policy stage unavailable");
+    }
+  });
+
+  it("maps only the fixed database policy rejection to the generic domain result", async () => {
+    const fixture = scriptedSql([
+      [],
+      [{ id: actorUserId }],
+      [{ id: conversationId }],
+      [participant("WRITABLE")],
+      [],
+      [{ stage: "POST_CONFIRM" }],
+      new Error("message blocked by pre-confirmation contact policy"),
+    ]);
+    await expect(
+      createConversationChatRepository(fixture.sql).sendMessage({
+        actorUserId,
+        body: "Bežná správa",
+        commandId,
+        conversationId,
+      }),
+    ).resolves.toEqual({ status: "BLOCKED_BY_CONTACT_POLICY" });
+
+    const unexpected = scriptedSql([
+      [],
+      [{ id: actorUserId }],
+      [{ id: conversationId }],
+      [participant("WRITABLE")],
+      [],
+      [{ stage: "POST_CONFIRM" }],
+      new Error("syntax failure"),
+    ]);
+    await expect(
+      createConversationChatRepository(unexpected.sql).sendMessage({
+        actorUserId,
+        body: "Bežná správa",
+        commandId,
+        conversationId,
+      }),
+    ).rejects.toThrow("syntax failure");
+  });
+
   it("fails closed on a corrupt timeline row", async () => {
     const fixture = scriptedSql([
       [participant("WRITABLE")],
@@ -171,11 +313,27 @@ function humanEntry() {
   };
 }
 
-function scriptedSql(results: unknown[][]) {
+function messageFingerprint(body: string): string {
+  return createHash("sha256")
+    .update(
+      JSON.stringify({
+        actorUserId,
+        body,
+        conversationId,
+        replyToMessageId: null,
+      }),
+    )
+    .digest("hex");
+}
+
+function scriptedSql(results: Array<Error | unknown[]>) {
   const statements: string[] = [];
   const query = ((strings: TemplateStringsArray) => {
     statements.push(strings.join("?"));
-    return Promise.resolve(results.shift() ?? []);
+    const result = results.shift() ?? [];
+    return result instanceof Error
+      ? Promise.reject(result)
+      : Promise.resolve(result);
   }) as unknown as Sql;
   Object.assign(query, {
     begin: (
@@ -188,3 +346,4 @@ function scriptedSql(results: unknown[][]) {
   });
   return { sql: query, statements };
 }
+import { createHash } from "node:crypto";

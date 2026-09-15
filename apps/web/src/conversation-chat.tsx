@@ -45,6 +45,9 @@ type LoadResult =
   | { readonly status: "NOT_FOUND" | "UNAVAILABLE" }
   | { readonly page: ConversationTimelineView; readonly status: "OK" };
 
+export const PRE_CONFIRM_CONTACT_WARNING =
+  "Pred potvrdením zákazky neposielajte telefón, email, sociálny kontakt ani presnú adresu. Text zostal v poli, aby ste ho mohli upraviť.";
+
 export function ConversationChat({
   conversation,
 }: {
@@ -133,7 +136,7 @@ export function ConversationChat({
       } else {
         setNotice(
           response.status === "CONTACT_BLOCKED"
-            ? "Pred potvrdením zákazky neposielajte kontakt ani presnú adresu."
+            ? PRE_CONFIRM_CONTACT_WARNING
             : response.status === "READ_ONLY"
               ? "Konverzácia je už iba na čítanie."
               : "Správu sa nepodarilo odoslať.",
@@ -346,8 +349,20 @@ export function ConversationChat({
             : "Archivovať lokálne"}
         </button>
       </div>
-      {notice === null ? null : <p aria-live="polite">{notice}</p>}
+      <ConversationNotice notice={notice} />
     </section>
+  );
+}
+
+export function ConversationNotice({
+  notice,
+}: {
+  readonly notice: string | null;
+}) {
+  return notice === null ? null : (
+    <p aria-live="assertive" role="alert">
+      {notice}
+    </p>
   );
 }
 

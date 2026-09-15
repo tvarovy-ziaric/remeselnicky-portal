@@ -282,6 +282,8 @@ describe("conversation routes", () => {
     });
     expect(blocked.statusCode).toBe(422);
     expect(blocked.json()).toEqual({ code: "CONTACT_SHARING_NOT_AVAILABLE" });
+    expect(blocked.body).not.toContain("kontakt@example.sk");
+    expect(Object.keys(blocked.json())).toEqual(["code"]);
 
     fixture.sendMessage.mockResolvedValueOnce({ status: "READ_ONLY" });
     const readOnly = await app.inject({

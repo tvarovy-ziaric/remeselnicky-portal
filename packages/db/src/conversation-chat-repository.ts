@@ -5,6 +5,7 @@ import {
   CONVERSATION_MESSAGE_MAX_ATTACHMENTS,
   CONVERSATION_MESSAGE_MAX_IMAGE_ATTACHMENTS,
   ConversationChatIdempotencyError,
+  evaluateConversationMessagePolicy,
   assertConversationParticipantStateInput,
   assertConversationReportInput,
   assertConversationTimelineReadInput,
@@ -69,6 +70,10 @@ interface MessageCommandRow {
   readonly resultingMessageId: string;
 }
 
+interface MessagePolicyRow {
+  readonly stage: string | null;
+}
+
 interface StateCommandRow {
   readonly actorUserId: string;
   readonly conversationId: string;
@@ -100,9 +105,16 @@ export function createConversationChatRepository(
     },
     sendMessage(input: ConversationMessageSendInput) {
       const normalized = normalizeConversationMessageSendInput(input);
-      return sql.begin(async (transaction) =>
-        sendMessage(transaction, normalized),
-      );
+      return sql
+        .begin(async (transaction) => sendMessage(transaction, normalized))
+        .catch((error: unknown) => {
+          if (isDatabasePolicyBlock(error)) {
+            return Object.freeze({
+              status: "BLOCKED_BY_CONTACT_POLICY" as const,
+            });
+          }
+          throw error;
+        });
     },
     updateParticipantState(input: ConversationParticipantStateInput) {
       assertConversationParticipantStateInput(input);
@@ -230,6 +242,23 @@ async function sendMessage(
   if (participant.access !== "WRITABLE") {
     return Object.freeze({ status: "READ_ONLY" });
   }
+  const [policy] = await transaction<MessagePolicyRow[]>`
+    SELECT conversation_message_policy_stage(${input.conversationId}) AS stage
+  `;
+  if (
+    policy === undefined ||
+    (policy.stage !== "PRE_CONFIRM" && policy.stage !== "POST_CONFIRM")
+  ) {
+    throw new Error("Conversation message policy stage unavailable.");
+  }
+  if (
+    evaluateConversationMessagePolicy({
+      body: input.body,
+      stage: policy.stage,
+    }).status === "BLOCK"
+  ) {
+    return Object.freeze({ status: "BLOCKED_BY_CONTACT_POLICY" });
+  }
   const [command] = await transaction<
     Array<{ readonly resultingMessageId: string }>
   >`
@@ -262,6 +291,16 @@ async function sendMessage(
     participant.counterpartUserId,
   );
   return Object.freeze({ entry, status: "SENT" });
+}
+
+function isDatabasePolicyBlock(error: unknown): boolean {
+  return (
+    error !== null &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof error.message === "string" &&
+    error.message.includes("message blocked by pre-confirmation contact policy")
+  );
 }
 
 async function updateParticipantState(

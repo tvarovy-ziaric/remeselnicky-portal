@@ -62,6 +62,7 @@ import {
   runConversationChatReadOnlyIntegrationAssertions,
 } from "./conversation-chat-integration-helper.js";
 import { runConversationAttachmentIntegrationAssertions } from "./conversation-attachment-integration-helper.js";
+import { runConversationMessagePolicyIntegrationAssertions } from "./conversation-message-policy-integration-helper.js";
 
 const testDatabaseUrl = process.env["TEST_DATABASE_URL"];
 const migrationsDirectory = fileURLToPath(
@@ -134,6 +135,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
           "0044_conversation_entity.sql",
           "0045_conversation_chat.sql",
           "0046_conversation_attachments.sql",
+          "0047_conversation_preconfirm_policy.sql",
         ],
         alreadyApplied: 0,
       });
@@ -142,7 +144,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         testDatabaseUrl,
         migrationsDirectory,
       );
-      expect(secondRun).toEqual({ applied: [], alreadyApplied: 47 });
+      expect(secondRun).toEqual({ applied: [], alreadyApplied: 48 });
 
       const sql = postgres(testDatabaseUrl, { max: 5 });
       try {
@@ -1734,6 +1736,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         await runJobInvitationNotificationIntegrationAssertions(sql);
         await runConversationIntegrationAssertions(sql);
         await runConversationChatIntegrationAssertions(sql);
+        await runConversationMessagePolicyIntegrationAssertions(sql);
         await runConversationAttachmentIntegrationAssertions(sql);
         await runJobRequestLifecycleIntegrationAssertions(sql);
         await runConversationReadOnlyIntegrationAssertions(sql);

@@ -4,7 +4,6 @@ import {
   createCustomerProfileService,
   createCustomerShortlistService,
   createConversationChatService,
-  createPreConfirmationConversationMessageAdmission,
   createJobRequestDraftService,
   createJobRequestService,
   createJobRequestLifecycleService,
@@ -89,7 +88,6 @@ const publicDiscoveryAdmission = createDatabasePublicSearchAdmission({
   timeWindowMs: config.auth.rateLimitWindowMs,
 });
 const conversationChat = createConversationChatService({
-  admission: createPreConfirmationConversationMessageAdmission(),
   persistence: database.conversationChat,
 });
 const conversationWriteAdmission = createDatabaseConversationWriteAdmission({

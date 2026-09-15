@@ -114,7 +114,9 @@ export type ConversationMessageSendResult = Readonly<
       readonly entry: ConversationTimelineEntry;
       readonly status: "DEDUPLICATED" | "SENT";
     }
-  | { readonly status: "NOT_FOUND" | "READ_ONLY" }
+  | {
+      readonly status: "BLOCKED_BY_CONTACT_POLICY" | "NOT_FOUND" | "READ_ONLY";
+    }
 >;
 
 export type ConversationParticipantStateResult = Readonly<
@@ -146,18 +148,11 @@ export interface ConversationChatPersistence {
   ): Promise<ConversationParticipantStateResult>;
 }
 
-export interface ConversationMessageAdmission {
-  evaluate(input: Readonly<{ body: string }>): Promise<"ALLOW" | "BLOCK">;
-}
-
 export interface ConversationChatService {
   report(input: ConversationReportInput): Promise<ConversationReportResult>;
   sendMessage(
     input: ConversationMessageSendInput,
-  ): Promise<
-    | ConversationMessageSendResult
-    | Readonly<{ status: "BLOCKED_BY_CONTACT_POLICY" }>
-  >;
+  ): Promise<ConversationMessageSendResult>;
   updateParticipantState(
     input: ConversationParticipantStateInput,
   ): Promise<ConversationParticipantStateResult>;
@@ -168,7 +163,6 @@ export class ConversationChatIdempotencyError extends Error {
 }
 
 export function createConversationChatService(input: {
-  readonly admission: ConversationMessageAdmission;
   readonly persistence: ConversationChatPersistence;
 }): ConversationChatService {
   return Object.freeze({
@@ -178,35 +172,11 @@ export function createConversationChatService(input: {
     },
     async sendMessage(command: ConversationMessageSendInput) {
       const normalized = normalizeConversationMessageSendInput(command);
-      if (
-        (await input.admission.evaluate({ body: normalized.body })) !== "ALLOW"
-      ) {
-        return Object.freeze({ status: "BLOCKED_BY_CONTACT_POLICY" as const });
-      }
       return input.persistence.sendMessage(normalized);
     },
     updateParticipantState(command: ConversationParticipantStateInput) {
       assertConversationParticipantStateInput(command);
       return input.persistence.updateParticipantState(command);
-    },
-  });
-}
-
-/**
- * Conservative pre-confirmation baseline. R3-014 replaces this with the full
- * confirmed-Job-aware policy, but obvious contact/address disclosure is never
- * temporarily opened while that richer policy is unfinished.
- */
-export function createPreConfirmationConversationMessageAdmission(): ConversationMessageAdmission {
-  return Object.freeze({
-    evaluate({ body }: Readonly<{ body: string }>) {
-      const blocked = [
-        /[\p{L}\d._%+-]+@[\p{L}\d.-]+\.[\p{L}]{2,}/iu,
-        /(?:\+|00)?\d(?:[\s()./-]*\d){6,}/u,
-        /(?:psč|psc)[^\n\d]{0,12}\d{3}\s?\d{2}/iu,
-        /(?:\b(?:adresa|ulica|námestie|trieda|číslo domu|číslo bytu)\b|\b(?:ul|nám)\.)/iu,
-      ].some((pattern) => pattern.test(body));
-      return Promise.resolve(blocked ? ("BLOCK" as const) : ("ALLOW" as const));
     },
   });
 }
