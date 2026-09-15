@@ -24,6 +24,8 @@ export interface InvitationDetailView {
     readonly rating: number | null;
     readonly reviewCount: number;
   };
+  readonly displayedRequestContentRevision: number;
+  readonly displayedRequestVisibleVersion: number;
   readonly expiresAt: string;
   readonly id: string;
   readonly jobRequestId: string;
@@ -89,20 +91,27 @@ export type InvitationActionResult =
 
 export function JobInvitationDetail({
   invitationId,
+  requestContentRevision,
 }: {
   readonly invitationId: string;
+  readonly requestContentRevision?: number;
 }) {
   const [result, setResult] = useState<InvitationLoadResult | null>(null);
   const [pending, setPending] = useState(false);
   useEffect(() => {
     let active = true;
-    void loadJobInvitationDetail({ invitationId }).then((loaded) => {
+    void loadJobInvitationDetail({
+      invitationId,
+      ...(requestContentRevision === undefined
+        ? {}
+        : { requestContentRevision }),
+    }).then((loaded) => {
       if (active) setResult(loaded);
     });
     return () => {
       active = false;
     };
-  }, [invitationId]);
+  }, [invitationId, requestContentRevision]);
 
   if (result === null) return <p aria-live="polite">Načítavam pozvanie…</p>;
   if (result.status !== "OK")
@@ -152,6 +161,13 @@ export function JobInvitationDetail({
           {invitation.counterpartDisplayName} · {stateLabel(invitation.state)}
         </p>
       </header>
+      {invitation.displayedRequestContentRevision ===
+      invitation.requestContentRevision ? null : (
+        <p role="status">
+          Zobrazuje sa aktualizovaná verzia dopytu č.{" "}
+          {invitation.displayedRequestVisibleVersion}.
+        </p>
+      )}
       <section aria-labelledby="invitation-description">
         <h2 id="invitation-description">Čo zákazník potrebuje</h2>
         <p>{invitation.request.description}</p>
@@ -221,13 +237,25 @@ export function conversationHrefForState(
 export async function loadJobInvitationDetail(input: {
   readonly fetch?: typeof fetch;
   readonly invitationId: string;
+  readonly requestContentRevision?: number;
 }): Promise<InvitationLoadResult> {
-  if (!uuid(input.invitationId)) return { status: "NOT_FOUND" };
+  if (
+    !uuid(input.invitationId) ||
+    (input.requestContentRevision !== undefined &&
+      (!Number.isSafeInteger(input.requestContentRevision) ||
+        input.requestContentRevision < 1))
+  ) {
+    return { status: "NOT_FOUND" };
+  }
+  const path =
+    input.requestContentRevision === undefined
+      ? `/v1/me/invitations/${encodeURIComponent(input.invitationId)}`
+      : `/v1/me/invitations/${encodeURIComponent(input.invitationId)}/versions/${input.requestContentRevision}`;
   try {
-    const response = await (input.fetch ?? fetch)(
-      `/v1/me/invitations/${encodeURIComponent(input.invitationId)}`,
-      { cache: "no-store", credentials: "same-origin" },
-    );
+    const response = await (input.fetch ?? fetch)(path, {
+      cache: "no-store",
+      credentials: "same-origin",
+    });
     if (response.status === 401) return { status: "AUTH_REQUIRED" };
     if (response.status === 403) return { status: "ACCOUNT_INACTIVE" };
     if (response.status === 404) return { status: "NOT_FOUND" };
@@ -336,6 +364,8 @@ function parseInvitation(value: unknown): InvitationDetailView | null {
       "competitionDisclosure",
       "counterpartDisplayName",
       "customerTrust",
+      "displayedRequestContentRevision",
+      "displayedRequestVisibleVersion",
       "expiresAt",
       "id",
       "jobRequestId",
@@ -404,6 +434,10 @@ function parseInvitation(value: unknown): InvitationDetailView | null {
     typeof value["counterpartDisplayName"] !== "string" ||
     typeof value["expiresAt"] !== "string" ||
     !Number.isSafeInteger(value["revision"]) ||
+    !Number.isSafeInteger(value["displayedRequestContentRevision"]) ||
+    (value["displayedRequestContentRevision"] as number) < 1 ||
+    !Number.isSafeInteger(value["displayedRequestVisibleVersion"]) ||
+    (value["displayedRequestVisibleVersion"] as number) < 1 ||
     typeof request["description"] !== "string" ||
     typeof request["municipalityCode"] !== "string" ||
     typeof request["primaryProfessionCode"] !== "string" ||

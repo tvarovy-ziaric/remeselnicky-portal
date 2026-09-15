@@ -6,19 +6,33 @@ import { createJobInvitationReminderRepository } from "../src/job-invitation-not
 
 describe("job invitation notification persistence", () => {
   it("captures send and expiry events in the invitation transaction", async () => {
-    const migration = await readFile(
+    const originalMigration = await readFile(
       new URL(
         "../migrations/0043_job_invitation_notifications.sql",
         import.meta.url,
       ),
       "utf8",
     );
-    expect(migration).toContain("AFTER INSERT ON job_invitation_revisions");
-    expect(migration).toContain("job_invitation.sent");
-    expect(migration).toContain("job_invitation.expired");
-    expect(migration).toContain("ON CONFLICT (idempotency_key) DO NOTHING");
-    expect(migration).not.toMatch(
-      /email|phone|exact_address|description|decline_note/iu,
+    const hardeningMigration = await readFile(
+      new URL(
+        "../migrations/0052_demand_side_notifications.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+    expect(originalMigration).toContain(
+      "AFTER INSERT ON job_invitation_revisions",
+    );
+    expect(hardeningMigration).toContain(
+      "CREATE OR REPLACE FUNCTION capture_job_invitation_notification_event",
+    );
+    expect(hardeningMigration).toContain("job_invitation.sent");
+    expect(hardeningMigration).toContain("job_invitation.expired");
+    expect(hardeningMigration).toContain(
+      "notification outbox idempotency key collision",
+    );
+    expect(`${originalMigration}\n${hardeningMigration}`).not.toMatch(
+      /email_address|phone_number|exact_address|description|decline_note/iu,
     );
   });
 
@@ -40,6 +54,7 @@ describe("job invitation notification persistence", () => {
     expect(query).toContain("warning_lead_days");
     expect(query).toContain("current.state = 'PENDING'");
     expect(query).toContain("FOR UPDATE OF invitation SKIP LOCKED");
-    expect(query).toContain("ON CONFLICT (idempotency_key) DO NOTHING");
+    expect(query).toContain("insert_exact_invitation_reminder_outbox_event");
+    expect(query).toContain("candidate.database_now");
   });
 });

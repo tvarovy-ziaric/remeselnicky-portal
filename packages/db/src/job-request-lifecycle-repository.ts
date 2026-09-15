@@ -65,27 +65,55 @@ export function createJobRequestLifecycleRepository(
       return duplicateOwned(sql, input);
     },
     async expireInactive(): Promise<readonly JobRequestId[]> {
-      return sql.begin(async (transaction) => {
-        const candidates = await transaction<
-          Array<{
-            readonly customerProfileId: CustomerProfileId;
-            readonly id: JobRequestId;
-            readonly revision: number;
-          }>
-        >`
+      const candidates = await sql.begin(
+        (transaction) =>
+          transaction<
+            Array<{
+              readonly customerProfileId: CustomerProfileId;
+              readonly id: JobRequestId;
+              readonly revision: number;
+            }>
+          >`
           SELECT status.job_request_id AS id,
             status.customer_profile_id AS "customerProfileId",
             status.revision
           FROM current_job_request_operational_status status
-          JOIN customer_profiles customer
-            ON customer.id = status.customer_profile_id
           WHERE status.state::text = 'ACTIVE'
             AND status.expires_at <= clock_timestamp()
           ORDER BY status.expires_at, status.job_request_id
-          LIMIT 100 FOR UPDATE OF customer SKIP LOCKED
-        `;
-        const expired: JobRequestId[] = [];
-        for (const candidate of candidates) {
+          LIMIT 100
+        `,
+      );
+      const expired: JobRequestId[] = [];
+      for (const candidate of candidates) {
+        const applied = await sql.begin(async (transaction) => {
+          await lockNotificationRequest(transaction, candidate.id);
+          if (
+            !(await lockExpiryCustomer(
+              transaction,
+              candidate.customerProfileId,
+            ))
+          ) {
+            return false;
+          }
+          if (
+            !(await lockOwnedRequest(
+              transaction,
+              candidate.id,
+              candidate.customerProfileId,
+            ))
+          ) {
+            return false;
+          }
+          const current = await selectCurrent(transaction, candidate.id);
+          if (
+            current === null ||
+            current.state !== "ACTIVE" ||
+            current.revision !== candidate.revision ||
+            !(await requestDeadlineIsDue(transaction, candidate.id))
+          ) {
+            return false;
+          }
           const commandId = randomUUID();
           const fingerprint = commandFingerprint("EXPIRE", {
             actorUserId: null,
@@ -111,10 +139,11 @@ export function createJobRequestLifecycleRepository(
             revision: candidate.revision + 1,
             state: "EXPIRED",
           });
-          expired.push(candidate.id);
-        }
-        return Object.freeze(expired);
-      });
+          return true;
+        });
+        if (applied) expired.push(candidate.id);
+      }
+      return Object.freeze(expired);
     },
     extendOwned(input: JobRequestLifecycleCommandInput) {
       assertJobRequestLifecycleCommandInput(input);
@@ -289,6 +318,7 @@ async function executeOwned(
   cancellationReason: JobRequestCancellationReason | null,
 ): Promise<JobRequestLifecycleCommandResult> {
   return sql.begin(async (transaction) => {
+    await lockNotificationRequest(transaction, input.jobRequestId);
     const customerProfileId = await lockActiveActorCustomer(
       transaction,
       input.actorUserId,
@@ -418,6 +448,42 @@ async function lockOwnedRequest(
     FOR UPDATE
   `;
   return rows.length === 1;
+}
+
+async function lockNotificationRequest(
+  sql: TransactionSql,
+  jobRequestId: JobRequestId,
+): Promise<void> {
+  await sql`
+    SELECT pg_advisory_xact_lock(
+      hashtextextended(${jobRequestId}::text, 41007)
+    )
+  `;
+}
+
+async function lockExpiryCustomer(
+  sql: TransactionSql,
+  customerProfileId: CustomerProfileId,
+): Promise<boolean> {
+  const rows = await sql`
+    SELECT id FROM customer_profiles
+    WHERE id = ${customerProfileId}
+    FOR UPDATE
+  `;
+  return rows.length === 1;
+}
+
+async function requestDeadlineIsDue(
+  sql: TransactionSql,
+  jobRequestId: JobRequestId,
+): Promise<boolean> {
+  const [row] = await sql<{ readonly due: boolean }[]>`
+    SELECT current.state::text = 'ACTIVE'
+      AND current.expires_at <= clock_timestamp() AS due
+    FROM current_job_requests current
+    WHERE current.id = ${jobRequestId}
+  `;
+  return row?.due === true;
 }
 
 async function lockCommand(sql: TransactionSql, commandId: string) {

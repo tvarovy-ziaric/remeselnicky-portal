@@ -111,6 +111,8 @@ export interface JobInvitationDetail extends JobInvitationListItem {
     readonly reviewCount: number;
   }>;
   readonly request: JobInvitationRequestBrief;
+  readonly displayedRequestContentRevision: number;
+  readonly displayedRequestVisibleVersion: number;
   readonly requestContentRevision: number;
   readonly requestVisibleVersion: number;
 }
@@ -172,6 +174,7 @@ export interface JobInvitationPersistence {
   readOwned(input: {
     readonly actorUserId: UserId;
     readonly invitationId: JobInvitationId;
+    readonly requestContentRevision?: number;
   }): Promise<JobInvitationDetail | null>;
   respondOwned(
     input: RespondToJobInvitationInput,

@@ -107,6 +107,7 @@ export function createJobRequestVersionRepository(
         throw new TypeError("Invalid expectedContentRevision.");
       }
       return sql.begin(async (transaction) => {
+        await lockNotificationRequest(transaction, input.jobRequestId);
         const customerProfileId = await lockActiveActorCustomer(
           transaction,
           input.actorUserId,
@@ -240,6 +241,17 @@ async function lockActiveActorCustomer(
   return row === undefined
     ? null
     : (row.customerProfileId as CustomerProfileId);
+}
+
+async function lockNotificationRequest(
+  sql: TransactionSql,
+  jobRequestId: JobRequestId,
+): Promise<void> {
+  await sql`
+    SELECT pg_advisory_xact_lock(
+      hashtextextended(${jobRequestId}::text, 41007)
+    )
+  `;
 }
 
 async function lockOwnedActiveRequest(

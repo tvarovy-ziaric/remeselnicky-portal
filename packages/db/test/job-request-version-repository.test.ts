@@ -23,6 +23,7 @@ describe("active job request version repository", () => {
     const previous = core({ description: "Oprava strechy" });
     const next = core({ description: "Výmena celej strechy" });
     const harness = transactionHarness([
+      [],
       [{ customerProfileId: customer }],
       [],
       [],
@@ -67,6 +68,7 @@ describe("active job request version repository", () => {
   it("keeps a title-only edit within the same visible version", async () => {
     const previous = core({ title: "Strecha" });
     const harness = transactionHarness([
+      [],
       [{ customerProfileId: customer }],
       [],
       [],
@@ -96,6 +98,7 @@ describe("active job request version repository", () => {
   it("durably records unchanged intent without revision effects", async () => {
     const section = core({ description: "Oprava strechy" });
     const harness = transactionHarness([
+      [],
       [{ customerProfileId: customer }],
       [],
       [],
@@ -122,6 +125,7 @@ describe("active job request version repository", () => {
 
   it("returns the authoritative revision on a stale competing command", async () => {
     const harness = transactionHarness([
+      [],
       [{ customerProfileId: customer }],
       [],
       [],
@@ -145,6 +149,7 @@ describe("active job request version repository", () => {
   it("reauthorizes before replay and rejects command collisions", async () => {
     const section = core();
     const harness = transactionHarness([
+      [],
       [{ customerProfileId: customer }],
       [],
       [
@@ -170,7 +175,8 @@ describe("active job request version repository", () => {
         section,
       }),
     ).rejects.toBeInstanceOf(JobRequestVersionIdempotencyError);
-    expect(harness.statements[0]).toMatch(/account_state = 'ACTIVE'/u);
+    expect(harness.statements[0]).toContain("41007");
+    expect(harness.statements[1]).toMatch(/account_state = 'ACTIVE'/u);
   });
 
   it("reads an exact historical snapshot under the owner lock", async () => {

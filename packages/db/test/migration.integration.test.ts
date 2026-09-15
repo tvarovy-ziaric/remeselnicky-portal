@@ -68,6 +68,7 @@ import { runStructuredQuoteIntegrationAssertions } from "./quote-structured-inte
 import { runExternalPdfQuoteIntegrationAssertions } from "./quote-external-pdf-integration-helper.js";
 import { runQuoteComparisonIntegrationAssertions } from "./quote-comparison-integration-helper.js";
 import { runQuoteLifecycleIntegrationAssertions } from "./quote-lifecycle-integration-helper.js";
+import { runDemandSideNotificationIntegrationAssertions } from "./demand-side-notification-integration-helper.js";
 
 const testDatabaseUrl = process.env["TEST_DATABASE_URL"];
 const migrationsDirectory = fileURLToPath(
@@ -145,6 +146,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
           "0049_quote_platform_structured.sql",
           "0050_quote_external_pdf.sql",
           "0051_quote_lifecycle.sql",
+          "0052_demand_side_notifications.sql",
         ],
         alreadyApplied: 0,
       });
@@ -153,7 +155,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         testDatabaseUrl,
         migrationsDirectory,
       );
-      expect(secondRun).toEqual({ applied: [], alreadyApplied: 52 });
+      expect(secondRun).toEqual({ applied: [], alreadyApplied: 53 });
 
       const sql = postgres(testDatabaseUrl, { max: 5 });
       try {
@@ -199,7 +201,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         `;
 
         expect(postgis?.extversion).toMatch(/^3\./);
-        expect(ledger?.count).toBe(52);
+        expect(ledger?.count).toBe(53);
         expect(created).toMatchObject({ account_state: "ACTIVE" });
         expect(created?.id).toMatch(
           /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
@@ -1755,6 +1757,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         );
         await runExternalPdfQuoteIntegrationAssertions(sql);
         await runQuoteLifecycleIntegrationAssertions(sql);
+        await runDemandSideNotificationIntegrationAssertions(sql);
         await runJobRequestLifecycleIntegrationAssertions(sql);
         await runConversationReadOnlyIntegrationAssertions(sql);
         await runConversationChatReadOnlyIntegrationAssertions(sql);

@@ -6,6 +6,7 @@ import { createInvitationNotificationProcessor } from "./notification-delivery.j
 describe("invitation notification processor", () => {
   it("schedules reminders before expiry and drains the durable outbox", async () => {
     const enqueueDueReminders = vi.fn(() => Promise.resolve([]));
+    const enqueueDueUnreadChatEmails = vi.fn(() => Promise.resolve(0));
     const expirePending = vi.fn(() => Promise.resolve([]));
     const expireDueSubmitted = vi.fn(() => Promise.resolve([]));
     const results: Awaited<ReturnType<OutboxWorker["processNext"]>>[] = [
@@ -17,6 +18,7 @@ describe("invitation notification processor", () => {
     );
     let currentTime = 1_000;
     const processor = createInvitationNotificationProcessor({
+      demandSideNotifications: { enqueueDueUnreadChatEmails },
       invitations: { expirePending },
       maintenanceIntervalMs: 60_000,
       now: () => currentTime,
@@ -31,6 +33,7 @@ describe("invitation notification processor", () => {
     currentTime += 1_000;
     await expect(processor.processNext()).resolves.toEqual({ status: "idle" });
     expect(enqueueDueReminders).toHaveBeenCalledTimes(1);
+    expect(enqueueDueUnreadChatEmails).toHaveBeenCalledTimes(1);
     expect(expirePending).toHaveBeenCalledTimes(1);
     expect(expireDueSubmitted).toHaveBeenCalledTimes(1);
     expect(processNext).toHaveBeenCalledTimes(2);
@@ -42,12 +45,14 @@ describe("invitation notification processor", () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("DATABASE_UNAVAILABLE"));
     const expirePending = vi.fn(() => Promise.resolve([]));
+    const enqueueDueUnreadChatEmails = vi.fn(() => Promise.resolve(0));
     const expireDueSubmitted = vi.fn(() => Promise.resolve([]));
     const processNext = vi.fn<OutboxWorker["processNext"]>(() =>
       Promise.resolve({ status: "IDLE" }),
     );
     let currentTime = 1;
     const processor = createInvitationNotificationProcessor({
+      demandSideNotifications: { enqueueDueUnreadChatEmails },
       invitations: { expirePending },
       maintenanceIntervalMs: 10,
       now: () => currentTime,

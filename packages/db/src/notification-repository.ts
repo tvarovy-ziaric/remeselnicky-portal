@@ -84,6 +84,11 @@ interface IdentifierRow {
   readonly id: string;
 }
 
+interface DeliveryChannelSetRow {
+  readonly emailKey: string | null;
+  readonly pushKey: string | null;
+}
+
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const eventKeyPattern = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$/u;
@@ -141,6 +146,7 @@ export function createNotificationRepository(sql: Sql): NotificationRepository {
         `;
 
         let notification = created;
+        const replay = notification === undefined;
         if (notification === undefined) {
           [notification] = await transaction<NotificationRow[]>`
             SELECT
@@ -162,10 +168,43 @@ export function createNotificationRepository(sql: Sql): NotificationRepository {
             WHERE domain_event_id = ${input.domainEventId}
               AND recipient_user_id = ${input.recipientUserId}
               AND type = ${input.type}
+              AND event_idempotency_key = ${input.eventIdempotencyKey}
+              AND entity_type = ${input.context.entityType}
+              AND entity_id = ${input.context.entityId}
+              AND entity_revision IS NOT DISTINCT FROM ${input.context.entityRevision ?? null}
+              AND deep_link_path = ${input.context.path}
+              AND priority = ${input.priority}
+              AND payload = ${transaction.json(input.payload)}
           `;
         }
         if (notification === undefined) {
-          throw new Error("Notification was not created or found.");
+          throw new Error("Notification idempotency intent collision.");
+        }
+        if (replay) {
+          const [existingChannels] = await transaction<DeliveryChannelSetRow[]>`
+            SELECT
+              max(delivery.idempotency_key) FILTER (
+                WHERE delivery.channel = 'EMAIL'
+              ) AS "emailKey",
+              max(delivery.idempotency_key) FILTER (
+                WHERE delivery.channel = 'PUSH'
+              ) AS "pushKey"
+            FROM notification_deliveries delivery
+            WHERE delivery.notification_id = ${notification.id}
+          `;
+          const expectedEmailKey = input.channels.includes("EMAIL")
+            ? deliveryIdempotencyKey(input, "EMAIL")
+            : null;
+          const expectedPushKey = input.channels.includes("PUSH")
+            ? deliveryIdempotencyKey(input, "PUSH")
+            : null;
+          if (
+            existingChannels === undefined ||
+            existingChannels.emailKey !== expectedEmailKey ||
+            existingChannels.pushKey !== expectedPushKey
+          ) {
+            throw new Error("Notification channel intent collision.");
+          }
         }
 
         for (const channel of input.channels) {

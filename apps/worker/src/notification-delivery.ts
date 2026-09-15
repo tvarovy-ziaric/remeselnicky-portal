@@ -2,7 +2,10 @@ import type {
   JobInvitationPersistence,
   QuoteLifecycleMaintenancePersistence,
 } from "@portal/domain";
-import type { JobInvitationReminderStore } from "@portal/notifications";
+import type {
+  DemandSideNotificationMaintenanceStore,
+  JobInvitationReminderStore,
+} from "@portal/notifications";
 import type { OutboxWorker } from "@portal/outbox";
 
 import type { WorkerLoopProcessor } from "./service.js";
@@ -15,6 +18,7 @@ export const INVITATION_MAINTENANCE_INTERVAL_MS = 60_000;
  * provider adapter is configured.
  */
 export function createInvitationNotificationProcessor(input: {
+  readonly demandSideNotifications: DemandSideNotificationMaintenanceStore;
   readonly invitations: Pick<JobInvitationPersistence, "expirePending">;
   readonly maintenanceIntervalMs?: number;
   readonly now?: () => number;
@@ -38,6 +42,7 @@ export function createInvitationNotificationProcessor(input: {
       }
       if (currentTime >= nextMaintenanceAt) {
         await input.reminders.enqueueDueReminders();
+        await input.demandSideNotifications.enqueueDueUnreadChatEmails();
         await input.invitations.expirePending();
         await input.quotes.expireDueSubmitted();
         nextMaintenanceAt = currentTime + interval;

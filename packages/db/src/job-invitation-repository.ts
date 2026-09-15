@@ -111,23 +111,41 @@ export function createJobInvitationRepository(
       );
     },
     async expirePending(): Promise<readonly JobInvitationId[]> {
-      return sql.begin(async (transaction) => {
-        const candidates = await transaction<
-          Array<{
-            readonly id: JobInvitationId;
-            readonly revision: number;
-          }>
-        >`
-          SELECT current.id, current.revision
+      const candidates = await sql.begin(
+        (transaction) =>
+          transaction<
+            Array<{
+              readonly id: JobInvitationId;
+              readonly jobRequestId: JobRequestId;
+              readonly revision: number;
+            }>
+          >`
+          SELECT current.id, current.revision,
+            identity.job_request_id AS "jobRequestId"
           FROM current_job_invitations current
           JOIN job_invitations identity ON identity.id = current.id
           WHERE current.state = 'PENDING'
             AND current.expires_at <= clock_timestamp()
           ORDER BY current.expires_at, current.id
-          LIMIT 100 FOR UPDATE OF identity SKIP LOCKED
-        `;
-        const expired: JobInvitationId[] = [];
-        for (const candidate of candidates) {
+          LIMIT 100
+        `,
+      );
+      const expired: JobInvitationId[] = [];
+      for (const candidate of candidates) {
+        const applied = await sql.begin(async (transaction) => {
+          await lockNotificationRequest(transaction, candidate.jobRequestId);
+          const context = await lockInvitationContext(
+            transaction,
+            candidate.id,
+          );
+          if (
+            context === null ||
+            context.state !== "PENDING" ||
+            context.revision !== candidate.revision ||
+            context.expiresAt.valueOf() > context.databaseNow.valueOf()
+          ) {
+            return false;
+          }
           const commandId = randomUUID();
           const fingerprint = commandFingerprint("EXPIRE", {
             actorUserId: null,
@@ -154,10 +172,11 @@ export function createJobInvitationRepository(
             revision: candidate.revision + 1,
             state: "EXPIRED",
           });
-          expired.push(candidate.id);
-        }
-        return Object.freeze(expired);
-      });
+          return true;
+        });
+        if (applied) expired.push(candidate.id);
+      }
+      return Object.freeze(expired);
     },
     async listOwned(input: {
       readonly actorUserId: UserId;
@@ -208,6 +227,7 @@ export function createJobInvitationRepository(
     async readOwned(input: {
       readonly actorUserId: UserId;
       readonly invitationId: JobInvitationId;
+      readonly requestContentRevision?: number;
     }): Promise<JobInvitationDetail | null> {
       assertReadDetailInput(input);
       return sql.begin(async (transaction) => {
@@ -256,6 +276,40 @@ export function createJobInvitationRepository(
           FOR UPDATE OF invitation, customer, craftsman
         `;
         if (context === undefined) return null;
+        let displayedContentRevision = context.requestContentRevision;
+        let displayedVisibleVersion = context.requestVisibleVersion;
+        if (input.requestContentRevision !== undefined) {
+          const [version] = await transaction<
+            Array<{ readonly visibleVersion: number }>
+          >`
+            SELECT visible_version AS "visibleVersion"
+            FROM job_request_active_content_revisions
+            WHERE job_request_id = ${context.jobRequestId}
+              AND content_revision = ${input.requestContentRevision}
+              AND (
+                ${context.perspective === "CUSTOMER"}
+                OR content_revision = ${context.requestContentRevision}
+                OR EXISTS (
+                  SELECT 1
+                  FROM job_request_material_update_entitlements entitlement
+                  WHERE entitlement.job_request_id = ${context.jobRequestId}
+                    AND entitlement.invitation_id = ${input.invitationId}
+                    AND entitlement.recipient_user_id = ${input.actorUserId}
+                    AND entitlement.request_content_revision
+                      = ${input.requestContentRevision}
+                )
+              )
+          `;
+          if (
+            version === undefined ||
+            !Number.isSafeInteger(version.visibleVersion) ||
+            version.visibleVersion < 1
+          ) {
+            return null;
+          }
+          displayedContentRevision = input.requestContentRevision;
+          displayedVisibleVersion = version.visibleVersion;
+        }
         const sections = await transaction<InvitationSectionRow[]>`
           SELECT DISTINCT ON (section.section_key)
             section.section_key AS "sectionKey",
@@ -263,10 +317,16 @@ export function createJobInvitationRepository(
             section.payload
           FROM job_request_active_section_revisions section
           WHERE section.job_request_id = ${context.jobRequestId}
-            AND section.content_revision <= ${context.requestContentRevision}
+            AND section.content_revision <= ${displayedContentRevision}
           ORDER BY section.section_key, section.content_revision DESC
         `;
-        const provisional = toDetail(context, sections, null);
+        const provisional = toDetail(
+          context,
+          sections,
+          null,
+          displayedContentRevision,
+          displayedVisibleVersion,
+        );
         const [distance] = await transaction<
           Array<{ readonly approximateDistanceKm: number }>
         >`
@@ -316,6 +376,7 @@ export function createJobInvitationRepository(
     ): Promise<JobInvitationCommandResult> {
       assertSendJobInvitationInput(input);
       return sql.begin(async (transaction) => {
+        await lockNotificationRequest(transaction, input.jobRequestId);
         const customerProfileId = await lockVerifiedCustomer(
           transaction,
           input.actorUserId,
@@ -418,6 +479,12 @@ async function executeActorCommand(
   declineNote: string | null,
 ): Promise<JobInvitationCommandResult> {
   return sql.begin(async (transaction) => {
+    const jobRequestId = await resolveInvitationRequestId(
+      transaction,
+      input.invitationId,
+    );
+    if (jobRequestId === null) return notFound();
+    await lockNotificationRequest(transaction, jobRequestId);
     if (!(await actorIsVerified(transaction, input.actorUserId))) {
       return accountNotEligible();
     }
@@ -487,6 +554,29 @@ async function executeActorCommand(
     });
     return applied(transaction, input.invitationId, input.expectedRevision + 1);
   });
+}
+
+async function resolveInvitationRequestId(
+  sql: TransactionSql,
+  invitationId: JobInvitationId,
+): Promise<JobRequestId | null> {
+  const [row] = await sql<{ readonly jobRequestId: string }[]>`
+    SELECT job_request_id AS "jobRequestId"
+    FROM job_invitations
+    WHERE id = ${invitationId}
+  `;
+  return row === undefined ? null : (row.jobRequestId as JobRequestId);
+}
+
+async function lockNotificationRequest(
+  sql: TransactionSql,
+  jobRequestId: JobRequestId,
+): Promise<void> {
+  await sql`
+    SELECT pg_advisory_xact_lock(
+      hashtextextended(${jobRequestId}::text, 41007)
+    )
+  `;
 }
 
 async function lockVerifiedCustomer(sql: TransactionSql, actorUserId: UserId) {
@@ -828,6 +918,8 @@ function toDetail(
   context: InvitationDetailContextRow,
   rows: readonly InvitationSectionRow[],
   approximateDistanceKm: number | null,
+  displayedRequestContentRevision: number,
+  displayedRequestVisibleVersion: number,
 ): JobInvitationDetail {
   if (
     !Number.isSafeInteger(context.requestContentRevision) ||
@@ -916,6 +1008,8 @@ function toDetail(
       timing: Object.freeze({ ...timing }),
       title: preConfirmationText(core.title) ?? "Dopyt",
     }),
+    displayedRequestContentRevision,
+    displayedRequestVisibleVersion,
     requestContentRevision: context.requestContentRevision,
     requestVisibleVersion: context.requestVisibleVersion,
   });
@@ -940,8 +1034,15 @@ function assertReadListInput(input: {
 function assertReadDetailInput(input: {
   readonly actorUserId: UserId;
   readonly invitationId: JobInvitationId;
+  readonly requestContentRevision?: number;
 }): void {
-  if (!isUuid(input.actorUserId) || !isUuid(input.invitationId)) {
+  if (
+    !isUuid(input.actorUserId) ||
+    !isUuid(input.invitationId) ||
+    (input.requestContentRevision !== undefined &&
+      (!Number.isSafeInteger(input.requestContentRevision) ||
+        input.requestContentRevision < 1))
+  ) {
     throw new TypeError("Invalid job invitation detail input.");
   }
 }

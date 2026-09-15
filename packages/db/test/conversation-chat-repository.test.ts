@@ -73,6 +73,7 @@ describe("conversation chat repository", () => {
   it("keeps terminal conversations readable but rejects a new message", async () => {
     const fixture = scriptedSql([
       [],
+      [],
       [{ id: actorUserId }],
       [{ id: conversationId }],
       [participant("READ_ONLY")],
@@ -86,14 +87,15 @@ describe("conversation chat repository", () => {
         conversationId,
       }),
     ).resolves.toEqual({ status: "READ_ONLY" });
-    expect(fixture.statements).toHaveLength(5);
-    expect(fixture.statements[1]).toContain("account_state = 'ACTIVE'");
-    expect(fixture.statements[2]).toContain("FROM conversations conversation");
-    expect(fixture.statements[2]).toContain("FOR UPDATE OF invitation");
+    expect(fixture.statements[1]).toContain("FOR UPDATE OF state");
+    expect(fixture.statements[2]).toContain("account_state = 'ACTIVE'");
+    expect(fixture.statements[3]).toContain("FROM conversations conversation");
+    expect(fixture.statements[3]).toContain("FOR UPDATE OF invitation");
   });
 
   it("returns the same uniform absence for a competitor", async () => {
     const fixture = scriptedSql([
+      [],
       [],
       [{ id: actorUserId }],
       [{ id: conversationId }],
@@ -111,6 +113,7 @@ describe("conversation chat repository", () => {
 
   it("rejects command-id reuse with another intent after reauthorization", async () => {
     const fixture = scriptedSql([
+      [],
       [],
       [{ id: actorUserId }],
       [{ id: conversationId }],
@@ -137,6 +140,7 @@ describe("conversation chat repository", () => {
   it("uses only a server-resolved PRE_CONFIRM stage and retains no blocked command", async () => {
     const fixture = scriptedSql([
       [],
+      [],
       [{ id: actorUserId }],
       [{ id: conversationId }],
       [participant("WRITABLE")],
@@ -151,7 +155,7 @@ describe("conversation chat repository", () => {
         conversationId,
       }),
     ).resolves.toEqual({ status: "BLOCKED_BY_CONTACT_POLICY" });
-    expect(fixture.statements).toHaveLength(6);
+    expect(fixture.statements).toHaveLength(7);
     expect(fixture.statements.at(-1)).toContain(
       "conversation_message_policy_stage",
     );
@@ -162,6 +166,7 @@ describe("conversation chat repository", () => {
 
   it("allows ordinary content at POST_CONFIRM without client-authored policy fields", async () => {
     const fixture = scriptedSql([
+      [],
       [],
       [{ id: actorUserId }],
       [{ id: conversationId }],
@@ -190,6 +195,7 @@ describe("conversation chat repository", () => {
   it("replays an accepted command before evaluating a newer policy", async () => {
     const body = "Pôvodne prijatá správa";
     const fixture = scriptedSql([
+      [],
       [],
       [{ id: actorUserId }],
       [{ id: conversationId }],
@@ -221,6 +227,7 @@ describe("conversation chat repository", () => {
     for (const stage of [null, "UNKNOWN"]) {
       const fixture = scriptedSql([
         [],
+        [],
         [{ id: actorUserId }],
         [{ id: conversationId }],
         [participant("WRITABLE")],
@@ -241,6 +248,7 @@ describe("conversation chat repository", () => {
   it("maps only the fixed database policy rejection to the generic domain result", async () => {
     const fixture = scriptedSql([
       [],
+      [],
       [{ id: actorUserId }],
       [{ id: conversationId }],
       [participant("WRITABLE")],
@@ -258,6 +266,7 @@ describe("conversation chat repository", () => {
     ).resolves.toEqual({ status: "BLOCKED_BY_CONTACT_POLICY" });
 
     const unexpected = scriptedSql([
+      [],
       [],
       [{ id: actorUserId }],
       [{ id: conversationId }],

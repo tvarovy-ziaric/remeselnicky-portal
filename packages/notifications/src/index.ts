@@ -26,6 +26,12 @@ export {
   RetryableEmailDeliveryError,
 } from "./email-worker.js";
 export {
+  DEMAND_SIDE_EXTENSION_EVENT_NAMES,
+  DEMAND_SIDE_NOTIFICATION_EVENT_NAMES,
+  mapDemandSideNotificationEvent,
+} from "./demand-side.js";
+export type { DemandSideNotificationMaintenanceStore } from "./demand-side.js";
+export {
   JOB_INVITATION_NOTIFICATION_EVENT_NAMES,
   mapJobInvitationNotificationEvent,
 } from "./job-invitation.js";

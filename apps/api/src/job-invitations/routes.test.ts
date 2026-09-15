@@ -182,6 +182,18 @@ describe("job invitation routes", () => {
       requestContentRevision: 2,
       requestVisibleVersion: 1,
     });
+    const versionResponse = await app.inject({
+      method: "GET",
+      url: JOB_INVITATION_PATHS.detailVersion
+        .replace(":invitationId", invitationId)
+        .replace(":requestContentRevision", "3"),
+    });
+    expect(versionResponse.statusCode).toBe(200);
+    expect(fixture.readOwned).toHaveBeenLastCalledWith({
+      actorUserId: actor,
+      invitationId,
+      requestContentRevision: 3,
+    });
     await app.close();
   });
 
@@ -317,6 +329,8 @@ function createFixture(
       },
       title: "Oprava strechy",
     },
+    displayedRequestContentRevision: 2,
+    displayedRequestVisibleVersion: 1,
     requestContentRevision: 2,
     requestVisibleVersion: 1,
   });

@@ -14,6 +14,7 @@ const now = new Date("2026-09-15T08:00:00Z");
 describe("job request lifecycle repository", () => {
   it("cancels an owned ACTIVE request with immutable reason provenance", async () => {
     const harness = transactionHarness([
+      [],
       [{ customerProfileId: customer }],
       [],
       [],
@@ -40,10 +41,13 @@ describe("job request lifecycle repository", () => {
       status: "APPLIED",
     });
     expect(harness.statements.join("\n")).toContain("cancellation_reason");
+    expect(harness.statements[0]).toContain("41007");
+    expect(harness.statements[1]).toContain("account_state = 'ACTIVE'");
   });
 
   it("uses database time and refuses to extend an already expired request", async () => {
     const harness = transactionHarness([
+      [],
       [{ customerProfileId: customer }],
       [],
       [],
@@ -117,12 +121,19 @@ describe("job request lifecycle repository", () => {
     const harness = transactionHarness([
       [{ customerProfileId: customer, id: request, revision: 2 }],
       [],
+      [{}],
+      [{}],
+      [row("ACTIVE", 2)],
+      [{ due: true }],
+      [],
       [],
     ]);
     await expect(
       createJobRequestLifecycleRepository(harness.sql).expireInactive(),
     ).resolves.toEqual([request]);
-    const command = harness.statements[1] ?? "";
+    expect(harness.statements[1]).toContain("41007");
+    expect(harness.statements[2]).toContain("customer_profiles");
+    const command = harness.statements[6] ?? "";
     expect(command).toContain("system_initiated");
     expect(command).toContain("cancellation_reason");
   });

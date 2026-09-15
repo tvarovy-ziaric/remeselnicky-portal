@@ -37,6 +37,17 @@ export function mapJobInvitationNotificationEvent(
   ) {
     throw new TypeError("Invalid job invitation notification event envelope.");
   }
+  const expectedPayloadKeys =
+    event.name === JOB_INVITATION_NOTIFICATION_EVENT_NAMES.reminder
+      ? ["expires_at", "invitation_revision", "recipient_user_id"]
+      : ["invitation_revision", "recipient_user_id"];
+  const actualPayloadKeys = Object.keys(event.payload).sort();
+  if (
+    actualPayloadKeys.length !== expectedPayloadKeys.length ||
+    actualPayloadKeys.some((key, index) => key !== expectedPayloadKeys[index])
+  ) {
+    throw new TypeError("Invitation notification payload keys are invalid.");
+  }
 
   const recipientUserId = requiredUuid(event.payload["recipient_user_id"]);
   const invitationRevision = requiredPositiveInteger(
@@ -131,10 +142,13 @@ function requiredPositiveInteger(value: unknown): number {
 }
 
 function requiredUtcTimestamp(value: unknown): void {
+  const parsed = typeof value === "string" ? new Date(value) : null;
   if (
     typeof value !== "string" ||
     !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u.test(value) ||
-    !Number.isFinite(Date.parse(value))
+    parsed === null ||
+    !Number.isFinite(parsed.valueOf()) ||
+    parsed.toISOString() !== value
   ) {
     throw new TypeError("Invitation reminder expiry is invalid.");
   }

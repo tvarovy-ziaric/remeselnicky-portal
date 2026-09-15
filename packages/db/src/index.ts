@@ -108,6 +108,7 @@ import { createJobRequestVersionRepository } from "./job-request-version-reposit
 import { createJobRequestLifecycleRepository } from "./job-request-lifecycle-repository.js";
 import { createJobInvitationRepository } from "./job-invitation-repository.js";
 import { createJobInvitationReminderRepository } from "./job-invitation-notification-repository.js";
+import { createDemandSideNotificationRepository } from "./demand-side-notification-repository.js";
 import { createConversationRepository } from "./conversation-repository.js";
 import { createConversationChatRepository } from "./conversation-chat-repository.js";
 import { createQuoteRepository } from "./quote-repository.js";
@@ -125,7 +126,10 @@ import {
   createConversationAttachmentMediaAccessResolver,
   createConversationAttachmentUploadAuthorization,
 } from "./conversation-attachment-repository.js";
-import type { JobInvitationReminderStore } from "@portal/notifications";
+import type {
+  DemandSideNotificationMaintenanceStore,
+  JobInvitationReminderStore,
+} from "@portal/notifications";
 import { createJobRequestMediaUploadAuthorization } from "./job-request-media-repository.js";
 import { createCraftsmanProfileRepository } from "./craftsman-profile-repository.js";
 import type {
@@ -638,6 +642,7 @@ export { createJobRequestLifecycleRepository } from "./job-request-lifecycle-rep
 export type { JobRequestLifecyclePersistence } from "@portal/domain";
 export { createJobInvitationRepository } from "./job-invitation-repository.js";
 export { createJobInvitationReminderRepository } from "./job-invitation-notification-repository.js";
+export { createDemandSideNotificationRepository } from "./demand-side-notification-repository.js";
 export type { JobInvitationPersistence } from "@portal/domain";
 export { createConversationRepository } from "./conversation-repository.js";
 export type { ConversationPersistence } from "@portal/domain";
@@ -812,6 +817,7 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly jobRequestLifecycle: JobRequestLifecyclePersistence;
   readonly jobInvitations: JobInvitationPersistence;
   readonly jobInvitationReminders: JobInvitationReminderStore;
+  readonly demandSideNotifications: DemandSideNotificationMaintenanceStore;
   readonly conversations: ConversationPersistence;
   readonly conversationChat: ConversationChatPersistence;
   readonly quotes: QuotePersistence;
@@ -910,6 +916,7 @@ export function createDatabase(
   const jobRequestLifecycle = createJobRequestLifecycleRepository(sql);
   const jobInvitations = createJobInvitationRepository(sql);
   const jobInvitationReminders = createJobInvitationReminderRepository(sql);
+  const demandSideNotifications = createDemandSideNotificationRepository(sql);
   const conversations = createConversationRepository(sql);
   const conversationChat = createConversationChatRepository(sql);
   const quotes = createQuoteRepository(sql);
@@ -974,6 +981,7 @@ export function createDatabase(
     jobRequestLifecycle,
     jobInvitations,
     jobInvitationReminders,
+    demandSideNotifications,
     conversations,
     conversationChat,
     quotes,

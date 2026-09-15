@@ -2,7 +2,7 @@ import { loadServerConfig } from "@portal/config/server";
 import { createDatabase } from "@portal/db";
 import {
   createNotificationOutboxPublisher,
-  mapJobInvitationNotificationEvent,
+  mapDemandSideNotificationEvent,
 } from "@portal/notifications";
 import {
   createCentralErrorTracker,
@@ -48,7 +48,7 @@ const monitoringServer = createMonitoringServer({
 const abortController = new AbortController();
 const notificationPublisher = createNotificationOutboxPublisher({
   claims: database.outbox.consumerClaims,
-  mapper: mapJobInvitationNotificationEvent,
+  mapper: mapDemandSideNotificationEvent,
   notifications: database.notifications.writer,
   transactions: database.outbox.transactions,
 });
@@ -78,6 +78,7 @@ const outboxWorker = createOutboxWorker({
   },
 });
 const processor = createInvitationNotificationProcessor({
+  demandSideNotifications: database.demandSideNotifications,
   invitations: database.jobInvitations,
   outbox: outboxWorker,
   quotes: database.quoteLifecycle,

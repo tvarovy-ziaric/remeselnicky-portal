@@ -22,6 +22,7 @@ const now = new Date("2026-09-15T08:00:00Z");
 describe("job invitation repository", () => {
   it("pins the current request versions and persists a pending invitation", async () => {
     const harness = transactionHarness([
+      [],
       [{ customerProfileId }],
       [],
       [],
@@ -54,7 +55,7 @@ describe("job invitation repository", () => {
   });
 
   it("fails closed before reading private data for an unverified actor", async () => {
-    const harness = transactionHarness([[]]);
+    const harness = transactionHarness([[{ jobRequestId: requestId }], [], []]);
     await expect(
       createJobInvitationRepository(harness.sql).respondOwned({
         action: "ENGAGE",
@@ -64,13 +65,17 @@ describe("job invitation repository", () => {
         invitationId,
       }),
     ).resolves.toEqual({ status: "ACCOUNT_NOT_ELIGIBLE" });
-    expect(harness.statements).toHaveLength(1);
-    expect(harness.statements[0]).toContain("JOIN auth_credentials credential");
-    expect(harness.statements[0]).toContain("phone_verified_at IS NOT NULL");
+    expect(harness.statements).toHaveLength(3);
+    expect(harness.statements[0]).toContain("FROM job_invitations");
+    expect(harness.statements[1]).toContain("41007");
+    expect(harness.statements[2]).toContain("JOIN auth_credentials credential");
+    expect(harness.statements[2]).toContain("phone_verified_at IS NOT NULL");
   });
 
   it("uses database expiry and refuses a late response", async () => {
     const harness = transactionHarness([
+      [{ jobRequestId: requestId }],
+      [],
       [{}],
       [],
       [],
@@ -99,7 +104,18 @@ describe("job invitation repository", () => {
 
   it("expires pending invitations with system-only commands", async () => {
     const harness = transactionHarness([
-      [{ id: invitationId, revision: 1 }],
+      [{ id: invitationId, jobRequestId: requestId, revision: 1 }],
+      [],
+      [
+        {
+          craftsmanOwnerId: craftsmanActor,
+          customerOwnerId: customerActor,
+          databaseNow: new Date("2026-09-16T08:00:00Z"),
+          expiresAt: new Date("2026-09-15T08:00:00Z"),
+          revision: 1,
+          state: "PENDING",
+        },
+      ],
       [],
       [],
     ]);
@@ -107,6 +123,8 @@ describe("job invitation repository", () => {
       createJobInvitationRepository(harness.sql).expirePending(),
     ).resolves.toEqual([invitationId]);
     expect(harness.statements.join("\n")).toContain("system_initiated");
+    expect(harness.statements[1]).toContain("41007");
+    expect(harness.statements[2]).toContain("FOR UPDATE OF invitation");
   });
 
   it("lists only invitations owned by an active actor", async () => {
@@ -145,7 +163,7 @@ describe("job invitation repository", () => {
     expect(statement).not.toContain("effectively_public");
   });
 
-  it("reads the pinned brief while omitting exact location and contacts", async () => {
+  it("reads a specifically notified material version while omitting exact location and contacts", async () => {
     const harness = transactionHarness([
       [{}],
       [
@@ -164,6 +182,7 @@ describe("job invitation repository", () => {
           state: "PENDING",
         },
       ],
+      [{ visibleVersion: 4 }],
       [
         {
           payload: {
@@ -203,6 +222,7 @@ describe("job invitation repository", () => {
     const detail = await createJobInvitationRepository(harness.sql).readOwned({
       actorUserId: craftsmanActor,
       invitationId,
+      requestContentRevision: 5,
     });
     expect(detail).toMatchObject({
       counterpartDisplayName: `Zákazník ${customerProfileId.slice(0, 8).toUpperCase()}`,
@@ -214,6 +234,8 @@ describe("job invitation repository", () => {
         municipalityCode: "SK0101528595",
         title: "Dopyt",
       },
+      displayedRequestContentRevision: 5,
+      displayedRequestVisibleVersion: 4,
       requestContentRevision: 4,
       requestVisibleVersion: 3,
     });
@@ -225,7 +247,49 @@ describe("job invitation repository", () => {
     expect(harness.statements[0]).toContain("account_state = 'ACTIVE'");
     expect(harness.statements[1]).toContain("FOR UPDATE OF invitation");
     expect(harness.statements[1]).toContain("actor.account_state = 'ACTIVE'");
+    expect(harness.statements[2]).toContain(
+      "job_request_material_update_entitlements",
+    );
+    expect(harness.statements[2]).toContain("recipient_user_id");
+    expect(harness.statements[2]).toContain("request_content_revision");
     expect(harness.statements.join("\n")).not.toContain("effectively_public");
+  });
+
+  it("denies a provider's unnotified pre-invitation, non-material or post-terminal revision", async () => {
+    const harness = transactionHarness([
+      [{}],
+      [
+        {
+          changedAt: now,
+          craftsmanDisplayName: "Majster Test",
+          customerProfileId,
+          expiresAt: new Date("2026-09-22T08:00:00Z"),
+          id: invitationId,
+          jobRequestId: requestId,
+          perspective: "CRAFTSMAN",
+          requestContentRevision: 4,
+          requestTitle: "Oprava strechy",
+          requestVisibleVersion: 3,
+          revision: 2,
+          state: "NOT_SELECTED",
+        },
+      ],
+      [],
+    ]);
+
+    await expect(
+      createJobInvitationRepository(harness.sql).readOwned({
+        actorUserId: craftsmanActor,
+        invitationId,
+        requestContentRevision: 7,
+      }),
+    ).resolves.toBeNull();
+    expect(harness.statements).toHaveLength(3);
+    expect(harness.statements[2]).toContain(
+      "job_request_material_update_entitlements",
+    );
+    expect(harness.statements[2]).toContain("invitation_id");
+    expect(harness.statements[2]).toContain("recipient_user_id");
   });
 
   it("returns no private detail for a foreign or suspended actor", async () => {

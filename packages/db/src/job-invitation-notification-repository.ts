@@ -38,26 +38,11 @@ export function createJobInvitationReminderRepository(
             FOR UPDATE OF invitation SKIP LOCKED
             LIMIT 100
           )
-          INSERT INTO domain_outbox_events (
-            event_id,
-            idempotency_key,
-            event_name,
-            schema_version,
-            occurred_at,
-            entity_type,
-            entity_id,
-            payload,
-            command_name,
-            correlation_id,
-            available_at
-          )
-          SELECT
-            gen_random_uuid(),
+          SELECT candidate.id::text AS "invitationId"
+          FROM candidates candidate
+          WHERE insert_exact_invitation_reminder_outbox_event(
             'job-invitation:' || candidate.id::text || ':expiry-reminder',
-            'job_invitation.expiry_reminder',
-            1,
             candidate.database_now,
-            'JOB_INVITATION',
             candidate.id::text,
             jsonb_build_object(
               'recipient_user_id', candidate.recipient_user_id::text,
@@ -70,9 +55,7 @@ export function createJobInvitationReminderRepository(
             'job_invitation.schedule_reminder',
             candidate.id::text,
             candidate.database_now
-          FROM candidates candidate
-          ON CONFLICT (idempotency_key) DO NOTHING
-          RETURNING entity_id AS "invitationId"
+          )
         `;
         return Object.freeze(inserted.map((row) => row.invitationId));
       });

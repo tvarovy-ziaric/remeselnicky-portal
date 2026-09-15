@@ -22,6 +22,8 @@ export const JOB_INVITATION_PATH =
 export const JOB_INVITATION_PATHS = Object.freeze({
   close: "/v1/me/invitations/:invitationId/close",
   detail: "/v1/me/invitations/:invitationId",
+  detailVersion:
+    "/v1/me/invitations/:invitationId/versions/:requestContentRevision",
   list: "/v1/me/invitations",
   respond: "/v1/me/invitations/:invitationId/respond",
 } as const);
@@ -127,6 +129,37 @@ export function registerJobInvitationRoutes(
         const invitation = await dependencies.invitations.readOwned({
           actorUserId,
           invitationId: request.params.invitationId as JobInvitationId,
+        });
+        if (invitation === null) {
+          return reply.code(404).send({ code: "NOT_FOUND" });
+        }
+        return reply.send(serializeDetail(invitation));
+      } catch (error: unknown) {
+        return readError(error, reply);
+      }
+    },
+  );
+
+  app.get<{
+    Params: {
+      readonly invitationId: string;
+      readonly requestContentRevision: number;
+    };
+  }>(
+    JOB_INVITATION_PATHS.detailVersion,
+    { schema: { params: invitationVersionParamsSchema } },
+    async (request, reply) => {
+      const actorUserId = await requireActor(
+        request,
+        reply,
+        dependencies.guard,
+      );
+      if (actorUserId === undefined) return;
+      try {
+        const invitation = await dependencies.invitations.readOwned({
+          actorUserId,
+          invitationId: request.params.invitationId as JobInvitationId,
+          requestContentRevision: request.params.requestContentRevision,
         });
         if (invitation === null) {
           return reply.code(404).send({ code: "NOT_FOUND" });
@@ -319,6 +352,8 @@ function serializeDetail(invitation: JobInvitationDetail) {
   return {
     ...serializeListItem(invitation),
     competitionDisclosure: invitation.competitionDisclosure,
+    displayedRequestContentRevision: invitation.displayedRequestContentRevision,
+    displayedRequestVisibleVersion: invitation.displayedRequestVisibleVersion,
     customerTrust: {
       permittedReviewComments: [
         ...invitation.customerTrust.permittedReviewComments,
@@ -420,6 +455,15 @@ const invitationParamsSchema = {
   additionalProperties: false,
   properties: { invitationId: uuid },
   required: ["invitationId"],
+  type: "object",
+} as const;
+const invitationVersionParamsSchema = {
+  additionalProperties: false,
+  properties: {
+    invitationId: uuid,
+    requestContentRevision: { minimum: 1, type: "integer" },
+  },
+  required: ["invitationId", "requestContentRevision"],
   type: "object",
 } as const;
 const listQuerySchema = {

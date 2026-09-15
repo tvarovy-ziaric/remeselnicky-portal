@@ -53,6 +53,30 @@ describe("job invitation detail", () => {
     });
   });
 
+  it("loads an exact updated request revision from the notification route", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(Response.json(detailFixture()));
+    await expect(
+      loadJobInvitationDetail({
+        fetch: fetcher,
+        invitationId,
+        requestContentRevision: 3,
+      }),
+    ).resolves.toMatchObject({ status: "OK" });
+    expect(fetcher).toHaveBeenCalledWith(
+      `/v1/me/invitations/${invitationId}/versions/3`,
+      { cache: "no-store", credentials: "same-origin" },
+    );
+    await expect(
+      loadJobInvitationDetail({
+        fetch: fetcher,
+        invitationId,
+        requestContentRevision: 0,
+      }),
+    ).resolves.toEqual({ status: "NOT_FOUND" });
+  });
+
   it("fails closed if an API response adds exact location or contact data", async () => {
     const fixture = detailFixture();
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
@@ -151,6 +175,8 @@ function detailFixture() {
       },
       title: "Oprava strechy",
     },
+    displayedRequestContentRevision: 2,
+    displayedRequestVisibleVersion: 1,
     requestContentRevision: 2,
     requestTitle: "Oprava strechy",
     requestVisibleVersion: 1,

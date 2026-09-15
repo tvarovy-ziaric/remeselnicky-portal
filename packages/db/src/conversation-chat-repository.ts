@@ -25,6 +25,7 @@ import {
   type ConversationTimelineAttachment,
   type ConversationTimelinePage,
   type ConversationTimelineReadInput,
+  type UserId,
 } from "@portal/domain";
 import type { Sql, TransactionSql } from "postgres";
 
@@ -210,6 +211,12 @@ async function sendMessage(
   input: ConversationMessageSendInput,
 ): Promise<ConversationMessageSendResult> {
   await commandLock(transaction, input.commandId, 45_001);
+  await lockNotificationState(
+    transaction,
+    input.conversationId,
+    input.actorUserId,
+    "COUNTERPART",
+  );
   const participant = await findParticipant(
     transaction,
     input.conversationId,
@@ -308,6 +315,12 @@ async function updateParticipantState(
   input: ConversationParticipantStateInput,
 ): Promise<ConversationParticipantStateResult> {
   await commandLock(transaction, input.commandId, 45_002);
+  await lockNotificationState(
+    transaction,
+    input.conversationId,
+    input.actorUserId,
+    "SELF",
+  );
   const participant = await findParticipant(
     transaction,
     input.conversationId,
@@ -379,6 +392,36 @@ async function updateParticipantState(
     participantState: toParticipantState(revision),
     status: "APPLIED",
   });
+}
+
+async function lockNotificationState(
+  transaction: TransactionSql,
+  conversationId: ConversationId,
+  actorUserId: UserId,
+  recipient: "COUNTERPART" | "SELF",
+): Promise<void> {
+  await transaction`
+    SELECT state.recipient_user_id
+    FROM conversations conversation
+    JOIN job_invitations invitation
+      ON invitation.id = conversation.invitation_id
+    JOIN customer_profiles customer
+      ON customer.id = invitation.customer_profile_id
+    JOIN craftsman_profiles craftsman
+      ON craftsman.id = invitation.craftsman_profile_id
+    JOIN conversation_notification_states state
+      ON state.conversation_id = conversation.id
+     AND state.recipient_user_id = CASE
+       WHEN ${recipient} = 'SELF' THEN ${actorUserId}::uuid
+       WHEN customer.owner_user_id = ${actorUserId}
+         THEN craftsman.owner_user_id
+       ELSE customer.owner_user_id
+     END
+    WHERE conversation.id = ${conversationId}
+      AND (${actorUserId} = customer.owner_user_id
+        OR ${actorUserId} = craftsman.owner_user_id)
+    FOR UPDATE OF state
+  `;
 }
 
 async function report(

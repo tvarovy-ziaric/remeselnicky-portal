@@ -87,5 +87,19 @@ describe("job invitation notification catalog", () => {
         }),
       ),
     ).toThrow("expiry");
+    expect(() =>
+      mapJobInvitationNotificationEvent(
+        event(JOB_INVITATION_NOTIFICATION_EVENT_NAMES.reminder, {
+          expires_at: "2026-02-31T08:00:00.000Z",
+        }),
+      ),
+    ).toThrow("expiry");
+    expect(() =>
+      mapJobInvitationNotificationEvent(
+        event(JOB_INVITATION_NOTIFICATION_EVENT_NAMES.sent, {
+          body: "private",
+        }),
+      ),
+    ).toThrow("payload keys");
   });
 });
