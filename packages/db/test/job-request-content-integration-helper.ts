@@ -24,7 +24,7 @@ export async function runJobRequestContentIntegrationAssertions(
   `;
   const [municipality] = await sql<{ readonly code: string }[]>`
     SELECT code FROM location_municipalities
-    WHERE active
+    WHERE is_active
     ORDER BY code
     LIMIT 1
   `;
