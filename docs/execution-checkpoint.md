@@ -5,11 +5,11 @@ This file is the persistent implementation-status overlay for the hash-verified 
 - Updated: 2026-09-15
 - Definition: D01–D30 LOCKED and hash verified
 - Active release: R3 — Demand side
-- Last completed ticket: R3-019 — Quote expiry/withdraw/stale handling
-- Active ticket: R3-020 — Demand-side notification catalog
-- Next dependency-satisfied candidate: R3-021 — R3 analytics funnel events
+- Last completed ticket: R3-020 — Demand-side notification catalog
+- Active ticket: R3-021 — R3 analytics funnel events
+- Next dependency-satisfied candidate: R3-022 — Competitor isolation/IDOR/E2E suite
 - Human gate: canonical Slovak profession/skill/location content still requires expert/legal/source review before activation; this does not block private supply-side implementation
-- Integrated verification: commit `e87c711`, CI run `34980343753`, passed quality, dependency audit, full-history secret scan, clean PostgreSQL/PostGIS migrations 0000–0051 and the complete live R0/R1/R2 plus R3-001–R3-019 integration suite; append-only Quote withdrawal/expiry, DB-clock deadline enforcement, no-worker-window exclusion, material-version staleness, immutable reconfirmation and worker/provider concurrency guards passed
+- Integrated verification: commit `7f0b1e4`, CI run `34992386982`, passed quality, dependency audit, full-history secret scan, clean PostgreSQL/PostGIS migrations 0000–0052 and the complete live R0/R1/R2 plus R3-001–R3-020 integration suite; transactional demand notifications, exact recipient/version provenance, delayed muted/read-aware chat email batching, command/outbox idempotency and deterministic lock-order races passed
 
 ## Ticket state overlay
 
@@ -100,9 +100,10 @@ This file is the persistent implementation-status overlay for the hash-verified 
 | R3-017 | DONE     | External PDF Quote authoring, minimal structured envelope and immutable PDF revisions passed live PG CI       |
 | R3-018 | DONE     | Neutral structured/PDF Quote normalization, strict private DTO, responsive UI and live PG checks passed       |
 | R3-019 | DONE     | Append-only Quote expiry/withdrawal, DB-clock deadlines, stale/reconfirm and worker race guards passed        |
-| R3-020 | ACTIVE   | Demand-side transactional notification catalog over invitation, conversation and Quote domain events          |
+| R3-020 | DONE     | Transactional invitation/chat/request/Quote notifications, batching, privacy and live lock races passed       |
+| R3-021 | ACTIVE   | Privacy-minimal server-derived R3 request/invitation/chat/Quote funnel analytics                               |
 
-All DONE rows above are covered by CI run `34980343753` unless a more specific earlier run is referenced in history. The run applied migrations `0000`–`0051` twice and passed the complete live PostgreSQL/PostGIS integration suite, including the R1 supply-side authorization/privacy matrix, full R2 discovery/shortlist assertions, and R3 request core, recovery, validated content, private media, lifecycle, invitations, conversations, immutable chat and attachments, pre-confirm privacy policy, Quote core revisions, both authoring modes, private comparison, expiry/withdrawal/staleness and concurrency boundaries.
+All DONE rows above are covered by CI run `34992386982` unless a more specific earlier run is referenced in history. The run applied migrations `0000`–`0052` twice and passed the complete live PostgreSQL/PostGIS integration suite, including the R1 supply-side authorization/privacy matrix, full R2 discovery/shortlist assertions, and R3 request core, recovery, validated content, private media, lifecycle, invitations, conversations, immutable chat and attachments, pre-confirm privacy policy, Quote core revisions, both authoring modes, private comparison, expiry/withdrawal/staleness, demand notifications and concurrency boundaries.
 
 ## Durable decisions
 
