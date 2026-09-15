@@ -21,6 +21,13 @@ body {
   margin: 0;
 }
 
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
 main {
   display: grid;
   min-height: 100vh;
@@ -110,6 +117,186 @@ section {
   background: #dce7de;
 }
 
+.job-request-page {
+  display: block;
+  min-height: 100vh;
+  padding: clamp(0.75rem, 3vw, 2rem);
+  background: #f6f4ee;
+}
+
+.job-request-shell {
+  width: min(100%, 52rem);
+  margin: 0 auto;
+  padding: clamp(1rem, 4vw, 2.5rem);
+}
+
+.job-request-header h1,
+.job-request-shell > h1 {
+  margin: 0.35rem 0 0.75rem;
+  font-size: clamp(2rem, 7vw, 3.5rem);
+}
+
+.job-request-progress {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(5rem, 1fr));
+  gap: 0.5rem;
+  margin: 2rem 0;
+  padding: 0;
+  overflow-x: auto;
+  list-style: none;
+}
+
+.job-request-progress li {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 5rem;
+  color: #66756b;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.job-request-progress li span {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  margin: auto;
+  place-items: center;
+  border: 1px solid #a8b2aa;
+  border-radius: 999px;
+  background: #fff;
+}
+
+.job-request-progress li[aria-current="step"] {
+  color: #234d31;
+}
+
+.job-request-progress li[aria-current="step"] span {
+  border-color: #234d31;
+  background: #234d31;
+  color: #fff;
+}
+
+.job-request-fields fieldset {
+  display: grid;
+  gap: 1.15rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.job-request-fields legend,
+.job-request-review h2 {
+  margin-bottom: 1.25rem;
+  font-size: clamp(1.4rem, 4vw, 2rem);
+  font-weight: 800;
+}
+
+.job-request-fields label {
+  display: grid;
+  gap: 0.45rem;
+  font-weight: 750;
+}
+
+.job-request-fields label span,
+.field-help {
+  color: #66756b;
+  font-size: 0.86rem;
+  font-weight: 500;
+}
+
+.job-request-fields input,
+.job-request-fields select,
+.job-request-fields textarea {
+  width: 100%;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid #a8b2aa;
+  border-radius: 0.6rem;
+  background: #fff;
+  color: #1f2923;
+}
+
+.job-request-fields input:focus-visible,
+.job-request-fields select:focus-visible,
+.job-request-fields textarea:focus-visible {
+  outline: 3px solid rgb(53 91 67 / 25%);
+  outline-offset: 1px;
+  border-color: #355b43;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.job-request-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 2rem;
+}
+
+.job-request-actions button,
+.review-row button {
+  padding: 0.75rem 1rem;
+  border: 1px solid #355b43;
+  border-radius: 0.6rem;
+  background: #fff;
+  color: #234d31;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.job-request-actions .primary-action {
+  background: #234d31;
+  color: #fff;
+}
+
+.job-request-actions button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.job-request-notice {
+  min-height: 1.5rem;
+  color: #55705f;
+  font-size: 0.9rem;
+}
+
+.review-row {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid #e3e0d7;
+}
+
+.review-row p {
+  margin: 0.25rem 0 0;
+}
+
+.privacy-note,
+.attachment-summary {
+  padding: 1rem;
+  border-radius: 0.65rem;
+  background: #edf3ed;
+}
+
+@media (max-width: 34rem) {
+  .field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .job-request-actions {
+    position: sticky;
+    bottom: 0;
+    padding: 0.75rem 0;
+    background: #fffdf7;
+  }
+}
+
 h1 {
   margin: 0.75rem 0;
   font-size: clamp(2.25rem, 8vw, 4.5rem);
@@ -123,6 +310,27 @@ p {
 .contract {
   margin-top: 2rem;
   text-transform: none;
+}
+
+.home-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.home-actions a {
+  padding: 0.75rem 1rem;
+  border: 1px solid #355b43;
+  border-radius: 0.6rem;
+  color: #234d31;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.home-actions a:first-child {
+  background: #234d31;
+  color: #fff;
 }
 
 .admin-shell {
