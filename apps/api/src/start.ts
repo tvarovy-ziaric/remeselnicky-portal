@@ -57,6 +57,9 @@ const customerShortlist = createCustomerShortlistService({
   }),
   persistence: database.customerShortlist,
 });
+const customerProfiles = createCustomerProfileService({
+  persistence: database.customerProfiles,
+});
 const publicSearchCards = createPublicSearchCardSearch(
   database.publicSearchCards,
 );
@@ -79,6 +82,10 @@ const app = buildApi({
       ),
     },
     customerShortlist: { shortlist: customerShortlist },
+    draftHandoff: {
+      customerProfiles,
+      drafts: database.jobRequestDrafts,
+    },
     persistence: authPersistence,
   },
   database,

@@ -2,7 +2,14 @@ import { createHash } from "node:crypto";
 
 import { AUTH_API_PATHS } from "@portal/contracts";
 import type { AuthRepository } from "@portal/db";
-import type { UserAccountState, UserId } from "@portal/domain";
+import {
+  JobRequestDraftIdempotencyError,
+  type CustomerProfileId,
+  type JobRequestId,
+  type PersistCreateDraftWithInitialSectionInput,
+  type UserAccountState,
+  type UserId,
+} from "@portal/domain";
 import type { Session } from "fastify";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -48,6 +55,118 @@ afterEach(async () => {
 });
 
 describe("authentication HTTP boundary", () => {
+  it("preserves a private handoff across registration and consumes it exactly once", async () => {
+    const fixture = createFixture({ draftHandoff: true, eligible: true });
+    const anonymous = await csrf(fixture.app);
+    const missingCsrf = await fixture.app.inject({
+      headers: { cookie: anonymous.cookie },
+      method: "POST",
+      url: AUTH_API_PATHS.draftHandoffArm,
+    });
+    expect(missingCsrf.statusCode).toBe(403);
+
+    const armed = await fixture.app.inject({
+      headers: {
+        cookie: anonymous.cookie,
+        "x-csrf-token": anonymous.token,
+      },
+      method: "POST",
+      url: AUTH_API_PATHS.draftHandoffArm,
+    });
+    expect(armed.statusCode).toBe(204);
+    const armedCookie = responseCookie(armed.headers["set-cookie"]);
+
+    const registered = await fixture.app.inject({
+      headers: { cookie: armedCookie, "x-csrf-token": anonymous.token },
+      method: "POST",
+      payload: {
+        adultAttested: true,
+        email: "person@example.com",
+        password: PASSWORD,
+      },
+      url: AUTH_API_PATHS.register,
+    });
+    expect(registered.statusCode).toBe(201);
+    const authCookie = responseCookie(registered.headers["set-cookie"]);
+    const authCsrf = registered.json<{ csrfToken: string }>().csrfToken;
+    const payload = {
+      section: {
+        key: "request.basics",
+        payload: { description: "Oprava strechy" },
+        schemaVersion: 1,
+      },
+    };
+    const consumed = await fixture.app.inject({
+      headers: { cookie: authCookie, "x-csrf-token": authCsrf },
+      method: "POST",
+      payload,
+      url: AUTH_API_PATHS.draftHandoffConsume,
+    });
+    expect(consumed.statusCode).toBe(200);
+    expect(consumed.json()).toEqual({
+      jobRequestId: "97000000-0000-4000-8000-000000000099",
+      revision: 1,
+    });
+    expect(consumed.body).not.toContain(
+      fixture.draftCreations[0]?.commandId ?? "not-present",
+    );
+    expect(fixture.draftCreations).toHaveLength(1);
+
+    const consumedCookie = responseCookie(consumed.headers["set-cookie"]);
+    const retried = await fixture.app.inject({
+      headers: { cookie: consumedCookie, "x-csrf-token": authCsrf },
+      method: "POST",
+      payload,
+      url: AUTH_API_PATHS.draftHandoffConsume,
+    });
+    expect(retried.statusCode).toBe(200);
+    expect(retried.json()).toEqual(consumed.json());
+    expect(fixture.draftCreations).toHaveLength(2);
+    expect(fixture.draftCreations[1]?.commandId).toBe(
+      fixture.draftCreations[0]?.commandId,
+    );
+
+    const conflict = await fixture.app.inject({
+      headers: { cookie: consumedCookie, "x-csrf-token": authCsrf },
+      method: "POST",
+      payload: {
+        section: {
+          ...payload.section,
+          payload: { description: "Iný zámer" },
+        },
+      },
+      url: AUTH_API_PATHS.draftHandoffConsume,
+    });
+    expect(conflict.statusCode).toBe(409);
+    expect(conflict.json()).toEqual({ code: "HANDOFF_CONFLICT" });
+  });
+
+  it("denies consuming a handoff without an authenticated session", async () => {
+    const fixture = createFixture({ draftHandoff: true });
+    const anonymous = await csrf(fixture.app);
+    await fixture.app.inject({
+      headers: {
+        cookie: anonymous.cookie,
+        "x-csrf-token": anonymous.token,
+      },
+      method: "POST",
+      url: AUTH_API_PATHS.draftHandoffArm,
+    });
+    const response = await fixture.app.inject({
+      headers: {
+        cookie: anonymous.cookie,
+        "x-csrf-token": anonymous.token,
+      },
+      method: "POST",
+      payload: {
+        section: { key: "request.basics", payload: {}, schemaVersion: 1 },
+      },
+      url: AUTH_API_PATHS.draftHandoffConsume,
+    });
+    expect(response.statusCode).toBe(401);
+    expect(fixture.draftCreations).toHaveLength(0);
+  });
+
   it("registers an eligible adult, regenerates the session, and logs out", async () => {
     const fixture = createFixture({ eligible: true });
     const { cookie: preLoginCookie, token } = await csrf(fixture.app);
@@ -828,6 +947,7 @@ interface Fixture {
   readonly app: ReturnType<typeof buildApi>;
   readonly clock: () => Date;
   readonly deliveries: { normalizedEmail: string; token: string }[];
+  readonly draftCreations: PersistCreateDraftWithInitialSectionInput[];
   readonly emailDeliveries: { normalizedEmail: string; token: string }[];
   readonly emailVerificationPersistence: MemoryEmailVerificationPersistence;
   readonly hasher: FakeHasher;
@@ -842,6 +962,7 @@ function createFixture(
   options: {
     readonly config?: Partial<AuthRuntimeConfig>;
     readonly delivery?: boolean;
+    readonly draftHandoff?: boolean;
     readonly emailVerification?: boolean;
     readonly emailVerificationDelivery?: boolean;
     readonly eligible?: boolean;
@@ -855,6 +976,7 @@ function createFixture(
   const persistence = new MemoryAuthPersistence();
   const hasher = new FakeHasher();
   const deliveries: { normalizedEmail: string; token: string }[] = [];
+  const draftCreations: PersistCreateDraftWithInitialSectionInput[] = [];
   const emailDeliveries: { normalizedEmail: string; token: string }[] = [];
   const phoneDeliveries: { normalizedPhone: string; otp: string }[] = [];
   const emailVerificationPersistence = new MemoryEmailVerificationPersistence(
@@ -923,6 +1045,56 @@ function createFixture(
             },
           }),
       ...(eligibility === undefined ? {} : { eligibility }),
+      ...(options.draftHandoff === true
+        ? {
+            draftHandoff: {
+              customerProfiles: {
+                ensureForCustomerUse: () =>
+                  Promise.resolve({
+                    profile: {
+                      createdAt: NOW,
+                      id: "97000000-0000-4000-8000-000000000098" as CustomerProfileId,
+                      ownerUserId: USER_ID,
+                      publicVisibility: "PRIVATE" as const,
+                      searchIndexing: "DISALLOWED" as const,
+                      updatedAt: NOW,
+                    },
+                    status: "CREATED" as const,
+                  }),
+              },
+              drafts: {
+                createDraftWithInitialSectionOwned: (
+                  input: PersistCreateDraftWithInitialSectionInput,
+                ) => {
+                  const first = draftCreations[0];
+                  draftCreations.push(input);
+                  if (
+                    first !== undefined &&
+                    (first.commandId !== input.commandId ||
+                      first.section.canonicalPayload !==
+                        input.section.canonicalPayload)
+                  ) {
+                    return Promise.reject(
+                      new JobRequestDraftIdempotencyError(),
+                    );
+                  }
+                  return Promise.resolve({
+                    jobRequestId:
+                      "97000000-0000-4000-8000-000000000099" as JobRequestId,
+                    ...(first === undefined
+                      ? { status: "APPLIED" as const }
+                      : {
+                          originalStatus: "APPLIED" as const,
+                          status: "DEDUPLICATED" as const,
+                        }),
+                    revision: 1,
+                    savedAt: NOW,
+                  });
+                },
+              },
+            },
+          }
+        : {}),
       ...(options.emailVerification === true
         ? {
             emailVerification: {
@@ -978,6 +1150,7 @@ function createFixture(
     app,
     clock,
     deliveries,
+    draftCreations,
     emailDeliveries,
     emailVerificationPersistence,
     hasher,

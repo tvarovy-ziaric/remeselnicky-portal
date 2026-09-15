@@ -8,12 +8,16 @@ declare module "fastify" {
   interface Session {
     _csrf?: string;
     authUserId?: UserId;
+    completedDraftHandoffId?: string;
+    pendingDraftHandoffId?: string;
   }
 }
 
 interface StoredSessionPayload extends Record<string, unknown> {
   readonly _csrf?: string;
   readonly authUserId?: UserId;
+  readonly completedDraftHandoffId?: string;
+  readonly pendingDraftHandoffId?: string;
 }
 
 export function createPostgresSessionStore(input: {
@@ -65,6 +69,12 @@ export function createPostgresSessionStore(input: {
         ...(session.authUserId === undefined
           ? {}
           : { authUserId: session.authUserId }),
+        ...(validUuid(session.completedDraftHandoffId)
+          ? { completedDraftHandoffId: session.completedDraftHandoffId }
+          : {}),
+        ...(validUuid(session.pendingDraftHandoffId)
+          ? { pendingDraftHandoffId: session.pendingDraftHandoffId }
+          : {}),
       };
       input.persistence
         .writeSession({
@@ -112,5 +122,20 @@ function restoreSession(
     },
     ...(typeof payload._csrf === "string" ? { _csrf: payload._csrf } : {}),
     ...(stored.userId === undefined ? {} : { authUserId: stored.userId }),
+    ...(validUuid(payload.completedDraftHandoffId)
+      ? { completedDraftHandoffId: payload.completedDraftHandoffId }
+      : {}),
+    ...(validUuid(payload.pendingDraftHandoffId)
+      ? { pendingDraftHandoffId: payload.pendingDraftHandoffId }
+      : {}),
   };
+}
+
+function validUuid(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(
+      value,
+    )
+  );
 }

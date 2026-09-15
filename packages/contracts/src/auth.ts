@@ -2,6 +2,8 @@ import type { UserAccountState, UserId } from "@portal/domain";
 
 export const AUTH_API_PATHS = Object.freeze({
   csrf: "/v1/auth/csrf",
+  draftHandoffArm: "/v1/auth/draft-handoff",
+  draftHandoffConsume: "/v1/me/job-request-draft/handoff",
   login: "/v1/auth/login",
   logout: "/v1/auth/logout",
   passwordReset: "/v1/auth/password-reset",
@@ -87,6 +89,19 @@ export interface AuthAcceptedResponse {
   readonly accepted: true;
 }
 
+export interface AuthDraftHandoffConsumeRequest {
+  readonly section: {
+    readonly key: string;
+    readonly payload: unknown;
+    readonly schemaVersion: number;
+  };
+}
+
+export interface AuthDraftHandoffResponse {
+  readonly jobRequestId: string;
+  readonly revision: number;
+}
+
 export interface AdminMfaChallengeRequest {
   readonly purpose: "PRIVILEGED_SESSION" | "ROLE_CHANGE";
 }
@@ -112,13 +127,16 @@ export type AuthErrorCode =
   | "ACCOUNT_NOT_ACTIVE"
   | "AUTHENTICATION_REQUIRED"
   | "CSRF_INVALID"
+  | "HANDOFF_CONFLICT"
+  | "HANDOFF_UNAVAILABLE"
   | "INTERNAL_ERROR"
   | "INVALID_CREDENTIALS"
   | "INVALID_OR_EXPIRED_RESET"
   | "INVALID_OR_EXPIRED_VERIFICATION"
   | "INVALID_REQUEST"
   | "RATE_LIMITED"
-  | "REGISTRATION_NOT_AVAILABLE";
+  | "REGISTRATION_NOT_AVAILABLE"
+  | "TEMPORARILY_UNAVAILABLE";
 
 export interface AuthErrorResponse {
   readonly code: AuthErrorCode;

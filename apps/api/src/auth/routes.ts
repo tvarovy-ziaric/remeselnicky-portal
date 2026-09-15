@@ -31,6 +31,10 @@ import {
 } from "../customer-shortlist/routes.js";
 import { createSessionGuard } from "./guard.js";
 import {
+  registerDraftHandoffRoutes,
+  type DraftHandoffRouteDependencies,
+} from "./draft-handoff.js";
+import {
   createEmailVerificationService,
   InvalidEmailVerificationTokenError,
   type EmailVerificationDeliveryPort,
@@ -73,6 +77,10 @@ export interface AuthModuleDependencies {
     "onApplied" | "shortlist"
   >;
   readonly delivery?: PasswordResetDeliveryPort;
+  readonly draftHandoff?: Pick<
+    DraftHandoffRouteDependencies,
+    "customerProfiles" | "drafts"
+  >;
   readonly emailVerification?: {
     readonly delivery?: EmailVerificationDeliveryPort;
     readonly persistence: EmailVerificationPersistence;
@@ -201,6 +209,25 @@ async function configureAuthModule(
       : { tokens: dependencies.tokens }),
   });
   const guard = createSessionGuard(dependencies.persistence);
+  const rateLimit = {
+    config: {
+      rateLimit: {
+        max: config.rateLimitMax * 5,
+        timeWindow: config.rateLimitWindowMs,
+      },
+    },
+  } as const;
+  if (dependencies.draftHandoff !== undefined) {
+    registerDraftHandoffRoutes(app, {
+      csrfProtection: csrfProtection(app),
+      guard,
+      rateLimit: {
+        max: rateLimit.config.rateLimit.max,
+        timeWindowMs: rateLimit.config.rateLimit.timeWindow,
+      },
+      ...dependencies.draftHandoff,
+    });
+  }
   if (dependencies.customerShortlist !== undefined) {
     registerCustomerShortlistRoutes(app, {
       guard,
@@ -251,14 +278,6 @@ async function configureAuthModule(
           persistence: dependencies.phoneVerification.persistence,
           ttlMs: config.phoneOtpTtlMs ?? phoneVerificationDefaults.ttlMs,
         });
-  const rateLimit = {
-    config: {
-      rateLimit: {
-        max: config.rateLimitMax * 5,
-        timeWindow: config.rateLimitWindowMs,
-      },
-    },
-  } as const;
   const identityRateLimit = createIdentityRateLimit({
     clock: dependencies.clock ?? (() => new Date()),
     max: config.rateLimitMax,
@@ -290,7 +309,10 @@ async function configureAuthModule(
       if (result.status === "NOT_AVAILABLE") {
         return reply.code(403).send({ code: "REGISTRATION_NOT_AVAILABLE" });
       }
-      await request.session.regenerate();
+      await request.session.regenerate([
+        "pendingDraftHandoffId",
+        "completedDraftHandoffId",
+      ]);
       request.session.set("authUserId", result.user.id);
       if (
         emailVerification !== undefined &&
@@ -317,7 +339,10 @@ async function configureAuthModule(
       if (result.status === "INVALID_CREDENTIALS") {
         return reply.code(401).send({ code: "INVALID_CREDENTIALS" });
       }
-      await request.session.regenerate();
+      await request.session.regenerate([
+        "pendingDraftHandoffId",
+        "completedDraftHandoffId",
+      ]);
       request.session.set("authUserId", result.user.id);
       return reply.send(sessionResponse(result.user, reply.generateCsrf()));
     },
