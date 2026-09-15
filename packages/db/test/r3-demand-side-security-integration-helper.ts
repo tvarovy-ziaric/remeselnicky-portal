@@ -538,6 +538,9 @@ async function findSourceConversation(sql: Sql): Promise<SourceConversation> {
       AND request.state = 'ACTIVE'
     JOIN current_job_request_active_content_versions content
       ON content.job_request_id = request.id
+    JOIN current_job_request_active_sections core
+      ON core.job_request_id = request.id
+      AND core.section_key = 'request.core'
     CROSS JOIN job_invitation_runtime_policy policy
     WHERE conversation.access_state = 'WRITABLE'
       AND conversation.invitation_state = 'ENGAGED'
@@ -546,6 +549,41 @@ async function findSourceConversation(sql: Sql): Promise<SourceConversation> {
         WHERE active_invitation.job_request_id = request.id
           AND active_invitation.state IN ('PENDING', 'ENGAGED')
       ) < policy.active_invitation_limit
+      AND EXISTS (
+        SELECT 1
+        FROM current_craftsman_profile_publications publication
+        JOIN craftsman_profiles candidate
+          ON candidate.id = publication.craftsman_profile_id
+        JOIN users candidate_actor
+          ON candidate_actor.id = candidate.owner_user_id
+          AND candidate_actor.account_state = 'ACTIVE'
+        JOIN auth_credentials candidate_credential
+          ON candidate_credential.user_id = candidate_actor.id
+          AND candidate_credential.email_verified_at IS NOT NULL
+          AND candidate_credential.phone_verified_at IS NOT NULL
+        WHERE publication.effectively_public
+          AND candidate.owner_user_id NOT IN (
+            customer.owner_user_id, craftsman.owner_user_id
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM job_invitations existing
+            WHERE existing.job_request_id = request.id
+              AND existing.craftsman_profile_id = candidate.id
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM current_credential_qualification_policies qualification
+            WHERE qualification.profession_code =
+                core.payload ->> 'primaryProfessionCode'
+              AND qualification.requirement = 'REQUIRED'
+              AND NOT EXISTS (
+                SELECT 1 FROM current_searchable_craftsman_credentials qualified
+                WHERE qualified.craftsman_profile_id = candidate.id
+                  AND qualified.profession_code = qualification.profession_code
+                  AND qualified.credential_type_code =
+                    qualification.credential_type_code
+              )
+          )
+      )
     ORDER BY conversation.created_at DESC, conversation.id DESC
     LIMIT 1
   `;
