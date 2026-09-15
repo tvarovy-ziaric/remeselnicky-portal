@@ -6,10 +6,10 @@ This file is the persistent implementation-status overlay for the hash-verified 
 - Definition: D01–D30 LOCKED and hash verified
 - Active release: R3 — Demand side
 - Last completed ticket: R3-021 — R3 analytics funnel events
-- Active ticket: R3-022 — Competitor isolation/IDOR/E2E suite
+- Active ticket: R3-022 — locally implemented competitor isolation/IDOR suite; staging E2E unverified
 - Next dependency-satisfied candidate: none until the R3 exit gate is satisfied; R4-001 remains sequenced after R3
-- Human gate: completing R3-022 now requires an isolated staging environment with object-storage/provider credentials and browser targets; selecting or provisioning that external infrastructure is required before the canonical staging E2E and production private-media composition can be verified
-- Integrated verification: commit `d1170e3`, CI run `35011581959`, passed quality, dependency audit, full-history secret scan, clean PostgreSQL/PostGIS migrations 0000–0053 and the complete live R0/R1/R2 plus R3-001–R3-022 Stage-1 integration suite; R3 analytics capture, consent races, independent delivery leases, stable event identity, Quote authoring HTTP authorization and the relation-driven competitor/IDOR matrix passed
+- Human gate: a concrete isolated staging/provider proposal is authorized, but no paid service may be created until its components, price, accounts, credentials, security boundaries and provisioning plan receive a separate human approval; canonical staging browser E2E remains unverified
+- Integrated verification: commit `df5d86c`, CI run `35016795109`, passed quality, dependency audit, full-history secret scan, clean PostgreSQL/PostGIS migrations 0000–0054 and the complete live R0/R1/R2 plus R3-001–R3-022 Stage-1 integration suite; durable media processing dispatch, R3 analytics capture, consent races, Quote authoring HTTP authorization and the relation-driven competitor/IDOR matrix passed
 
 ## Ticket state overlay
 
@@ -102,9 +102,9 @@ This file is the persistent implementation-status overlay for the hash-verified 
 | R3-019 | DONE     | Append-only Quote expiry/withdrawal, DB-clock deadlines, stale/reconfirm and worker race guards passed        |
 | R3-020 | DONE     | Transactional invitation/chat/request/Quote notifications, batching, privacy and live lock races passed       |
 | R3-021 | DONE     | Privacy-minimal server-derived R3 funnel analytics, consent and independent delivery passed live PG CI        |
-| R3-022 | ACTIVE   | DB/API competitor and IDOR matrices passed; staging browser and production private-media seams remain         |
+| R3-022 | ACTIVE   | Implemented locally: DB/API competitor and IDOR matrices; staging browser E2E remains UNVERIFIED              |
 
-All DONE rows above are covered by CI run `35011581959` unless a more specific earlier run is referenced in history. The run applied migrations `0000`–`0053` twice and passed the complete live PostgreSQL/PostGIS integration suite, including the R1 supply-side authorization/privacy matrix, full R2 discovery/shortlist assertions, and R3 request core, recovery, validated content, private media, lifecycle, invitations, conversations, immutable chat and attachments, pre-confirm privacy policy, Quote core revisions, both authoring modes, private comparison, expiry/withdrawal/staleness, demand notifications, R3 funnel analytics and Stage-1 competitor-isolation/IDOR assertions. R3-022 also has a real-session Fastify transport matrix and Quote authoring/provider UI coverage; staging browser E2E and production object-storage/media composition remain deliberately unclaimed.
+All DONE rows above are covered by CI run `35016795109` unless a more specific earlier run is referenced in history. The run applied migrations `0000`–`0054` twice and passed the complete live PostgreSQL/PostGIS integration suite, including the R1 supply-side authorization/privacy matrix, full R2 discovery/shortlist assertions, and R3 request core, recovery, validated content, private media, lifecycle, invitations, conversations, immutable chat and attachments, pre-confirm privacy policy, Quote core revisions, both authoring modes, private comparison, expiry/withdrawal/staleness, demand notifications, R3 funnel analytics, durable media processing and Stage-1 competitor-isolation/IDOR assertions. R3-022 also has a real-session Fastify transport matrix and Quote authoring/provider UI coverage. Its staging browser E2E and production-like object-storage/media composition are explicitly UNVERIFIED; no paid staging service has been provisioned. The proposed next gate is documented in [the isolated staging provider plan](./release/staging-provider-plan.md).
 
 ## Durable decisions
 
