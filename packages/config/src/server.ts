@@ -55,6 +55,8 @@ const serverEnvironmentSchema = z
       3_600,
     ),
     DATABASE_URL: z.string().min(1),
+    MALWARE_SCANNER_HOST: z.enum(["127.0.0.1", "::1", "localhost"]).optional(),
+    MALWARE_SCANNER_PORT: portSchema.optional(),
     PASSWORD_RESET_TTL_SECONDS: boundedIntegerEnvironmentValue(
       3_600,
       300,
@@ -285,6 +287,11 @@ export interface ObjectStorageServerConfig {
   readonly region: string;
 }
 
+export interface MalwareScannerServerConfig {
+  readonly host: "127.0.0.1" | "::1" | "localhost";
+  readonly port: number;
+}
+
 export interface AuthServerConfig {
   readonly cookieName: string;
   readonly cookieSecure: boolean;
@@ -311,6 +318,7 @@ export interface ServerConfig {
   readonly appOrigin: string;
   readonly auth: AuthServerConfig;
   readonly environment: DeploymentEnvironment;
+  readonly malwareScanner: MalwareScannerServerConfig | undefined;
   readonly observability: ObservabilityContext;
   readonly objectStorage: ObjectStorageServerConfig | undefined;
   readonly port: number | undefined;
@@ -374,6 +382,13 @@ export function parseServerConfig(
       trustProxyHops: result.data.APP_ENV === "development" ? 0 : 1,
     }),
     environment: result.data.APP_ENV,
+    malwareScanner:
+      result.data.MALWARE_SCANNER_HOST === undefined
+        ? undefined
+        : Object.freeze({
+            host: result.data.MALWARE_SCANNER_HOST,
+            port: result.data.MALWARE_SCANNER_PORT ?? 3_310,
+          }),
     observability,
     objectStorage: objectStorage?.config,
     port: result.data.PORT,

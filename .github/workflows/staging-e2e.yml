@@ -1,0 +1,82 @@
+name: Staging R3 E2E
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_revision:
+        description: Full Git SHA deployed to staging
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: staging-r3-e2e
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: staging
+    env:
+      CI: "true"
+      STAGING_E2E_ENABLED: "true"
+      STAGING_E2E_BASE_URL: ${{ vars.STAGING_E2E_BASE_URL }}
+      STAGING_E2E_REQUEST_A_ID: ${{ vars.STAGING_E2E_REQUEST_A_ID }}
+      STAGING_E2E_REQUEST_B_ID: ${{ vars.STAGING_E2E_REQUEST_B_ID }}
+      STAGING_E2E_INVITATION_A_ID: ${{ vars.STAGING_E2E_INVITATION_A_ID }}
+      STAGING_E2E_INVITATION_B_ID: ${{ vars.STAGING_E2E_INVITATION_B_ID }}
+      STAGING_E2E_CONVERSATION_A_ID: ${{ vars.STAGING_E2E_CONVERSATION_A_ID }}
+      STAGING_E2E_CONVERSATION_B_ID: ${{ vars.STAGING_E2E_CONVERSATION_B_ID }}
+      STAGING_E2E_MEDIA_A_ID: ${{ vars.STAGING_E2E_MEDIA_A_ID }}
+      STAGING_E2E_MEDIA_B_ID: ${{ vars.STAGING_E2E_MEDIA_B_ID }}
+      STAGING_E2E_PROVIDER_A_CANARY: ${{ secrets.STAGING_E2E_PROVIDER_A_CANARY }}
+      STAGING_E2E_PROVIDER_B_CANARY: ${{ secrets.STAGING_E2E_PROVIDER_B_CANARY }}
+      STAGING_E2E_CUSTOMER_EMAIL: ${{ secrets.STAGING_E2E_CUSTOMER_EMAIL }}
+      STAGING_E2E_CUSTOMER_PASSWORD: ${{ secrets.STAGING_E2E_CUSTOMER_PASSWORD }}
+      STAGING_E2E_PROVIDER_A_EMAIL: ${{ secrets.STAGING_E2E_PROVIDER_A_EMAIL }}
+      STAGING_E2E_PROVIDER_A_PASSWORD: ${{ secrets.STAGING_E2E_PROVIDER_A_PASSWORD }}
+      STAGING_E2E_PROVIDER_B_EMAIL: ${{ secrets.STAGING_E2E_PROVIDER_B_EMAIL }}
+      STAGING_E2E_PROVIDER_B_PASSWORD: ${{ secrets.STAGING_E2E_PROVIDER_B_PASSWORD }}
+    steps:
+      - name: Validate release revision
+        shell: bash
+        env:
+          RELEASE_REVISION: ${{ inputs.release_revision }}
+        run: '[[ "$RELEASE_REVISION" =~ ^[0-9a-f]{40}$ ]]'
+
+      - name: Check out deployed revision
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ inputs.release_revision }}
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@f520eceda224fe1a4aed5a2a27a194379a409996 # v6
+        with:
+          version: 11.19.0
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install browser engines
+        run: pnpm --filter @portal/e2e exec playwright install --with-deps chromium firefox webkit
+
+      - name: Run isolated R3 competitor and IDOR smoke
+        run: pnpm --filter @portal/e2e test
+
+      - name: Record privacy-safe evidence
+        if: success()
+        shell: bash
+        env:
+          RELEASE_REVISION: ${{ inputs.release_revision }}
+        run: echo "R3 staging E2E passed for $RELEASE_REVISION on Chromium, Firefox and WebKit." >> "$GITHUB_STEP_SUMMARY"

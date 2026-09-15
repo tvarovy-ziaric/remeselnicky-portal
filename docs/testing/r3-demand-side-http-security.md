@@ -40,19 +40,25 @@ context, provider-only withdraw and reconfirm commands and the absence of a
 public system-expiry route. Repository authorization remains Stage 1 evidence;
 these focused tests prove the Fastify transport and composition boundary.
 
+## Local composition now present
+
+The API startup now composes private storage, purpose-bound JobRequest/chat/Quote
+delivery, JobRequest/chat upload and Quote PDF upload. The worker composes the
+durable image/document processor with a loopback-only active malware scanner.
+Unit, static and real-session Fastify tests verify these local seams; this does
+not substitute for a real S3-compatible provider, ClamAV signature update or
+browser run.
+
 ## Explicitly not evaluated
 
-The report retains these production seams as `NOT_EVALUATED`:
+The report retains this release seam as `NOT_EVALUATED`:
 
-- production composition of private-media delivery;
-- job-request private-media delivery;
 - browser/staging E2E.
 
-The media repositories and resolvers behind those boundaries have Stage 1
-live-PostgreSQL coverage, but the production API still does not compose the
-private-media delivery port. Marking those rows as passed would therefore be
-synthetic evidence. Browser and staging execution remains follow-up work when a
-real storage composition and browser fixture runner exist.
+The manual protected staging workflow and three-engine Playwright suite are
+implemented but skip without explicit staging enablement, credentials and
+synthetic fixture IDs. No paid staging stack exists, so no provider-backed
+storage/scanner/network result or browser result is claimed.
 
 R4 acceptance, Job creation, post-confirmation contact/address disclosure and
 new lifecycle mutations remain outside R3-022.

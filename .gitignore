@@ -9,6 +9,17 @@ dist/
 node_modules/
 *.tsbuildinfo
 
+# OpenTofu/Terraform local state and plans may contain provider credentials.
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+!*.tfvars.example
+crash.log
+crash.*.log
+
 # Canonical readable files are materialized from hash-verified bundles.
 /IMPLEMENTATION_BACKLOG.md
 /ROADMAP.md

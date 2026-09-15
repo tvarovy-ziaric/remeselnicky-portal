@@ -107,15 +107,19 @@ jobs:
           kubectl apply -f "$RUNNER_TEMP/staging-rendered.yaml"
           kubectl -n portal-staging rollout status deployment/portal-api --timeout=180s
           kubectl -n portal-staging rollout status deployment/portal-web --timeout=180s
+          kubectl -n portal-staging rollout status deployment/portal-worker --timeout=720s
           kubectl -n portal-staging port-forward service/portal-api 18081:3001 >"$RUNNER_TEMP/api-port-forward.log" 2>&1 &
           API_FORWARD_PID=$!
           kubectl -n portal-staging port-forward service/portal-api 19464:9464 >"$RUNNER_TEMP/metrics-port-forward.log" 2>&1 &
           METRICS_FORWARD_PID=$!
           kubectl -n portal-staging port-forward service/portal-web 18080:3000 >"$RUNNER_TEMP/web-port-forward.log" 2>&1 &
           WEB_FORWARD_PID=$!
-          trap 'kill "$API_FORWARD_PID" "$METRICS_FORWARD_PID" "$WEB_FORWARD_PID" 2>/dev/null || true' EXIT
+          kubectl -n portal-staging port-forward service/portal-worker 19465:9465 >"$RUNNER_TEMP/worker-port-forward.log" 2>&1 &
+          WORKER_FORWARD_PID=$!
+          trap 'kill "$API_FORWARD_PID" "$METRICS_FORWARD_PID" "$WEB_FORWARD_PID" "$WORKER_FORWARD_PID" 2>/dev/null || true' EXIT
           SMOKE_API_URL=http://127.0.0.1:18081 \
           SMOKE_METRICS_URL=http://127.0.0.1:19464 \
           SMOKE_WEB_URL=http://127.0.0.1:18080 \
+          SMOKE_WORKER_URL=http://127.0.0.1:19465 \
           EXPECTED_RELEASE_REVISION="$RELEASE_REVISION" \
             node deploy/scripts/smoke-release.mjs

@@ -144,3 +144,8 @@ export type {
   MediaProcessingDispatcher,
   MediaProcessingJob,
 } from "./processing-queue.js";
+export {
+  createClamdMalwareScanner,
+  type ClamdMalwareScannerConfig,
+} from "./clamd-malware-scanner.js";
+export { createPurposeBoundMediaEntityAccessResolver } from "./entity-access-router.js";

@@ -9,6 +9,7 @@ import type {
   ExternalPdfQuotePersistence,
   UserId,
 } from "@portal/domain";
+import type { QuoteDocumentUploadService } from "@portal/media";
 import Fastify, {
   type FastifyInstance,
   type onRequestHookHandler,
@@ -33,6 +34,40 @@ const apps: FastifyInstance[] = [];
 afterEach(async () => Promise.all(apps.splice(0).map((app) => app.close())));
 
 describe("Quote authoring routes", () => {
+  it("uploads an external Quote PDF through the exact provider boundary", async () => {
+    const fixture = build();
+    fixture.documentUploads.upload.mockResolvedValue({
+      assetId: pdfAssetId,
+      status: "PROCESSING",
+    });
+    const response = await fixture.app.inject({
+      headers: { "content-type": "application/pdf" },
+      method: "POST",
+      payload: Buffer.from("%PDF-1.7\nsynthetic"),
+      url: revisionPath(QUOTE_AUTHORING_PATHS.externalDocument),
+    });
+    expect(response.statusCode).toBe(202);
+    expect(JSON.parse(response.body) as unknown).toEqual({
+      assetId: pdfAssetId,
+      status: "PROCESSING",
+    });
+    expect(fixture.documentUploads.upload).toHaveBeenCalledOnce();
+    const upload = fixture.documentUploads.upload.mock.calls[0]?.[0];
+    expect(upload?.actor).toMatchObject({
+      accountState: "ACTIVE",
+      kind: "AUTHENTICATED",
+      userId: actorUserId,
+    });
+    expect(Buffer.isBuffer(upload?.body)).toBe(true);
+    expect(upload).toMatchObject({
+      declaredContentType: "application/pdf",
+      quoteId,
+      quoteRevision: 1,
+    });
+    expect(response.headers["cache-control"]).toBe("private, no-store");
+    expect(response.body).not.toMatch(/filename|storage|hash|scanner/iu);
+  });
+
   it("creates and reads an allowlisted no-store Quote using the session actor", async () => {
     const fixture = build();
     fixture.core.createDraft.mockResolvedValue({ status: "APPLIED", quote });
@@ -276,9 +311,13 @@ function build(
     readOwned: vi.fn<ExternalPdfQuotePersistence["readOwned"]>(),
     saveDraft: vi.fn<ExternalPdfQuotePersistence["saveDraft"]>(),
   };
+  const documentUploads = {
+    upload: vi.fn<QuoteDocumentUploadService["upload"]>(),
+  };
   registerQuoteAuthoringRoutes(app, {
     core,
     csrfProtection: csrf,
+    documentUploads,
     externalPdf,
     guard: {
       evaluate: vi.fn(() =>
@@ -289,9 +328,10 @@ function build(
         ),
       ),
     },
+    rateLimit: { max: 50, timeWindowMs: 60_000 },
     structured,
   });
-  return { app, core, csrf, externalPdf, structured };
+  return { app, core, csrf, documentUploads, externalPdf, structured };
 }
 
 function revisionPath(template: string) {

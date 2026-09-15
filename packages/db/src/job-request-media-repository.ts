@@ -1,5 +1,8 @@
 import {
+  createServerMediaEntityAccess,
   createServerMediaProvenance,
+  type MediaEntityAccessResolver,
+  type PrivateMediaDeliverySnapshot,
   type JobRequestMediaUploadAuthorization,
   type JobRequestMediaUploadStatus,
   type PrepareJobRequestMediaUploadResult,
@@ -145,3 +148,119 @@ export function createJobRequestMediaUploadAuthorization(
     },
   });
 }
+
+interface JobRequestMediaAccessRow {
+  readonly contentRevision: number;
+  readonly grant: string;
+  readonly relationId: string;
+  readonly relationRevision: number;
+}
+
+export function createJobRequestMediaAccessResolver(
+  sql: Sql,
+): MediaEntityAccessResolver {
+  return Object.freeze({
+    async resolvePrivateMediaAccess(snapshot: PrivateMediaDeliverySnapshot) {
+      if (
+        snapshot.asset.provenanceEntityType !== "JOB_REQUEST" ||
+        snapshot.asset.provenanceEntityId === null ||
+        !uuidPattern.test(snapshot.asset.provenanceEntityId) ||
+        !uuidPattern.test(snapshot.asset.id) ||
+        (snapshot.asset.purpose !== "JOB_REQUEST_IMAGE" &&
+          snapshot.asset.purpose !== "JOB_REQUEST_DOCUMENT")
+      ) {
+        return createServerMediaEntityAccess({ revision: "job-request:none" });
+      }
+      const rows = await sql<JobRequestMediaAccessRow[]>`
+        SELECT access.grant AS "grant",
+          access.relation_id AS "relationId",
+          access.relation_revision AS "relationRevision",
+          access.content_revision AS "contentRevision"
+        FROM (
+          SELECT 'JOB_CUSTOMER'::text AS grant,
+            request.id AS relation_id,
+            current.revision AS relation_revision,
+            current.revision AS content_revision
+          FROM users actor
+          JOIN customer_profiles customer ON customer.owner_user_id = actor.id
+          JOIN job_requests request
+            ON request.customer_profile_id = customer.id
+            AND request.id = ${snapshot.asset.provenanceEntityId}
+          JOIN current_job_requests current ON current.id = request.id
+          WHERE actor.id = ${snapshot.actor.userId}
+            AND actor.account_state = 'ACTIVE'
+            AND actor.id = ${snapshot.asset.ownerUserId}
+
+          UNION ALL
+
+          SELECT 'INVITED_PROVIDER'::text AS grant,
+            invitation.id AS relation_id,
+            current.revision AS relation_revision,
+            allowed.content_revision
+          FROM users actor
+          JOIN craftsman_profiles profile ON profile.owner_user_id = actor.id
+          JOIN job_invitations invitation
+            ON invitation.craftsman_profile_id = profile.id
+            AND invitation.job_request_id = ${snapshot.asset.provenanceEntityId}
+          JOIN current_job_invitations current ON current.id = invitation.id
+          CROSS JOIN LATERAL (
+            SELECT invitation.request_content_revision AS content_revision
+            UNION
+            SELECT entitlement.request_content_revision
+            FROM job_request_material_update_entitlements entitlement
+            WHERE entitlement.invitation_id = invitation.id
+              AND entitlement.recipient_user_id = actor.id
+              AND entitlement.job_request_id = invitation.job_request_id
+          ) allowed
+          JOIN LATERAL (
+            SELECT section.payload
+            FROM job_request_active_section_revisions section
+            WHERE section.job_request_id = invitation.job_request_id
+              AND section.section_key = 'request.media'
+              AND section.content_revision <= allowed.content_revision
+            ORDER BY section.content_revision DESC
+            LIMIT 1
+          ) media ON true
+          WHERE actor.id = ${snapshot.actor.userId}
+            AND actor.account_state = 'ACTIVE'
+            AND EXISTS (
+              SELECT 1
+              FROM jsonb_array_elements_text(
+                COALESCE(
+                  media.payload -> ${snapshot.asset.purpose === "JOB_REQUEST_IMAGE" ? "photoMediaAssetIds" : "documentMediaAssetIds"},
+                  '[]'::jsonb
+                )
+              ) selected(asset_id)
+              WHERE selected.asset_id = ${snapshot.asset.id}
+            )
+        ) access
+        ORDER BY access.grant, access.relation_id, access.content_revision
+        LIMIT 21
+      `;
+      if (rows.length === 0 || rows.length > 20) {
+        return createServerMediaEntityAccess({ revision: "job-request:none" });
+      }
+      for (const row of rows) {
+        if (
+          (row.grant !== "INVITED_PROVIDER" && row.grant !== "JOB_CUSTOMER") ||
+          !uuidPattern.test(row.relationId) ||
+          !Number.isSafeInteger(row.relationRevision) ||
+          row.relationRevision < 1 ||
+          !Number.isSafeInteger(row.contentRevision) ||
+          row.contentRevision < 1
+        ) {
+          throw new Error("Job request media access row is invalid.");
+        }
+      }
+      return createServerMediaEntityAccess({
+        grants: [...new Set(rows.map((row) => row.grant))] as Array<
+          "INVITED_PROVIDER" | "JOB_CUSTOMER"
+        >,
+        revision: `job-request:${createHash("sha256")
+          .update(JSON.stringify(rows))
+          .digest("hex")}`,
+      });
+    },
+  });
+}
+import { createHash } from "node:crypto";

@@ -8,6 +8,8 @@ const productionEnvironment = {
   APP_ORIGIN: "https://portal.example",
   DATABASE_URL:
     "postgresql://portal:strong-database-password@db.example/portal?sslmode=require",
+  MALWARE_SCANNER_HOST: "127.0.0.1",
+  MALWARE_SCANNER_PORT: "3310",
   OBJECT_STORAGE_ACCESS_KEY_ID: "portal-staging-access",
   OBJECT_STORAGE_ENDPOINT: "https://objects.example",
   OBJECT_STORAGE_PRIVATE_CONTAINER: "portal-private",
@@ -42,6 +44,10 @@ describe("server configuration", () => {
       publicBaseUrl: "https://cdn.example/assets/",
       publicDerivativeContainer: "portal-public",
       region: "eu-central-1",
+    });
+    expect(config.malwareScanner).toEqual({
+      host: "127.0.0.1",
+      port: 3_310,
     });
     expect(config.auth).toEqual({
       cookieName: "__Host-portal.sid",
@@ -184,6 +190,21 @@ describe("server configuration", () => {
       if (field.startsWith("OBJECT_STORAGE_")) delete environment[field];
     }
     expect(parseServerConfig(environment).objectStorage).toBeUndefined();
+  });
+
+  it("only accepts a loopback malware-scanner sidecar", () => {
+    expect(() =>
+      parseServerConfig({
+        ...productionEnvironment,
+        MALWARE_SCANNER_HOST: "scanner.example",
+      }),
+    ).toThrow(/MALWARE_SCANNER_HOST/u);
+    expect(() =>
+      parseServerConfig({
+        ...productionEnvironment,
+        MALWARE_SCANNER_PORT: "0",
+      }),
+    ).toThrow(/MALWARE_SCANNER_PORT/u);
   });
 
   it("rejects admin reauthentication windows longer than privileged sessions", () => {

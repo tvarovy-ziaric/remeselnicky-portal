@@ -11,7 +11,16 @@ import {
   createQuoteService,
   createStructuredQuoteService,
 } from "@portal/domain";
-import { createPublicPortfolioDeliveryResolver } from "@portal/media";
+import {
+  createControlledMediaUploadService,
+  createConversationAttachmentUploadService,
+  createJobRequestMediaUploadService,
+  createMediaProcessingDispatcher,
+  createPrivateMediaDeliveryService,
+  createPublicPortfolioDeliveryResolver,
+  createPurposeBoundMediaEntityAccessResolver,
+  createQuoteDocumentUploadService,
+} from "@portal/media";
 import {
   createCentralErrorTracker,
   createLoggerErrorTransport,
@@ -24,6 +33,11 @@ import {
   createPublicSearchCardSearch,
   createTaxonomyAutocompleteService,
 } from "@portal/search";
+import {
+  createObjectStorageService,
+  createS3CompatibleObjectStorageAdapter,
+  defineStorageTopology,
+} from "@portal/storage";
 
 import { buildApi } from "./app.js";
 import {
@@ -101,6 +115,7 @@ const quoteAuthoring = createQuoteService({ persistence: database.quotes });
 const structuredQuoteAuthoring = createStructuredQuoteService({
   persistence: database.structuredQuotes,
 });
+const mediaRuntime = createApiMediaRuntime();
 
 const app = buildApi({
   auth: {
@@ -128,6 +143,9 @@ const app = buildApi({
       customerProfiles,
       draftPersistence: database.jobRequestDrafts,
       drafts: jobRequestDrafts,
+      ...(mediaRuntime === undefined
+        ? {}
+        : { mediaUploads: mediaRuntime.jobRequestUploads }),
       requests: jobRequests,
     },
     jobRequestVersions: { versions: jobRequestVersions },
@@ -138,14 +156,25 @@ const app = buildApi({
     quoteLifecycle: { lifecycle: database.quoteLifecycle },
     quoteAuthoring: {
       core: quoteAuthoring,
+      ...(mediaRuntime === undefined
+        ? {}
+        : { documentUploads: mediaRuntime.quoteDocumentUploads }),
       externalPdf: database.externalPdfQuotes,
       structured: structuredQuoteAuthoring,
     },
     r3Analytics: { observations: database.r3AnalyticsObservations },
     conversationChat: {
       admission: conversationWriteAdmission,
+      ...(mediaRuntime === undefined
+        ? {}
+        : {
+            attachmentUploads: mediaRuntime.conversationAttachmentUploads,
+          }),
       pdfDeliveryObservation: database.r3PdfDeliveryObservations,
       persistence: database.conversationChat,
+      ...(mediaRuntime === undefined
+        ? {}
+        : { privateMediaDelivery: mediaRuntime.privateMediaDelivery }),
       service: conversationChat,
     },
     persistence: authPersistence,
@@ -183,6 +212,85 @@ const app = buildApi({
     metrics,
   },
 });
+
+function createApiMediaRuntime() {
+  const storageConfig = config.objectStorage;
+  const storageSecrets = config.secrets.storage;
+  if (storageConfig === undefined || storageSecrets === undefined) {
+    if (
+      config.environment === "staging" ||
+      config.environment === "production"
+    ) {
+      throw new Error("Private media runtime is required outside development");
+    }
+    return undefined;
+  }
+  const storage = createObjectStorageService({
+    adapter: createS3CompatibleObjectStorageAdapter({
+      accessKeyId: storageSecrets.accessKeyId,
+      endpoint: storageConfig.endpoint,
+      forcePathStyle: storageConfig.forcePathStyle,
+      publicBaseUrl: storageConfig.publicBaseUrl,
+      region: storageConfig.region,
+      secretAccessKey: storageSecrets.secretAccessKey,
+    }),
+    topology: defineStorageTopology({
+      privateContainer: storageConfig.privateContainer,
+      publicDerivativeContainer: storageConfig.publicDerivativeContainer,
+    }),
+  });
+  const orphanedObjectObserver = Object.freeze({
+    recordOrphanedPrivateObject(input: {
+      readonly reason: string;
+      readonly storageObject: Readonly<{ readonly area: string }>;
+    }): void {
+      logger.error("orphaned_private_media_object", {
+        reason: input.reason,
+        storageArea: input.storageObject.area,
+      });
+    },
+  });
+  const uploads = createControlledMediaUploadService({
+    orphanedObjectObserver,
+    repository: database.media,
+    storage,
+  });
+  const processing = createMediaProcessingDispatcher(
+    database.mediaProcessingQueue,
+  );
+  const privateMediaDelivery = createPrivateMediaDeliveryService({
+    applicationOrigin: config.appOrigin,
+    entityAccess: createPurposeBoundMediaEntityAccessResolver({
+      byPurpose: {
+        CHAT_DOCUMENT: database.conversationAttachmentMediaAccess,
+        CHAT_IMAGE: database.conversationAttachmentMediaAccess,
+        JOB_REQUEST_DOCUMENT: database.jobRequestMediaAccess,
+        JOB_REQUEST_IMAGE: database.jobRequestMediaAccess,
+        QUOTE_DOCUMENT: database.quoteDocumentMediaAccess,
+      },
+    }),
+    repository: database.privateMediaDelivery,
+    storage,
+  });
+  return Object.freeze({
+    conversationAttachmentUploads: createConversationAttachmentUploadService({
+      authorization: database.conversationAttachmentUploads,
+      processing,
+      uploads,
+    }),
+    jobRequestUploads: createJobRequestMediaUploadService({
+      authorization: database.jobRequestMedia,
+      processing,
+      uploads,
+    }),
+    privateMediaDelivery,
+    quoteDocumentUploads: createQuoteDocumentUploadService({
+      authorization: database.quoteDocumentUploads,
+      processing,
+      uploads,
+    }),
+  });
+}
 app.addHook("onClose", async () => {
   await monitoringServer.close();
   await database.close();

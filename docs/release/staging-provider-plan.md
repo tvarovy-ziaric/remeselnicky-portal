@@ -1,7 +1,8 @@
 # Isolated staging provider plan
 
-Status: proposal only. No account, subscription, billable resource, credential or
-DNS record has been created by this plan.
+Status: provider proposal approved for non-billable preparation only. The local
+runtime, OpenTofu root and staging E2E preflight are implemented, but no account,
+subscription, billable resource, credential or DNS record has been created.
 
 Pricing was checked on 2026-09-15. Amounts are DigitalOcean list prices in USD,
 excluding tax, domain registration and usage above included quotas.
@@ -112,10 +113,10 @@ Secrets:
 Separate secrets:
 
 - `MIGRATION_DATABASE_URL`: schema-owner role used only by the migration Job;
-  the current deployment manifest must be changed to stop reusing runtime DB
-  credentials before provisioning
+  the deployment manifest maps it only into the migration container
 - `portal-critical-alert-channel/webhook-url`
-- an internal scanner service token if the HTTP scanner boundary is retained
+- no scanner API secret: the worker reaches its ClamAV sidecar only over pod
+  loopback
 - ACME account material managed by cert-manager
 
 Non-secret ConfigMap values:
@@ -126,6 +127,8 @@ Non-secret ConfigMap values:
 - distinct private and public-derivative bucket names
 - `OBJECT_STORAGE_PUBLIC_BASE_URL=https://media-staging.<approved-domain>/`
 - public web/API origins, release SHA and scanner service endpoint
+- `PORTAL_API_ORIGIN=http://portal-api:3001` for server-rendered web reads; the
+  browser still uses the public same-origin `/v1` ingress path
 
 ## Security boundaries
 
@@ -145,15 +148,17 @@ Non-secret ConfigMap values:
 - Private delivery continues to require application authorization immediately
   before short-lived signing. Object keys, hashes, scanner evidence and signed
   URLs are excluded from logs and browser persistence.
-- ClamAV runs as a non-root, pinned-by-digest internal workload. Only the worker
-  can call it. Uploaded documents are never sent to a third-party scanning API;
-  signature updates are its only required outbound path.
+- ClamAV runs as a non-root, pinned-by-digest sidecar in the worker pod. Its scan
+  protocol listens only on pod loopback. Uploaded documents are never sent to a
+  third-party scanning API; signature updates are its only required outbound
+  path.
 - GitHub protected-environment reviewers gate secret release. Credentials are
   rotated after initial E2E, on any exposure, and before any future production
   reuse. Production credentials are structurally absent from staging.
 - Playwright uses deterministic synthetic identities and high-entropy canaries.
-  Screenshots, traces and videos are retained briefly and scanned for forbidden
-  private markers before becoming release evidence.
+  Screenshots, traces and videos are disabled and the workflow uploads no test
+  artifact; its evidence is limited to release SHA, browser result and case
+  count.
 - Budget alerts are configured at `$90` and `$120`; the second threshold stops
   further discretionary scale-up and requires review. Provider hard limits are
   not treated as a security control.
@@ -167,10 +172,40 @@ Non-secret ConfigMap values:
 2. Add OpenTofu modules and policy checks in a pull request. Pin providers and
    container images; define exact resource names and lifecycle protections.
 3. Add the separate migration credential seam, ClamAV health/readiness contract,
-   scanner authentication, NetworkPolicies, resource requests/limits and
-   Playwright staging configuration. Run all local and CI checks.
-4. Review an expected plan and a teardown checklist. No `apply` is allowed in
-   this phase.
+   loopback-only scanner protocol, resource requests/limits and Playwright
+   staging configuration. Run all local and CI checks.
+4. Review an expected plan, cluster-specific NetworkPolicies and a teardown
+   checklist. No `apply` is allowed in this phase.
+
+Implemented locally in Phase A:
+
+- `infra/opentofu/staging` pins OpenTofu 1.11 and the DigitalOcean provider
+  2.100 family, requires an exact DOKS version, and declares the VPC, one 8 GiB
+  node cluster, 1 GiB PostgreSQL, cluster-only database firewall, Basic
+  registry and two private versioned application buckets. Destructive core
+  resources have lifecycle protection. It deliberately creates no DNS,
+  credentials or Kubernetes secrets and exposes no password or kubeconfig.
+- runtime and migration database URLs are separate manifest inputs; web/API,
+  worker and migration privileges can therefore be granted independently;
+- private upload and delivery composition is present for JobRequest, chat and
+  Quote documents; the worker owns durable processing and uses a pinned,
+  non-root ClamAV sidecar over loopback;
+- same-origin `/v1` ingress, API/worker rollout checks and a manual protected
+  Chromium/Firefox/WebKit workflow are present. The browser workflow is
+  intentionally skipped locally until synthetic staging fixtures exist.
+
+Still required before a provider-backed plan/apply:
+
+- the organization must supply the billing owner, approved DNS names, alert
+  destination, exact currently supported DOKS version and collision-free name
+  suffix;
+- the state bucket and state-only key require the separate Phase B approval;
+- namespace NetworkPolicies must be rendered against the actual DOKS ingress,
+  DNS and monitoring namespace labels. Generic guessed selectors are not
+  committed because they could either block probes/DNS or silently allow the
+  wrong controller;
+- `tofu init`, provider validation and the expected provider-backed plan remain
+  unexecuted because no DigitalOcean or Spaces credentials exist.
 
 ### Phase B — billable apply after separate approval
 
@@ -211,7 +246,7 @@ Non-secret ConfigMap values:
 
 ## Approval required before provisioning
 
-The next human decision is limited and explicit: approve or reject DigitalOcean
-`fra1`, the `$85.15/month` non-HA staging baseline, the named DNS/alert owners
-and execution of Phase B. Until then, R3-022 remains locally implemented with
-staging E2E unverified.
+The next human decision is limited and explicit: approve or reject the billable
+DigitalOcean `fra1` Phase B at the `$85.15/month` non-HA baseline and provide the
+named billing, DNS and alert owners. Until then, R3-022 remains locally
+implemented with staging E2E unverified.

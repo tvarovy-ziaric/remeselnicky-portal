@@ -6,6 +6,11 @@ import {
 } from "@portal/analytics";
 import { createDatabase } from "@portal/db";
 import {
+  createClamdMalwareScanner,
+  createDocumentValidationQueueHandler,
+  createImageCanonicalizationQueueHandler,
+} from "@portal/media";
+import {
   createNotificationOutboxPublisher,
   mapDemandSideNotificationEvent,
 } from "@portal/notifications";
@@ -18,7 +23,13 @@ import {
   createStructuredLogger,
 } from "@portal/observability";
 import { createOutboxWorker } from "@portal/outbox";
+import {
+  createObjectStorageService,
+  createS3CompatibleObjectStorageAdapter,
+  defineStorageTopology,
+} from "@portal/storage";
 
+import { createMediaProcessingWorker } from "./media-processing.js";
 import { createInvitationNotificationProcessor } from "./notification-delivery.js";
 import { createWorkerReadiness, runWorkerLoop } from "./service.js";
 import { runWorker } from "./worker.js";
@@ -94,10 +105,12 @@ const analyticsProcessor = createR3AnalyticsProcessor({
   publisher: analyticsPublisher,
   store: database.r3Analytics,
 });
+const mediaProcessing = createMediaRuntime();
 const processor = createInvitationNotificationProcessor({
   analytics: analyticsProcessor,
   demandSideNotifications: database.demandSideNotifications,
   invitations: database.jobInvitations,
+  ...(mediaProcessing === undefined ? {} : { mediaProcessing }),
   outbox: outboxWorker,
   onAnalyticsError(error) {
     errorTracker.capture(error, { handled: true, mechanism: "worker" });
@@ -105,6 +118,67 @@ const processor = createInvitationNotificationProcessor({
   quotes: database.quoteLifecycle,
   reminders: database.jobInvitationReminders,
 });
+
+function createMediaRuntime() {
+  const storageConfig = config.objectStorage;
+  const storageSecrets = config.secrets.storage;
+  const scannerConfig = config.malwareScanner;
+  if (
+    storageConfig === undefined ||
+    storageSecrets === undefined ||
+    scannerConfig === undefined
+  ) {
+    if (
+      config.environment === "staging" ||
+      config.environment === "production"
+    ) {
+      throw new Error(
+        "Media processing runtime is required outside development",
+      );
+    }
+    return undefined;
+  }
+  const storage = createObjectStorageService({
+    adapter: createS3CompatibleObjectStorageAdapter({
+      accessKeyId: storageSecrets.accessKeyId,
+      endpoint: storageConfig.endpoint,
+      forcePathStyle: storageConfig.forcePathStyle,
+      publicBaseUrl: storageConfig.publicBaseUrl,
+      region: storageConfig.region,
+      secretAccessKey: storageSecrets.secretAccessKey,
+    }),
+    topology: defineStorageTopology({
+      privateContainer: storageConfig.privateContainer,
+      publicDerivativeContainer: storageConfig.publicDerivativeContainer,
+    }),
+  });
+  const orphanedObjectObserver = Object.freeze({
+    recordOrphanedPrivateObject(input: {
+      readonly reason: string;
+      readonly storageObject: Readonly<{ readonly area: string }>;
+    }): void {
+      logger.error("orphaned_private_media_object", {
+        reason: input.reason,
+        storageArea: input.storageObject.area,
+      });
+    },
+  });
+  return createMediaProcessingWorker({
+    document: createDocumentValidationQueueHandler({
+      environment: config.environment,
+      orphanedObjectObserver,
+      repository: database.media,
+      scanner: createClamdMalwareScanner(scannerConfig),
+      storage,
+    }),
+    image: createImageCanonicalizationQueueHandler({
+      orphanedObjectObserver,
+      repository: database.media,
+      storage,
+    }),
+    queue: database.mediaProcessingQueue,
+  });
+}
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, () => abortController.abort());

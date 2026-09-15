@@ -20,6 +20,8 @@ spec:
     spec:
       serviceAccountName: portal-worker
       securityContext:
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
@@ -80,8 +82,69 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+        - name: clamav
+          image: clamav/clamav:1.5.4-debian13-slim@sha256:cc16781fe005e49de6a8fc1231b63b265f74b18fc2a6347c670c35716914c3b6
+          imagePullPolicy: IfNotPresent
+          command: ["/init-unprivileged"]
+          env:
+            - name: CLAMD_CONF_TCPAddr
+              value: 127.0.0.1
+            - name: CLAMD_CONF_StreamMaxLength
+              value: 25M
+            - name: CLAMD_CONF_MaxFileSize
+              value: 25M
+            - name: CLAMD_STARTUP_TIMEOUT
+              value: "600"
+            - name: FRESHCLAM_CHECKS
+              value: "12"
+          startupProbe:
+            exec:
+              command: ["/usr/local/bin/clamdcheck.sh"]
+            failureThreshold: 60
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command: ["/usr/local/bin/clamdcheck.sh"]
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["/usr/local/bin/clamdcheck.sh"]
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 250m
+              memory: 3Gi
+            limits:
+              cpu: "1"
+              memory: 4Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+            runAsGroup: 1000
+            runAsNonRoot: true
+            runAsUser: 1000
+          volumeMounts:
+            - name: clamav-database
+              mountPath: /var/lib/clamav
+            - name: clamav-log
+              mountPath: /var/log/clamav
+            - name: clamav-run
+              mountPath: /run/clamav
+            - name: clamav-tmp
+              mountPath: /tmp
       volumes:
         - name: tmp
+          emptyDir: {}
+        - name: clamav-database
+          emptyDir: {}
+        - name: clamav-log
+          emptyDir: {}
+        - name: clamav-run
+          emptyDir: {}
+        - name: clamav-tmp
           emptyDir: {}
 ---
 apiVersion: v1

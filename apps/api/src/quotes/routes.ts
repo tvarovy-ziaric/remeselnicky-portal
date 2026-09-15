@@ -16,17 +16,25 @@ import {
   type StructuredQuotePersistence,
   type UserId,
 } from "@portal/domain";
+import { createAuthenticatedAuthorizationActor } from "@portal/authorization";
 import type {
   FastifyInstance,
   FastifyReply,
   FastifyRequest,
   onRequestHookHandler,
 } from "fastify";
+import {
+  MEDIA_UPLOAD_LIMITS,
+  MediaUploadRejectedError,
+  type QuoteDocumentUploadService,
+} from "@portal/media";
 
 export const QUOTE_AUTHORING_PATHS = Object.freeze({
   byInvitation: "/v1/me/invitations/:invitationId/quote",
   create: "/v1/me/conversations/:conversationId/quotes",
   external: "/v1/me/quotes/:quoteId/revisions/:quoteRevision/external-pdf",
+  externalDocument:
+    "/v1/me/quotes/:quoteId/revisions/:quoteRevision/external-pdf/document",
   quote: "/v1/me/quotes/:quoteId",
   reject: "/v1/me/quotes/:quoteId/revisions/:quoteRevision/reject",
   revision: "/v1/me/quotes/:quoteId/revisions",
@@ -47,7 +55,12 @@ export interface QuoteAuthoringRouteDependencies {
   readonly core: QuotePersistence;
   readonly csrfProtection: onRequestHookHandler;
   readonly externalPdf: ExternalPdfQuotePersistence;
+  readonly documentUploads?: QuoteDocumentUploadService;
   readonly guard: Guard;
+  readonly rateLimit: {
+    readonly max: number;
+    readonly timeWindowMs: number;
+  };
   readonly structured: StructuredQuotePersistence;
 }
 
@@ -64,6 +77,7 @@ export function registerQuoteAuthoringRoutes(
   app: FastifyInstance,
   dependencies: QuoteAuthoringRouteDependencies,
 ): void {
+  registerPdfBodyParser(app);
   app.addHook("onSend", (request, reply, payload, done) => {
     if (
       request.url.startsWith("/v1/me/quotes/") ||
@@ -348,6 +362,68 @@ function registerExternalPdfRoutes(
   app: FastifyInstance,
   dependencies: QuoteAuthoringRouteDependencies,
 ): void {
+  app.post<{
+    Body: Buffer;
+    Params: { readonly quoteId: string; readonly quoteRevision: number };
+  }>(
+    QUOTE_AUTHORING_PATHS.externalDocument,
+    {
+      bodyLimit: MEDIA_UPLOAD_LIMITS.documentMaxBytes,
+      config: {
+        rateLimit: {
+          max: dependencies.rateLimit.max,
+          timeWindow: dependencies.rateLimit.timeWindowMs,
+        },
+      },
+      onRequest: dependencies.csrfProtection,
+      schema: { params: revisionParamsSchema },
+    },
+    async (request, reply) => {
+      const actorUserId = await requireActor(
+        request,
+        reply,
+        dependencies.guard,
+      );
+      if (actorUserId === undefined) return;
+      if (dependencies.documentUploads === undefined) {
+        return reply.code(503).send({ code: "UPLOAD_UNAVAILABLE" });
+      }
+      if (
+        !Buffer.isBuffer(request.body) ||
+        request.body.byteLength < 1 ||
+        request.headers["content-type"]?.trim().toLowerCase() !==
+          "application/pdf"
+      ) {
+        return reply.code(400).send({ code: "INVALID_FILE" });
+      }
+      try {
+        const result = await dependencies.documentUploads.upload({
+          actor: createAuthenticatedAuthorizationActor({
+            accountState: "ACTIVE",
+            id: actorUserId,
+          }),
+          body: request.body,
+          declaredContentType: "application/pdf",
+          quoteId: request.params.quoteId,
+          quoteRevision: request.params.quoteRevision,
+        });
+        return result.status === "PROCESSING"
+          ? reply.code(202).send(result)
+          : reply.code(404).send({ code: "UPLOAD_UNAVAILABLE" });
+      } catch (error: unknown) {
+        if (error instanceof MediaUploadRejectedError) {
+          return reply.code(error.code === "FILE_TOO_LARGE" ? 413 : 400).send({
+            code:
+              error.code === "FILE_TOO_LARGE"
+                ? "FILE_TOO_LARGE"
+                : "INVALID_FILE",
+          });
+        }
+        return reply.code(503).send({ code: "UPLOAD_UNAVAILABLE" });
+      }
+    },
+  );
+
   app.get<{
     Params: { readonly quoteId: string; readonly quoteRevision: number };
   }>(
@@ -420,6 +496,15 @@ function registerExternalPdfRoutes(
         return sendError(reply, error);
       }
     },
+  );
+}
+
+function registerPdfBodyParser(app: FastifyInstance): void {
+  if (app.hasContentTypeParser("application/pdf")) return;
+  app.addContentTypeParser(
+    "application/pdf",
+    { parseAs: "buffer" },
+    (_request, body, done) => done(null, body),
   );
 }
 

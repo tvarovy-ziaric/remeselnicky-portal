@@ -28,10 +28,19 @@ for (const environment of ["staging", "production"]) {
   ) {
     failures.push(`${environment}: TLS secret path is missing`);
   }
+  if (
+    !ingress.includes("path: /v1\n") ||
+    !ingress.includes("name: portal-api")
+  ) {
+    failures.push(`${environment}: same-origin API routing is missing`);
+  }
   if (!kustomization.includes("../../observability/monitoring.yaml")) {
     failures.push(
       `${environment}: operational monitoring resources are missing`,
     );
+  }
+  if (!kustomization.includes("PORTAL_API_ORIGIN=http://portal-api:3001")) {
+    failures.push(`${environment}: server-side web API origin is missing`);
   }
 }
 
@@ -58,6 +67,7 @@ for (const required of [
   "portal-migrate-release-revision",
   "registry.invalid/remeselnicky-portal/api:release-revision",
   'command: ["node", "packages/db/dist/migrate-cli.js"]',
+  "key: MIGRATION_DATABASE_URL",
   "automountServiceAccountToken: false",
   "readOnlyRootFilesystem: true",
   "ttlSecondsAfterFinished: 86400",
@@ -65,6 +75,11 @@ for (const required of [
   if (!migrationJob.includes(required)) {
     failures.push(`release migration: missing ${required}`);
   }
+}
+if (migrationJob.includes("key: DATABASE_URL")) {
+  failures.push(
+    "release migration: runtime database credential must not authorize migrations",
+  );
 }
 
 const workflowsRoot = resolve(root, "..", ".github", "workflows");
@@ -94,6 +109,19 @@ for (const [environment, workflow] of [
   }
   if (workflow.includes("pull_request_target")) {
     failures.push(`${environment} workflow: pull_request_target is forbidden`);
+  }
+}
+for (const [environment, workflow] of [
+  ["staging", stagingWorkflow],
+  ["production", productionWorkflow],
+]) {
+  for (const required of [
+    "rollout status deployment/portal-worker",
+    "SMOKE_WORKER_URL=",
+  ]) {
+    if (!workflow.includes(required)) {
+      failures.push(`${environment} workflow: missing ${required}`);
+    }
   }
 }
 for (const required of [
@@ -126,6 +154,36 @@ for (const workflow of [stagingWorkflow, productionWorkflow]) {
   ) {
     failures.push("release workflows must pin every action to a full SHA");
   }
+}
+
+const e2eWorkflow = readFileSync(
+  resolve(workflowsRoot, "staging-e2e.yml"),
+  "utf8",
+);
+for (const required of [
+  "workflow_dispatch:",
+  "environment: staging",
+  'STAGING_E2E_ENABLED: "true"',
+  "playwright install --with-deps chromium firefox webkit",
+  "pnpm --filter @portal/e2e test",
+]) {
+  if (!e2eWorkflow.includes(required)) {
+    failures.push(`staging E2E workflow: missing ${required}`);
+  }
+}
+if (/upload-artifact|pull_request_target/u.test(e2eWorkflow)) {
+  failures.push("staging E2E workflow: unsafe trigger or artifact upload");
+}
+const e2eActionReferences = [
+  ...e2eWorkflow.matchAll(/uses:\s*([^\s#]+)/gu),
+].map((match) => match[1]);
+if (
+  e2eActionReferences.some(
+    (reference) =>
+      reference === undefined || !/@[0-9a-f]{40}$/u.test(reference),
+  )
+) {
+  failures.push("staging E2E workflow must pin every action to a full SHA");
 }
 
 const workspacePackages = readdirSync(resolve(repositoryRoot, "packages"), {
@@ -187,6 +245,64 @@ for (const required of [
 
 if (allDeploymentSources.includes("kind: Secret")) {
   failures.push("deploy manifests must not materialize credentials");
+}
+
+const worker = read("base/worker.yaml");
+for (const required of [
+  "name: clamav",
+  "clamav/clamav:1.5.4-debian13-slim@sha256:",
+  'command: ["/init-unprivileged"]',
+  "name: CLAMD_CONF_TCPAddr",
+  "value: 127.0.0.1",
+  "runAsUser: 1000",
+  "readOnlyRootFilesystem: true",
+]) {
+  if (!worker.includes(required)) {
+    failures.push(`worker malware scanner: missing ${required}`);
+  }
+}
+for (const environment of ["staging", "production"]) {
+  const manifest = read(`overlays/${environment}/kustomization.yaml`);
+  if (
+    !manifest.includes("MALWARE_SCANNER_HOST=127.0.0.1") ||
+    !manifest.includes("MALWARE_SCANNER_PORT=3310")
+  ) {
+    failures.push(`${environment}: loopback malware scanner is not configured`);
+  }
+}
+
+const stagingTofu = ["versions.tf", "variables.tf", "main.tf", "outputs.tf"]
+  .map((file) =>
+    readFileSync(
+      resolve(repositoryRoot, "infra", "opentofu", "staging", file),
+      "utf8",
+    ),
+  )
+  .join("\n");
+for (const required of [
+  'version = "~> 2.100.0"',
+  'backend "s3" {}',
+  'default     = "fra1"',
+  'size       = "s-2vcpu-8gb"',
+  'size                 = "db-s-1vcpu-1gb"',
+  'subscription_tier_slug = "basic"',
+  'type  = "k8s"',
+  "prevent_destroy = true",
+]) {
+  if (!stagingTofu.includes(required)) {
+    failures.push(`staging OpenTofu: missing ${required}`);
+  }
+}
+for (const forbidden of [
+  'resource "digitalocean_domain"',
+  'resource "digitalocean_record"',
+  'resource "digitalocean_spaces_key"',
+  'output "database_password"',
+  'output "kube_config"',
+]) {
+  if (stagingTofu.includes(forbidden)) {
+    failures.push(`staging OpenTofu: forbidden ${forbidden}`);
+  }
 }
 
 if (failures.length > 0) {

@@ -6,6 +6,7 @@ export async function runReleaseSmoke(input) {
   const webUrl = safeBaseUrl(input.webUrl);
   const apiUrl = safeBaseUrl(input.apiUrl);
   const metricsUrl = safeBaseUrl(input.metricsUrl);
+  const workerUrl = safeBaseUrl(input.workerUrl);
   const fetcher = input.fetcher ?? fetch;
 
   await expectStatus(fetcher, new URL("/", webUrl), "public web");
@@ -46,12 +47,23 @@ export async function runReleaseSmoke(input) {
       "Monitoring does not expose the expected release revision.",
     );
   }
+  const workerReady = await expectJson(
+    fetcher,
+    new URL("/health/ready", workerUrl),
+    "worker readiness",
+  );
+  if (workerReady.status !== "ready") {
+    throw new Error(
+      "Worker readiness did not prove its active processing loop.",
+    );
+  }
   return Object.freeze({
     apiLive: true,
     authEntrypoint: true,
     databaseReady: true,
     publicWeb: true,
     releaseRevisionVisible: true,
+    workerReady: true,
   });
 }
 
@@ -143,6 +155,7 @@ async function main() {
     expectedRevision: process.env.EXPECTED_RELEASE_REVISION,
     metricsUrl: process.env.SMOKE_METRICS_URL,
     webUrl: process.env.SMOKE_WEB_URL,
+    workerUrl: process.env.SMOKE_WORKER_URL,
   });
   process.stdout.write(
     `Release smoke passed for ${process.env.EXPECTED_RELEASE_REVISION}: ${Object.keys(result).join(", ")}\n`,

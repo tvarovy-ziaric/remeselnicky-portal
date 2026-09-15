@@ -7,3 +7,4 @@ IMPLEMENTATION_BACKLOG.md
 ROADMAP.md
 docs/_source
 pnpm-lock.yaml
+apps/e2e/test-results

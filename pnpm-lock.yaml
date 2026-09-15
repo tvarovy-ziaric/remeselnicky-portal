@@ -104,6 +104,9 @@ importers:
       '@portal/search':
         specifier: workspace:*
         version: link:../../packages/search
+      '@portal/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
       argon2:
         specifier: 0.45.1
         version: 0.45.1
@@ -127,6 +130,18 @@ importers:
         specifier: 'catalog:'
         version: 3.2.7(@types/node@26.5.1)(tsx@4.23.13)
 
+  apps/e2e:
+    devDependencies:
+      '@playwright/test':
+        specifier: 1.63.0
+        version: 1.63.0
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.5.1
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+
   apps/web:
     dependencies:
       '@portal/config':
@@ -143,7 +158,7 @@ importers:
         version: link:../../packages/observability
       next:
         specifier: 16.3.5
-        version: 16.3.5(@types/node@26.5.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 16.3.5(@playwright/test@1.63.0)(@types/node@26.5.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       react:
         specifier: 19.3.0
         version: 19.3.0
@@ -202,6 +217,9 @@ importers:
       '@portal/queue':
         specifier: workspace:*
         version: link:../../packages/queue
+      '@portal/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -1231,6 +1249,11 @@ packages:
   '@pinojs/redact@0.4.0':
     resolution: {integrity: sha512-k2ENnmBugE/rzQfEcdWHcCY+/FM3VLzH9cYEsbdsoqrvzAKRhUZeRNhAZvB8OitQJ1TBed3yqWtdjzS6wJKBwg==}
 
+  '@playwright/test@1.63.0':
+    resolution: {integrity: sha512-oxMK4vllB9RK5NQ2l1pq1IfOf2AvnEuj/vYGDj0H2nMtmtZpKtCwt/l00GEO6xjGfpBNAvjovvYdCm50dRQkpQ==}
+    engines: {node: '>=20'}
+    hasBin: true
+
   '@rollup/rollup-android-arm-eabi@4.63.2':
     resolution: {integrity: sha512-Xa6RDoWa+hNiX6PgsljlH6W75RaONx3y6PVlbLhkEWW+GaPQ3dP5gwbL/erAzQHWwkvW5UxdD5l87Qx2FAQ/4A==}
     cpu: [arm]
@@ -2061,6 +2084,16 @@ packages:
 
   pino@10.3.1:
     resolution: {integrity: sha512-r34yH/GlQpKZbU1BvFFqOjhISRo1MNx1tWYsYvmj6KIRHSPMT2+yHOEb1SG6NMvRoHRF0a07kCOox/9yakl1vg==}
+    hasBin: true
+
+  playwright-core@1.63.0:
+    resolution: {integrity: sha512-rYCsBF/M5HjUch52bbtVONEFjv6Xu8sm8h72dNlR5bzIE1fvC/bxgspzkjSfU+MweEMmPM8KJebG6nnyxo5mCg==}
+    engines: {node: '>=20'}
+    hasBin: true
+
+  playwright@1.63.0:
+    resolution: {integrity: sha512-+7ziBLidS4NaNCdt57SUDT+wYmmd5fmiQejUic/kb+YsYSCPyOOE9sebzMjNmQrsnNpDJqd4WHvV/8lfKfUDUg==}
+    engines: {node: '>=20'}
     hasBin: true
 
   postcss@8.5.23:
@@ -2951,6 +2984,10 @@ snapshots:
 
   '@pinojs/redact@0.4.0': {}
 
+  '@playwright/test@1.63.0':
+    dependencies:
+      playwright: 1.63.0
+
   '@rollup/rollup-android-arm-eabi@4.63.2':
     optional: true
 
@@ -3611,7 +3648,7 @@ snapshots:
 
   natural-compare@1.4.0: {}
 
-  next@16.3.5(@types/node@26.5.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
+  next@16.3.5(@playwright/test@1.63.0)(@types/node@26.5.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
     dependencies:
       '@next/env': 16.3.5
       '@swc/helpers': 0.5.23
@@ -3630,6 +3667,7 @@ snapshots:
       '@next/swc-linux-x64-musl': 16.3.5
       '@next/swc-win32-arm64-msvc': 16.3.5
       '@next/swc-win32-x64-msvc': 16.3.5
+      '@playwright/test': 1.63.0
       sharp: 0.35.4(@types/node@26.5.1)
     transitivePeerDependencies:
       - '@babel/core'
@@ -3694,6 +3732,12 @@ snapshots:
       safe-stable-stringify: 2.5.0
       sonic-boom: 4.2.1
       thread-stream: 4.2.0
+
+  playwright-core@1.63.0: {}
+
+  playwright@1.63.0:
+    dependencies:
+      playwright-core: 1.63.0
 
   postcss@8.5.23:
     dependencies:

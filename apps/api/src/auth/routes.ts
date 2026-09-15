@@ -119,7 +119,11 @@ export interface AuthModuleDependencies {
   >;
   readonly jobRequestDrafts?: Pick<
     JobRequestDraftRouteDependencies,
-    "customerProfiles" | "draftPersistence" | "drafts" | "requests"
+    | "customerProfiles"
+    | "draftPersistence"
+    | "drafts"
+    | "mediaUploads"
+    | "requests"
   >;
   readonly jobRequestVersions?: Pick<
     JobRequestVersionRouteDependencies,
@@ -138,7 +142,7 @@ export interface AuthModuleDependencies {
   readonly quoteLifecycle?: Pick<QuoteLifecycleRouteDependencies, "lifecycle">;
   readonly quoteAuthoring?: Pick<
     QuoteAuthoringRouteDependencies,
-    "core" | "externalPdf" | "structured"
+    "core" | "documentUploads" | "externalPdf" | "structured"
   >;
   readonly r3Analytics?: Pick<R3AnalyticsRouteDependencies, "observations">;
   readonly conversationChat?: {
@@ -394,6 +398,10 @@ async function configureAuthModule(
     registerQuoteAuthoringRoutes(app, {
       csrfProtection: csrfProtection(app),
       guard,
+      rateLimit: {
+        max: rateLimit.config.rateLimit.max,
+        timeWindowMs: rateLimit.config.rateLimit.timeWindow,
+      },
       ...dependencies.quoteAuthoring,
     });
   }

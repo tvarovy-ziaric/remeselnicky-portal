@@ -353,7 +353,7 @@ function allowedGrantsForPurpose(
   switch (purpose) {
     case "JOB_REQUEST_IMAGE":
     case "JOB_REQUEST_DOCUMENT":
-      return new Set(["INVITED_PROVIDER"]);
+      return new Set(["INVITED_PROVIDER", "JOB_CUSTOMER"]);
     case "JOB_IMAGE":
     case "JOB_DOCUMENT":
       return new Set([

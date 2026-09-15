@@ -16,6 +16,7 @@ test("proves public web, auth, database readiness and revision monitoring", asyn
     },
     metricsUrl: "http://127.0.0.1:19464",
     webUrl: "http://127.0.0.1:18080",
+    workerUrl: "http://127.0.0.1:19465",
   });
   assert.deepEqual(visited, [
     "/",
@@ -23,6 +24,7 @@ test("proves public web, auth, database readiness and revision monitoring", asyn
     "/health/ready",
     "/v1/auth/csrf",
     "/metrics",
+    "/health/ready",
   ]);
   assert.equal(Object.values(result).every(Boolean), true);
 });
@@ -40,6 +42,7 @@ test("fails when readiness does not prove the database", async () => {
         ),
       metricsUrl: "http://localhost:19464",
       webUrl: "http://localhost:18080",
+      workerUrl: "http://localhost:19465",
     }),
     /database availability/u,
   );
@@ -58,6 +61,7 @@ test("fails on revision drift or cacheable auth", async () => {
         ),
       metricsUrl: "http://localhost:19464",
       webUrl: "http://localhost:18080",
+      workerUrl: "http://localhost:19465",
     }),
     /expected release revision/u,
   );
@@ -73,6 +77,7 @@ test("fails on revision drift or cacheable auth", async () => {
         ),
       metricsUrl: "http://localhost:19464",
       webUrl: "http://localhost:18080",
+      workerUrl: "http://localhost:19465",
     }),
     /cacheable/u,
   );
@@ -92,6 +97,7 @@ test("rejects remote plaintext and credential-bearing URLs before requests", asy
         },
         metricsUrl: "https://metrics.staging.example.test",
         webUrl,
+        workerUrl: "https://worker.staging.example.test",
       }),
       /TLS\/credential boundary/u,
     );

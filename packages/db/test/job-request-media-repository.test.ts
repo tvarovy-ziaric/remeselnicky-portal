@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Sql } from "postgres";
 
-import { createJobRequestMediaUploadAuthorization } from "../src/job-request-media-repository.js";
+import {
+  createJobRequestMediaAccessResolver,
+  createJobRequestMediaUploadAuthorization,
+} from "../src/job-request-media-repository.js";
 
 const actorUserId = "94000000-0000-4000-8000-000000000001";
 const jobRequestId = "94000000-0000-4000-8000-000000000002";
@@ -101,6 +104,119 @@ describe("job request media upload authorization", () => {
     expect(invalid.queries).toHaveLength(0);
   });
 });
+
+describe("job request media delivery authorization", () => {
+  it("grants only an ACTIVE provider whose exact entitled snapshot selected the asset", async () => {
+    const sql = scriptedSql([
+      [
+        {
+          contentRevision: 3,
+          grant: "INVITED_PROVIDER",
+          relationId: "94000000-0000-4000-8000-000000000005",
+          relationRevision: 2,
+        },
+      ],
+    ]);
+    const access =
+      await createJobRequestMediaAccessResolver(sql).resolvePrivateMediaAccess(
+        deliverySnapshot(),
+      );
+    expect(access.grants).toEqual(["INVITED_PROVIDER"]);
+    expect(access.revision).toMatch(/^job-request:[0-9a-f]{64}$/u);
+    const query = sql.queries.join("\n");
+    expect(query).toMatch(/actor\.account_state = 'ACTIVE'/u);
+    expect(query).toMatch(/'JOB_CUSTOMER'::text/u);
+    expect(query).toMatch(/job_request_material_update_entitlements/u);
+    expect(query).toMatch(/job_request_active_section_revisions/u);
+    expect(query).toMatch(/jsonb_array_elements_text/u);
+    expect(query).not.toMatch(/storage_key|content_sha256/iu);
+  });
+
+  it("grants the ACTIVE customer owner without exposing provider-only history", async () => {
+    const sql = scriptedSql([
+      [
+        {
+          contentRevision: 7,
+          grant: "JOB_CUSTOMER",
+          relationId: jobRequestId,
+          relationRevision: 7,
+        },
+      ],
+    ]);
+    await expect(
+      createJobRequestMediaAccessResolver(sql).resolvePrivateMediaAccess({
+        ...deliverySnapshot(),
+        asset: {
+          ...deliverySnapshot().asset,
+          ownerUserId: actorUserId as never,
+        },
+      }),
+    ).resolves.toMatchObject({ grants: ["JOB_CUSTOMER"] });
+    const query = sql.queries.join("\n");
+    expect(query).toMatch(/customer\.owner_user_id = actor\.id/u);
+    expect(query).toMatch(/actor\.id = \?/u);
+  });
+
+  it("denies wrong provenance, absent entitlement, and corrupt rows", async () => {
+    const wrong = scriptedSql([]);
+    await expect(
+      createJobRequestMediaAccessResolver(wrong).resolvePrivateMediaAccess({
+        ...deliverySnapshot(),
+        asset: { ...deliverySnapshot().asset, provenanceEntityType: "JOB" },
+      }),
+    ).resolves.toMatchObject({ grants: [] });
+    expect(wrong.queries).toHaveLength(0);
+
+    await expect(
+      createJobRequestMediaAccessResolver(
+        scriptedSql([[]]),
+      ).resolvePrivateMediaAccess(deliverySnapshot()),
+    ).resolves.toMatchObject({ grants: [] });
+
+    await expect(
+      createJobRequestMediaAccessResolver(
+        scriptedSql([
+          [
+            {
+              contentRevision: 0,
+              grant: "UNKNOWN",
+              relationId: "invalid",
+              relationRevision: 0,
+            },
+          ],
+        ]),
+      ).resolvePrivateMediaAccess(deliverySnapshot()),
+    ).rejects.toThrow(/invalid/u);
+  });
+});
+
+function deliverySnapshot() {
+  const now = new Date("2026-09-15T20:00:00.000Z");
+  return {
+    actor: { accountState: "ACTIVE" as const, userId: actorUserId as never },
+    asset: {
+      id: "94000000-0000-4000-8000-000000000003",
+      ownerUserId: "94000000-0000-4000-8000-000000000004" as never,
+      provenanceEntityId: jobRequestId,
+      provenanceEntityRevision: 7,
+      provenanceEntityType: "JOB_REQUEST" as const,
+      purpose: "JOB_REQUEST_IMAGE" as const,
+      status: "READY" as const,
+      updatedAt: now,
+    },
+    object: {
+      contentType: "image/webp",
+      createdAt: now,
+      id: "94000000-0000-4000-8000-000000000006",
+      revokedAt: null,
+      role: "CANONICAL" as const,
+      storageObject: {
+        area: "private" as const,
+        key: "private/2026/09/94000000-0000-4000-8000-000000000007" as never,
+      },
+    },
+  };
+}
 
 interface ScriptedSql extends Sql {
   readonly queries: string[];

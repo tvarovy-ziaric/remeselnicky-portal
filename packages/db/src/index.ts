@@ -146,7 +146,10 @@ import type {
   DemandSideNotificationMaintenanceStore,
   JobInvitationReminderStore,
 } from "@portal/notifications";
-import { createJobRequestMediaUploadAuthorization } from "./job-request-media-repository.js";
+import {
+  createJobRequestMediaAccessResolver,
+  createJobRequestMediaUploadAuthorization,
+} from "./job-request-media-repository.js";
 import { createCraftsmanProfileRepository } from "./craftsman-profile-repository.js";
 import type {
   CraftsmanProfilePersistence,
@@ -676,7 +679,10 @@ export {
 } from "./quote-external-pdf-repository.js";
 export type { ExternalPdfQuotePersistence } from "@portal/domain";
 export type { QuoteDocumentUploadAuthorization } from "@portal/media";
-export { createJobRequestMediaUploadAuthorization } from "./job-request-media-repository.js";
+export {
+  createJobRequestMediaAccessResolver,
+  createJobRequestMediaUploadAuthorization,
+} from "./job-request-media-repository.js";
 export type { JobRequestMediaUploadAuthorization } from "@portal/media";
 export { createCraftsmanProfileRepository } from "./craftsman-profile-repository.js";
 export type { CraftsmanProfilePersistence } from "@portal/domain";
@@ -851,6 +857,7 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly conversationAttachmentUploads: ConversationAttachmentUploadAuthorization;
   readonly conversationAttachmentMediaAccess: MediaEntityAccessResolver;
   readonly jobRequestMedia: JobRequestMediaUploadAuthorization;
+  readonly jobRequestMediaAccess: MediaEntityAccessResolver;
   readonly emailVerification: EmailVerificationRepository;
   readonly media: MediaRepository;
   readonly mediaProcessingQueue: ReturnType<typeof createMediaProcessingQueue>;
@@ -956,6 +963,7 @@ export function createDatabase(
   const conversationAttachmentMediaAccess =
     createConversationAttachmentMediaAccessResolver(sql);
   const jobRequestMedia = createJobRequestMediaUploadAuthorization(sql);
+  const jobRequestMediaAccess = createJobRequestMediaAccessResolver(sql);
   const emailVerification = createEmailVerificationRepository(sql);
   const media = createMediaRepository(sql);
   const mediaProcessingQueue = createMediaProcessingQueue(sql);
@@ -1023,6 +1031,7 @@ export function createDatabase(
     conversationAttachmentUploads,
     conversationAttachmentMediaAccess,
     jobRequestMedia,
+    jobRequestMediaAccess,
     emailVerification,
     media,
     mediaProcessingQueue,

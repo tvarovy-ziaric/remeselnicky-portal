@@ -1,0 +1,3 @@
+kubernetes_version = "1.XX.Y-do.Z"
+name_suffix         = "replace1"
+vpc_ip_range        = "10.42.0.0/20"

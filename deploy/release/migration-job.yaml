@@ -35,7 +35,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: portal-runtime-secrets
-                  key: DATABASE_URL
+                  key: MIGRATION_DATABASE_URL
           resources:
             requests:
               cpu: 25m

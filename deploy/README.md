@@ -7,10 +7,13 @@ registry, ingress, certificate, database, or secret-management vendor.
 ## Required platform contracts
 
 - Supply `portal-runtime-secrets` independently in each namespace with
-  `DATABASE_URL`, `SESSION_SECRET`, `OBJECT_STORAGE_ACCESS_KEY_ID` and
-  `OBJECT_STORAGE_SECRET_ACCESS_KEY`. Never commit rendered Secrets. Runtime
-  database credentials must be least-privilege and different per environment;
-  production `DATABASE_URL` must enable TLS.
+  `DATABASE_URL`, `MIGRATION_DATABASE_URL`, `SESSION_SECRET`,
+  `OBJECT_STORAGE_ACCESS_KEY_ID` and `OBJECT_STORAGE_SECRET_ACCESS_KEY`. Never
+  commit rendered Secrets. Runtime database credentials must be least-privilege,
+  unable to perform schema migrations and different per environment. The
+  release migration Job maps the separate schema-owner
+  `MIGRATION_DATABASE_URL` to the migration CLI's process-local `DATABASE_URL`.
+  Both database URLs must enable verified TLS outside development.
 - Replace the object-storage endpoint, public media origin, provider region and
   container placeholders independently in staging and production. The private
   and public-derivative containers must be distinct, credentials must be scoped

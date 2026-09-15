@@ -29,7 +29,8 @@
     "@portal/notifications": "workspace:*",
     "@portal/observability": "workspace:*",
     "@portal/outbox": "workspace:*",
-    "@portal/queue": "workspace:*"
+    "@portal/queue": "workspace:*",
+    "@portal/storage": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",
