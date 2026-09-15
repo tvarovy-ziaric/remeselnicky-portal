@@ -1,5 +1,6 @@
 import {
   normalizeJobRequestContentSection,
+  type JobRequestContentSectionKey,
   type JobRequestContentSection,
 } from "./job-request-content.js";
 import type { JobRequestDraftSectionInput } from "./job-request-draft.js";
@@ -35,6 +36,17 @@ export interface JobRequestActiveContentVersion {
   readonly visibleVersion: number;
 }
 
+export interface JobRequestActiveContentSection {
+  readonly key: JobRequestContentSectionKey;
+  readonly payload: JobRequestContentSection["payload"];
+  readonly schemaVersion: 1;
+}
+
+export interface JobRequestActiveContentSnapshot {
+  readonly sections: readonly JobRequestActiveContentSection[];
+  readonly version: JobRequestActiveContentVersion;
+}
+
 export interface ReviseActiveJobRequestInput {
   readonly actorUserId: UserId;
   readonly commandId: string;
@@ -66,12 +78,30 @@ export type ReviseActiveJobRequestResult = Readonly<
 >;
 
 export interface JobRequestVersionPersistence {
+  readActiveOwned(input: {
+    readonly actorUserId: UserId;
+    readonly contentRevision?: number;
+    readonly jobRequestId: JobRequestId;
+  }): Promise<
+    Readonly<
+      | {
+          readonly snapshot: JobRequestActiveContentSnapshot;
+          readonly status: "OK";
+        }
+      | { readonly status: "ACCOUNT_NOT_ACTIVE" | "NOT_FOUND" }
+    >
+  >;
   reviseActiveOwned(
     input: PersistReviseActiveJobRequestInput,
   ): Promise<ReviseActiveJobRequestResult>;
 }
 
 export interface JobRequestVersionService {
+  readActive(input: {
+    readonly actorUserId: UserId;
+    readonly contentRevision?: number;
+    readonly jobRequestId: JobRequestId;
+  }): ReturnType<JobRequestVersionPersistence["readActiveOwned"]>;
   reviseActive(
     input: ReviseActiveJobRequestInput,
   ): Promise<ReviseActiveJobRequestResult>;
@@ -85,6 +115,14 @@ export function createJobRequestVersionService(input: {
   readonly persistence: JobRequestVersionPersistence;
 }): JobRequestVersionService {
   return Object.freeze({
+    readActive(command: {
+      readonly actorUserId: UserId;
+      readonly contentRevision?: number;
+      readonly jobRequestId: JobRequestId;
+    }) {
+      assertReadActiveJobRequestInput(command);
+      return input.persistence.readActiveOwned(command);
+    },
     reviseActive(command: ReviseActiveJobRequestInput) {
       assertReviseActiveJobRequestInput(command);
       return input.persistence.reviseActiveOwned({
@@ -93,6 +131,32 @@ export function createJobRequestVersionService(input: {
       });
     },
   });
+}
+
+export function assertReadActiveJobRequestInput(input: {
+  readonly actorUserId: UserId;
+  readonly contentRevision?: number;
+  readonly jobRequestId: JobRequestId;
+}): void {
+  if (input === null || typeof input !== "object" || Array.isArray(input)) {
+    throw new TypeError("Invalid active job request read.");
+  }
+  for (const value of [input.actorUserId, input.jobRequestId]) {
+    if (
+      typeof value !== "string" ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(
+        value,
+      )
+    ) {
+      throw new TypeError("Invalid active job request read identity.");
+    }
+  }
+  if (
+    input.contentRevision !== undefined &&
+    (!Number.isSafeInteger(input.contentRevision) || input.contentRevision < 1)
+  ) {
+    throw new TypeError("Invalid active job request content revision.");
+  }
 }
 
 export function assertReviseActiveJobRequestInput(

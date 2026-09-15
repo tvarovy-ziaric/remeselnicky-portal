@@ -394,3 +394,4 @@ export {
 } from "./craftsman-availability-match.js";
 export * from "./job-request.js";
 export * from "./job-request-draft.js";
+export * from "./job-request-version.js";

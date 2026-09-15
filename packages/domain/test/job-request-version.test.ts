@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   classifyJobRequestChange,
@@ -76,6 +76,9 @@ describe("job request version classification", () => {
     let persisted: unknown;
     const service = createJobRequestVersionService({
       persistence: {
+        readActiveOwned() {
+          return Promise.resolve({ status: "NOT_FOUND" as const });
+        },
         reviseActiveOwned(input) {
           persisted = input;
           return Promise.resolve({
@@ -104,6 +107,32 @@ describe("job request version classification", () => {
         payload: { description: "Opraviť strechu" },
       },
     });
+  });
+
+  it("validates exact historical reads before persistence", async () => {
+    const readActiveOwned = vi.fn().mockResolvedValue({ status: "NOT_FOUND" });
+    const service = createJobRequestVersionService({
+      persistence: {
+        readActiveOwned,
+        reviseActiveOwned: () =>
+          Promise.resolve({ status: "NOT_FOUND" as const }),
+      },
+    });
+    await expect(
+      service.readActive({
+        actorUserId: "95000000-0000-4000-8000-000000000001" as UserId,
+        contentRevision: 2,
+        jobRequestId: "95000000-0000-4000-8000-000000000003" as JobRequestId,
+      }),
+    ).resolves.toEqual({ status: "NOT_FOUND" });
+    expect(readActiveOwned).toHaveBeenCalledTimes(1);
+    expect(() =>
+      service.readActive({
+        actorUserId: "95000000-0000-4000-8000-000000000001" as UserId,
+        contentRevision: 0,
+        jobRequestId: "95000000-0000-4000-8000-000000000003" as JobRequestId,
+      }),
+    ).toThrow(/content revision/u);
   });
 });
 

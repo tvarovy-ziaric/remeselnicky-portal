@@ -101,6 +101,7 @@ import { createCustomerProfileRepository } from "./customer-profile-repository.j
 import { createCustomerShortlistRepository } from "./customer-shortlist-repository.js";
 import { createJobRequestRepository } from "./job-request-repository.js";
 import { createJobRequestDraftRepository } from "./job-request-draft-repository.js";
+import { createJobRequestVersionRepository } from "./job-request-version-repository.js";
 import { createJobRequestMediaUploadAuthorization } from "./job-request-media-repository.js";
 import { createCraftsmanProfileRepository } from "./craftsman-profile-repository.js";
 import type {
@@ -109,6 +110,7 @@ import type {
   CustomerProfilePersistence,
   JobRequestPersistence,
   JobRequestDraftPersistence,
+  JobRequestVersionPersistence,
 } from "@portal/domain";
 import * as schema from "./schema/index.js";
 
@@ -592,6 +594,8 @@ export { createJobRequestRepository } from "./job-request-repository.js";
 export type { JobRequestPersistence } from "@portal/domain";
 export { createJobRequestDraftRepository } from "./job-request-draft-repository.js";
 export type { JobRequestDraftPersistence } from "@portal/domain";
+export { createJobRequestVersionRepository } from "./job-request-version-repository.js";
+export type { JobRequestVersionPersistence } from "@portal/domain";
 export { createJobRequestMediaUploadAuthorization } from "./job-request-media-repository.js";
 export type { JobRequestMediaUploadAuthorization } from "@portal/media";
 export { createCraftsmanProfileRepository } from "./craftsman-profile-repository.js";
@@ -746,6 +750,7 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly customerShortlist: CustomerShortlistPersistence;
   readonly jobRequests: JobRequestPersistence;
   readonly jobRequestDrafts: JobRequestDraftPersistence;
+  readonly jobRequestVersions: JobRequestVersionPersistence;
   readonly jobRequestMedia: JobRequestMediaUploadAuthorization;
   readonly emailVerification: EmailVerificationRepository;
   readonly media: MediaRepository;
@@ -828,6 +833,7 @@ export function createDatabase(
   const customerShortlist = createCustomerShortlistRepository(sql);
   const jobRequests = createJobRequestRepository(sql);
   const jobRequestDrafts = createJobRequestDraftRepository(sql);
+  const jobRequestVersions = createJobRequestVersionRepository(sql);
   const jobRequestMedia = createJobRequestMediaUploadAuthorization(sql);
   const emailVerification = createEmailVerificationRepository(sql);
   const media = createMediaRepository(sql);
@@ -875,6 +881,7 @@ export function createDatabase(
     customerShortlist,
     jobRequests,
     jobRequestDrafts,
+    jobRequestVersions,
     jobRequestMedia,
     emailVerification,
     media,

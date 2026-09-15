@@ -49,6 +49,7 @@ import { runCustomerShortlistIntegrationAssertions } from "./customer-shortlist-
 import { runJobRequestIntegrationAssertions } from "./job-request-integration-helper.js";
 import { runJobRequestDraftIntegrationAssertions } from "./job-request-draft-integration-helper.js";
 import { runJobRequestContentIntegrationAssertions } from "./job-request-content-integration-helper.js";
+import { runJobRequestVersionIntegrationAssertions } from "./job-request-version-integration-helper.js";
 
 const testDatabaseUrl = process.env["TEST_DATABASE_URL"];
 const migrationsDirectory = fileURLToPath(
@@ -113,6 +114,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
           "0036_job_request_core.sql",
           "0037_job_request_draft_autosave.sql",
           "0038_job_request_content_validation.sql",
+          "0039_job_request_active_versions.sql",
         ],
         alreadyApplied: 0,
       });
@@ -121,7 +123,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         testDatabaseUrl,
         migrationsDirectory,
       );
-      expect(secondRun).toEqual({ applied: [], alreadyApplied: 39 });
+      expect(secondRun).toEqual({ applied: [], alreadyApplied: 40 });
 
       const sql = postgres(testDatabaseUrl, { max: 5 });
       try {
@@ -167,7 +169,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         `;
 
         expect(postgis?.extversion).toMatch(/^3\./);
-        expect(ledger?.count).toBe(39);
+        expect(ledger?.count).toBe(40);
         expect(created).toMatchObject({ account_state: "ACTIVE" });
         expect(created?.id).toMatch(
           /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
@@ -1707,6 +1709,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         await runJobRequestIntegrationAssertions(sql);
         await runJobRequestDraftIntegrationAssertions(sql);
         await runJobRequestContentIntegrationAssertions(sql);
+        await runJobRequestVersionIntegrationAssertions(sql);
 
         await adminAccess.revokePrivilegedSession(superSessionDigest);
         await expect(
