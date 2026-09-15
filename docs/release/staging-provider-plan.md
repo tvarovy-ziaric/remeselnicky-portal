@@ -190,9 +190,12 @@ Implemented locally in Phase A:
 - private upload and delivery composition is present for JobRequest, chat and
   Quote documents; the worker owns durable processing and uses a pinned,
   non-root ClamAV sidecar over loopback;
-- same-origin `/v1` ingress, API/worker rollout checks and a manual protected
-  Chromium/Firefox/WebKit workflow are present. The browser workflow is
-  intentionally skipped locally until synthetic staging fixtures exist.
+- same-origin `/v1` ingress, API/worker rollout checks and manual protected
+  deployment and Chromium/Firefox/WebKit workflows are present. Deployment
+  requires an exact full SHA reachable from `main` plus the literal
+  `STAGING DEPLOY` confirmation; an ordinary push cannot apply ingress or
+  instantiate a load balancer. The browser workflow is intentionally skipped
+  locally until synthetic staging fixtures exist.
 
 Still required before a provider-backed plan/apply:
 

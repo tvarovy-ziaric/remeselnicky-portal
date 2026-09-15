@@ -1,11 +1,16 @@
 name: Deploy staging
 
 on:
-  workflow_run:
-    workflows: [CI]
-    branches: [main]
-    types: [completed]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      release_revision:
+        description: Full Git SHA approved for the isolated staging deployment
+        required: true
+        type: string
+      deploy_confirmation:
+        description: Type STAGING DEPLOY to confirm the explicit deployment
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -16,22 +21,23 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: staging
     env:
+      STAGING_APPROVAL: ${{ inputs.deploy_confirmation }}
       IMAGE_PREFIX: ${{ vars.STAGING_IMAGE_PREFIX }}
       KUBE_CONFIG_STAGING_B64: ${{ secrets.KUBE_CONFIG_STAGING_B64 }}
       REGISTRY_HOST: ${{ secrets.REGISTRY_HOST }}
       REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
       REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
-      RELEASE_REVISION: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+      RELEASE_REVISION: ${{ inputs.release_revision }}
     steps:
       - name: Check out release revision
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ env.RELEASE_REVISION }}
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Validate deployment inputs and skeleton
@@ -39,7 +45,9 @@ jobs:
         run: |
           set -euo pipefail
           node deploy/scripts/validate.mjs
+          [[ "$STAGING_APPROVAL" == 'STAGING DEPLOY' ]]
           [[ "$RELEASE_REVISION" =~ ^[0-9a-f]{40}$ ]]
+          git merge-base --is-ancestor "$RELEASE_REVISION" origin/main
           [[ "$IMAGE_PREFIX" =~ ^[a-z0-9][a-z0-9._:/-]+$ ]]
           [[ "$REGISTRY_HOST" =~ ^[a-z0-9][a-z0-9.-]*(:[0-9]{1,5})?$ ]]
           [[ "$IMAGE_PREFIX" == "$REGISTRY_HOST/"* ]]

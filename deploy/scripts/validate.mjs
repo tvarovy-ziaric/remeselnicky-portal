@@ -142,6 +142,23 @@ for (const forbidden of ["workflow_run:", "pull_request:", "push:"]) {
     );
   }
 }
+
+for (const required of [
+  "workflow_dispatch:",
+  "STAGING DEPLOY",
+  "release_revision:",
+  "git merge-base --is-ancestor",
+  "cancel-in-progress: false",
+]) {
+  if (!stagingWorkflow.includes(required)) {
+    failures.push(`staging workflow: missing ${required}`);
+  }
+}
+for (const forbidden of ["workflow_run:", "pull_request:", "push:"]) {
+  if (stagingWorkflow.includes(forbidden)) {
+    failures.push(`staging workflow: automatic trigger ${forbidden} forbidden`);
+  }
+}
 for (const workflow of [stagingWorkflow, productionWorkflow]) {
   const actionReferences = [...workflow.matchAll(/uses:\s*([^\s#]+)/gu)].map(
     (match) => match[1],

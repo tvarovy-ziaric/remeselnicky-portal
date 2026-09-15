@@ -47,8 +47,12 @@ port `9464`. Neither monitoring port is exposed by Ingress.
 
 ## Staging CI contract
 
-The staging workflow runs only after successful main-branch CI or explicit
-dispatch. Configure the protected `staging` GitHub environment with:
+The staging workflow is manual-only. Dispatch it with the exact full Git SHA
+already reachable from `main` and the literal confirmation `STAGING DEPLOY`.
+The protected `staging` environment may additionally require an environment
+review before releasing credentials. An ordinary push or successful CI run
+cannot apply manifests or instantiate the ingress load balancer. Configure the
+environment with:
 
 - variable `STAGING_IMAGE_PREFIX` (for example an OCI repository prefix);
 - secrets `REGISTRY_HOST`, `REGISTRY_USERNAME`, `REGISTRY_PASSWORD`;
