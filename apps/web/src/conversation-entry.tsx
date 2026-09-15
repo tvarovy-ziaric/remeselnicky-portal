@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 
 import { ConversationChat } from "./conversation-chat";
+import { QuoteAuthoring } from "./quote-authoring";
 
 export interface ConversationView {
   readonly access: "READ_ONLY" | "WRITABLE";
@@ -64,6 +65,13 @@ export function ConversationEntry({
         Pred potvrdením zákazky nezdieľajte telefón, e-mail ani presnú adresu.
       </p>
       <ConversationChat conversation={conversation} />
+      {conversation.participantRole === "CRAFTSMAN" &&
+      conversation.access === "WRITABLE" ? (
+        <QuoteAuthoring
+          conversationId={conversation.id}
+          invitationId={conversation.invitationId}
+        />
+      ) : null}
       <a href={`/invitations/${encodeURIComponent(conversation.invitationId)}`}>
         Späť na pozvanie
       </a>

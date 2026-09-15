@@ -5,6 +5,7 @@ import {
   createR3AnalyticsProcessor,
   createTrustedAnalyticsPublisher,
 } from "@portal/analytics";
+import type { QuoteId, UserId } from "@portal/domain";
 import type { Sql, TransactionSql } from "postgres";
 import { expect } from "vitest";
 
@@ -12,6 +13,7 @@ import {
   createR3AnalyticsLeaseStore,
   createR3AnalyticsObservationRepository,
 } from "../src/r3-analytics-repository.js";
+import { createQuoteRepository } from "../src/quote-repository.js";
 
 export async function runR3AnalyticsIntegrationAssertions(
   sql: Sql,
@@ -26,6 +28,7 @@ export async function runR3AnalyticsIntegrationAssertions(
     WHERE event_name LIKE 'r3.analytics.%'
   `;
   expect(sourceCount?.count).toBeGreaterThan(0);
+  await createCommittedQuoteRejectionEffect(sql);
   await assertExistingSourceCoverage(sql);
   await assertDeclineEffectInRollback(sql);
   const unsafe = await sql<{ eventName: string }[]>`
@@ -159,6 +162,49 @@ export async function runR3AnalyticsIntegrationAssertions(
 
   await assertInvitationViewAuthorization(sql);
   await assertConsentedObservation(sql);
+}
+
+async function createCommittedQuoteRejectionEffect(sql: Sql): Promise<void> {
+  const [target] = await sql<
+    Array<{
+      readonly customerOwnerId: UserId;
+      readonly quoteId: QuoteId;
+      readonly quoteRevision: number;
+      readonly stateRevision: number;
+    }>
+  >`
+    SELECT customer.owner_user_id AS "customerOwnerId",
+      state.quote_id AS "quoteId", state.revision AS "quoteRevision",
+      state.state_revision AS "stateRevision"
+    FROM current_quote_revision_states state
+    JOIN quotes quote ON quote.id = state.quote_id
+    JOIN current_job_invitations invitation
+      ON invitation.id = quote.invitation_id
+      AND invitation.state = 'ENGAGED'
+    JOIN current_conversations conversation
+      ON conversation.id = quote.conversation_id
+      AND conversation.access_state = 'WRITABLE'
+    JOIN job_invitations identity ON identity.id = invitation.id
+    JOIN customer_profiles customer
+      ON customer.id = identity.customer_profile_id
+    JOIN users owner ON owner.id = customer.owner_user_id
+      AND owner.account_state = 'ACTIVE'
+    WHERE state.state = 'SUBMITTED'
+    ORDER BY state.changed_at, state.quote_id
+    LIMIT 1
+  `;
+  if (target === undefined) {
+    throw new Error("R3 analytics Quote rejection fixture is unavailable.");
+  }
+  const result = await createQuoteRepository(sql).reject({
+    actorUserId: target.customerOwnerId,
+    commandId: randomUUID(),
+    expectedStateRevision: target.stateRevision,
+    quoteId: target.quoteId,
+    rejectionReason: null,
+    revision: target.quoteRevision,
+  });
+  expect(result.status).toBe("APPLIED");
 }
 
 export async function runR3AnalyticsPostLifecycleAssertions(
