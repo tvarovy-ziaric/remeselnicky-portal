@@ -623,9 +623,6 @@ async function findTargetProvider(
         ON profile.id = invitation.craftsman_profile_id
       JOIN users actor ON actor.id = profile.owner_user_id
         AND actor.account_state = 'ACTIVE'
-      JOIN auth_credentials credential ON credential.user_id = actor.id
-        AND credential.email_verified_at IS NOT NULL
-        AND credential.phone_verified_at IS NOT NULL
       WHERE invitation.job_request_id = ${source.jobRequestId}
         AND invitation.state IN ('PENDING', 'ENGAGED')
         AND profile.owner_user_id NOT IN (
@@ -639,9 +636,6 @@ async function findTargetProvider(
         ON profile.id = publication.craftsman_profile_id
       JOIN users actor ON actor.id = profile.owner_user_id
         AND actor.account_state = 'ACTIVE'
-      JOIN auth_credentials credential ON credential.user_id = actor.id
-        AND credential.email_verified_at IS NOT NULL
-        AND credential.phone_verified_at IS NOT NULL
       JOIN current_job_request_active_sections core
         ON core.job_request_id = ${source.jobRequestId}
         AND core.section_key = 'request.core'
