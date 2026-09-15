@@ -718,8 +718,8 @@ async function findBoundaryActors(
   `;
   const [admin] = await sql<ActorRow[]>`
     SELECT owner.id FROM users owner
-    JOIN admin_role_grants grant ON grant.user_id = owner.id
-      AND grant.role = 'ADMIN' AND grant.revoked_at IS NULL
+    JOIN admin_role_grants role_grant ON role_grant.user_id = owner.id
+      AND role_grant.role = 'ADMIN' AND role_grant.revoked_at IS NULL
     WHERE owner.account_state = 'ACTIVE'
       AND owner.id NOT IN (
         ${fixed.competingProviderId}, ${fixed.customerOwnerId},
@@ -729,8 +729,8 @@ async function findBoundaryActors(
   `;
   const [superadmin] = await sql<ActorRow[]>`
     SELECT owner.id FROM users owner
-    JOIN admin_role_grants grant ON grant.user_id = owner.id
-      AND grant.role = 'SUPER_ADMIN' AND grant.revoked_at IS NULL
+    JOIN admin_role_grants role_grant ON role_grant.user_id = owner.id
+      AND role_grant.role = 'SUPER_ADMIN' AND role_grant.revoked_at IS NULL
     WHERE owner.account_state = 'ACTIVE'
       AND owner.id NOT IN (
         ${fixed.competingProviderId}, ${fixed.customerOwnerId},
