@@ -440,9 +440,15 @@ function privateStorage() {
 
 async function createSecurityFixture(sql: Sql): Promise<SecurityFixture> {
   const { source, target } = await findSecurityLineage(sql);
+  const [lifecycleClock] = await sql<Array<{ readonly validUntil: Date }>>`
+    SELECT clock_timestamp() + interval '15 seconds' AS "validUntil"
+  `;
+  if (lifecycleClock === undefined) {
+    throw new Error("R3-022 lifecycle fixture clock is missing.");
+  }
   await ensureVerifiedCredentials(sql, source.customerOwnerId);
   await ensureVerifiedCredentials(sql, target.ownerUserId);
-  await ensureComparableSubmittedQuotes(sql, source);
+  await ensureComparableSubmittedQuotes(sql, source, lifecycleClock.validUntil);
 
   const invitations = createJobInvitationRepository(sql);
   const pendingInvitation =
@@ -528,6 +534,7 @@ async function createSecurityFixture(sql: Sql): Promise<SecurityFixture> {
     providerOwnerId: target.ownerUserId,
     requestContentRevision,
     requestVisibleVersion,
+    validUntil: lifecycleClock.validUntil,
   });
   const actors = await findBoundaryActors(sql, {
     competingProviderId: source.competitorProviderOwnerId,
@@ -992,6 +999,7 @@ async function createReadyChatImage(
 async function ensureComparableSubmittedQuotes(
   sql: Sql,
   source: SourceConversation,
+  validUntil: Date,
 ): Promise<void> {
   const invalidQuotes = await sql<
     Array<{
@@ -1056,6 +1064,7 @@ async function ensureComparableSubmittedQuotes(
         quoteRevision,
         assetId,
         0,
+        validUntil,
       ),
     );
     if (external.status !== "SAVED") {
@@ -1088,6 +1097,7 @@ async function createQuoteHistory(
     readonly providerOwnerId: UserId;
     readonly requestContentRevision: number;
     readonly requestVisibleVersion: number;
+    readonly validUntil: Date;
   },
 ): Promise<{
   readonly currentPdfAssetId: string;
@@ -1169,6 +1179,7 @@ async function createQuoteHistory(
       externalRevision,
       replacedPdfAssetId,
       0,
+      input.validUntil,
     ),
   );
   if (first.status !== "SAVED") {
@@ -1181,6 +1192,7 @@ async function createQuoteHistory(
       externalRevision,
       currentPdfAssetId,
       first.revision.contentRevision,
+      input.validUntil,
     ),
   );
   if (second.status !== "SAVED") {
@@ -1242,6 +1254,7 @@ function externalContentInput(
   quoteRevision: number,
   pdfAssetId: string,
   expectedContentRevision: number,
+  validUntil: Date,
 ) {
   return {
     actorUserId,
@@ -1251,7 +1264,7 @@ function externalContentInput(
       priceMode: "FIXED" as const,
       providerConfirmedSummaryMatchesPdf: true as const,
       totalAmountCents: 146_000,
-      validUntil: new Date("2099-12-31T00:00:00.000Z"),
+      validUntil,
       vatStatus: "VAT_INCLUDED" as const,
     },
     expectedContentRevision,
