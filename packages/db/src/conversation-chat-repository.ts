@@ -315,7 +315,7 @@ async function updateParticipantState(
       ${input.conversationId}, ${input.actorUserId},
       ${command.resultingRevision}, ${input.commandId}, 0, NULL, false, false,
       clock_timestamp()
-    ) RETURNING revision, last_read_sequence AS "lastReadSequence",
+    ) RETURNING revision, last_read_sequence::integer AS "lastReadSequence",
       last_read_at AS "lastReadAt",
       archived, muted
   `;
