@@ -5,11 +5,11 @@ This file is the persistent implementation-status overlay for the hash-verified 
 - Updated: 2026-09-15
 - Definition: D01–D30 LOCKED and hash verified
 - Active release: R3 — Demand side
-- Last completed ticket: R3-006 — active-request limits, expiry, reactivation, cancellation and duplication
-- Active ticket: R3-007 — JobInvitation lifecycle and five-active-invitation bound
-- Next dependency-satisfied candidate: R3-008 — candidate list to customer-selected invitations
+- Last completed ticket: R3-007 — JobInvitation lifecycle and five-active-invitation bound
+- Active ticket: R3-008 — candidate list to customer-selected invitations
+- Next dependency-satisfied candidate: R3-009 — invitation notifications and reminders
 - Human gate: canonical Slovak profession/skill/location content still requires expert/legal/source review before activation; this does not block private supply-side implementation
-- Integrated verification: commit `7fa155b`, CI run `34938053790`, passed quality, dependency audit, secret scan, clean PostgreSQL/PostGIS migrations 0000–0040 and the complete live R0/R1/R2 plus R3-001–R3-006 integration suite; active limits, warning/expiry facts, extension, cancellation, history-clean duplication, idempotency and private session/CSRF API tests passed
+- Integrated verification: commit `ace9966`, CI run `34942638969`, passed quality, dependency audit, secret scan, clean PostgreSQL/PostGIS migrations 0000–0042 and the complete live R0/R1/R2 plus R3-001–R3-007 integration suite; invitation qualification, exact request-version provenance, verification, idempotency, simultaneous-active limit and request-closure behavior passed
 
 ## Ticket state overlay
 
@@ -87,9 +87,10 @@ This file is the persistent implementation-status overlay for the hash-verified 
 | R3-004 | DONE     | Mobile autosave form, governed selection, strict submission validation and READY-only private media passed    |
 | R3-005 | DONE     | Append-only active-content history, server-derived material versions and live PG concurrency guards passed    |
 | R3-006 | DONE     | Configurable active limit/warnings, expiry, extension/reactivation, cancellation and clean duplication passed |
-| R3-007 | ACTIVE   | JobInvitation lifecycle, exact request-version provenance and max-five active invitations                     |
+| R3-007 | DONE     | JobInvitation lifecycle, exact request-version provenance and max-five active invitations passed              |
+| R3-008 | ACTIVE   | Candidate-list selection into server-revalidated customer invitations                                         |
 
-All DONE rows above are covered by CI run `34938053790` unless a more specific earlier run is referenced in history. The run applied migrations `0000`–`0040` twice and passed the complete live PostgreSQL/PostGIS integration suite, including the R1 supply-side authorization/privacy matrix, full R2 discovery/shortlist assertions, and R3 request core, recovery, validated content, private media, active-version history, lifecycle, limit and duplication boundaries.
+All DONE rows above are covered by CI run `34942638969` unless a more specific earlier run is referenced in history. The run applied migrations `0000`–`0042` twice and passed the complete live PostgreSQL/PostGIS integration suite, including the R1 supply-side authorization/privacy matrix, full R2 discovery/shortlist assertions, and R3 request core, recovery, validated content, private media, active-version history, lifecycle, invitation eligibility and concurrency boundaries.
 
 ## Durable decisions
 
