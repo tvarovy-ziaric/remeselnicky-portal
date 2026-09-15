@@ -1762,9 +1762,9 @@ describe.skipIf(testDatabaseUrl === undefined)(
           "PLATFORM_STRUCTURED",
         );
         await runExternalPdfQuoteIntegrationAssertions(sql);
+        await runR3DemandSideSecurityIntegrationAssertions(sql);
         await runQuoteLifecycleIntegrationAssertions(sql);
         await runDemandSideNotificationIntegrationAssertions(sql);
-        await runR3DemandSideSecurityIntegrationAssertions(sql);
         await runR3AnalyticsIntegrationAssertions(sql);
         await runJobRequestLifecycleIntegrationAssertions(sql);
         await runR3AnalyticsPostLifecycleAssertions(sql);
