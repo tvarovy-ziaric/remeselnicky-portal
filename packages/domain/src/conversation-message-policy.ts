@@ -83,7 +83,7 @@ const policyExpressions: ReadonlyArray<
       /https?:\/\/(?:www\.)?(?:m\.me|t\.me|signal\.me)\/[\p{L}\d._%+~@-]+/iu,
       /https?:\/\/(?:www\.)?instagram\.com\/(?!(?:p|reel|explore|business)\/)[\p{L}\d._-]{2,}(?:[/?#]|$)/iu,
       /https?:\/\/(?:www\.)?facebook\.com\/(?!(?:business|help|groups|watch|marketplace)\/)(?:profile\.php\?id=\d+|[\p{L}\d._-]{2,})(?:[/?#]|$)/iu,
-      /\b(?:instagram|insta|ig|facebook|fb|messenger|telegram|signal|whatsapp|viber|tiktok)\b[^\n]{0,30}(?:@[\p{L}\d._-]{2,}|(?:profil|profile|meno|username|nick)\s*[:=-]?\s*[\p{L}\d._-]{2,}|[:=-]\s*[\p{L}\d._-]{2,})/iu,
+      /\b(?:instagram(?:e)?|insta|ig|facebook(?:u)?|fb|messenger(?:i)?|telegram(?:e)?|signal(?:e)?|whatsapp(?:e)?|viber(?:e)?|tiktok(?:u)?)\b[^\n]{0,30}(?:@[\p{L}\d._-]{2,}|(?:profil|profile|meno|username|nick)\s*[:=-]?\s*[\p{L}\d._-]{2,}|[:=-]\s*[\p{L}\d._-]{2,})/iu,
     ],
   ],
   [

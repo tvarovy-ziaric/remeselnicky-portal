@@ -57,7 +57,7 @@ BEGIN
       normalized ~ 'https?://(www\.)?facebook\.com/(profile\.php\?id=[0-9]+|[[:alnum:]_.-]{2,})([/?#[:space:]]|$)'
       AND normalized !~ 'https?://(www\.)?facebook\.com/(business|help|groups|watch|marketplace)/'
     )
-    OR normalized ~ '(^|[^[:alnum:]_])(instagram|insta|ig|facebook|fb|messenger|telegram|signal|whatsapp|viber|tiktok)([^[:alnum:]_]|$)[^\n]{0,30}(@[[:alnum:]_.-]{2,}|(profil|profile|meno|username|nick)[[:space:]]*[:=-]?[[:space:]]*[[:alnum:]_.-]{2,}|[:=-][[:space:]]*[[:alnum:]_.-]{2,})'
+    OR normalized ~ '(^|[^[:alnum:]_])(instagram(e)?|insta|ig|facebook(u)?|fb|messenger(i)?|telegram(e)?|signal(e)?|whatsapp(e)?|viber(e)?|tiktok(u)?)([^[:alnum:]_]|$)[^\n]{0,30}(@[[:alnum:]_.-]{2,}|(profil|profile|meno|username|nick)[[:space:]]*[:=-]?[[:space:]]*[[:alnum:]_.-]{2,}|[:=-][[:space:]]*[[:alnum:]_.-]{2,})'
     -- Postal/address disclosures. Slash fractions alone are intentionally safe.
     OR normalized ~ '(^|[^[:alnum:]_])(psč|psc)([^[:alnum:]_]|$)[^0-9\n]{0,12}[0-9]{3}[[:space:]]?[0-9]{2}([^0-9]|$)'
     OR normalized ~ '(^|[^0-9])[0-9]{3}[[:space:]][0-9]{2}([^0-9]|$)'

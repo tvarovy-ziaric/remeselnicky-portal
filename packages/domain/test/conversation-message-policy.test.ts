@@ -17,6 +17,7 @@ describe("conversation message contact/address policy", () => {
     ["CONTACT_SCHEME", "tel:+421900123456"],
     ["CONTACT_SCHEME", "https://wa.me/421900123456"],
     ["SOCIAL_CONTACT", "Instagram @moj_profil"],
+    ["SOCIAL_CONTACT", "Som na Instagrame @majster_test"],
     ["SOCIAL_CONTACT", "IG: moj_profil"],
     ["SOCIAL_CONTACT", "FB @majster_test"],
     ["SOCIAL_CONTACT", "Telegram meno: majster123"],
