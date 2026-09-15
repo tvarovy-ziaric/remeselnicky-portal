@@ -116,9 +116,19 @@ export interface AuthModuleDependencies {
   readonly jobInvitations?: Pick<JobInvitationRouteDependencies, "invitations">;
   readonly conversations?: Pick<ConversationRouteDependencies, "conversations">;
   readonly conversationChat?: {
+    readonly admission: Exclude<
+      NonNullable<ConversationRouteDependencies["chat"]>["admission"],
+      undefined
+    >;
+    readonly attachmentUploads?: NonNullable<
+      ConversationRouteDependencies["chat"]
+    >["attachmentUploads"];
     readonly persistence: NonNullable<
       ConversationRouteDependencies["chat"]
     >["persistence"];
+    readonly privateMediaDelivery?: NonNullable<
+      ConversationRouteDependencies["chat"]
+    >["privateMediaDelivery"];
     readonly service: NonNullable<
       ConversationRouteDependencies["chat"]
     >["service"];
@@ -309,12 +319,22 @@ async function configureAuthModule(
         ? {}
         : {
             chat: {
+              admission: dependencies.conversationChat.admission,
+              ...(dependencies.conversationChat.attachmentUploads === undefined
+                ? {}
+                : {
+                    attachmentUploads:
+                      dependencies.conversationChat.attachmentUploads,
+                  }),
               csrfProtection: csrfProtection(app),
               persistence: dependencies.conversationChat.persistence,
-              rateLimit: {
-                max: rateLimit.config.rateLimit.max,
-                timeWindowMs: rateLimit.config.rateLimit.timeWindow,
-              },
+              ...(dependencies.conversationChat.privateMediaDelivery ===
+              undefined
+                ? {}
+                : {
+                    privateMediaDelivery:
+                      dependencies.conversationChat.privateMediaDelivery,
+                  }),
               service: dependencies.conversationChat.service,
             },
           }),

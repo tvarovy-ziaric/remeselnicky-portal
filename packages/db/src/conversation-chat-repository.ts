@@ -2,6 +2,8 @@ import { createHash, randomUUID } from "node:crypto";
 
 import {
   CONVERSATION_TIMELINE_MAX_PAGE_SIZE,
+  CONVERSATION_MESSAGE_MAX_ATTACHMENTS,
+  CONVERSATION_MESSAGE_MAX_IMAGE_ATTACHMENTS,
   ConversationChatIdempotencyError,
   assertConversationParticipantStateInput,
   assertConversationReportInput,
@@ -19,6 +21,7 @@ import {
   type ConversationReportInput,
   type ConversationReportResult,
   type ConversationTimelineEntry,
+  type ConversationTimelineAttachment,
   type ConversationTimelinePage,
   type ConversationTimelineReadInput,
 } from "@portal/domain";
@@ -41,6 +44,14 @@ interface EntryRow {
   readonly replyToMessageId: string | null;
   readonly sequence: number;
   readonly systemEvent: "ENGAGEMENT" | null;
+}
+
+interface AttachmentRow {
+  readonly assetId: string;
+  readonly createdAt: Date;
+  readonly kind: "DOCUMENT" | "IMAGE";
+  readonly messageId: string;
+  readonly status: "PROCESSING" | "READY" | "REJECTED";
 }
 
 interface StateRow {
@@ -147,12 +158,17 @@ async function readTimeline(
   `;
   const hasMore = rows.length > limit;
   const selected = rows.slice(0, limit).reverse();
+  const attachments = await loadAttachments(
+    transaction,
+    selected.filter((row) => row.kind === "HUMAN_MESSAGE").map((row) => row.id),
+  );
   const entries = Object.freeze(
     selected.map((row) =>
       toTimelineEntry(
         row,
         input.actorUserId,
         counterpartState.lastReadSequence,
+        attachments.get(row.id) ?? Object.freeze([]),
       ),
     ),
   );
@@ -383,6 +399,23 @@ async function findParticipant(
   actorUserId: string,
   lock: boolean,
 ): Promise<ParticipantRow | null> {
+  if (lock) {
+    const actors = await transaction`
+      SELECT id FROM users
+      WHERE id = ${actorUserId} AND account_state = 'ACTIVE'
+      FOR UPDATE
+    `;
+    if (actors.length !== 1) return null;
+    const invitations = await transaction`
+      SELECT invitation.id
+      FROM conversations conversation
+      JOIN job_invitations invitation
+        ON invitation.id = conversation.invitation_id
+      WHERE conversation.id = ${conversationId}
+      FOR UPDATE OF invitation
+    `;
+    if (invitations.length !== 1) return null;
+  }
   const rows = lock
     ? await transaction<ParticipantRow[]>`
         SELECT current.access_state AS access,
@@ -402,7 +435,7 @@ async function findParticipant(
         WHERE conversation.id = ${conversationId}
           AND (customer.owner_user_id = actor.id
             OR craftsman.owner_user_id = actor.id)
-        FOR UPDATE OF conversation, actor
+        FOR UPDATE OF conversation
       `
     : await transaction<ParticipantRow[]>`
         SELECT current.access_state AS access,
@@ -509,13 +542,73 @@ async function loadEntry(
     row.conversationId as ConversationId,
     counterpartUserId,
   );
-  return toTimelineEntry(row, actorUserId, counterpartState.lastReadSequence);
+  const attachments = await loadAttachments(transaction, [row.id]);
+  return toTimelineEntry(
+    row,
+    actorUserId,
+    counterpartState.lastReadSequence,
+    attachments.get(row.id) ?? Object.freeze([]),
+  );
+}
+
+async function loadAttachments(
+  transaction: TransactionSql,
+  messageIds: readonly string[],
+): Promise<ReadonlyMap<string, readonly ConversationTimelineAttachment[]>> {
+  if (messageIds.length === 0) return new Map();
+  const rows = await transaction<AttachmentRow[]>`
+    SELECT asset.id AS "assetId", asset.provenance_entity_id AS "messageId",
+      asset.kind, asset.status, asset.created_at AS "createdAt"
+    FROM media_assets asset
+    WHERE asset.provenance_entity_type = 'CONVERSATION_MESSAGE'
+      AND asset.provenance_entity_id = ANY(${messageIds}::uuid[])
+      AND asset.purpose IN ('CHAT_IMAGE', 'CHAT_DOCUMENT')
+    ORDER BY asset.provenance_entity_id, asset.created_at, asset.id
+    LIMIT ${messageIds.length * CONVERSATION_MESSAGE_MAX_ATTACHMENTS + 1}
+  `;
+  if (rows.length > messageIds.length * CONVERSATION_MESSAGE_MAX_ATTACHMENTS) {
+    throw new Error("Corrupt conversation attachment projection.");
+  }
+  const grouped = new Map<string, ConversationTimelineAttachment[]>();
+  for (const row of rows) {
+    if (
+      !isUuid(row.assetId) ||
+      !messageIds.includes(row.messageId) ||
+      (row.kind !== "IMAGE" && row.kind !== "DOCUMENT") ||
+      !["PROCESSING", "READY", "REJECTED"].includes(row.status) ||
+      !(row.createdAt instanceof Date) ||
+      Number.isNaN(row.createdAt.valueOf())
+    ) {
+      throw new Error("Corrupt conversation attachment projection.");
+    }
+    const current = grouped.get(row.messageId) ?? [];
+    current.push(
+      Object.freeze({
+        assetId: row.assetId,
+        createdAt: new Date(row.createdAt),
+        kind: row.kind === "IMAGE" ? "IMAGE" : "PDF",
+        status: row.status,
+      }),
+    );
+    if (
+      current.length > CONVERSATION_MESSAGE_MAX_ATTACHMENTS ||
+      current.filter((attachment) => attachment.kind === "IMAGE").length >
+        CONVERSATION_MESSAGE_MAX_IMAGE_ATTACHMENTS
+    ) {
+      throw new Error("Corrupt conversation attachment projection.");
+    }
+    grouped.set(row.messageId, current);
+  }
+  return new Map(
+    [...grouped].map(([messageId, items]) => [messageId, Object.freeze(items)]),
+  );
 }
 
 function toTimelineEntry(
   row: EntryRow,
   actorUserId: string,
   counterpartLastRead: number,
+  attachments: readonly ConversationTimelineAttachment[],
 ): ConversationTimelineEntry {
   if (
     !isUuid(row.id) ||
@@ -539,6 +632,7 @@ function toTimelineEntry(
       throw new Error("Corrupt conversation system event.");
     }
     return Object.freeze({
+      attachments: Object.freeze([]),
       author: "SYSTEM",
       authorRole: null,
       body: null,
@@ -564,6 +658,7 @@ function toTimelineEntry(
   }
   const self = row.authorUserId === actorUserId;
   return Object.freeze({
+    attachments,
     author: self ? "SELF" : "COUNTERPART",
     authorRole: row.authorRole,
     body: row.body,

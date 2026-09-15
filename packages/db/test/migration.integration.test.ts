@@ -61,6 +61,7 @@ import {
   runConversationChatIntegrationAssertions,
   runConversationChatReadOnlyIntegrationAssertions,
 } from "./conversation-chat-integration-helper.js";
+import { runConversationAttachmentIntegrationAssertions } from "./conversation-attachment-integration-helper.js";
 
 const testDatabaseUrl = process.env["TEST_DATABASE_URL"];
 const migrationsDirectory = fileURLToPath(
@@ -132,6 +133,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
           "0043_job_invitation_notifications.sql",
           "0044_conversation_entity.sql",
           "0045_conversation_chat.sql",
+          "0046_conversation_attachments.sql",
         ],
         alreadyApplied: 0,
       });
@@ -140,7 +142,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         testDatabaseUrl,
         migrationsDirectory,
       );
-      expect(secondRun).toEqual({ applied: [], alreadyApplied: 46 });
+      expect(secondRun).toEqual({ applied: [], alreadyApplied: 47 });
 
       const sql = postgres(testDatabaseUrl, { max: 5 });
       try {
@@ -186,7 +188,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         `;
 
         expect(postgis?.extversion).toMatch(/^3\./);
-        expect(ledger?.count).toBe(46);
+        expect(ledger?.count).toBe(47);
         expect(created).toMatchObject({ account_state: "ACTIVE" });
         expect(created?.id).toMatch(
           /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
@@ -1732,6 +1734,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         await runJobInvitationNotificationIntegrationAssertions(sql);
         await runConversationIntegrationAssertions(sql);
         await runConversationChatIntegrationAssertions(sql);
+        await runConversationAttachmentIntegrationAssertions(sql);
         await runJobRequestLifecycleIntegrationAssertions(sql);
         await runConversationReadOnlyIntegrationAssertions(sql);
         await runConversationChatReadOnlyIntegrationAssertions(sql);

@@ -17,11 +17,28 @@ import type {
   FastifyRequest,
   onRequestHookHandler,
 } from "fastify";
+import {
+  MEDIA_UPLOAD_LIMITS,
+  MediaUploadRejectedError,
+  PRIVATE_MEDIA_DOWNLOAD_PATH,
+  type ConversationAttachmentMediaKind,
+  type ConversationAttachmentUploadService,
+  type PrivateMediaEndpointResponse,
+} from "@portal/media";
+import { createAuthenticatedAuthorizationActor } from "@portal/authorization";
+
+import type {
+  ConversationWriteAction,
+  ConversationWriteAdmission,
+} from "./write-admission.js";
 
 export const CONVERSATION_PATHS = Object.freeze({
   byId: "/v1/me/conversations/:conversationId",
   byInvitation: "/v1/me/invitations/:invitationId/conversation",
   messages: "/v1/me/conversations/:conversationId/messages",
+  attachments:
+    "/v1/me/conversations/:conversationId/messages/:messageId/attachments/:mediaKind",
+  mediaDownload: PRIVATE_MEDIA_DOWNLOAD_PATH,
   report: "/v1/me/conversations/:conversationId/reports",
   state: "/v1/me/conversations/:conversationId/state",
   timeline: "/v1/me/conversations/:conversationId/timeline",
@@ -39,10 +56,17 @@ interface Guard {
 
 export interface ConversationRouteDependencies {
   readonly chat?: {
+    readonly admission?: ConversationWriteAdmission;
+    readonly attachmentUploads?: ConversationAttachmentUploadService;
     readonly csrfProtection: onRequestHookHandler;
     readonly persistence: Pick<ConversationChatPersistence, "readTimeline">;
-    readonly rateLimit: { readonly max: number; readonly timeWindowMs: number };
     readonly service: ConversationChatService;
+    readonly privateMediaDelivery?: {
+      handleDownload(input: {
+        readonly actorUserId?: string;
+        readonly mediaAssetId: string;
+      }): Promise<PrivateMediaEndpointResponse>;
+    };
   };
   readonly conversations: Pick<
     ConversationPersistence,
@@ -56,6 +80,12 @@ export function registerConversationRoutes(
   dependencies: ConversationRouteDependencies,
 ): void {
   app.addHook("onSend", (request, reply, payload, done) => {
+    if (request.url.startsWith("/v1/media/")) {
+      void reply.header("cache-control", "private, no-store");
+      void reply.header("x-robots-tag", "noindex, nofollow");
+      done(null, payload);
+      return;
+    }
     if (
       request.url.startsWith("/v1/me/conversations/") ||
       (request.url.startsWith("/v1/me/invitations/") &&
@@ -122,14 +152,7 @@ function registerConversationChatRoutes(
   guard: Guard,
   chat: NonNullable<ConversationRouteDependencies["chat"]>,
 ): void {
-  const limited = {
-    config: {
-      rateLimit: {
-        max: chat.rateLimit.max,
-        timeWindow: chat.rateLimit.timeWindowMs,
-      },
-    },
-  } as const;
+  registerPrivateMediaBodyParsers(app);
 
   app.get<{
     Params: { readonly conversationId: string };
@@ -183,13 +206,22 @@ function registerConversationChatRoutes(
   }>(
     CONVERSATION_PATHS.messages,
     {
-      ...limited,
       onRequest: chat.csrfProtection,
       schema: { body: messageBodySchema, params: conversationParamsSchema },
     },
     async (request, reply) => {
       const actorUserId = await requireActor(request, reply, guard);
       if (actorUserId === undefined) return;
+      if (
+        !(await admitWrite(
+          chat.admission,
+          request,
+          reply,
+          actorUserId,
+          "MESSAGE_SEND",
+        ))
+      )
+        return;
       try {
         const result = await chat.service.sendMessage({
           actorUserId,
@@ -232,13 +264,22 @@ function registerConversationChatRoutes(
   }>(
     CONVERSATION_PATHS.state,
     {
-      ...limited,
       onRequest: chat.csrfProtection,
       schema: { body: stateBodySchema, params: conversationParamsSchema },
     },
     async (request, reply) => {
       const actorUserId = await requireActor(request, reply, guard);
       if (actorUserId === undefined) return;
+      if (
+        !(await admitWrite(
+          chat.admission,
+          request,
+          reply,
+          actorUserId,
+          "PARTICIPANT_STATE",
+        ))
+      )
+        return;
       try {
         const result = await chat.service.updateParticipantState({
           action: request.body.action as ConversationParticipantAction,
@@ -280,13 +321,22 @@ function registerConversationChatRoutes(
   }>(
     CONVERSATION_PATHS.report,
     {
-      ...limited,
       onRequest: chat.csrfProtection,
       schema: { body: reportBodySchema, params: conversationParamsSchema },
     },
     async (request, reply) => {
       const actorUserId = await requireActor(request, reply, guard);
       if (actorUserId === undefined) return;
+      if (
+        !(await admitWrite(
+          chat.admission,
+          request,
+          reply,
+          actorUserId,
+          "REPORT",
+        ))
+      )
+        return;
       try {
         const result = await chat.service.report({
           actorUserId,
@@ -304,6 +354,106 @@ function registerConversationChatRoutes(
       } catch (error: unknown) {
         return commandError(error, reply);
       }
+    },
+  );
+
+  app.post<{
+    Body: Buffer;
+    Params: {
+      readonly conversationId: string;
+      readonly mediaKind: "documents" | "photos";
+      readonly messageId: string;
+    };
+  }>(
+    CONVERSATION_PATHS.attachments,
+    {
+      bodyLimit: MEDIA_UPLOAD_LIMITS.documentMaxBytes,
+      onRequest: chat.csrfProtection,
+      schema: { params: attachmentParamsSchema },
+    },
+    async (request, reply) => {
+      const actorUserId = await requireActor(request, reply, guard);
+      if (actorUserId === undefined) return;
+      if (
+        !(await admitWrite(
+          chat.admission,
+          request,
+          reply,
+          actorUserId,
+          "ATTACHMENT_UPLOAD",
+        ))
+      ) {
+        return;
+      }
+      if (chat.attachmentUploads === undefined) {
+        return reply.code(503).send({ code: "UPLOAD_UNAVAILABLE" });
+      }
+      const mediaKind: ConversationAttachmentMediaKind =
+        request.params.mediaKind === "photos" ? "IMAGE" : "PDF";
+      const maximumBytes =
+        mediaKind === "IMAGE"
+          ? MEDIA_UPLOAD_LIMITS.imageMaxBytes
+          : MEDIA_UPLOAD_LIMITS.documentMaxBytes;
+      if (!Buffer.isBuffer(request.body) || request.body.byteLength < 1) {
+        return reply.code(400).send({ code: "INVALID_FILE" });
+      }
+      if (request.body.byteLength > maximumBytes) {
+        return reply.code(413).send({ code: "FILE_TOO_LARGE" });
+      }
+      const contentType = request.headers["content-type"] ?? "";
+      if (!contentTypeAllowed(mediaKind, contentType)) {
+        return reply.code(400).send({ code: "INVALID_FILE" });
+      }
+      try {
+        const result = await chat.attachmentUploads.upload({
+          actor: createAuthenticatedAuthorizationActor({
+            accountState: "ACTIVE",
+            id: actorUserId,
+          }),
+          body: request.body,
+          conversationId: request.params.conversationId,
+          declaredContentType: contentType,
+          mediaKind,
+          messageId: request.params.messageId,
+        });
+        return result.status === "PROCESSING"
+          ? reply.code(202).send(result)
+          : reply.code(404).send({ code: "UPLOAD_UNAVAILABLE" });
+      } catch (error: unknown) {
+        if (error instanceof MediaUploadRejectedError) {
+          return reply.code(error.code === "FILE_TOO_LARGE" ? 413 : 400).send({
+            code:
+              error.code === "FILE_TOO_LARGE"
+                ? "FILE_TOO_LARGE"
+                : "INVALID_FILE",
+          });
+        }
+        return reply.code(503).send({ code: "UPLOAD_UNAVAILABLE" });
+      }
+    },
+  );
+
+  app.get<{ Params: { readonly mediaAssetId: string } }>(
+    CONVERSATION_PATHS.mediaDownload,
+    { schema: { params: mediaDownloadParamsSchema } },
+    async (request, reply) => {
+      const actorUserId = await requireActor(request, reply, guard);
+      if (actorUserId === undefined) return;
+      if (chat.privateMediaDelivery === undefined) {
+        return reply.code(503).send({ code: "MEDIA_DELIVERY_UNAVAILABLE" });
+      }
+      const result = await chat.privateMediaDelivery.handleDownload({
+        actorUserId,
+        mediaAssetId: request.params.mediaAssetId,
+      });
+      reply.headers({
+        ...result.headers,
+        "x-content-type-options": "nosniff",
+      });
+      if (result.statusCode === 303) {
+        return reply.code(303).send();
+      }
+      return reply.code(result.statusCode).send(result.body);
     },
   );
 }
@@ -332,6 +482,12 @@ function serializeConversation(conversation: Conversation) {
 
 function serializeTimelineEntry(entry: ConversationTimelineEntry) {
   return {
+    attachments: entry.attachments.map((attachment) => ({
+      assetId: attachment.assetId,
+      createdAt: attachment.createdAt.toISOString(),
+      kind: attachment.kind,
+      status: attachment.status,
+    })),
     author: entry.author,
     authorRole: entry.authorRole,
     body: entry.body,
@@ -397,6 +553,63 @@ async function requireActor(
   return result.user.id;
 }
 
+async function admitWrite(
+  admission: ConversationWriteAdmission | undefined,
+  request: FastifyRequest,
+  reply: FastifyReply,
+  actorUserId: UserId,
+  action: ConversationWriteAction,
+): Promise<boolean> {
+  if (admission === undefined) {
+    await reply.code(503).send({ code: "TEMPORARILY_UNAVAILABLE" });
+    return false;
+  }
+  try {
+    const result = await admission.admit({
+      action,
+      actorUserId,
+      ip: request.ip,
+    });
+    if (result === "RATE_LIMITED") {
+      await reply.code(429).send({ code: "RATE_LIMITED" });
+      return false;
+    }
+    return true;
+  } catch {
+    await reply.code(503).send({ code: "TEMPORARILY_UNAVAILABLE" });
+    return false;
+  }
+}
+
+function registerPrivateMediaBodyParsers(app: FastifyInstance): void {
+  for (const contentType of [
+    "application/pdf",
+    "image/heic",
+    "image/heif",
+    "image/jpeg",
+    "image/png",
+  ]) {
+    if (app.hasContentTypeParser(contentType)) continue;
+    app.addContentTypeParser(
+      contentType,
+      { parseAs: "buffer" },
+      (_request, body, done) => done(null, body),
+    );
+  }
+}
+
+function contentTypeAllowed(
+  mediaKind: ConversationAttachmentMediaKind,
+  contentType: string,
+): boolean {
+  const normalized = contentType.trim().toLowerCase();
+  return mediaKind === "PDF"
+    ? normalized === "application/pdf"
+    : ["image/heic", "image/heif", "image/jpeg", "image/png"].includes(
+        normalized,
+      );
+}
+
 const uuid = {
   pattern:
     "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
@@ -412,6 +625,22 @@ const invitationParamsSchema = {
   additionalProperties: false,
   properties: { invitationId: uuid },
   required: ["invitationId"],
+  type: "object",
+} as const;
+const attachmentParamsSchema = {
+  additionalProperties: false,
+  properties: {
+    conversationId: uuid,
+    mediaKind: { enum: ["documents", "photos"], type: "string" },
+    messageId: uuid,
+  },
+  required: ["conversationId", "messageId", "mediaKind"],
+  type: "object",
+} as const;
+const mediaDownloadParamsSchema = {
+  additionalProperties: false,
+  properties: { mediaAssetId: uuid },
+  required: ["mediaAssetId"],
   type: "object",
 } as const;
 const timelineQuerySchema = {

@@ -374,6 +374,9 @@ importers:
       '@portal/authorization':
         specifier: workspace:*
         version: link:../authorization
+      '@portal/domain':
+        specifier: workspace:*
+        version: link:../domain
       '@portal/queue':
         specifier: workspace:*
         version: link:../queue
@@ -390,9 +393,6 @@ importers:
         specifier: 0.35.4
         version: 0.35.4(@types/node@26.5.1)
     devDependencies:
-      '@portal/domain':
-        specifier: workspace:*
-        version: link:../domain
       '@types/node':
         specifier: 'catalog:'
         version: 26.5.1

@@ -27,6 +27,15 @@ export {
 } from "./conversations/routes.js";
 export type { ConversationRouteDependencies } from "./conversations/routes.js";
 export {
+  CONVERSATION_WRITE_IP_LIMIT_MULTIPLIER,
+  createDatabaseConversationWriteAdmission,
+} from "./conversations/write-admission.js";
+export type {
+  ConversationWriteAction,
+  ConversationWriteAdmission,
+  ConversationWriteRateLimitPersistence,
+} from "./conversations/write-admission.js";
+export {
   createDatabasePublicSearchAdmission,
   PUBLIC_SEARCH_CARDS_PATH,
   PUBLIC_SEARCH_RATE_LIMIT_MULTIPLIER,

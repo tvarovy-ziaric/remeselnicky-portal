@@ -30,6 +30,15 @@ describe("conversation chat repository", () => {
         },
       ],
       [humanEntry()],
+      [
+        {
+          assetId: "95200000-0000-4000-8000-000000000006",
+          createdAt: new Date("2026-09-15T08:00:01Z"),
+          kind: "DOCUMENT",
+          messageId,
+          status: "PROCESSING",
+        },
+      ],
       [{ count: 1 }],
     ]);
     await expect(
@@ -40,6 +49,7 @@ describe("conversation chat repository", () => {
     ).resolves.toMatchObject({
       entries: [
         {
+          attachments: [{ kind: "PDF", status: "PROCESSING" }],
           author: "SELF",
           readByCounterpart: true,
           sequence: 2,
@@ -61,7 +71,13 @@ describe("conversation chat repository", () => {
   });
 
   it("keeps terminal conversations readable but rejects a new message", async () => {
-    const fixture = scriptedSql([[], [participant("READ_ONLY")], []]);
+    const fixture = scriptedSql([
+      [],
+      [{ id: actorUserId }],
+      [{ id: conversationId }],
+      [participant("READ_ONLY")],
+      [],
+    ]);
     await expect(
       createConversationChatRepository(fixture.sql).sendMessage({
         actorUserId,
@@ -70,11 +86,19 @@ describe("conversation chat repository", () => {
         conversationId,
       }),
     ).resolves.toEqual({ status: "READ_ONLY" });
-    expect(fixture.statements).toHaveLength(3);
+    expect(fixture.statements).toHaveLength(5);
+    expect(fixture.statements[1]).toContain("account_state = 'ACTIVE'");
+    expect(fixture.statements[2]).toContain("FROM conversations conversation");
+    expect(fixture.statements[2]).toContain("FOR UPDATE OF invitation");
   });
 
   it("returns the same uniform absence for a competitor", async () => {
-    const fixture = scriptedSql([[], []]);
+    const fixture = scriptedSql([
+      [],
+      [{ id: actorUserId }],
+      [{ id: conversationId }],
+      [],
+    ]);
     await expect(
       createConversationChatRepository(fixture.sql).sendMessage({
         actorUserId,
@@ -88,6 +112,8 @@ describe("conversation chat repository", () => {
   it("rejects command-id reuse with another intent after reauthorization", async () => {
     const fixture = scriptedSql([
       [],
+      [{ id: actorUserId }],
+      [{ id: conversationId }],
       [participant("WRITABLE")],
       [
         {
@@ -114,6 +140,7 @@ describe("conversation chat repository", () => {
       [],
       [],
       [{ ...humanEntry(), body: null }],
+      [],
       [{ count: 0 }],
     ]);
     await expect(

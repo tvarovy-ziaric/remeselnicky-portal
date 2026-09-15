@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@portal/authorization": "workspace:*",
+    "@portal/domain": "workspace:*",
     "@portal/queue": "workspace:*",
     "@portal/storage": "workspace:*",
     "exif-reader": "2.0.2",
@@ -27,7 +28,6 @@
     "sharp": "0.35.4"
   },
   "devDependencies": {
-    "@portal/domain": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

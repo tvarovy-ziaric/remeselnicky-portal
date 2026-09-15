@@ -31,6 +31,7 @@ import {
   createPhoneVerificationPersistence,
 } from "./auth/index.js";
 import { createDatabaseFrontendErrorAdmission } from "./observability.js";
+import { createDatabaseConversationWriteAdmission } from "./conversations/write-admission.js";
 import {
   createDatabasePublicSearchAdmission,
   PUBLIC_SEARCH_RATE_LIMIT_MULTIPLIER,
@@ -91,6 +92,11 @@ const conversationChat = createConversationChatService({
   admission: createPreConfirmationConversationMessageAdmission(),
   persistence: database.conversationChat,
 });
+const conversationWriteAdmission = createDatabaseConversationWriteAdmission({
+  accountLimit: config.auth.rateLimitMax,
+  persistence: authPersistence,
+  timeWindowMs: config.auth.rateLimitWindowMs,
+});
 
 const app = buildApi({
   auth: {
@@ -125,6 +131,7 @@ const app = buildApi({
     jobInvitations: { invitations: database.jobInvitations },
     conversations: { conversations: database.conversations },
     conversationChat: {
+      admission: conversationWriteAdmission,
       persistence: database.conversationChat,
       service: conversationChat,
     },

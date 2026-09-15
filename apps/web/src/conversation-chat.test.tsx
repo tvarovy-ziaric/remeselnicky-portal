@@ -6,6 +6,7 @@ import {
   ConversationChat,
   loadConversationTimeline,
   mutateConversation,
+  uploadConversationAttachment,
 } from "./conversation-chat";
 
 const conversationId = "95100000-0000-4000-8000-000000000001";
@@ -153,10 +154,122 @@ describe("conversation chat UI boundary", () => {
       JSON.stringify({ commandId, messageId, reason: "ABUSE" }),
     );
   });
+
+  it("uploads a selected file only to its source message with CSRF", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(Response.json({ csrfToken: "csrf-test" }))
+      .mockResolvedValueOnce(
+        Response.json(
+          {
+            assetId: "95100000-0000-4000-8000-000000000006",
+            kind: "PDF",
+            status: "PROCESSING",
+          },
+          { status: 202 },
+        ),
+      );
+    const file = new File(["%PDF-1.7\n%%EOF"], "ponuka.pdf", {
+      type: "application/pdf",
+    });
+    await expect(
+      uploadConversationAttachment({
+        conversationId,
+        fetch: fetcher,
+        file,
+        messageId,
+      }),
+    ).resolves.toEqual({
+      assetId: "95100000-0000-4000-8000-000000000006",
+      kind: "PDF",
+      status: "UPLOADED",
+    });
+    expect(fetcher).toHaveBeenNthCalledWith(
+      2,
+      `/v1/me/conversations/${conversationId}/messages/${messageId}/attachments/documents`,
+      expect.objectContaining({
+        body: file,
+        headers: {
+          "content-type": "application/pdf",
+          "x-csrf-token": "csrf-test",
+        },
+        method: "POST",
+      }),
+    );
+  });
+
+  it("rejects corrupt attachment fields and excess photo cardinality", async () => {
+    const corrupt = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json({
+        entries: [
+          {
+            ...entryFixture(),
+            attachments: Array.from({ length: 6 }, (_, index) => ({
+              assetId: `95100000-0000-4000-8000-${String(index + 10).padStart(12, "0")}`,
+              createdAt: "2026-09-15T08:01:01.000Z",
+              kind: "IMAGE",
+              status: "READY",
+            })),
+          },
+        ],
+        hasMore: false,
+        nextBeforeSequence: null,
+        participantState: {
+          archived: false,
+          lastReadAt: null,
+          lastReadSequence: 0,
+          muted: false,
+          revision: 0,
+        },
+        unreadCount: 1,
+      }),
+    );
+    await expect(
+      loadConversationTimeline({ conversationId, fetch: corrupt }),
+    ).resolves.toEqual({ status: "UNAVAILABLE" });
+
+    corrupt.mockResolvedValueOnce(
+      Response.json({
+        entries: [
+          {
+            ...entryFixture(),
+            author: "SYSTEM",
+            authorRole: null,
+            body: null,
+            kind: "SYSTEM_EVENT",
+            readByCounterpart: null,
+            replyToMessageId: null,
+            systemEvent: "ENGAGEMENT",
+          },
+        ],
+        hasMore: false,
+        nextBeforeSequence: null,
+        participantState: {
+          archived: false,
+          lastReadAt: null,
+          lastReadSequence: 0,
+          muted: false,
+          revision: 0,
+        },
+        unreadCount: 0,
+      }),
+    );
+    await expect(
+      loadConversationTimeline({ conversationId, fetch: corrupt }),
+    ).resolves.toEqual({ status: "UNAVAILABLE" });
+  });
 });
 
 function entryFixture() {
   return {
+    attachments: [
+      {
+        assetId: "95100000-0000-4000-8000-000000000006",
+        createdAt: "2026-09-15T08:01:01.000Z",
+        kind: "PDF",
+        status: "READY",
+      },
+    ],
     author: "COUNTERPART",
     authorRole: "CRAFTSMAN",
     body: "Dobrý deň",

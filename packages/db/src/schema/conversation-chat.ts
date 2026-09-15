@@ -16,6 +16,9 @@ import {
 import { conversations } from "./conversation.js";
 import { users } from "./user.js";
 
+export const CONVERSATION_JOB_MEDIA_CANDIDATE_VIEW =
+  "conversation_job_media_candidates" as const;
+
 export const conversationTimelineEntryKind = pgEnum(
   "conversation_timeline_entry_kind",
   ["HUMAN_MESSAGE", "SYSTEM_EVENT"],

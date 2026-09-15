@@ -62,6 +62,18 @@ export {
   detectImageSignature,
 } from "./image-processing.js";
 export {
+  CONVERSATION_ATTACHMENT_UPLOAD_LIMITS,
+  createConversationAttachmentUploadService,
+} from "./conversation-attachment.js";
+export type {
+  ConversationAttachmentMediaKind,
+  ConversationAttachmentProcessingDispatcher,
+  ConversationAttachmentUploadAuthorization,
+  ConversationAttachmentUploadResult,
+  ConversationAttachmentUploadService,
+  PrepareConversationAttachmentUploadResult,
+} from "./conversation-attachment.js";
+export {
   PORTFOLIO_PUBLICATION_STATES,
   assertPortfolioPublicationCommand,
   createPortfolioPublicationService,

@@ -19,6 +19,7 @@ const jobRequestId = "9e200000-0000-4000-8000-000000000004" as JobRequestId;
 const messageId =
   "9e200000-0000-4000-8000-000000000007" as ConversationMessageId;
 const commandId = "9e200000-0000-4000-8000-000000000008";
+const mediaAssetId = "9e200000-0000-4000-8000-000000000010";
 
 describe("conversation routes", () => {
   it("returns only the participant-facing conversation identity", async () => {
@@ -116,6 +117,14 @@ describe("conversation routes", () => {
     expect(response.json()).toEqual({
       entries: [
         {
+          attachments: [
+            {
+              assetId: mediaAssetId,
+              createdAt: "2026-09-15T08:01:01.000Z",
+              kind: "IMAGE",
+              status: "PROCESSING",
+            },
+          ],
           author: "COUNTERPART",
           authorRole: "CRAFTSMAN",
           body: "Dobrý deň",
@@ -141,6 +150,103 @@ describe("conversation routes", () => {
     });
     expect(response.body).not.toMatch(/email|phone|storage|profileId/iu);
     await app.close();
+  });
+
+  it("uploads only allowlisted private IMAGE/PDF bytes to an exact source message", async () => {
+    const fixture = createFixture();
+    const app = Fastify();
+    registerConversationRoutes(app, fixture.dependencies);
+    const url = CONVERSATION_PATHS.attachments
+      .replace(":conversationId", conversationId)
+      .replace(":messageId", messageId)
+      .replace(":mediaKind", "photos");
+    const response = await app.inject({
+      headers: { "content-type": "image/jpeg" },
+      method: "POST",
+      payload: Buffer.from([0xff, 0xd8, 0xff]),
+      url,
+    });
+    expect(response.statusCode).toBe(202);
+    expect(response.json()).toEqual({
+      assetId: mediaAssetId,
+      kind: "IMAGE",
+      status: "PROCESSING",
+    });
+    expect(fixture.uploadAttachment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversationId,
+        declaredContentType: "image/jpeg",
+        mediaKind: "IMAGE",
+        messageId,
+      }),
+    );
+    expect(response.body).not.toMatch(/storage|url|filename/iu);
+
+    const invalid = await app.inject({
+      headers: { "content-type": "application/pdf" },
+      method: "POST",
+      payload: Buffer.from("%PDF-1.7\n%%EOF"),
+      url,
+    });
+    expect(invalid.statusCode).toBe(400);
+    expect(fixture.uploadAttachment).toHaveBeenCalledTimes(1);
+    await app.close();
+  });
+
+  it("delivers READY private media only through the no-store redirect seam", async () => {
+    const fixture = createFixture();
+    const app = Fastify();
+    registerConversationRoutes(app, fixture.dependencies);
+    const response = await app.inject({
+      method: "GET",
+      url: CONVERSATION_PATHS.mediaDownload.replace(
+        ":mediaAssetId",
+        mediaAssetId,
+      ),
+    });
+    expect(response.statusCode).toBe(303);
+    expect(response.headers["cache-control"]).toBe("private, no-store");
+    expect(response.headers["x-content-type-options"]).toBe("nosniff");
+    expect(response.headers.location).toBe("https://private.invalid/grant");
+    expect(response.body).toBe("");
+    await app.close();
+  });
+
+  it("fails closed before write services when layered admission is absent or exhausted", async () => {
+    const fixture = createFixture();
+    const { admission: _admission, ...chatWithoutAdmission } =
+      fixture.dependencies.chat;
+    expect(_admission).toBeDefined();
+    const unavailableApp = Fastify();
+    registerConversationRoutes(unavailableApp, {
+      ...fixture.dependencies,
+      chat: chatWithoutAdmission,
+    });
+    const url = CONVERSATION_PATHS.messages.replace(
+      ":conversationId",
+      conversationId,
+    );
+    const unavailable = await unavailableApp.inject({
+      method: "POST",
+      payload: { body: "Dobrý deň", commandId },
+      url,
+    });
+    expect(unavailable.statusCode).toBe(503);
+    expect(fixture.sendMessage).not.toHaveBeenCalled();
+    await unavailableApp.close();
+
+    const limited = createFixture();
+    limited.admit.mockResolvedValueOnce("RATE_LIMITED");
+    const limitedApp = Fastify();
+    registerConversationRoutes(limitedApp, limited.dependencies);
+    const denied = await limitedApp.inject({
+      method: "POST",
+      payload: { body: "Dobrý deň", commandId },
+      url,
+    });
+    expect(denied.statusCode).toBe(429);
+    expect(limited.sendMessage).not.toHaveBeenCalled();
+    await limitedApp.close();
   });
 
   it("protects message sends with CSRF and maps policy/read-only outcomes", async () => {
@@ -245,6 +351,14 @@ function createFixture(
   const readOwned = vi.fn().mockResolvedValue(conversation);
   const readOwnedByInvitation = vi.fn().mockResolvedValue(conversation);
   const entry = Object.freeze({
+    attachments: Object.freeze([
+      Object.freeze({
+        assetId: mediaAssetId,
+        createdAt: new Date("2026-09-15T08:01:01Z"),
+        kind: "IMAGE" as const,
+        status: "PROCESSING" as const,
+      }),
+    ]),
     author: "COUNTERPART" as const,
     authorRole: "CRAFTSMAN" as const,
     body: "Dobrý deň",
@@ -285,6 +399,20 @@ function createFixture(
     reportId: "9e200000-0000-4000-8000-000000000009",
     status: "REPORTED",
   });
+  const admit = vi.fn().mockResolvedValue("ADMITTED" as const);
+  const uploadAttachment = vi.fn().mockResolvedValue({
+    assetId: mediaAssetId,
+    kind: "IMAGE",
+    status: "PROCESSING",
+  });
+  const handleDownload = vi.fn().mockResolvedValue({
+    headers: {
+      "cache-control": "private, no-store",
+      location: "https://private.invalid/grant",
+      "referrer-policy": "no-referrer",
+    },
+    statusCode: 303,
+  });
   let csrfCallCount = 0;
   const csrfProtection: onRequestHookHandler = (_request, _reply, done) => {
     csrfCallCount += 1;
@@ -293,9 +421,11 @@ function createFixture(
   return {
     dependencies: {
       chat: {
+        admission: { admit },
+        attachmentUploads: { upload: uploadAttachment },
         csrfProtection,
         persistence: { readTimeline },
-        rateLimit: { max: 100, timeWindowMs: 60_000 },
+        privateMediaDelivery: { handleDownload },
         service: { report, sendMessage, updateParticipantState },
       },
       conversations: { readOwned, readOwnedByInvitation },
@@ -310,11 +440,13 @@ function createFixture(
       },
     },
     csrfCalls: () => csrfCallCount,
+    admit,
     readOwned,
     readOwnedByInvitation,
     readTimeline,
     report,
     sendMessage,
+    uploadAttachment,
     updateParticipantState,
   };
 }

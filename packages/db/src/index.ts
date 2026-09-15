@@ -23,7 +23,9 @@ import {
   createPublicPortfolioDeliveryRepository,
 } from "./portfolio-publication-repository.js";
 import type {
+  ConversationAttachmentUploadAuthorization,
   JobRequestMediaUploadAuthorization,
+  MediaEntityAccessResolver,
   PortfolioPublicationRepository,
   PrivateMediaDeliveryRepository,
   PublicPortfolioDeliveryRepository,
@@ -107,6 +109,10 @@ import { createJobInvitationRepository } from "./job-invitation-repository.js";
 import { createJobInvitationReminderRepository } from "./job-invitation-notification-repository.js";
 import { createConversationRepository } from "./conversation-repository.js";
 import { createConversationChatRepository } from "./conversation-chat-repository.js";
+import {
+  createConversationAttachmentMediaAccessResolver,
+  createConversationAttachmentUploadAuthorization,
+} from "./conversation-attachment-repository.js";
 import type { JobInvitationReminderStore } from "@portal/notifications";
 import { createJobRequestMediaUploadAuthorization } from "./job-request-media-repository.js";
 import { createCraftsmanProfileRepository } from "./craftsman-profile-repository.js";
@@ -566,6 +572,10 @@ export type {
 } from "./phone-verification-repository.js";
 export { createMediaRepository } from "./media-repository.js";
 export { createPrivateMediaDeliveryRepository } from "./media-delivery-repository.js";
+export {
+  createConversationAttachmentMediaAccessResolver,
+  createConversationAttachmentUploadAuthorization,
+} from "./conversation-attachment-repository.js";
 export type { PrivateMediaDeliveryRepository } from "@portal/media";
 export type {
   CreateProcessingMediaAssetInput,
@@ -775,6 +785,8 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly jobInvitationReminders: JobInvitationReminderStore;
   readonly conversations: ConversationPersistence;
   readonly conversationChat: ConversationChatPersistence;
+  readonly conversationAttachmentUploads: ConversationAttachmentUploadAuthorization;
+  readonly conversationAttachmentMediaAccess: MediaEntityAccessResolver;
   readonly jobRequestMedia: JobRequestMediaUploadAuthorization;
   readonly emailVerification: EmailVerificationRepository;
   readonly media: MediaRepository;
@@ -863,6 +875,10 @@ export function createDatabase(
   const jobInvitationReminders = createJobInvitationReminderRepository(sql);
   const conversations = createConversationRepository(sql);
   const conversationChat = createConversationChatRepository(sql);
+  const conversationAttachmentUploads =
+    createConversationAttachmentUploadAuthorization(sql);
+  const conversationAttachmentMediaAccess =
+    createConversationAttachmentMediaAccessResolver(sql);
   const jobRequestMedia = createJobRequestMediaUploadAuthorization(sql);
   const emailVerification = createEmailVerificationRepository(sql);
   const media = createMediaRepository(sql);
@@ -916,6 +932,8 @@ export function createDatabase(
     jobInvitationReminders,
     conversations,
     conversationChat,
+    conversationAttachmentUploads,
+    conversationAttachmentMediaAccess,
     jobRequestMedia,
     emailVerification,
     media,

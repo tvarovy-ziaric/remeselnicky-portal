@@ -1,10 +1,20 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import {
+  CONVERSATION_MESSAGE_MAX_ATTACHMENTS,
+  CONVERSATION_MESSAGE_MAX_IMAGE_ATTACHMENTS,
+} from "@portal/domain";
 
 import type { ConversationView } from "./conversation-entry";
 
 export interface ConversationTimelineEntryView {
+  readonly attachments: readonly Readonly<{
+    readonly assetId: string;
+    readonly createdAt: string;
+    readonly kind: "IMAGE" | "PDF";
+    readonly status: "PROCESSING" | "READY" | "REJECTED";
+  }>[];
   readonly author: "COUNTERPART" | "SELF" | "SYSTEM";
   readonly authorRole: "CRAFTSMAN" | "CUSTOMER" | null;
   readonly body: string | null;
@@ -42,6 +52,8 @@ export function ConversationChat({
 }) {
   const [result, setResult] = useState<LoadResult | null>(null);
   const [body, setBody] = useState("");
+  const [files, setFiles] = useState<readonly File[]>([]);
+  const [fileInputKey, setFileInputKey] = useState(0);
   const [pending, setPending] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   useEffect(() => {
@@ -66,29 +78,69 @@ export function ConversationChat({
     if (result?.status !== "OK" || body.trim() === "") return;
     setPending(true);
     setNotice(null);
-    const response = await mutateConversation({
-      body,
-      conversationId: conversation.id,
-      kind: "MESSAGE",
-    });
-    setPending(false);
-    if (response.status === "MESSAGE_SENT") {
-      setBody("");
-      setResult({
-        page: {
-          ...result.page,
-          entries: [...result.page.entries, response.entry],
-        },
-        status: "OK",
+    try {
+      const response = await mutateConversation({
+        body,
+        conversationId: conversation.id,
+        kind: "MESSAGE",
       });
-    } else {
-      setNotice(
-        response.status === "CONTACT_BLOCKED"
-          ? "Pred potvrdením zákazky neposielajte kontakt ani presnú adresu."
-          : response.status === "READ_ONLY"
-            ? "Konverzácia je už iba na čítanie."
-            : "Správu sa nepodarilo odoslať.",
-      );
+      if (response.status === "MESSAGE_SENT") {
+        setBody("");
+        if (files.length === 0) {
+          setResult({
+            page: {
+              ...result.page,
+              entries: [...result.page.entries, response.entry],
+            },
+            status: "OK",
+          });
+          return;
+        }
+        const csrfToken = await loadCsrfToken();
+        let uploadFailed = csrfToken === null;
+        if (csrfToken !== null) {
+          for (const file of files) {
+            const uploaded = await uploadConversationAttachment({
+              conversationId: conversation.id,
+              csrfToken,
+              file,
+              messageId: response.entry.id,
+            });
+            if (uploaded.status !== "UPLOADED") uploadFailed = true;
+          }
+        }
+        setFiles([]);
+        setFileInputKey((current) => current + 1);
+        const refreshed = await loadConversationTimeline({
+          conversationId: conversation.id,
+        });
+        if (refreshed.status === "OK") setResult(refreshed);
+        else {
+          setResult({
+            page: {
+              ...result.page,
+              entries: [...result.page.entries, response.entry],
+            },
+            status: "OK",
+          });
+          uploadFailed = true;
+        }
+        if (uploadFailed) {
+          setNotice(
+            "Správa bola odoslaná, ale niektorú prílohu sa nepodarilo pridať. Skúste ju pridať k novej správe.",
+          );
+        }
+      } else {
+        setNotice(
+          response.status === "CONTACT_BLOCKED"
+            ? "Pred potvrdením zákazky neposielajte kontakt ani presnú adresu."
+            : response.status === "READ_ONLY"
+              ? "Konverzácia je už iba na čítanie."
+              : "Správu sa nepodarilo odoslať.",
+        );
+      }
+    } finally {
+      setPending(false);
     }
   }
 
@@ -173,6 +225,27 @@ export function ConversationChat({
                   {entry.author === "SELF" ? "Vy" : "Druhá strana"}
                 </p>
                 <p>{linkPlainText(entry.body ?? "")}</p>
+                {entry.attachments.length === 0 ? null : (
+                  <ul aria-label="Prílohy správy">
+                    {entry.attachments.map((attachment) => (
+                      <li key={attachment.assetId}>
+                        {attachment.status === "READY" ? (
+                          <a
+                            href={`/v1/media/${encodeURIComponent(attachment.assetId)}/download`}
+                          >
+                            {attachment.kind === "IMAGE"
+                              ? "Otvoriť fotografiu"
+                              : "Stiahnuť PDF dokument"}
+                          </a>
+                        ) : attachment.status === "PROCESSING" ? (
+                          <span>Príloha sa bezpečne spracúva…</span>
+                        ) : (
+                          <span>Príloha bola odmietnutá.</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 <small>
                   {new Date(entry.createdAt).toLocaleString("sk-SK")}
                   {entry.readByCounterpart === true ? " · Prečítané" : ""}
@@ -207,6 +280,41 @@ export function ConversationChat({
             rows={5}
             value={body}
           />
+          <label htmlFor="conversation-attachments">
+            Fotografie alebo PDF prílohy
+          </label>
+          <input
+            accept="image/jpeg,image/png,image/heic,image/heif,application/pdf"
+            disabled={pending}
+            id="conversation-attachments"
+            key={fileInputKey}
+            multiple
+            onChange={(event) => {
+              const selected = [...(event.target.files ?? [])];
+              const imageCount = selected.filter((file) =>
+                file.type.startsWith("image/"),
+              ).length;
+              if (
+                selected.length > CONVERSATION_MESSAGE_MAX_ATTACHMENTS ||
+                imageCount > CONVERSATION_MESSAGE_MAX_IMAGE_ATTACHMENTS
+              ) {
+                setFiles([]);
+                setFileInputKey((current) => current + 1);
+                setNotice(
+                  "K jednej správe môžete pridať najviac 5 fotografií a 10 príloh spolu.",
+                );
+                event.target.value = "";
+                return;
+              }
+              setNotice(null);
+              setFiles(selected);
+            }}
+            type="file"
+          />
+          <small>
+            Prílohy sa odošlú až po textovej správe. Video a hlasové správy nie
+            sú podporované.
+          </small>
           <button disabled={pending || body.trim() === ""} type="submit">
             Odoslať správu
           </button>
@@ -376,6 +484,93 @@ export async function mutateConversation(
   }
 }
 
+export async function uploadConversationAttachment(input: {
+  readonly conversationId: string;
+  readonly csrfToken?: string;
+  readonly fetch?: typeof fetch;
+  readonly file: File;
+  readonly messageId: string;
+}): Promise<
+  | Readonly<{ readonly status: "UNAVAILABLE" }>
+  | Readonly<{
+      readonly assetId: string;
+      readonly kind: "IMAGE" | "PDF";
+      readonly status: "UPLOADED";
+    }>
+> {
+  if (
+    !uuid(input.conversationId) ||
+    !uuid(input.messageId) ||
+    typeof File === "undefined" ||
+    !(input.file instanceof File)
+  ) {
+    return { status: "UNAVAILABLE" };
+  }
+  const kind = input.file.type === "application/pdf" ? "PDF" : "IMAGE";
+  const allowed =
+    kind === "PDF"
+      ? input.file.type === "application/pdf"
+      : ["image/heic", "image/heif", "image/jpeg", "image/png"].includes(
+          input.file.type,
+        );
+  if (!allowed || input.file.size < 1) return { status: "UNAVAILABLE" };
+  try {
+    const fetcher = input.fetch ?? fetch;
+    const csrfToken = input.csrfToken ?? (await loadCsrfToken(fetcher));
+    if (csrfToken === null || csrfToken.length > 1_000) {
+      return { status: "UNAVAILABLE" };
+    }
+    const response = await fetcher(
+      `/v1/me/conversations/${encodeURIComponent(input.conversationId)}/messages/${encodeURIComponent(input.messageId)}/attachments/${kind === "IMAGE" ? "photos" : "documents"}`,
+      {
+        body: input.file,
+        cache: "no-store",
+        credentials: "same-origin",
+        headers: {
+          "content-type": input.file.type,
+          "x-csrf-token": csrfToken,
+        },
+        method: "POST",
+      },
+    );
+    if (!response.ok) return { status: "UNAVAILABLE" };
+    const value: unknown = await response.json();
+    if (
+      !record(value) ||
+      !exactKeys(value, ["assetId", "kind", "status"]) ||
+      !uuid(value["assetId"]) ||
+      value["kind"] !== kind ||
+      value["status"] !== "PROCESSING"
+    ) {
+      return { status: "UNAVAILABLE" };
+    }
+    return { assetId: value["assetId"], kind, status: "UPLOADED" };
+  } catch {
+    return { status: "UNAVAILABLE" };
+  }
+}
+
+async function loadCsrfToken(
+  fetcher: typeof fetch = fetch,
+): Promise<string | null> {
+  try {
+    const session = await fetcher("/v1/auth/session", {
+      cache: "no-store",
+      credentials: "same-origin",
+    });
+    if (!session.ok) return null;
+    const body: unknown = await session.json();
+    return record(body) &&
+      typeof body["csrfToken"] === "string" &&
+      body["csrfToken"].length >= 1 &&
+      body["csrfToken"].length <= 1_000
+      ? body["csrfToken"]
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 function parseTimeline(value: unknown): ConversationTimelineView | null {
   if (
     !record(value) ||
@@ -414,6 +609,7 @@ function parseEntry(value: unknown): ConversationTimelineEntryView | null {
     !exactKeys(value, [
       "author",
       "authorRole",
+      "attachments",
       "body",
       "createdAt",
       "id",
@@ -433,6 +629,20 @@ function parseEntry(value: unknown): ConversationTimelineEntryView | null {
   ) {
     return null;
   }
+  if (
+    !Array.isArray(value["attachments"]) ||
+    value["attachments"].length > CONVERSATION_MESSAGE_MAX_ATTACHMENTS
+  ) {
+    return null;
+  }
+  const attachments = value["attachments"].map(parseAttachment);
+  if (
+    attachments.some((attachment) => attachment === null) ||
+    attachments.filter((attachment) => attachment?.kind === "IMAGE").length >
+      CONVERSATION_MESSAGE_MAX_IMAGE_ATTACHMENTS
+  ) {
+    return null;
+  }
   const human = value["kind"] === "HUMAN_MESSAGE";
   if (
     human
@@ -447,6 +657,7 @@ function parseEntry(value: unknown): ConversationTimelineEntryView | null {
           value["readByCounterpart"] !== null)
       : value["kind"] !== "SYSTEM_EVENT" ||
         value["body"] !== null ||
+        attachments.length !== 0 ||
         value["systemEvent"] !== "ENGAGEMENT" ||
         value["author"] !== "SYSTEM" ||
         value["authorRole"] !== null ||
@@ -455,7 +666,26 @@ function parseEntry(value: unknown): ConversationTimelineEntryView | null {
   ) {
     return null;
   }
-  return value as unknown as ConversationTimelineEntryView;
+  return {
+    ...(value as unknown as ConversationTimelineEntryView),
+    attachments: attachments as ConversationTimelineEntryView["attachments"],
+  };
+}
+
+function parseAttachment(
+  value: unknown,
+): ConversationTimelineEntryView["attachments"][number] | null {
+  if (
+    !record(value) ||
+    !exactKeys(value, ["assetId", "createdAt", "kind", "status"]) ||
+    !uuid(value["assetId"]) ||
+    !validDate(value["createdAt"]) ||
+    (value["kind"] !== "IMAGE" && value["kind"] !== "PDF") ||
+    !["PROCESSING", "READY", "REJECTED"].includes(String(value["status"]))
+  ) {
+    return null;
+  }
+  return value as unknown as ConversationTimelineEntryView["attachments"][number];
 }
 
 function parseParticipantState(

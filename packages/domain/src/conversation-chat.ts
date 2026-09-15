@@ -12,6 +12,9 @@ export type ConversationMessageId = EntityId & {
 
 export const CONVERSATION_MESSAGE_MAX_LENGTH = 4_000;
 export const CONVERSATION_TIMELINE_MAX_PAGE_SIZE = 50;
+/** Technical abuse bounds, not a product or Job capacity promise. */
+export const CONVERSATION_MESSAGE_MAX_ATTACHMENTS = 10;
+export const CONVERSATION_MESSAGE_MAX_IMAGE_ATTACHMENTS = 5;
 export const CONVERSATION_REPORT_REASONS = Object.freeze([
   "ABUSE",
   "CONTACT_CIRCUMVENTION",
@@ -32,7 +35,19 @@ export type ConversationReportReason =
 export type ConversationParticipantAction =
   (typeof CONVERSATION_PARTICIPANT_ACTIONS)[number];
 
+export type ConversationTimelineAttachmentKind = "IMAGE" | "PDF";
+export type ConversationTimelineAttachmentStatus =
+  "PROCESSING" | "READY" | "REJECTED";
+
+export interface ConversationTimelineAttachment {
+  readonly assetId: string;
+  readonly createdAt: Date;
+  readonly kind: ConversationTimelineAttachmentKind;
+  readonly status: ConversationTimelineAttachmentStatus;
+}
+
 export interface ConversationTimelineEntry {
+  readonly attachments: readonly ConversationTimelineAttachment[];
   readonly author: "COUNTERPART" | "SELF" | "SYSTEM";
   readonly authorRole: ConversationParticipantRole | null;
   readonly body: string | null;
