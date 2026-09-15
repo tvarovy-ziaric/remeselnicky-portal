@@ -6,7 +6,13 @@ import {
   type JobRequestContentSection,
   type JobRequestContentSectionKey,
 } from "@portal/domain";
-import React, { useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import {
   createJobRequestDraftClient,
@@ -82,6 +88,8 @@ export function JobRequestForm({
   const [step, setStep] = useState(0);
   const [reviewing, setReviewing] = useState(false);
   const [notice, setNotice] = useState("");
+  const savedFingerprints = useRef(new Map<string, string>());
+  const blockedAutosaveFingerprint = useRef<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -94,6 +102,12 @@ export function JobRequestForm({
       setCsrfToken(result.csrfToken);
       setDraft(result.draft);
       setValues(valuesFromDraft(result.draft));
+      savedFingerprints.current = new Map(
+        (result.draft?.sections ?? []).map((section) => [
+          section.key,
+          section.canonicalPayload,
+        ]),
+      );
       setStatus("READY");
     });
     return () => {
@@ -101,7 +115,7 @@ export function JobRequestForm({
     };
   }, [client]);
 
-  const saveCurrent = async (): Promise<boolean> => {
+  const saveCurrent = useCallback(async (): Promise<boolean> => {
     if (status !== "READY" || csrfToken === "") return false;
     let section: JobRequestContentSection;
     try {
@@ -127,6 +141,7 @@ export function JobRequestForm({
       return false;
     }
     if (result.status !== "SAVED") {
+      blockedAutosaveFingerprint.current = section.canonicalPayload;
       setStatus("READY");
       setNotice(
         "Zmenu sa nepodarilo bezpečne uložiť. Údaje ostali vo formulári; skúste to znova.",
@@ -139,10 +154,45 @@ export function JobRequestForm({
       sections: replaceSection(draft?.sections ?? [], section),
     });
     setDraft(nextDraft);
+    savedFingerprints.current.set(section.key, section.canonicalPayload);
+    blockedAutosaveFingerprint.current = null;
     setStatus("READY");
     setNotice("Uložené");
     return true;
-  };
+  }, [client, csrfToken, draft, status, step, values]);
+
+  useEffect(() => {
+    if (status !== "READY" || reviewing) return;
+    let section: JobRequestContentSection;
+    try {
+      section = sectionFromValues(
+        STEPS[step]?.key ?? "request.core",
+        values,
+        draft,
+      );
+    } catch {
+      return;
+    }
+    if (
+      draft === null &&
+      section.key === "request.core" &&
+      !hasMeaningfulCoreInput(section)
+    ) {
+      return;
+    }
+    if (
+      savedFingerprints.current.get(section.key) === section.canonicalPayload
+    ) {
+      return;
+    }
+    if (blockedAutosaveFingerprint.current === section.canonicalPayload) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void saveCurrent();
+    }, 900);
+    return () => window.clearTimeout(timer);
+  }, [draft, reviewing, saveCurrent, status, step, values]);
 
   const continueForward = async () => {
     if (!(await saveCurrent())) return;
@@ -984,6 +1034,16 @@ function requirementLabel(value: string): string {
       : value === "MUNICIPALITY"
         ? "obec"
         : "povinné údaje";
+}
+
+function hasMeaningfulCoreInput(section: JobRequestContentSection): boolean {
+  if (section.key !== "request.core") return false;
+  const payload = section.payload as unknown as Record<string, unknown>;
+  return [
+    payload["description"],
+    payload["primaryProfessionCode"],
+    payload["title"],
+  ].some((value) => typeof value === "string" && value.length > 0);
 }
 
 const emptyValues: EditorValues = {
