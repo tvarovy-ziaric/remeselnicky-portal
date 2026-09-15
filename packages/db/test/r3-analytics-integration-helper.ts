@@ -56,7 +56,7 @@ export async function runR3AnalyticsIntegrationAssertions(
       ${key}, 'r3.analytics.job_request_started', ${occurredAt},
       'JOB_REQUEST', ${randomUUID()},
       r3_analytics_subject_payload(${subject.userId}, 'CUSTOMER', 'USER',
-        jsonb_build_object('job_request_id', ${randomUUID()})),
+        jsonb_build_object('job_request_id', ${randomUUID()}::text)),
       'integration.analytics', ${randomUUID()}
     ) AS id
   `;
@@ -621,8 +621,8 @@ async function assertVersionedReplayAndTransientRetry(
       ${`r3-analytics:integration:v1:${v1Id}`},
       'r3.analytics.quote_submitted', ${now}, 'QUOTE', ${quoteId},
       r3_analytics_subject_payload(${subjectUserId}, 'CRAFTSMAN', 'USER',
-        jsonb_build_object('job_request_id', ${requestId},
-          'quote_id', ${quoteId})),
+        jsonb_build_object('job_request_id', ${requestId}::text,
+          'quote_id', ${quoteId}::text)),
       'integration.analytics', ${v1Id}, ${v1Id})
   `;
   await sql`
@@ -632,8 +632,8 @@ async function assertVersionedReplayAndTransientRetry(
       'QUOTE_REVISION', ${`${quoteId}:1`},
       r3_analytics_subject_payload(${subjectUserId}, 'CRAFTSMAN', 'USER',
         jsonb_build_object('authoring_mode', 'PLATFORM_STRUCTURED',
-          'job_request_id', ${requestId}, 'price_mode', 'FIXED',
-          'quote_id', ${quoteId}, 'quote_revision', 1)),
+          'job_request_id', ${requestId}::text, 'price_mode', 'FIXED',
+          'quote_id', ${quoteId}::text, 'quote_revision', 1)),
       'integration.analytics', ${v2Id}, ${v2Id})
   `;
   const transport = createMemoryAnalyticsTransport("staging");
@@ -683,7 +683,7 @@ async function assertVersionedReplayAndTransientRetry(
       'r3.analytics.job_request_started', clock_timestamp(),
       'JOB_REQUEST', ${requestId},
       r3_analytics_subject_payload(${subjectUserId}, 'CUSTOMER', 'USER',
-        jsonb_build_object('job_request_id', ${requestId})),
+        jsonb_build_object('job_request_id', ${requestId}::text)),
       'integration.analytics', ${retryId}, ${retryId})
   `;
   const deliveredIds: string[] = [];
