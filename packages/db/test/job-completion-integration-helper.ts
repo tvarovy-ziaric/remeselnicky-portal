@@ -80,11 +80,21 @@ export async function runJobCompletionIntegrationAssertions(
       expect(
         await proposals.list({ actorUserId: job.providerUserId, jobId: job.id }),
       ).toMatchObject([{ id: proposalId, outcome: "PENDING" }]);
-      await expect(
-        repository.request({
+      expect(
+        await repository.request({
           actorUserId: job.providerUserId,
           commandId: randomUUID(),
           jobId: job.id,
+        }),
+      ).toEqual({ status: "STALE_STATE" });
+      await expect(
+        tx.savepoint(async (savepoint) => {
+          await savepoint`
+            INSERT INTO job_completion_attempts (
+              id, job_id, attempt_number, requested_by_user_id, payload_fingerprint
+            ) VALUES (${randomUUID()}, ${job.id}, 1,
+              ${job.providerUserId}, ${"b".repeat(64)})
+          `;
         }),
       ).rejects.toThrow("resolve customer completion proposal first");
       expect(
