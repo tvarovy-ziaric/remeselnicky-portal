@@ -8,7 +8,12 @@ const uuid =
 
 export interface JobListItem {
   id: string;
-  state: "CONFIRMED" | "IN_PROGRESS" | "CANCELLED";
+  state:
+    | "CONFIRMED"
+    | "IN_PROGRESS"
+    | "COMPLETION_REQUESTED"
+    | "COMPLETED"
+    | "CANCELLED";
   acceptedAt: string;
   role: "CUSTOMER" | "PRIMARY_PROVIDER";
   providerDisplayName: string;
@@ -34,9 +39,13 @@ export function parseJobList(payload: unknown): readonly JobListItem[] | null {
       typeof item.id !== "string" ||
       !uuid.test(item.id) ||
       ids.has(item.id) ||
-      !["CONFIRMED", "IN_PROGRESS", "CANCELLED"].includes(
-        item.state as string,
-      ) ||
+      ![
+        "CONFIRMED",
+        "IN_PROGRESS",
+        "COMPLETION_REQUESTED",
+        "COMPLETED",
+        "CANCELLED",
+      ].includes(item.state as string) ||
       typeof item.acceptedAt !== "string" ||
       Number.isNaN(Date.parse(item.acceptedAt)) ||
       (item.role !== "CUSTOMER" && item.role !== "PRIMARY_PROVIDER") ||
@@ -83,7 +92,11 @@ export function JobListView({ jobs }: { jobs: readonly JobListItem[] }) {
                 ? "Potvrdená"
                 : job.state === "IN_PROGRESS"
                   ? "Prebieha"
-                  : "Zrušená"}
+                  : job.state === "COMPLETION_REQUESTED"
+                    ? "Čaká na potvrdenie dokončenia"
+                    : job.state === "COMPLETED"
+                      ? "Dokončená"
+                      : "Zrušená"}
             </span>
           </Link>
         </li>

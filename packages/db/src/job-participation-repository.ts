@@ -64,7 +64,12 @@ export interface JobParticipationInboxPage {
 }
 
 export interface OwnJobParticipationHistoryItem extends PendingJobParticipationInvitation {
-  readonly jobState: "CONFIRMED" | "IN_PROGRESS" | "CANCELLED";
+  readonly jobState:
+    | "CONFIRMED"
+    | "IN_PROGRESS"
+    | "COMPLETION_REQUESTED"
+    | "COMPLETED"
+    | "CANCELLED";
   readonly state: Exclude<ParticipationState, "INVITED">;
   readonly acceptedAt: Date | null;
   readonly leftAt: Date | null;
@@ -195,7 +200,13 @@ export function createJobParticipationRepository(sql: RootSql) {
         const items = rows.slice(0, input.limit).map((row) => {
           const common = validateInvitationRow(row);
           if (
-            !["CONFIRMED", "IN_PROGRESS", "CANCELLED"].includes(row.jobState) ||
+            ![
+              "CONFIRMED",
+              "IN_PROGRESS",
+              "COMPLETION_REQUESTED",
+              "COMPLETED",
+              "CANCELLED",
+            ].includes(row.jobState) ||
             !["ACCEPTED", "DECLINED", "LEFT", "REMOVED"].includes(row.state) ||
             (row.acceptedAt !== null &&
               (!(row.acceptedAt instanceof Date) ||

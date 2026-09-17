@@ -757,7 +757,7 @@ export function JobChangeOrders({
           )}
         </>
       )}
-      {jobState !== "CANCELLED" && (
+      {(jobState === "CONFIRMED" || jobState === "IN_PROGRESS") && (
         <>
           <button type="button" onClick={() => setCreate(!create)}>
             {create ? "Zrušiť nový návrh" : "Pripraviť nový návrh zmeny"}

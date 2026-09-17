@@ -20,7 +20,12 @@ export interface JobDashboardSummary {
   readonly providerDisplayName: string;
   readonly requestTitle: string;
   readonly role: "CUSTOMER" | "PRIMARY_PROVIDER";
-  readonly state: "CONFIRMED" | "IN_PROGRESS" | "CANCELLED";
+  readonly state:
+    | "CONFIRMED"
+    | "IN_PROGRESS"
+    | "COMPLETION_REQUESTED"
+    | "COMPLETED"
+    | "CANCELLED";
 }
 
 export interface JobDashboard extends JobDashboardSummary {
@@ -334,7 +339,13 @@ function toSummary(row: JobRow): JobDashboardSummary {
     !uuid.test(row.customerOwnerUserId) ||
     !(row.acceptedAt instanceof Date) ||
     !Number.isFinite(row.acceptedAt.getTime()) ||
-    !["CONFIRMED", "IN_PROGRESS", "CANCELLED"].includes(row.state) ||
+    ![
+      "CONFIRMED",
+      "IN_PROGRESS",
+      "COMPLETION_REQUESTED",
+      "COMPLETED",
+      "CANCELLED",
+    ].includes(row.state) ||
     (row.role !== "CUSTOMER" && row.role !== "PRIMARY_PROVIDER") ||
     typeof row.providerDisplayName !== "string" ||
     row.providerDisplayName.length === 0 ||

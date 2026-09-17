@@ -292,6 +292,23 @@ describe("D17-A Job dashboard", () => {
     expect(html).toContain("Zrušiť zákazku");
     expect(html).not.toContain("Začať práce");
     expect(html).not.toContain("Pozvať remeselníka na zákazku");
+    for (const [state, label] of [
+      ["COMPLETION_REQUESTED", "Čaká na potvrdenie dokončenia"],
+      ["COMPLETED", "Dokončená zákazka"],
+    ] as const) {
+      const completion = parseJobDashboard({ ...job(), state }, jobId);
+      expect(completion).not.toBeNull();
+      if (!completion) continue;
+      const completionContacts = parseJobContacts(contacts(), completion);
+      expect(completionContacts).not.toBeNull();
+      if (!completionContacts) continue;
+      const stateHtml = renderToStaticMarkup(
+        <JobDashboardView job={completion} contacts={completionContacts} />,
+      );
+      expect(stateHtml).toContain(label);
+      expect(stateHtml).not.toContain("Zrušiť zákazku");
+      expect(stateHtml).not.toContain("Pozvať remeselníka na zákazku");
+    }
   });
 
   it("shows a source-linked approved delta and rejects internal PDF identifiers", () => {

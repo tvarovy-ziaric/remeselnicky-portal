@@ -97,6 +97,7 @@ import { runJobMilestoneIntegrationAssertions } from "./job-milestone-integratio
 import { runJobMilestoneContextIntegrationAssertions } from "./job-milestone-context-integration-helper.js";
 import { runChangeOrderIntegrationAssertions } from "./change-order-integration-helper.js";
 import { runChangeOrderPdfIntegrationAssertions } from "./change-order-pdf-integration-helper.js";
+import { runJobCompletionIntegrationAssertions } from "./job-completion-integration-helper.js";
 
 const testDatabaseUrl = process.env["TEST_DATABASE_URL"];
 const migrationsDirectory = fileURLToPath(
@@ -207,6 +208,8 @@ describe.skipIf(testDatabaseUrl === undefined)(
           "0082_change_order_foundation.sql",
           "0083_change_order_pdf_reservations.sql",
           "0084_job_milestone_change_order_provenance.sql",
+          "0085_job_completion_states.sql",
+          "0086_job_completion_attempts.sql",
         ],
         alreadyApplied: 0,
       });
@@ -215,7 +218,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         testDatabaseUrl,
         migrationsDirectory,
       );
-      expect(secondRun).toEqual({ applied: [], alreadyApplied: 85 });
+      expect(secondRun).toEqual({ applied: [], alreadyApplied: 87 });
 
       const sql = postgres(testDatabaseUrl, { max: 5 });
       try {
@@ -261,7 +264,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         `;
 
         expect(postgis?.extversion).toMatch(/^3\./);
-        expect(ledger?.count).toBe(85);
+        expect(ledger?.count).toBe(87);
         expect(created).toMatchObject({ account_state: "ACTIVE" });
         expect(created?.id).toMatch(
           /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
@@ -1847,6 +1850,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         await runJobMilestoneContextIntegrationAssertions(sql);
         await runChangeOrderIntegrationAssertions(sql);
         await runChangeOrderPdfIntegrationAssertions(sql);
+        await runJobCompletionIntegrationAssertions(sql);
         await runJobLifecycleIntegrationAssertions(sql);
         await runJobRosterCancelledIntegrationAssertions(sql);
         await runJobRosterCancelledReadIntegrationAssertions(sql);

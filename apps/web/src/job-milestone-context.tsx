@@ -145,9 +145,15 @@ export function JobMilestoneProposals({
 }: {
   jobId: string;
   role: "CUSTOMER" | "PRIMARY_PROVIDER";
-  jobState: "CONFIRMED" | "IN_PROGRESS" | "CANCELLED";
+  jobState:
+    | "CONFIRMED"
+    | "IN_PROGRESS"
+    | "COMPLETION_REQUESTED"
+    | "COMPLETED"
+    | "CANCELLED";
   milestones: readonly MilestoneItem[];
 }) {
+  const writable = jobState === "CONFIRMED" || jobState === "IN_PROGRESS";
   const [open, setOpen] = useState(false);
   const [page, setPage] =
     useState<MilestoneContextPage<MilestoneProposal> | null>(null);
@@ -189,7 +195,7 @@ export function JobMilestoneProposals({
     return true;
   };
   const run = async (key: string, action: MilestoneContextCommand) => {
-    if (pending || jobState === "CANCELLED") return false;
+    if (pending || !writable) return false;
     const intent = JSON.stringify(action);
     const prior = attempts.current.get(key);
     const id = prior?.intent === intent ? prior.id : crypto.randomUUID();
@@ -278,7 +284,7 @@ export function JobMilestoneProposals({
               Načítať staršie návrhy
             </button>
           )}
-          {role === "CUSTOMER" && jobState !== "CANCELLED" && (
+          {role === "CUSTOMER" && writable && (
             <form
               onSubmit={(event) => {
                 event.preventDefault();

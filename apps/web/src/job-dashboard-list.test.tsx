@@ -41,5 +41,15 @@ describe("private Job list", () => {
     const html = renderToStaticMarkup(<JobListView jobs={jobs} />);
     expect(html).toContain(`/zakazky/${jobId}`);
     expect(html).toContain("Strecha");
+    for (const [state, label] of [
+      ["COMPLETION_REQUESTED", "Čaká na potvrdenie dokončenia"],
+      ["COMPLETED", "Dokončená"],
+    ] as const) {
+      const completed = parseJobList({ jobs: [{ ...item, state }] });
+      expect(completed).not.toBeNull();
+      expect(renderToStaticMarkup(<JobListView jobs={completed!} />)).toContain(
+        label,
+      );
+    }
   });
 });

@@ -4,7 +4,12 @@ import type { JobDocumentationItem } from "./job-documentation-repository.js";
 
 type RootSql = Sql | TransactionSql;
 type Role = "CUSTOMER" | "PRIMARY_PROVIDER";
-type State = "CONFIRMED" | "IN_PROGRESS" | "CANCELLED";
+type State =
+  | "CONFIRMED"
+  | "IN_PROGRESS"
+  | "COMPLETION_REQUESTED"
+  | "COMPLETED"
+  | "CANCELLED";
 export type JobIssueKind = "PROBLEM" | "DELAY" | "WAITING";
 const uuid =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -632,7 +637,13 @@ async function authorizeJob(
   if (party === undefined) return null;
   if (
     !["CUSTOMER", "PRIMARY_PROVIDER"].includes(party.role) ||
-    !["CONFIRMED", "IN_PROGRESS", "CANCELLED"].includes(party.state)
+    ![
+      "CONFIRMED",
+      "IN_PROGRESS",
+      "COMPLETION_REQUESTED",
+      "COMPLETED",
+      "CANCELLED",
+    ].includes(party.state)
   )
     throw new Error("Invalid Job operational party projection.");
   return party;

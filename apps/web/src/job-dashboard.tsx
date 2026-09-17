@@ -4,6 +4,7 @@ import Link from "next/link";
 import React, { useEffect, useRef, useState } from "react";
 
 import { JobChangeOrders } from "./change-orders";
+import { JobCompletion } from "./job-completion";
 import { JobDocumentation } from "./job-documentation";
 import { JobMilestones } from "./job-milestones";
 import { JobOperations } from "./job-operations";
@@ -18,7 +19,12 @@ type Dict = Record<string, unknown>;
 type Contact = { email: string | null; phone: string | null };
 export interface JobDashboardData {
   id: string;
-  state: "CONFIRMED" | "IN_PROGRESS" | "CANCELLED";
+  state:
+    | "CONFIRMED"
+    | "IN_PROGRESS"
+    | "COMPLETION_REQUESTED"
+    | "COMPLETED"
+    | "CANCELLED";
   acceptedAt: string;
   role: "CUSTOMER" | "PRIMARY_PROVIDER";
   providerDisplayName: string;
@@ -185,9 +191,13 @@ export function parseJobDashboard(
   if (
     !record(value) ||
     value.id !== jobId ||
-    !["CONFIRMED", "IN_PROGRESS", "CANCELLED"].includes(
-      value.state as string,
-    ) ||
+    ![
+      "CONFIRMED",
+      "IN_PROGRESS",
+      "COMPLETION_REQUESTED",
+      "COMPLETED",
+      "CANCELLED",
+    ].includes(value.state as string) ||
     !date(value.acceptedAt) ||
     (value.role !== "CUSTOMER" && value.role !== "PRIMARY_PROVIDER") ||
     !string(value.providerDisplayName) ||
@@ -595,7 +605,11 @@ export function JobDashboardView({
             ? "Potvrdená zákazka"
             : job.state === "IN_PROGRESS"
               ? "Práce prebiehajú"
-              : "Zákazka zrušená"}{" "}
+              : job.state === "COMPLETION_REQUESTED"
+                ? "Čaká na potvrdenie dokončenia"
+                : job.state === "COMPLETED"
+                  ? "Dokončená zákazka"
+                  : "Zákazka zrušená"}{" "}
           · {new Date(job.acceptedAt).toLocaleString("sk-SK")}
         </p>
         <p>
@@ -714,13 +728,15 @@ export function JobDashboardView({
         approvedChanges={job.currentCommercialState.approvedChanges}
       />
       <JobRoster jobId={job.id} jobState={job.state} />
-      {job.role === "PRIMARY_PROVIDER" && job.state !== "CANCELLED" && (
-        <p>
-          <Link href={`/remeselnici?jobId=${encodeURIComponent(job.id)}`}>
-            Pozvať remeselníka na zákazku
-          </Link>
-        </p>
-      )}
+      <JobCompletion jobId={job.id} role={job.role} jobState={job.state} />
+      {job.role === "PRIMARY_PROVIDER" &&
+        ["CONFIRMED", "IN_PROGRESS"].includes(job.state) && (
+          <p>
+            <Link href={`/remeselnici?jobId=${encodeURIComponent(job.id)}`}>
+              Pozvať remeselníka na zákazku
+            </Link>
+          </p>
+        )}
       <section aria-labelledby="job-contacts">
         <h2 id="job-contacts">Kontakty a miesto výkonu</h2>
         <ContactDetails title="Zákazník" contact={contacts.customer} />
@@ -794,7 +810,7 @@ function JobLifecycleActions({ job }: { job: JobDashboardData }) {
   const [pending, setPending] = useState(false);
   const [notice, setNotice] = useState("");
   const retry = useRef<{ intent: string; commandId: string } | null>(null);
-  if (job.state === "CANCELLED") return null;
+  if (job.state !== "CONFIRMED" && job.state !== "IN_PROGRESS") return null;
   const act = async (kind: "start" | "cancel") => {
     const normalizedReason = reason.trim();
     if (

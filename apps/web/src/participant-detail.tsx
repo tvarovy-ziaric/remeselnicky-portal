@@ -26,7 +26,12 @@ export interface JobParticipantDetail {
   readonly jobId: string;
   readonly viewerRole: "PARTICIPANT" | "PRIMARY_PROVIDER" | "CUSTOMER";
   readonly state: "INVITED" | "ACCEPTED" | "DECLINED" | "LEFT" | "REMOVED";
-  readonly jobState: "CONFIRMED" | "IN_PROGRESS" | "CANCELLED";
+  readonly jobState:
+    | "CONFIRMED"
+    | "IN_PROGRESS"
+    | "COMPLETION_REQUESTED"
+    | "COMPLETED"
+    | "CANCELLED";
   readonly participantDisplayName: string;
   readonly providerDisplayName: string;
   readonly municipalityName: string;
@@ -69,9 +74,13 @@ export function parseJobParticipantDetail(
     !["INVITED", "ACCEPTED", "DECLINED", "LEFT", "REMOVED"].includes(
       String(value.state),
     ) ||
-    !["CONFIRMED", "IN_PROGRESS", "CANCELLED"].includes(
-      String(value.jobState),
-    ) ||
+    ![
+      "CONFIRMED",
+      "IN_PROGRESS",
+      "COMPLETION_REQUESTED",
+      "COMPLETED",
+      "CANCELLED",
+    ].includes(String(value.jobState)) ||
     typeof value.participantDisplayName !== "string" ||
     value.participantDisplayName.trim().length < 1 ||
     value.participantDisplayName.length > 255 ||

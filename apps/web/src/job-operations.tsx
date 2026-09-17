@@ -18,7 +18,14 @@ import {
   type ProgressItem,
 } from "./job-operational-data";
 
-type JobState = "CONFIRMED" | "IN_PROGRESS" | "CANCELLED";
+type JobState =
+  | "CONFIRMED"
+  | "IN_PROGRESS"
+  | "COMPLETION_REQUESTED"
+  | "COMPLETED"
+  | "CANCELLED";
+const editable = (state: JobState) =>
+  state === "CONFIRMED" || state === "IN_PROGRESS";
 type Role = "CUSTOMER" | "PRIMARY_PROVIDER";
 const date = (value: string) => new Date(value).toLocaleString("sk-SK");
 const kindLabel: Record<IssueItem["kind"], string> = {
@@ -388,7 +395,7 @@ export function IssueDiscussion({
                   Načítať staršie komentáre
                 </button>
               )}
-              {jobState !== "CANCELLED" && page.canCreate && (
+              {editable(jobState) && page.canCreate && (
                 <div>
                   <label htmlFor={`issue-comment-${issueId}`}>
                     Pridať komentár
@@ -574,8 +581,7 @@ export function JobOperations({
     setPending(false);
   };
   const acknowledge = async (id: string) => {
-    if (ackId !== null || jobState === "CANCELLED" || role !== "CUSTOMER")
-      return;
+    if (ackId !== null || !editable(jobState) || role !== "CUSTOMER") return;
     const commandId = ackRetries.current.get(id) ?? crypto.randomUUID();
     ackRetries.current.set(id, commandId);
     setAckId(id);
@@ -610,7 +616,7 @@ export function JobOperations({
             <ProgressItems
               items={progress.items}
               jobId={jobId}
-              canAcknowledge={role === "CUSTOMER" && jobState !== "CANCELLED"}
+              canAcknowledge={role === "CUSTOMER" && editable(jobState)}
               busyId={ackId}
               onAcknowledge={(id) => void acknowledge(id)}
             />
@@ -624,7 +630,7 @@ export function JobOperations({
               </button>
             )}
             {role === "PRIMARY_PROVIDER" &&
-              jobState !== "CANCELLED" &&
+              editable(jobState) &&
               progress.canCreate && (
                 <div>
                   <label htmlFor="job-progress-body">
@@ -679,7 +685,7 @@ export function JobOperations({
                 Načítať staršie problémy
               </button>
             )}
-            {jobState !== "CANCELLED" && issues.canCreate && (
+            {editable(jobState) && issues.canCreate && (
               <div>
                 <label htmlFor="job-issue-kind">Typ záznamu</label>
                 <select

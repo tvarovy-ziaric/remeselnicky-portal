@@ -260,7 +260,9 @@ test("change-order draft, exact counterproposal and approval preserve the origin
       page.getByRole("heading", { name: "Aktuálna obchodná dohoda" }),
     ).toBeVisible();
     await expect(
-      page.getByRole("link", { name: `${nextTerms.title} · revízia 2` }).first(),
+      page
+        .getByRole("link", { name: `${nextTerms.title} · revízia 2` })
+        .first(),
     ).toBeVisible();
     await expect(
       page.getByText(`Väzba na schválenú revíziu zmeny: ${counterId}.`, {

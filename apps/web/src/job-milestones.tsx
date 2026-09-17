@@ -347,7 +347,12 @@ export function JobMilestones({
 }: {
   jobId: string;
   role: "CUSTOMER" | "PRIMARY_PROVIDER";
-  jobState: "CONFIRMED" | "IN_PROGRESS" | "CANCELLED";
+  jobState:
+    | "CONFIRMED"
+    | "IN_PROGRESS"
+    | "COMPLETION_REQUESTED"
+    | "COMPLETED"
+    | "CANCELLED";
   acceptedQuoteAvailable: boolean;
   approvedChanges?: readonly {
     revisionId: string;
@@ -355,6 +360,7 @@ export function JobMilestones({
     terms?: Record<string, unknown>;
   }[];
 }) {
+  const writable = jobState === "CONFIRMED" || jobState === "IN_PROGRESS";
   const [page, setPage] = useState<MilestonePage | null>(null);
   const [loadStatus, setLoadStatus] = useState<"LOADING" | "OK" | "ERROR">(
     "LOADING",
@@ -406,7 +412,7 @@ export function JobMilestones({
     };
   }, [jobId]);
   const command = async (key: string, action: MilestoneCommand) => {
-    if (pending || jobState === "CANCELLED") return false;
+    if (pending || !writable) return false;
     const intent = JSON.stringify(action);
     const previous = attempts.current.get(key);
     const commandId =
@@ -527,12 +533,7 @@ export function JobMilestones({
     setOptionsPending(false);
   };
   const loadOptions = async () => {
-    if (
-      optionsPending ||
-      role !== "PRIMARY_PROVIDER" ||
-      jobState === "CANCELLED"
-    )
-      return;
+    if (optionsPending || role !== "PRIMARY_PROVIDER" || !writable) return;
     setOptionsPending(true);
     const [nextRoster, nextGroups] = await Promise.all([
       loadJobRosterPage({ fetch: globalThis.fetch, jobId }),
@@ -609,7 +610,7 @@ export function JobMilestones({
                     </Link>
                   </p>
                   {role === "CUSTOMER" &&
-                    jobState !== "CANCELLED" &&
+                    writable &&
                     item.capabilities.canAcknowledge &&
                     !item.acknowledgedAt && (
                       <button
@@ -626,7 +627,7 @@ export function JobMilestones({
                       </button>
                     )}
                   {role === "PRIMARY_PROVIDER" &&
-                    jobState !== "CANCELLED" &&
+                    writable &&
                     item.capabilities.canEdit && (
                       <div>
                         {editId === item.id ? (
@@ -671,7 +672,7 @@ export function JobMilestones({
                       </div>
                     )}
                   {role === "PRIMARY_PROVIDER" &&
-                    jobState !== "CANCELLED" &&
+                    writable &&
                     item.capabilities.canSetState && (
                       <fieldset disabled={pending}>
                         <legend>Zmeniť stav míľnika</legend>
@@ -702,7 +703,7 @@ export function JobMilestones({
                       </fieldset>
                     )}
                   {role === "PRIMARY_PROVIDER" &&
-                    jobState !== "CANCELLED" &&
+                    writable &&
                     item.capabilities.canReorder &&
                     index > 0 && (
                       <button
@@ -721,7 +722,7 @@ export function JobMilestones({
                       </button>
                     )}
                   {role === "PRIMARY_PROVIDER" &&
-                    jobState !== "CANCELLED" &&
+                    writable &&
                     item.capabilities.canAssign && (
                       <div>
                         <label htmlFor={`job-milestone-assign-${item.id}`}>
@@ -780,7 +781,7 @@ export function JobMilestones({
             </button>
           )}
           {role === "PRIMARY_PROVIDER" &&
-            jobState !== "CANCELLED" &&
+            writable &&
             page.items.some((item) => item.capabilities.canAssign) &&
             !optionsReady && (
               <button
@@ -791,44 +792,38 @@ export function JobMilestones({
                 Načítať možnosti priradenia z tejto zákazky
               </button>
             )}
-          {role === "PRIMARY_PROVIDER" &&
-            jobState !== "CANCELLED" &&
-            roster?.nextCursor && (
-              <button
-                disabled={pending || optionsPending}
-                type="button"
-                onClick={() => void moreRoster()}
-              >
-                Načítať ďalších zodpovedných účastníkov
-              </button>
-            )}
-          {role === "PRIMARY_PROVIDER" &&
-            jobState !== "CANCELLED" &&
-            groups?.nextCursor && (
-              <button
-                disabled={pending || optionsPending}
-                type="button"
-                onClick={() => void moreGroups()}
-              >
-                Načítať ďalšie pracovné skupiny
-              </button>
-            )}
-          {role === "PRIMARY_PROVIDER" &&
-            jobState !== "CANCELLED" &&
-            page.canCreate && (
-              <div>
-                <h3>Pridať prevádzkový míľnik</h3>
-                <MilestoneEditor
-                  draft={draft}
-                  onChange={setDraft}
-                  onSubmit={() => void create()}
-                  pending={pending}
-                  mode="CREATE"
-                  approvedChanges={approvedChanges}
-                  acceptedQuoteAvailable={acceptedQuoteAvailable}
-                />
-              </div>
-            )}
+          {role === "PRIMARY_PROVIDER" && writable && roster?.nextCursor && (
+            <button
+              disabled={pending || optionsPending}
+              type="button"
+              onClick={() => void moreRoster()}
+            >
+              Načítať ďalších zodpovedných účastníkov
+            </button>
+          )}
+          {role === "PRIMARY_PROVIDER" && writable && groups?.nextCursor && (
+            <button
+              disabled={pending || optionsPending}
+              type="button"
+              onClick={() => void moreGroups()}
+            >
+              Načítať ďalšie pracovné skupiny
+            </button>
+          )}
+          {role === "PRIMARY_PROVIDER" && writable && page.canCreate && (
+            <div>
+              <h3>Pridať prevádzkový míľnik</h3>
+              <MilestoneEditor
+                draft={draft}
+                onChange={setDraft}
+                onSubmit={() => void create()}
+                pending={pending}
+                mode="CREATE"
+                approvedChanges={approvedChanges}
+                acceptedQuoteAvailable={acceptedQuoteAvailable}
+              />
+            </div>
+          )}
         </>
       )}
     </section>

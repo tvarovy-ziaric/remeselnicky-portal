@@ -59,6 +59,11 @@ export {
 } from "./job-lifecycle/routes.js";
 export type { JobLifecycleRouteDependencies } from "./job-lifecycle/routes.js";
 export {
+  JOB_COMPLETION_PATHS,
+  registerJobCompletionRoutes,
+} from "./job-completion/routes.js";
+export type { JobCompletionRouteDependencies } from "./job-completion/routes.js";
+export {
   JOB_DOCUMENTATION_PATH,
   registerJobDocumentationRoutes,
 } from "./job-documentation/routes.js";

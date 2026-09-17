@@ -817,6 +817,7 @@ function JobWorkGroupControls({
 function ParticipantCard({
   participant,
   jobCancelled = false,
+  jobCompleted = false,
   capabilityLink = false,
   onRoleAction,
   rolesDisabled = false,
@@ -826,6 +827,7 @@ function ParticipantCard({
 }: {
   participant: JobRosterParticipant;
   jobCancelled?: boolean;
+  jobCompleted?: boolean;
   capabilityLink?: boolean;
   onRoleAction?: (
     participantId: string,
@@ -844,7 +846,9 @@ function ParticipantCard({
         {participant.state === "ACCEPTED"
           ? jobCancelled
             ? "Potvrdená účasť na zrušenej zákazke"
-            : "Potvrdený účastník"
+            : jobCompleted
+              ? "Potvrdená účasť na dokončenej zákazke"
+              : "Potvrdený účastník"
           : participant.state === "LEFT"
             ? "Účasť ukončená odchodom"
             : participant.state === "REMOVED"
@@ -901,33 +905,37 @@ function ParticipantCard({
           </ul>
         </div>
       )}
-      {onRoleAction && participant.state === "ACCEPTED" && !jobCancelled && (
-        <div className="job-roster-role-controls">
-          <strong>Roly na zákazke</strong>
-          <p>
-            Členstvo je súčasťou potvrdenej účasti; ďalšie roly možno prideliť
-            súbežne.
-          </p>
-          <div>
-            {editableRoles.map((role) => {
-              const active = participant.roles.some(
-                (item) => item.role === role && item.active,
-              );
-              const action: RoleAction = active ? "REVOKE" : "ASSIGN";
-              return (
-                <button
-                  disabled={rolesDisabled}
-                  key={role}
-                  onClick={() => onRoleAction(participant.id, role, action)}
-                  type="button"
-                >
-                  {active ? "Odobrať rolu" : "Prideliť rolu"} {roleLabel[role]}
-                </button>
-              );
-            })}
+      {onRoleAction &&
+        participant.state === "ACCEPTED" &&
+        !jobCancelled &&
+        !jobCompleted && (
+          <div className="job-roster-role-controls">
+            <strong>Roly na zákazke</strong>
+            <p>
+              Členstvo je súčasťou potvrdenej účasti; ďalšie roly možno prideliť
+              súbežne.
+            </p>
+            <div>
+              {editableRoles.map((role) => {
+                const active = participant.roles.some(
+                  (item) => item.role === role && item.active,
+                );
+                const action: RoleAction = active ? "REVOKE" : "ASSIGN";
+                return (
+                  <button
+                    disabled={rolesDisabled}
+                    key={role}
+                    onClick={() => onRoleAction(participant.id, role, action)}
+                    type="button"
+                  >
+                    {active ? "Odobrať rolu" : "Prideliť rolu"}{" "}
+                    {roleLabel[role]}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        )}
       {participant.workGroups.length > 0 && (
         <div>
           <strong>Pracovné skupiny</strong>
@@ -951,7 +959,8 @@ function ParticipantCard({
                 {onGroupRemove &&
                   participant.state === "ACCEPTED" &&
                   group.active &&
-                  !jobCancelled && (
+                  !jobCancelled &&
+                  !jobCompleted && (
                     <JobWorkGroupRemovalForm
                       assignmentId={group.assignmentId}
                       disabled={groupsDisabled}
@@ -1031,7 +1040,12 @@ export function JobRosterGroups({
   removalLocks = {},
 }: {
   page: JobRosterPage;
-  jobState: "CONFIRMED" | "IN_PROGRESS" | "CANCELLED";
+  jobState:
+    | "CONFIRMED"
+    | "IN_PROGRESS"
+    | "COMPLETION_REQUESTED"
+    | "COMPLETED"
+    | "CANCELLED";
   onRoleAction?: (
     participantId: string,
     role: EditableRole,
@@ -1048,12 +1062,13 @@ export function JobRosterGroups({
   onGroupRemove?: (assignmentId: string, reason: string) => Promise<boolean>;
   removalLocks?: Readonly<Record<string, string>>;
 }) {
-  const current =
-    jobState === "CANCELLED"
-      ? []
-      : page.participants.filter((item) => item.state === "ACCEPTED");
+  const writable = jobState === "CONFIRMED" || jobState === "IN_PROGRESS";
+  const closed = jobState === "CANCELLED" || jobState === "COMPLETED";
+  const current = closed
+    ? []
+    : page.participants.filter((item) => item.state === "ACCEPTED");
   const historical = page.participants.filter((item) =>
-    jobState === "CANCELLED"
+    closed
       ? item.state === "ACCEPTED" ||
         item.state === "LEFT" ||
         item.state === "REMOVED"
@@ -1068,7 +1083,7 @@ export function JobRosterGroups({
   return (
     <div className="job-roster-groups">
       {page.role === "PRIMARY_PROVIDER" &&
-        jobState !== "CANCELLED" &&
+        writable &&
         workGroups &&
         onGroupCreate &&
         onGroupAssign && (
@@ -1080,7 +1095,7 @@ export function JobRosterGroups({
             onAssign={onGroupAssign}
           />
         )}
-      {jobState !== "CANCELLED" && (
+      {!closed && (
         <div>
           <h3>Aktuálni účastníci</h3>
           {current.length === 0 ? (
@@ -1092,10 +1107,14 @@ export function JobRosterGroups({
                   key={item.id}
                   participant={item}
                   capabilityLink={page.role === "PRIMARY_PROVIDER"}
-                  {...(page.role === "PRIMARY_PROVIDER" && onRoleAction
+                  {...(page.role === "PRIMARY_PROVIDER" &&
+                  writable &&
+                  onRoleAction
                     ? { onRoleAction, rolesDisabled }
                     : {})}
-                  {...(page.role === "PRIMARY_PROVIDER" && onGroupRemove
+                  {...(page.role === "PRIMARY_PROVIDER" &&
+                  writable &&
+                  onGroupRemove
                     ? { onGroupRemove, removalLocks, groupsDisabled }
                     : {})}
                 />
@@ -1113,6 +1132,7 @@ export function JobRosterGroups({
                 key={item.id}
                 participant={item}
                 jobCancelled={jobState === "CANCELLED"}
+                jobCompleted={jobState === "COMPLETED"}
                 capabilityLink={page.role === "PRIMARY_PROVIDER"}
               />
             ))}
@@ -1130,9 +1150,9 @@ export function JobRosterGroups({
           </ul>
         </div>
       )}
-      {jobState === "CANCELLED" &&
-        historical.length === 0 &&
-        pending.length === 0 && <p>Bez zaznamenanej účasti.</p>}
+      {closed && historical.length === 0 && pending.length === 0 && (
+        <p>Bez zaznamenanej účasti.</p>
+      )}
     </div>
   );
 }
@@ -1142,8 +1162,14 @@ export function JobRoster({
   jobState,
 }: {
   jobId: string;
-  jobState: "CONFIRMED" | "IN_PROGRESS" | "CANCELLED";
+  jobState:
+    | "CONFIRMED"
+    | "IN_PROGRESS"
+    | "COMPLETION_REQUESTED"
+    | "COMPLETED"
+    | "CANCELLED";
 }) {
+  const writable = jobState === "CONFIRMED" || jobState === "IN_PROGRESS";
   const [page, setPage] = useState<JobRosterPage | null>(null);
   const [failed, setFailed] = useState(false);
   const [pending, setPending] = useState(false);
@@ -1180,7 +1206,7 @@ export function JobRoster({
         if (!active) return;
         setPage(result);
         setFailed(result === null);
-        if (result?.role === "PRIMARY_PROVIDER" && jobState !== "CANCELLED")
+        if (result?.role === "PRIMARY_PROVIDER" && writable)
           void loadJobWorkGroupListPage({
             fetch: globalThis.fetch,
             jobId,
@@ -1266,7 +1292,7 @@ export function JobRoster({
       groupsLoadingMore ||
       !page ||
       page.role !== "PRIMARY_PROVIDER" ||
-      jobState === "CANCELLED" ||
+      !writable ||
       !page.participants.some(
         (item) =>
           item.id === participantId &&
@@ -1332,7 +1358,7 @@ export function JobRoster({
       !page ||
       !groupPage ||
       page.role !== "PRIMARY_PROVIDER" ||
-      jobState === "CANCELLED" ||
+      !writable ||
       !workGroupName(name)
     )
       return false;
@@ -1390,7 +1416,7 @@ export function JobRoster({
       !page ||
       !groupPage ||
       page.role !== "PRIMARY_PROVIDER" ||
-      jobState === "CANCELLED" ||
+      !writable ||
       !deriveWorkGroupOptions(page, groupPage.groups).some(
         (group) => group.id === workGroupId,
       ) ||
@@ -1460,7 +1486,7 @@ export function JobRoster({
       groupsLoadingMore ||
       !page ||
       page.role !== "PRIMARY_PROVIDER" ||
-      jobState === "CANCELLED" ||
+      !writable ||
       !removalReason(reason) ||
       !page.participants.some(
         (participant) =>
@@ -1543,7 +1569,7 @@ export function JobRoster({
         <p role={groupError ? "alert" : "status"}>{groupMessage}</p>
       )}
       {page?.role === "PRIMARY_PROVIDER" &&
-        jobState !== "CANCELLED" &&
+        writable &&
         groupPage === null &&
         !groupLoadFailed && (
           <p role="status">Načítavajú sa pracovné skupiny…</p>

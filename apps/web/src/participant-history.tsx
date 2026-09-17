@@ -24,7 +24,12 @@ export interface ParticipationHistoryItem {
   readonly invitedAt: string;
   readonly acceptedAt: string | null;
   readonly leftAt: string | null;
-  readonly jobState: "CONFIRMED" | "IN_PROGRESS" | "CANCELLED";
+  readonly jobState:
+    | "CONFIRMED"
+    | "IN_PROGRESS"
+    | "COMPLETION_REQUESTED"
+    | "COMPLETED"
+    | "CANCELLED";
   readonly state: State;
 }
 export interface ParticipationHistoryPage {
@@ -81,9 +86,13 @@ export function parseParticipationHistoryPage(
       !isoDate(item.invitedAt) ||
       (item.acceptedAt !== null && !isoDate(item.acceptedAt)) ||
       (item.leftAt !== null && !isoDate(item.leftAt)) ||
-      !["CONFIRMED", "IN_PROGRESS", "CANCELLED"].includes(
-        String(item.jobState),
-      ) ||
+      ![
+        "CONFIRMED",
+        "IN_PROGRESS",
+        "COMPLETION_REQUESTED",
+        "COMPLETED",
+        "CANCELLED",
+      ].includes(String(item.jobState)) ||
       !["ACCEPTED", "DECLINED", "LEFT", "REMOVED"].includes(
         String(item.state),
       ) ||
