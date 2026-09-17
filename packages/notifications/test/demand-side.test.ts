@@ -41,6 +41,82 @@ function event(input: {
 
 describe("R3 demand-side notification catalog", () => {
   it.each([
+    [
+      "job.completion.requested",
+      "REVIEW_COMPLETION",
+      "IMPORTANT",
+      ["IN_APP", "EMAIL"],
+    ],
+    [
+      "job.completion.accepted",
+      "COMPLETION_ACCEPTED",
+      "IMPORTANT",
+      ["IN_APP", "EMAIL"],
+    ],
+    [
+      "job.completion.rejected",
+      "COMPLETION_REJECTED",
+      "IMPORTANT",
+      ["IN_APP", "EMAIL"],
+    ],
+    ["job.completion.withdrawn", "COMPLETION_WITHDRAWN", "INFO", ["IN_APP"]],
+  ] as const)(
+    "maps %s to private Job handover without reasons or media",
+    (name, action, priority, channels) => {
+      const jobId = randomUUID();
+      const attemptId = randomUUID();
+      const draft = mapDemandSideNotificationEvent(
+        event({
+          entityId: jobId,
+          entityType: "JOB",
+          name,
+          payload: { job_id: jobId, attempt_id: attemptId },
+        }),
+      )?.[0];
+      expect(draft).toEqual({
+        channels,
+        context: {
+          entityId: jobId,
+          entityType: "JOB",
+          path: `/zakazky/${jobId}`,
+        },
+        payload: { action, attempt_id: attemptId },
+        priority,
+        recipientUserId,
+        type: name,
+      });
+      expect(() => validateNotificationDraft(draft as never)).not.toThrow();
+      expect(JSON.stringify(draft)).not.toMatch(
+        /reason|note|media|filename|address|payment/iu,
+      );
+      expect(() =>
+        mapDemandSideNotificationEvent(
+          event({
+            entityId: randomUUID(),
+            entityType: "JOB",
+            name,
+            payload: { job_id: jobId, attempt_id: attemptId },
+          }),
+        ),
+      ).toThrow();
+      expect(() =>
+        mapDemandSideNotificationEvent(
+          event({
+            entityId: jobId,
+            entityType: "JOB",
+            name,
+            payload: {
+              job_id: jobId,
+              attempt_id: attemptId,
+              reason: "private",
+            },
+          }),
+        ),
+      ).toThrow();
+    },
+  );
+
+  it.each([
     ["job.change_order.proposed", "REVIEW_CHANGE_ORDER"],
     ["job.change_order.counterproposed", "REVIEW_CHANGE_ORDER_REVISION"],
     ["job.change_order.approved", "CHANGE_ORDER_APPROVED"],
