@@ -66,6 +66,7 @@ function profile(): PublicCraftsmanProfile {
       {
         code: "PROF:CARPENTER",
         label: "Stolár",
+        verifiedJobCount: 0,
         declaredProficiency: { level: "MASTER", source: "SELF_DECLARED" },
         evidenceSupportedProficiency: null,
       },

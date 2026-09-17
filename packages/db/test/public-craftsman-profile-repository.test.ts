@@ -59,6 +59,7 @@ describe("public craftsman profile repository", () => {
         {
           declaredProficiency: { level: "MASTER", source: "SELF_DECLARED" },
           evidenceSupportedProficiency: null,
+          verifiedJobCount: 0,
         },
       ],
       trust: {
@@ -77,6 +78,13 @@ describe("public craftsman profile repository", () => {
     expect(gate).toContain("publication.owner_visibility = 'PUBLIC'");
     expect(gate).toContain("publication.moderation_state = 'ALLOWED'");
     expect(gate).toContain("owner.account_state = 'ACTIVE'");
+    expect(gate).toContain("completed_job_profile_evidence");
+    const professionQuery =
+      sql.queries.find((query) =>
+        query.includes("current_craftsman_professions profession"),
+      ) ?? "";
+    expect(professionQuery).toContain("completed_job_profession_evidence");
+    expect(professionQuery).toContain("count(DISTINCT completed.job_id)");
     const credentialQuery =
       sql.queries.find((query) => query.includes("credential_claims")) ?? "";
     expect(credentialQuery).toContain("claim.state = 'APPROVED'");
@@ -107,6 +115,30 @@ describe("public craftsman profile repository", () => {
       ).resolves.toBeNull();
       expect(sql.queries).toHaveLength(1);
     }
+  });
+
+  it("exposes only factual aggregate completed-work counts by profile and profession", async () => {
+    const responses = completeResponses();
+    responses[0] = [
+      {
+        ...(responses[0]?.[0] as Record<string, unknown>),
+        verifiedWorkCount: 2,
+      },
+    ];
+    responses[2] = [
+      {
+        ...(responses[2]?.[0] as Record<string, unknown>),
+        verifiedJobCount: 1,
+      },
+    ];
+    const profile = await sqlRepository(scriptedSql(responses)).findPublic(
+      profileId,
+    );
+    expect(profile?.trust.verifiedWorkCount).toBe(2);
+    expect(profile?.professions[0]?.verifiedJobCount).toBe(1);
+    expect(JSON.stringify(profile)).not.toMatch(
+      /jobId|participantId|customerProfileId/u,
+    );
   });
 
   it("fails closed when approved legacy display text contains contact data", async () => {
@@ -192,6 +224,7 @@ function completeResponses(): unknown[][] {
         profileType: "INDIVIDUAL",
         realFirstName: "Ján",
         realLastName: "Remeselný",
+        verifiedWorkCount: 0,
         email: "must-not-leak@example.test",
         identityVerificationReference: "internal:identity",
       },
@@ -202,6 +235,7 @@ function completeResponses(): unknown[][] {
         code: "PROF:CARPENTER",
         declaredLevel: "MASTER",
         evidenceSupportedLevel: null,
+        verifiedJobCount: 0,
         label: "Stolár",
       },
     ],

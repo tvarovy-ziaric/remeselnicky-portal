@@ -61,6 +61,7 @@ export interface PublicCraftsmanProfilePersistence {
 export interface PublicCraftsmanProfession {
   readonly code: string;
   readonly label: string;
+  readonly verifiedJobCount: number;
   readonly declaredProficiency: Readonly<{
     level: "BEGINNER" | "ADVANCED" | "MASTER";
     source: "SELF_DECLARED";
@@ -213,6 +214,14 @@ export function serializePublicCraftsmanProfile(
   if (
     displayText.some(
       (value) => value !== null && !isPublicDisplayTextSafe(value),
+    ) ||
+    !Number.isSafeInteger(candidate.trust.verifiedWorkCount) ||
+    candidate.trust.verifiedWorkCount < 0 ||
+    candidate.professions.some(
+      (profession) =>
+        !Number.isSafeInteger(profession.verifiedJobCount) ||
+        profession.verifiedJobCount < 0 ||
+        profession.verifiedJobCount > candidate.trust.verifiedWorkCount,
     )
   ) {
     return null;
@@ -229,6 +238,7 @@ export function serializePublicCraftsmanProfile(
     professions: candidate.professions.map((profession) => ({
       code: profession.code,
       label: profession.label,
+      verifiedJobCount: profession.verifiedJobCount,
       declaredProficiency: {
         level: profession.declaredProficiency.level,
         source: "SELF_DECLARED",

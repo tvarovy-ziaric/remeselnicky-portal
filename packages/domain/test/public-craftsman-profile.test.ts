@@ -94,6 +94,39 @@ describe("public craftsman profile", () => {
     ).not.toBeNull();
   });
 
+  it("shows profession-specific completed-work volume only as a bounded factual count", () => {
+    const candidate = validCandidate();
+    const verified = serializePublicCraftsmanProfile({
+      ...candidate,
+      trust: { ...candidate.trust, verifiedWorkCount: 2 },
+      professions: [{ ...candidate.professions[0]!, verifiedJobCount: 1 }],
+    });
+    expect(verified?.professions[0]?.verifiedJobCount).toBe(1);
+    for (const invalid of [
+      -1,
+      1.5,
+      Number.NaN,
+      Number.MAX_SAFE_INTEGER + 1,
+      3,
+    ]) {
+      expect(
+        serializePublicCraftsmanProfile({
+          ...candidate,
+          trust: { ...candidate.trust, verifiedWorkCount: 2 },
+          professions: [
+            { ...candidate.professions[0]!, verifiedJobCount: invalid },
+          ],
+        }),
+      ).toBeNull();
+    }
+    expect(
+      serializePublicCraftsmanProfile({
+        ...candidate,
+        trust: { ...candidate.trust, verifiedWorkCount: -1 },
+      }),
+    ).toBeNull();
+  });
+
   it("fails closed for unsafe project text and malformed public photos", () => {
     expect(
       serializePublicCraftsmanProfile({
@@ -143,6 +176,7 @@ function validCandidate(): PublicCraftsmanProfileCandidate {
       {
         code: "PROF:CARPENTER",
         label: "Stolár",
+        verifiedJobCount: 0,
         declaredProficiency: { level: "MASTER", source: "SELF_DECLARED" },
         evidenceSupportedProficiency: null,
       },

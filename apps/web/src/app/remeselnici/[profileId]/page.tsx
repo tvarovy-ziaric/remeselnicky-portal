@@ -60,6 +60,9 @@ export default async function PublicCraftsmanProfilePage({
               <li key={profession.code}>
                 <strong>{profession.label}</strong>
                 <span>
+                  Overené realizácie v profesii: {profession.verifiedJobCount}
+                </span>
+                <span>
                   Deklarovaná úroveň:{" "}
                   {proficiencyLabel(profession.declaredProficiency.level)}
                 </span>

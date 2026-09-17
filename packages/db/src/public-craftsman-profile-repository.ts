@@ -19,6 +19,7 @@ interface ProfileRow {
   readonly profileType: "INDIVIDUAL" | "COMPANY";
   readonly realFirstName: string | null;
   readonly realLastName: string | null;
+  readonly verifiedWorkCount: number;
 }
 
 interface ProfessionRow {
@@ -26,6 +27,7 @@ interface ProfessionRow {
   readonly declaredLevel: "BEGINNER" | "ADVANCED" | "MASTER";
   readonly evidenceSupportedLevel: "BEGINNER" | "ADVANCED" | "MASTER" | null;
   readonly label: string;
+  readonly verifiedJobCount: number;
 }
 
 interface MunicipalityRow {
@@ -146,7 +148,12 @@ async function findInSnapshot(
         AS "companyRegistrationVerified",
       area.base_municipality_code AS "baseMunicipalityCode",
       municipality.name_sk AS "baseMunicipalityName",
-      area.normal_radius_meters AS "normalRadiusMeters"
+      area.normal_radius_meters AS "normalRadiusMeters",
+      (
+        SELECT count(DISTINCT completed.job_id)::integer
+        FROM completed_job_profile_evidence completed
+        WHERE completed.craftsman_profile_id = profile.id
+      ) AS "verifiedWorkCount"
     FROM current_craftsman_profile_publications publication
     JOIN craftsman_profiles profile
       ON profile.id = publication.craftsman_profile_id
@@ -179,7 +186,13 @@ async function findInSnapshot(
       profession.profession_code AS code,
       taxonomy.label_sk AS label,
       profession.declared_level AS "declaredLevel",
-      profession.evidence_supported_level AS "evidenceSupportedLevel"
+      profession.evidence_supported_level AS "evidenceSupportedLevel",
+      (
+        SELECT count(DISTINCT completed.job_id)::integer
+        FROM completed_job_profession_evidence completed
+        WHERE completed.craftsman_profile_id = profession.craftsman_profile_id
+          AND completed.profession_code = profession.profession_code
+      ) AS "verifiedJobCount"
     FROM current_craftsman_professions profession
     JOIN taxonomy_professions taxonomy
       ON taxonomy.release_id = profession.taxonomy_release_id
@@ -359,6 +372,7 @@ async function findInSnapshot(
     professions: professions.map((profession) => ({
       code: profession.code,
       label: profession.label,
+      verifiedJobCount: profession.verifiedJobCount,
       declaredProficiency: {
         level: profession.declaredLevel,
         source: "SELF_DECLARED",
@@ -384,7 +398,7 @@ async function findInSnapshot(
       companyRegistrationVerified: profile.companyRegistrationVerified,
       customerScore: null,
       reviewCount: 0,
-      verifiedWorkCount: 0,
+      verifiedWorkCount: profile.verifiedWorkCount,
     },
     portfolio: portfolioProjects.map((project) => ({
       projectId: project.projectId,
