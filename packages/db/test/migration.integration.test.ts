@@ -206,6 +206,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
           "0081_job_milestone_context.sql",
           "0082_change_order_foundation.sql",
           "0083_change_order_pdf_reservations.sql",
+          "0084_job_milestone_change_order_provenance.sql",
         ],
         alreadyApplied: 0,
       });
@@ -214,7 +215,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         testDatabaseUrl,
         migrationsDirectory,
       );
-      expect(secondRun).toEqual({ applied: [], alreadyApplied: 84 });
+      expect(secondRun).toEqual({ applied: [], alreadyApplied: 85 });
 
       const sql = postgres(testDatabaseUrl, { max: 5 });
       try {
@@ -260,7 +261,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         `;
 
         expect(postgis?.extversion).toMatch(/^3\./);
-        expect(ledger?.count).toBe(84);
+        expect(ledger?.count).toBe(85);
         expect(created).toMatchObject({ account_state: "ACTIVE" });
         expect(created?.id).toMatch(
           /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,

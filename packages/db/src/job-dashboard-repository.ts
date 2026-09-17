@@ -1,5 +1,16 @@
 import type { Sql, TransactionSql } from "postgres";
 
+import type {
+  ChangeOrderPriceImpact,
+  ChangeOrderScheduleImpact,
+  ChangeOrderTerms,
+} from "./change-order-repository.js";
+import {
+  deriveCurrentCommercialState,
+  type CommercialChangeRevision,
+  type CurrentCommercialState,
+} from "./current-commercial-state.js";
+
 const uuid =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
@@ -13,6 +24,7 @@ export interface JobDashboardSummary {
 }
 
 export interface JobDashboard extends JobDashboardSummary {
+  readonly currentCommercialState: CurrentCommercialState;
   readonly customerDisplayName: string;
   readonly quote: Readonly<{
     authoringMode: "EXTERNAL_PDF" | "PLATFORM_STRUCTURED";
@@ -74,6 +86,35 @@ interface TimelineRow {
   readonly occurredAt: Date;
   readonly actorRole: string | null;
   readonly reason: string | null;
+}
+
+interface ApprovedChangeRow {
+  readonly changeOrderId: string;
+  readonly revisionId: string;
+  readonly revisionNumber: number;
+  readonly approvedAt: Date;
+  readonly title: string;
+  readonly reason: string;
+  readonly changeDescription: string;
+  readonly scopeAdded: string[];
+  readonly scopeRemoved: string[];
+  readonly scopeChanged: string[];
+  readonly priceImpactMode: ChangeOrderPriceImpact["mode"];
+  readonly deltaAmountCents: string | null;
+  readonly rangeMinimumDeltaCents: string | null;
+  readonly rangeMaximumDeltaCents: string | null;
+  readonly priceBasis: string | null;
+  readonly vatStatus:
+    "VAT_INCLUDED" | "VAT_EXCLUDED" | "NOT_VAT_REGISTERED" | null;
+  readonly scheduleImpactMode: ChangeOrderScheduleImpact["mode"];
+  readonly scheduleDeltaDays: number | null;
+  readonly scheduleNewDate: string | null;
+  readonly scheduleRangeStart: string | null;
+  readonly scheduleRangeEnd: string | null;
+  readonly materialResponsibility: "PROVIDER" | "CUSTOMER" | "MIXED" | null;
+  readonly warrantyChange: string | null;
+  readonly otherConditionChange: string | null;
+  readonly affectedMilestoneIds: string[];
 }
 
 export function createJobDashboardRepository(sql: Sql | TransactionSql) {
@@ -184,6 +225,44 @@ export function createJobDashboardRepository(sql: Sql | TransactionSql) {
       `;
         if (count === undefined || count.total !== documents.length)
           throw new Error("Accepted Job documents are unavailable.");
+        const approvedRows = await transaction<ApprovedChangeRow[]>`
+        SELECT order_identity.id AS "changeOrderId", revision.id AS "revisionId",
+          revision.revision_number AS "revisionNumber",
+          approval.occurred_at AS "approvedAt",
+          revision.title, revision.reason,
+          revision.change_description AS "changeDescription",
+          revision.scope_added AS "scopeAdded",
+          revision.scope_removed AS "scopeRemoved",
+          revision.scope_changed AS "scopeChanged",
+          revision.price_impact_mode::text AS "priceImpactMode",
+          revision.delta_amount_cents AS "deltaAmountCents",
+          revision.range_minimum_delta_cents AS "rangeMinimumDeltaCents",
+          revision.range_maximum_delta_cents AS "rangeMaximumDeltaCents",
+          revision.price_basis AS "priceBasis",
+          revision.vat_status::text AS "vatStatus",
+          revision.schedule_impact_mode::text AS "scheduleImpactMode",
+          revision.schedule_delta_days AS "scheduleDeltaDays",
+          revision.schedule_new_date AS "scheduleNewDate",
+          revision.schedule_range_start AS "scheduleRangeStart",
+          revision.schedule_range_end AS "scheduleRangeEnd",
+          revision.material_responsibility::text AS "materialResponsibility",
+          revision.warranty_change AS "warrantyChange",
+          revision.other_condition_change AS "otherConditionChange",
+          revision.affected_milestone_ids AS "affectedMilestoneIds"
+        FROM change_orders order_identity
+        JOIN change_order_revisions revision
+          ON revision.change_order_id = order_identity.id
+        JOIN current_change_order_revision_states state
+          ON state.revision_id = revision.id AND state.state = 'APPROVED'
+        JOIN change_order_revision_actions approval
+          ON approval.revision_id = revision.id AND approval.action = 'APPROVE'
+        WHERE order_identity.job_id = ${input.jobId}
+        ORDER BY approval.occurred_at, approval.id, order_identity.id
+      `;
+        const currentCommercialState = deriveCurrentCommercialState(
+          quote,
+          approvedRows.map(mapApprovedChange),
+        );
         const timeline = await transaction<TimelineRow[]>`
         SELECT event_id AS "eventId", event_type AS "eventType",
           occurred_at AS "occurredAt", actor_role AS "actorRole", reason
@@ -214,6 +293,7 @@ export function createJobDashboardRepository(sql: Sql | TransactionSql) {
         return Object.freeze({
           ...summary,
           customerDisplayName: `Konto ${row.customerOwnerUserId.slice(0, 8)}`,
+          currentCommercialState,
           quote,
           request,
           supportingDocuments: Object.freeze(
@@ -399,6 +479,114 @@ function parseQuote(value: unknown): JobDashboard["quote"] | null {
     quoteId,
     revision: snapshot["revision"],
   });
+}
+
+function mapApprovedChange(row: ApprovedChangeRow): CommercialChangeRevision {
+  if (
+    !uuid.test(row.changeOrderId) ||
+    !uuid.test(row.revisionId) ||
+    !positive(row.revisionNumber) ||
+    !(row.approvedAt instanceof Date) ||
+    !Number.isFinite(row.approvedAt.getTime()) ||
+    ![row.scopeAdded, row.scopeRemoved, row.scopeChanged].every(
+      (lines) =>
+        Array.isArray(lines) && lines.every((line) => typeof line === "string"),
+    ) ||
+    !Array.isArray(row.affectedMilestoneIds) ||
+    !row.affectedMilestoneIds.every((id) => uuid.test(id))
+  )
+    throw new Error("Invalid approved Change-order provenance.");
+  let priceImpact: ChangeOrderPriceImpact;
+  if (row.priceImpactMode === "NONE") priceImpact = { mode: "NONE" };
+  else if (row.priceImpactMode === "FIXED_DELTA")
+    priceImpact = {
+      mode: "FIXED_DELTA",
+      amountCents: cents(row.deltaAmountCents),
+      vatStatus: requiredVat(row.vatStatus),
+    };
+  else if (row.priceImpactMode === "ESTIMATE_DELTA")
+    priceImpact = {
+      mode: "ESTIMATE_DELTA",
+      amountCents: cents(row.deltaAmountCents),
+      basis: requiredText(row.priceBasis),
+      vatStatus: requiredVat(row.vatStatus),
+    };
+  else if (row.priceImpactMode === "RANGE_DELTA")
+    priceImpact = {
+      mode: "RANGE_DELTA",
+      minimumCents: cents(row.rangeMinimumDeltaCents),
+      maximumCents: cents(row.rangeMaximumDeltaCents),
+      basis: requiredText(row.priceBasis),
+      vatStatus: requiredVat(row.vatStatus),
+    };
+  else throw new Error("Invalid approved Change-order price impact.");
+  let scheduleImpact: ChangeOrderScheduleImpact;
+  if (row.scheduleImpactMode === "NONE") scheduleImpact = { mode: "NONE" };
+  else if (row.scheduleImpactMode === "DAYS") {
+    if (!Number.isSafeInteger(row.scheduleDeltaDays))
+      throw new Error("Invalid approved Change-order schedule.");
+    scheduleImpact = { mode: "DAYS", deltaDays: row.scheduleDeltaDays! };
+  } else if (row.scheduleImpactMode === "DATE")
+    scheduleImpact = {
+      mode: "DATE",
+      newDate: requiredText(row.scheduleNewDate),
+    };
+  else if (row.scheduleImpactMode === "RANGE")
+    scheduleImpact = {
+      mode: "RANGE",
+      startDate: requiredText(row.scheduleRangeStart),
+      endDate: requiredText(row.scheduleRangeEnd),
+    };
+  else throw new Error("Invalid approved Change-order schedule impact.");
+  const terms: ChangeOrderTerms = {
+    title: requiredText(row.title),
+    reason: requiredText(row.reason),
+    changeDescription: requiredText(row.changeDescription),
+    scopeAdded: row.scopeAdded,
+    scopeRemoved: row.scopeRemoved,
+    scopeChanged: row.scopeChanged,
+    priceImpact,
+    scheduleImpact,
+    materialResponsibility: row.materialResponsibility,
+    warrantyChange: row.warrantyChange,
+    otherConditionChange: row.otherConditionChange,
+    affectedMilestoneIds: row.affectedMilestoneIds,
+  };
+  return {
+    changeOrderId: row.changeOrderId,
+    revisionId: row.revisionId,
+    revisionNumber: row.revisionNumber,
+    state: "APPROVED",
+    approvedAt: row.approvedAt,
+    terms,
+  };
+}
+
+function cents(value: string | null): number {
+  if (typeof value !== "string" || !/^-?\d{1,13}$/u.test(value))
+    throw new Error("Invalid approved Change-order amount.");
+  const result = Number(value);
+  if (!Number.isSafeInteger(result) || Math.abs(result) > 1_000_000_000_000)
+    throw new Error("Invalid approved Change-order amount.");
+  return result;
+}
+
+function requiredText(value: string | null): string {
+  if (typeof value !== "string" || value.trim().length === 0)
+    throw new Error("Invalid approved Change-order text.");
+  return value;
+}
+
+function requiredVat(
+  value: ApprovedChangeRow["vatStatus"],
+): NonNullable<ApprovedChangeRow["vatStatus"]> {
+  if (
+    value !== "VAT_INCLUDED" &&
+    value !== "VAT_EXCLUDED" &&
+    value !== "NOT_VAT_REGISTERED"
+  )
+    throw new Error("Invalid approved Change-order VAT.");
+  return value;
 }
 
 function record(value: unknown): Record<string, unknown> | null {

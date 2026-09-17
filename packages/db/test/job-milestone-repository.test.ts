@@ -43,6 +43,25 @@ describe("Job milestone input boundary", () => {
         acceptedStageLabel: " x ",
       }),
     ).rejects.toThrow(TypeError);
+    await expect(
+      repository.createMilestone({
+        actorUserId: id(),
+        commandId: id(),
+        jobId: id(),
+        title: "Fáza",
+        sourceChangeOrderRevisionId: "not-a-revision",
+      }),
+    ).rejects.toThrow(TypeError);
+    await expect(
+      repository.createMilestone({
+        actorUserId: id(),
+        commandId: id(),
+        jobId: id(),
+        title: "Fáza",
+        acceptedStageLabel: "Etapa",
+        sourceChangeOrderRevisionId: id(),
+      }),
+    ).rejects.toThrow(TypeError);
   });
 
   it("rejects invalid dates, reversed range and responsibility", async () => {

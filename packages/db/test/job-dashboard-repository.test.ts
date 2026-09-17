@@ -110,6 +110,7 @@ describe("primary-party Job dashboard repository", () => {
       [row],
       [{ displayFilename: "dodatok.pdf", mediaAssetId }],
       [{ total: 1 }],
+      [],
       [
         {
           eventId: eventA,
@@ -163,7 +164,9 @@ describe("primary-party Job dashboard repository", () => {
       "job_quote_supporting_document_snapshots",
     );
     expect(fixture.statements[1]).toContain("canonical.revoked_at IS NULL");
-    expect(fixture.statements[3]).toContain(
+    expect(fixture.statements[3]).toContain("state.state = 'APPROVED'");
+    expect(fixture.statements[3]).toContain("approval.action = 'APPROVE'");
+    expect(fixture.statements[4]).toContain(
       "ORDER BY occurred_at, event_order",
     );
   });
@@ -198,6 +201,93 @@ describe("primary-party Job dashboard repository", () => {
         jobId,
       }),
     ).rejects.toThrow("Invalid accepted Job read model");
+  });
+
+  it("derives an approved fixed delta without rewriting the accepted Quote", async () => {
+    const changeOrderId = "86200000-0000-4000-8000-000000000009";
+    const revisionId = "86200000-0000-4000-8000-00000000000a";
+    const fixture = fakeSql([
+      [
+        {
+          ...row,
+          quoteSnapshot: {
+            ...row.quoteSnapshot,
+            commercialContent: {
+              ...row.quoteSnapshot.commercialContent,
+              currency: "EUR",
+            },
+          },
+        },
+      ],
+      [],
+      [{ total: 0 }],
+      [
+        {
+          changeOrderId,
+          revisionId,
+          revisionNumber: 1,
+          approvedAt: new Date("2026-09-17T10:00:00.000Z"),
+          title: "Doplnenie práce",
+          reason: "Doplnenie rozsahu",
+          changeDescription: "Montáž ďalšieho prvku",
+          scopeAdded: ["Ďalší prvok"],
+          scopeRemoved: [],
+          scopeChanged: [],
+          priceImpactMode: "FIXED_DELTA",
+          deltaAmountCents: "12000",
+          rangeMinimumDeltaCents: null,
+          rangeMaximumDeltaCents: null,
+          priceBasis: null,
+          vatStatus: "VAT_INCLUDED",
+          scheduleImpactMode: "NONE",
+          scheduleDeltaDays: null,
+          scheduleNewDate: null,
+          scheduleRangeStart: null,
+          scheduleRangeEnd: null,
+          materialResponsibility: null,
+          warrantyChange: null,
+          otherConditionChange: null,
+          affectedMilestoneIds: [],
+        },
+      ],
+      [
+        {
+          eventId: eventA,
+          eventType: "JOB_CONFIRMED",
+          occurredAt: acceptedAt,
+          actorRole: null,
+          reason: null,
+        },
+        {
+          eventId: eventB,
+          eventType: "CONTACT_ADDRESS_UNLOCKED",
+          occurredAt: acceptedAt,
+          actorRole: null,
+          reason: null,
+        },
+      ],
+    ]);
+    const detail = await createJobDashboardRepository(
+      fixture.sql,
+    ).readForPrimaryParty({ actorUserId, jobId });
+    expect(detail?.quote.commercialContent["totalAmountCents"]).toBe(100_000);
+    expect(detail?.currentCommercialState).toMatchObject({
+      originalTotalCents: 100_000,
+      fixedDeltaCents: 12_000,
+      exactTotalCents: 112_000,
+      exactTotalUnavailableReason: null,
+      approvedChanges: [
+        {
+          changeOrderId,
+          revisionId,
+          approvedAt: "2026-09-17T10:00:00.000Z",
+          terms: { title: "Doplnenie práce" },
+        },
+      ],
+    });
+    expect(
+      detail?.currentCommercialState.approvedChanges[0]?.terms,
+    ).not.toHaveProperty("externalPdfMediaAssetId");
   });
 
   it("gives an accepted request without an optional title a stable display label", async () => {

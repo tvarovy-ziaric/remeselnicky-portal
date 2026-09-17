@@ -145,6 +145,13 @@ export { createJobContactRepository } from "./job-contact-repository.js";
 export type { JobContactDetails } from "./job-contact-repository.js";
 import { createJobDashboardRepository } from "./job-dashboard-repository.js";
 export { createJobDashboardRepository } from "./job-dashboard-repository.js";
+export { deriveCurrentCommercialState } from "./current-commercial-state.js";
+export type {
+  CommercialBaseQuote,
+  CommercialChangeRevision,
+  CurrentCommercialState,
+  ExactTotalUnavailableReason,
+} from "./current-commercial-state.js";
 export type {
   JobDashboard,
   JobDashboardSummary,

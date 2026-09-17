@@ -23,6 +23,7 @@ export interface CreateJobMilestoneInput {
   readonly plannedStartOn?: string | null;
   readonly plannedEndOn?: string | null;
   readonly acceptedStageLabel?: string | null;
+  readonly sourceChangeOrderRevisionId?: string | null;
   readonly responsibility?: JobMilestoneResponsibility | null;
 }
 export interface EditJobMilestoneInput extends JobMilestoneCommand {
@@ -30,6 +31,7 @@ export interface EditJobMilestoneInput extends JobMilestoneCommand {
   readonly description: string | null;
   readonly plannedStartOn: string | null;
   readonly plannedEndOn: string | null;
+  readonly sourceChangeOrderRevisionId?: string | null;
 }
 export interface SetJobMilestoneStateInput extends JobMilestoneCommand {
   readonly state: JobMilestoneState;
@@ -65,6 +67,7 @@ export interface JobMilestoneItem {
   readonly sourceQuoteId: string | null;
   readonly sourceQuoteRevision: number | null;
   readonly sourcePdfMediaAssetId: string | null;
+  readonly sourceChangeOrderRevisionId: string | null;
   readonly responsibility: JobMilestoneResponsibility | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
@@ -99,6 +102,7 @@ export interface JobMilestoneHistoryEvent {
   readonly sourceQuoteId: string | null;
   readonly sourceQuoteRevision: number | null;
   readonly sourcePdfMediaAssetId: string | null;
+  readonly sourceChangeOrderRevisionId: string | null;
   readonly recordedAt: Date;
 }
 export class JobMilestoneIdempotencyError extends Error {}
@@ -129,6 +133,7 @@ interface Current {
   readonly acceptedQuoteId: string | null;
   readonly acceptedQuoteRevision: number | null;
   readonly acceptedPdfMediaAssetId: string | null;
+  readonly sourceChangeOrderRevisionId: string | null;
 }
 interface Existing {
   readonly kind: Kind | "ACK";
@@ -151,6 +156,12 @@ export function createJobMilestoneRepository(sql: RootSql) {
       const plannedEndOn = optionalDay(input.plannedEndOn);
       validateRange(plannedStartOn, plannedEndOn);
       const acceptedStageLabel = optionalText(input.acceptedStageLabel, 160);
+      const sourceChangeOrderRevisionId =
+        input.sourceChangeOrderRevisionId ?? null;
+      if (sourceChangeOrderRevisionId !== null)
+        validateIds(sourceChangeOrderRevisionId);
+      if (sourceChangeOrderRevisionId !== null && acceptedStageLabel !== null)
+        throw new TypeError("Milestone cannot claim two creation sources.");
       validateResponsibility(input.responsibility ?? null);
       const responsibility = input.responsibility ?? null;
       const intent = {
@@ -160,6 +171,9 @@ export function createJobMilestoneRepository(sql: RootSql) {
         plannedStartOn,
         plannedEndOn,
         acceptedStageLabel,
+        ...(sourceChangeOrderRevisionId === null
+          ? {}
+          : { sourceChangeOrderRevisionId }),
         responsibility,
       };
       return transaction(sql, async (tx) => {
@@ -167,11 +181,25 @@ export function createJobMilestoneRepository(sql: RootSql) {
         if (!party?.canPlan) return { status: "NOT_FOUND" };
         if (acceptedStageLabel !== null && party.role !== "PRIMARY_PROVIDER")
           return { status: "NOT_FOUND" };
+        if (
+          sourceChangeOrderRevisionId !== null &&
+          party.role !== "PRIMARY_PROVIDER"
+        )
+          return { status: "NOT_FOUND" };
         await commandLock(tx, input.commandId);
         const prior = await existing(tx, input.commandId, intent);
         if (prior) return replay(prior, input, "CREATE");
         if (!open(party.state)) return { status: "STALE_STATE" };
         if (!(await responsibilityAvailable(tx, input.jobId, responsibility)))
+          return { status: "NOT_FOUND" };
+        if (
+          sourceChangeOrderRevisionId !== null &&
+          !(await approvedRevisionAvailable(
+            tx,
+            input.jobId,
+            sourceChangeOrderRevisionId,
+          ))
+        )
           return { status: "NOT_FOUND" };
         const [source] = await tx<
           Array<{ quoteId: string; revision: number; pdfId: string | null }>
@@ -200,7 +228,7 @@ export function createJobMilestoneRepository(sql: RootSql) {
               title, description, planned_start_date, planned_end_date, state, order_key,
               responsible_participant_id, responsible_work_group_id,
               accepted_stage_label, accepted_quote_id, accepted_quote_revision,
-              accepted_pdf_media_asset_id)
+              accepted_pdf_media_asset_id, source_change_order_revision_id)
           VALUES (${input.commandId}, ${input.commandId}, 1, 'CREATE', ${input.actorUserId},
             ${tx.json(intent)}, ${title}, ${description},
             ${plannedStartOn}::date, ${plannedEndOn}::date, 'PLANNED', ${orderKey}::numeric,
@@ -208,7 +236,8 @@ export function createJobMilestoneRepository(sql: RootSql) {
             ${responsibility?.kind === "WORK_GROUP" ? responsibility.id : null}::uuid,
             ${acceptedStageLabel}, ${acceptedStageLabel ? source.quoteId : null}::uuid,
             ${acceptedStageLabel ? source.revision : null}::integer,
-            ${acceptedStageLabel ? source.pdfId : null}::uuid)
+            ${acceptedStageLabel ? source.pdfId : null}::uuid,
+            ${sourceChangeOrderRevisionId}::uuid)
           RETURNING recorded_at AS "recordedAt"
         `;
         if (!identity || !event) throw new Error("Milestone insert missing.");
@@ -227,18 +256,47 @@ export function createJobMilestoneRepository(sql: RootSql) {
       const plannedStartOn = optionalDay(input.plannedStartOn);
       const plannedEndOn = optionalDay(input.plannedEndOn);
       validateRange(plannedStartOn, plannedEndOn);
+      const sourceChangeOrderRevisionId =
+        input.sourceChangeOrderRevisionId ?? null;
+      if (sourceChangeOrderRevisionId !== null)
+        validateIds(sourceChangeOrderRevisionId);
       return mutate(
         sql,
         input,
         "EDIT",
-        { title, description, plannedStartOn, plannedEndOn },
-        (current) => ({
-          ...current,
+        {
           title,
           description,
-          plannedStartDate: plannedStartOn,
-          plannedEndDate: plannedEndOn,
-        }),
+          plannedStartOn,
+          plannedEndOn,
+          ...(sourceChangeOrderRevisionId === null
+            ? {}
+            : { sourceChangeOrderRevisionId }),
+        },
+        async (current, tx) => {
+          if (
+            sourceChangeOrderRevisionId !== null &&
+            sourceChangeOrderRevisionId !==
+              current.sourceChangeOrderRevisionId &&
+            !(await approvedRevisionAvailable(
+              tx,
+              input.jobId,
+              sourceChangeOrderRevisionId,
+              input.milestoneId,
+            ))
+          )
+            return null;
+          return {
+            ...current,
+            title,
+            description,
+            plannedStartDate: plannedStartOn,
+            plannedEndDate: plannedEndOn,
+            sourceChangeOrderRevisionId:
+              sourceChangeOrderRevisionId ??
+              current.sourceChangeOrderRevisionId,
+          };
+        },
       );
     },
     setMilestoneState(
@@ -497,6 +555,7 @@ export function createJobMilestoneRepository(sql: RootSql) {
             accepted_quote_id AS "sourceQuoteId",
             accepted_quote_revision AS "sourceQuoteRevision",
             accepted_pdf_media_asset_id AS "sourcePdfMediaAssetId",
+            source_change_order_revision_id AS "sourceChangeOrderRevisionId",
             recorded_at AS "recordedAt"
           FROM job_milestone_events WHERE milestone_id = ${input.milestoneId}
             AND (${input.beforeSequence ?? null}::integer IS NULL OR event_sequence < ${input.beforeSequence ?? null})
@@ -537,6 +596,12 @@ async function mutate(
     if (!open(party.state)) return { status: "STALE_STATE" };
     const current = await loadCurrent(tx, input.jobId, input.milestoneId);
     if (!current) return { status: "NOT_FOUND" };
+    if (
+      kind === "EDIT" &&
+      typeof payload["sourceChangeOrderRevisionId"] === "string" &&
+      party.role !== "PRIMARY_PROVIDER"
+    )
+      return { status: "NOT_FOUND" };
     if (
       kind === "STATE" &&
       (payload["state"] === "DONE" || payload["state"] === "SKIPPED") &&
@@ -583,7 +648,7 @@ async function insertEvent(
           title, description, planned_start_date, planned_end_date, state, order_key,
           responsible_participant_id, responsible_work_group_id,
           accepted_stage_label, accepted_quote_id, accepted_quote_revision,
-          accepted_pdf_media_asset_id)
+          accepted_pdf_media_asset_id, source_change_order_revision_id)
       VALUES (${eventId}, ${current.id}, ${current.eventSequence + 1},
         ${kind}::job_milestone_event_kind, ${actorUserId}, ${tx.json(intent as never)},
         ${next.title}, ${next.description}, ${next.plannedStartDate}::date,
@@ -591,7 +656,8 @@ async function insertEvent(
         ${next.orderKey}::numeric, ${next.responsibleParticipantId}::uuid,
         ${next.responsibleWorkGroupId}::uuid, ${next.acceptedStageLabel},
         ${next.acceptedQuoteId}::uuid, ${next.acceptedQuoteRevision}::integer,
-        ${next.acceptedPdfMediaAssetId}::uuid)
+        ${next.acceptedPdfMediaAssetId}::uuid,
+        ${next.sourceChangeOrderRevisionId}::uuid)
       RETURNING recorded_at AS "recordedAt"
     `;
   if (!event) throw new Error("Milestone event insert missing.");
@@ -683,7 +749,8 @@ async function loadCurrent(
       responsible_work_group_id AS "responsibleWorkGroupId",
       accepted_stage_label AS "acceptedStageLabel", accepted_quote_id AS "acceptedQuoteId",
       accepted_quote_revision AS "acceptedQuoteRevision",
-      accepted_pdf_media_asset_id AS "acceptedPdfMediaAssetId"
+      accepted_pdf_media_asset_id AS "acceptedPdfMediaAssetId",
+      source_change_order_revision_id AS "sourceChangeOrderRevisionId"
     FROM current_job_milestones WHERE job_id = ${jobId} AND id = ${milestoneId}
   `;
   return row ?? null;
@@ -706,6 +773,23 @@ async function responsibilityAvailable(
   `;
   return row !== undefined;
 }
+async function approvedRevisionAvailable(
+  tx: TransactionSql,
+  jobId: string,
+  revisionId: string,
+  milestoneId?: string,
+): Promise<boolean> {
+  const [revision] = await tx<Array<{ id: string }>>`
+    SELECT revision.id FROM change_order_revisions revision
+    JOIN change_orders change ON change.id = revision.change_order_id
+    JOIN current_change_order_revision_states state ON state.revision_id = revision.id
+    WHERE revision.id = ${revisionId} AND change.job_id = ${jobId}
+      AND state.state = 'APPROVED'
+      AND (${milestoneId ?? null}::uuid IS NULL
+        OR ${milestoneId ?? null}::uuid = ANY(revision.affected_milestone_ids))
+  `;
+  return revision !== undefined;
+}
 function sameProjection(a: Current, b: Current): boolean {
   return (
     a.title === b.title &&
@@ -715,7 +799,8 @@ function sameProjection(a: Current, b: Current): boolean {
     a.state === b.state &&
     a.orderKey === b.orderKey &&
     a.responsibleParticipantId === b.responsibleParticipantId &&
-    a.responsibleWorkGroupId === b.responsibleWorkGroupId
+    a.responsibleWorkGroupId === b.responsibleWorkGroupId &&
+    a.sourceChangeOrderRevisionId === b.sourceChangeOrderRevisionId
   );
 }
 function canTransition(
@@ -758,6 +843,7 @@ async function readRows(
       ordered.accepted_stage_label AS "acceptedStageLabel",
       ordered.accepted_quote_id AS "acceptedQuoteId", ordered.accepted_quote_revision AS "acceptedQuoteRevision",
       ordered.accepted_pdf_media_asset_id AS "acceptedPdfMediaAssetId",
+      ordered.source_change_order_revision_id AS "sourceChangeOrderRevisionId",
       first_event.planned_start_date::text AS "originalPlannedStartOn",
       first_event.planned_end_date::text AS "originalPlannedEndOn",
       ordered.created_at AS "createdAt", ordered.updated_at AS "updatedAt",
@@ -788,6 +874,7 @@ function item(row: ReadRow, party: Party): JobMilestoneItem {
     sourceQuoteId: row.acceptedQuoteId,
     sourceQuoteRevision: row.acceptedQuoteRevision,
     sourcePdfMediaAssetId: row.acceptedPdfMediaAssetId,
+    sourceChangeOrderRevisionId: row.sourceChangeOrderRevisionId,
     responsibility: responsibility(row),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,

@@ -64,6 +64,7 @@ export interface MilestoneItem {
   readonly sourceQuoteId: string | null;
   readonly sourceQuoteRevision: number | null;
   readonly sourcePdfDownloadPath: string | null;
+  readonly sourceChangeOrderRevisionId: string | null;
   readonly responsibility: MilestoneResponsibility | null;
   readonly createdAt: string;
   readonly updatedAt: string;
@@ -95,6 +96,7 @@ export interface MilestoneHistoryItem {
   readonly sourceQuoteId: string | null;
   readonly sourceQuoteRevision: number | null;
   readonly sourcePdfDownloadPath: string | null;
+  readonly sourceChangeOrderRevisionId: string | null;
   readonly recordedAt: string;
 }
 export interface MilestoneHistoryPage {
@@ -120,6 +122,7 @@ const itemKeys = [
   "sourceQuoteId",
   "sourceQuoteRevision",
   "sourcePdfDownloadPath",
+  "sourceChangeOrderRevisionId",
   "responsibility",
   "createdAt",
   "updatedAt",
@@ -171,6 +174,9 @@ export function parseMilestoneItem(
     (value.sourcePdfDownloadPath !== null &&
       (typeof value.sourcePdfDownloadPath !== "string" ||
         !download.test(value.sourcePdfDownloadPath))) ||
+    (value.sourceChangeOrderRevisionId !== null &&
+      (typeof value.sourceChangeOrderRevisionId !== "string" ||
+        !uuid.test(value.sourceChangeOrderRevisionId))) ||
     (value.acceptedStageLabel === null &&
       (value.sourceQuoteId !== null ||
         value.sourceQuoteRevision !== null ||
@@ -271,6 +277,7 @@ const historyKeys = [
   "sourceQuoteId",
   "sourceQuoteRevision",
   "sourcePdfDownloadPath",
+  "sourceChangeOrderRevisionId",
   "recordedAt",
 ] as const;
 
@@ -325,6 +332,9 @@ export function parseMilestoneHistoryPage(
       (raw.sourcePdfDownloadPath !== null &&
         (typeof raw.sourcePdfDownloadPath !== "string" ||
           !download.test(raw.sourcePdfDownloadPath))) ||
+      (raw.sourceChangeOrderRevisionId !== null &&
+        (typeof raw.sourceChangeOrderRevisionId !== "string" ||
+          !uuid.test(raw.sourceChangeOrderRevisionId))) ||
       (raw.acceptedStageLabel === null &&
         (raw.sourceQuoteId !== null ||
           raw.sourceQuoteRevision !== null ||
@@ -461,6 +471,7 @@ export type MilestoneCommand =
       readonly plannedStartOn?: string | null;
       readonly plannedEndOn?: string | null;
       readonly acceptedStageLabel?: string | null;
+      readonly sourceChangeOrderRevisionId?: string | null;
       readonly responsibility?: MilestoneResponsibility | null;
     }
   | {
@@ -470,6 +481,7 @@ export type MilestoneCommand =
       readonly description?: string | null;
       readonly plannedStartOn?: string | null;
       readonly plannedEndOn?: string | null;
+      readonly sourceChangeOrderRevisionId?: string | null;
     }
   | {
       readonly kind: "STATE";
@@ -507,6 +519,12 @@ export function validMilestoneCommand(command: MilestoneCommand): boolean {
       command.acceptedStageLabel !== undefined &&
       command.acceptedStageLabel !== null &&
       !bounded(command.acceptedStageLabel, 160, 1)
+    )
+      return false;
+    if (
+      command.sourceChangeOrderRevisionId !== undefined &&
+      command.sourceChangeOrderRevisionId !== null &&
+      !uuid.test(command.sourceChangeOrderRevisionId)
     )
       return false;
   }

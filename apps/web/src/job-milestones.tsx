@@ -97,6 +97,12 @@ export function MilestoneSummary({
           )}
         </div>
       )}
+      {item.sourceChangeOrderRevisionId && (
+        <p>
+          Väzba na schválenú revíziu zmeny: {item.sourceChangeOrderRevisionId}.
+          Míľnik sám nemení cenu ani zmluvné podmienky.
+        </p>
+      )}
       {item.responsibility && (
         <p>
           Zodpovednosť:{" "}
@@ -138,6 +144,7 @@ type Draft = {
   plannedStartOn: string;
   plannedEndOn: string;
   acceptedStageLabel: string;
+  sourceChangeOrderRevisionId: string;
 };
 const emptyDraft: Draft = {
   title: "",
@@ -145,6 +152,7 @@ const emptyDraft: Draft = {
   plannedStartOn: "",
   plannedEndOn: "",
   acceptedStageLabel: "",
+  sourceChangeOrderRevisionId: "",
 };
 const fromItem = (item: MilestoneItem): Draft => ({
   title: item.title,
@@ -152,16 +160,20 @@ const fromItem = (item: MilestoneItem): Draft => ({
   plannedStartOn: item.currentPlannedStartOn ?? "",
   plannedEndOn: item.currentPlannedEndOn ?? "",
   acceptedStageLabel: item.acceptedStageLabel ?? "",
+  sourceChangeOrderRevisionId: item.sourceChangeOrderRevisionId ?? "",
 });
 const draftDatesValid = (draft: Draft) =>
   !draft.plannedStartOn ||
   !draft.plannedEndOn ||
   draft.plannedStartOn <= draft.plannedEndOn;
-const draftValid = (draft: Draft) =>
+const draftValid = (draft: Draft, mode: "CREATE" | "EDIT") =>
   draft.title.trim().length > 0 &&
   draft.title.length <= 160 &&
   draft.description.length <= 2_000 &&
   draft.acceptedStageLabel.length <= 160 &&
+  (mode !== "CREATE" ||
+    !draft.acceptedStageLabel.trim() ||
+    !draft.sourceChangeOrderRevisionId) &&
   draftDatesValid(draft);
 
 export function MilestoneEditor({
@@ -171,6 +183,7 @@ export function MilestoneEditor({
   pending,
   mode,
   acceptedQuoteAvailable,
+  approvedChanges = [],
 }: {
   draft: Draft;
   onChange: (next: Draft) => void;
@@ -178,6 +191,7 @@ export function MilestoneEditor({
   pending: boolean;
   mode: "CREATE" | "EDIT";
   acceptedQuoteAvailable: boolean;
+  approvedChanges?: readonly { revisionId: string; revisionNumber: number }[];
 }) {
   const prefix =
     mode === "CREATE" ? "job-milestone-create" : "job-milestone-edit";
@@ -185,7 +199,7 @@ export function MilestoneEditor({
     <form
       onSubmit={(event) => {
         event.preventDefault();
-        if (draftValid(draft)) onSubmit();
+        if (draftValid(draft, mode)) onSubmit();
       }}
     >
       <label htmlFor={`${prefix}-title`}>Názov míľnika</label>
@@ -254,7 +268,43 @@ export function MilestoneEditor({
           </p>
         </>
       )}
-      <button type="submit" disabled={pending || !draftValid(draft)}>
+      {approvedChanges.length > 0 && (
+        <>
+          <label htmlFor={`${prefix}-change-revision`}>
+            Schválená revízia zmeny (nepovinná)
+          </label>
+          <select
+            id={`${prefix}-change-revision`}
+            disabled={pending}
+            value={draft.sourceChangeOrderRevisionId}
+            onChange={(event) =>
+              onChange({
+                ...draft,
+                sourceChangeOrderRevisionId: event.target.value,
+              })
+            }
+          >
+            <option value="">Bez novej väzby</option>
+            {approvedChanges.map((change) => (
+              <option key={change.revisionId} value={change.revisionId}>
+                Schválená revízia {change.revisionNumber} · {change.revisionId}
+              </option>
+            ))}
+          </select>
+          <p>
+            Väzba len zaznamenáva pôvod plánu; nezakladá cenu ani schválenie.
+          </p>
+        </>
+      )}
+      {mode === "CREATE" &&
+        draft.acceptedStageLabel.trim() &&
+        draft.sourceChangeOrderRevisionId && (
+          <p role="alert">
+            Pri vytvorení zvoľte buď etapu prijatej ponuky, alebo schválenú
+            revíziu zmeny.
+          </p>
+        )}
+      <button type="submit" disabled={pending || !draftValid(draft, mode)}>
         {mode === "CREATE" ? "Pridať míľnik" : "Uložiť prevádzkový plán"}
       </button>
     </form>
@@ -293,11 +343,17 @@ export function JobMilestones({
   role,
   jobState,
   acceptedQuoteAvailable,
+  approvedChanges = [],
 }: {
   jobId: string;
   role: "CUSTOMER" | "PRIMARY_PROVIDER";
   jobState: "CONFIRMED" | "IN_PROGRESS" | "CANCELLED";
   acceptedQuoteAvailable: boolean;
+  approvedChanges?: readonly {
+    revisionId: string;
+    revisionNumber: number;
+    terms?: Record<string, unknown>;
+  }[];
 }) {
   const [page, setPage] = useState<MilestonePage | null>(null);
   const [loadStatus, setLoadStatus] = useState<"LOADING" | "OK" | "ERROR">(
@@ -383,7 +439,11 @@ export function JobMilestones({
     return result.status === "OK";
   };
   const create = async () => {
-    if (!page?.canCreate || role !== "PRIMARY_PROVIDER" || !draftValid(draft))
+    if (
+      !page?.canCreate ||
+      role !== "PRIMARY_PROVIDER" ||
+      !draftValid(draft, "CREATE")
+    )
       return;
     const action: MilestoneCommand = {
       kind: "CREATE",
@@ -396,6 +456,9 @@ export function JobMilestones({
       ...(draft.acceptedStageLabel.trim() && acceptedQuoteAvailable
         ? { acceptedStageLabel: draft.acceptedStageLabel.trim() }
         : {}),
+      ...(draft.sourceChangeOrderRevisionId
+        ? { sourceChangeOrderRevisionId: draft.sourceChangeOrderRevisionId }
+        : {}),
     };
     if (await command("CREATE", action)) setDraft(emptyDraft);
   };
@@ -403,7 +466,7 @@ export function JobMilestones({
     if (
       !item.capabilities.canEdit ||
       editId !== item.id ||
-      !draftValid(editDraft)
+      !draftValid(editDraft, "EDIT")
     )
       return;
     const action: MilestoneCommand = {
@@ -413,6 +476,10 @@ export function JobMilestones({
       description: editDraft.description.trim() || null,
       plannedStartOn: editDraft.plannedStartOn || null,
       plannedEndOn: editDraft.plannedEndOn || null,
+      ...(editDraft.sourceChangeOrderRevisionId &&
+      editDraft.sourceChangeOrderRevisionId !== item.sourceChangeOrderRevisionId
+        ? { sourceChangeOrderRevisionId: editDraft.sourceChangeOrderRevisionId }
+        : {}),
     };
     if (await command(`EDIT:${item.id}`, action)) setEditId(null);
   };
@@ -571,6 +638,15 @@ export function JobMilestones({
                               pending={pending}
                               mode="EDIT"
                               acceptedQuoteAvailable={acceptedQuoteAvailable}
+                              approvedChanges={approvedChanges.filter(
+                                (change) =>
+                                  Array.isArray(
+                                    change.terms?.affectedMilestoneIds,
+                                  ) &&
+                                  change.terms.affectedMilestoneIds.includes(
+                                    item.id,
+                                  ),
+                              )}
                             />
                             <button
                               disabled={pending}
@@ -748,6 +824,7 @@ export function JobMilestones({
                   onSubmit={() => void create()}
                   pending={pending}
                   mode="CREATE"
+                  approvedChanges={approvedChanges}
                   acceptedQuoteAvailable={acceptedQuoteAvailable}
                 />
               </div>
@@ -893,6 +970,12 @@ export function MilestoneHistoryItems({
                   <a href={entry.sourcePdfDownloadPath}>Prijaté PDF</a>
                 </>
               )}
+            </p>
+          )}
+          {entry.sourceChangeOrderRevisionId && (
+            <p>
+              Vtedajšia schválená revízia zmeny:{" "}
+              {entry.sourceChangeOrderRevisionId}
             </p>
           )}
         </li>

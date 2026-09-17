@@ -8,6 +8,7 @@ import {
   ChangeOrderIdempotencyError,
   type ChangeOrderTerms,
 } from "../src/change-order-repository.js";
+import { createJobDashboardRepository } from "../src/job-dashboard-repository.js";
 
 const terms: ChangeOrderTerms = {
   title: "Zmena rozsahu prác",
@@ -308,4 +309,56 @@ export async function runChangeOrderIntegrationAssertions(
   ).toBe(true);
   expect(JSON.stringify(notifications)).not.toContain("Oprava podkladu");
   expect(JSON.stringify(notifications)).not.toContain("15000");
+
+  const deterministicChangeId = randomUUID();
+  const deterministicRevisionId = randomUUID();
+  expect(
+    await repository.createDraft({
+      actorUserId: job.providerUserId,
+      commandId: deterministicChangeId,
+      jobId: job.jobId,
+      revisionId: deterministicRevisionId,
+      terms,
+    }),
+  ).toMatchObject({ status: "APPLIED", state: "DRAFT" });
+  expect(
+    await repository.submitRevision({
+      actorUserId: job.providerUserId,
+      commandId: randomUUID(),
+      jobId: job.jobId,
+      changeOrderId: deterministicChangeId,
+      revisionId: deterministicRevisionId,
+      revisionNumber: 1,
+    }),
+  ).toMatchObject({ status: "APPLIED", state: "PROPOSED" });
+  expect(
+    await repository.approveRevision({
+      actorUserId: job.customerUserId,
+      commandId: randomUUID(),
+      jobId: job.jobId,
+      changeOrderId: deterministicChangeId,
+      revisionId: deterministicRevisionId,
+      revisionNumber: 1,
+    }),
+  ).toMatchObject({ status: "APPLIED", state: "APPROVED" });
+  const dashboardRepository = createJobDashboardRepository(sql);
+  for (const actorUserId of [job.customerUserId, job.providerUserId]) {
+    const dashboard = await dashboardRepository.readForPrimaryParty({
+      actorUserId,
+      jobId: job.jobId,
+    });
+    expect(dashboard?.quote.quoteId).toBe(job.acceptedQuoteId);
+    expect(dashboard?.quote.revision).toBe(job.acceptedQuoteRevision);
+    expect(
+      dashboard?.currentCommercialState.approvedChanges.some(
+        (change) =>
+          change.changeOrderId === deterministicChangeId &&
+          change.revisionId === deterministicRevisionId &&
+          change.terms.title === terms.title,
+      ),
+    ).toBe(true);
+    expect(JSON.stringify(dashboard?.currentCommercialState)).not.toContain(
+      "externalPdfMediaAssetId",
+    );
+  }
 }

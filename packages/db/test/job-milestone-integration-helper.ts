@@ -7,6 +7,7 @@ import {
   createJobMilestoneRepository,
   JobMilestoneIdempotencyError,
 } from "../src/job-milestone-repository.js";
+import { createChangeOrderRepository } from "../src/change-order-repository.js";
 
 interface Fixture {
   readonly id: string;
@@ -300,4 +301,164 @@ export async function runJobMilestoneIntegrationAssertions(
     Array<{ state: string }>
   >`SELECT state FROM current_job_states WHERE job_id = ${job.id}`;
   expect(snapshot?.state).toBe("CONFIRMED");
+  await assertChangeOrderProvenance(sql, job, stageId, secondId);
+}
+
+async function assertChangeOrderProvenance(
+  sql: Sql,
+  job: Fixture,
+  stageId: string,
+  unrelatedMilestoneId: string,
+): Promise<void> {
+  const milestones = createJobMilestoneRepository(sql);
+  const changes = createChangeOrderRepository(sql);
+  const changeOrderId = randomUUID();
+  const revisionId = randomUUID();
+  const terms = {
+    title: "Schválená zmena etapy",
+    reason: "Spresnený postup po obhliadke",
+    changeDescription: "Etapa potrebuje iný harmonogram.",
+    scopeAdded: [] as string[],
+    scopeRemoved: [] as string[],
+    scopeChanged: ["Spresnený pracovný postup"],
+    priceImpact: { mode: "NONE" as const },
+    scheduleImpact: { mode: "DAYS" as const, deltaDays: 2 },
+    affectedMilestoneIds: [stageId],
+  };
+  expect(
+    await changes.createDraft({
+      actorUserId: job.customerUserId,
+      commandId: changeOrderId,
+      revisionId,
+      jobId: job.id,
+      terms,
+    }),
+  ).toMatchObject({ status: "APPLIED", state: "DRAFT" });
+  const createLinked = {
+    actorUserId: job.providerUserId,
+    commandId: randomUUID(),
+    jobId: job.id,
+    title: "Nová vykonávacia etapa",
+    sourceChangeOrderRevisionId: revisionId,
+  };
+  expect(await milestones.createMilestone(createLinked)).toEqual({
+    status: "NOT_FOUND",
+  });
+  const stage = await milestones.getMilestone({
+    actorUserId: job.providerUserId,
+    jobId: job.id,
+    milestoneId: stageId,
+  });
+  if (!stage) throw new Error("Milestone provenance fixture missing.");
+  const edit = {
+    actorUserId: job.providerUserId,
+    commandId: randomUUID(),
+    jobId: job.id,
+    milestoneId: stageId,
+    title: `${stage.title} – aktualizácia`,
+    description: stage.description,
+    plannedStartOn: stage.currentPlannedStartOn,
+    plannedEndOn: stage.currentPlannedEndOn,
+    sourceChangeOrderRevisionId: revisionId,
+  };
+  expect(await milestones.editMilestone(edit)).toEqual({ status: "NOT_FOUND" });
+  expect(
+    await changes.submitRevision({
+      actorUserId: job.customerUserId,
+      commandId: randomUUID(),
+      jobId: job.id,
+      changeOrderId,
+      revisionId,
+      revisionNumber: 1,
+    }),
+  ).toMatchObject({ status: "APPLIED", state: "PROPOSED" });
+  expect(
+    await changes.approveRevision({
+      actorUserId: job.providerUserId,
+      commandId: randomUUID(),
+      jobId: job.id,
+      changeOrderId,
+      revisionId,
+      revisionNumber: 1,
+    }),
+  ).toMatchObject({ status: "APPLIED", state: "APPROVED" });
+  expect(await milestones.editMilestone(edit)).toMatchObject({
+    status: "APPLIED",
+  });
+  expect(await milestones.editMilestone(edit)).toMatchObject({
+    status: "DEDUPLICATED",
+  });
+  expect(
+    await milestones.getMilestone({
+      actorUserId: job.customerUserId,
+      jobId: job.id,
+      milestoneId: stageId,
+    }),
+  ).toMatchObject({
+    sourceQuoteId: job.quoteId,
+    sourceQuoteRevision: job.quoteRevision,
+    sourceChangeOrderRevisionId: revisionId,
+  });
+  const unrelated = await milestones.getMilestone({
+    actorUserId: job.providerUserId,
+    jobId: job.id,
+    milestoneId: unrelatedMilestoneId,
+  });
+  if (!unrelated) throw new Error("Unrelated milestone fixture missing.");
+  expect(
+    await milestones.editMilestone({
+      actorUserId: job.providerUserId,
+      commandId: randomUUID(),
+      jobId: job.id,
+      milestoneId: unrelatedMilestoneId,
+      title: unrelated.title,
+      description: unrelated.description,
+      plannedStartOn: unrelated.currentPlannedStartOn,
+      plannedEndOn: unrelated.currentPlannedEndOn,
+      sourceChangeOrderRevisionId: revisionId,
+    }),
+  ).toEqual({ status: "NOT_FOUND" });
+  expect(await milestones.createMilestone(createLinked)).toMatchObject({
+    status: "APPLIED",
+    id: createLinked.commandId,
+  });
+  expect(
+    await milestones.getMilestone({
+      actorUserId: job.customerUserId,
+      jobId: job.id,
+      milestoneId: createLinked.commandId,
+    }),
+  ).toMatchObject({
+    sourceQuoteId: null,
+    sourceChangeOrderRevisionId: revisionId,
+  });
+  expect(
+    (
+      await milestones.listMilestoneHistory({
+        actorUserId: job.customerUserId,
+        jobId: job.id,
+        milestoneId: stageId,
+        limit: 20,
+      })
+    )?.map((event) => event.sourceChangeOrderRevisionId),
+  ).toEqual([revisionId, null]);
+  await expect(sql`
+    UPDATE job_milestone_events SET source_change_order_revision_id = NULL
+    WHERE event_id = ${edit.commandId}
+  `).rejects.toThrow(/immutable/);
+  await expect(sql`
+    INSERT INTO job_milestone_events
+      (event_id, milestone_id, event_sequence, kind, actor_user_id, intent,
+       title, description, planned_start_date, planned_end_date, state, order_key,
+       accepted_stage_label, accepted_quote_id, accepted_quote_revision,
+       accepted_pdf_media_asset_id, source_change_order_revision_id)
+    SELECT ${randomUUID()}, current.id, current.event_sequence + 1, 'EDIT',
+      ${job.providerUserId}, '{"kind":"EDIT"}'::jsonb,
+      current.title, current.description, current.planned_start_date,
+      current.planned_end_date, current.state, current.order_key,
+      current.accepted_stage_label, current.accepted_quote_id,
+      current.accepted_quote_revision, current.accepted_pdf_media_asset_id,
+      ${revisionId}::uuid
+    FROM current_job_milestones current WHERE current.id = ${unrelatedMilestoneId}
+  `).rejects.toThrow(/did not identify edited milestone/);
 }

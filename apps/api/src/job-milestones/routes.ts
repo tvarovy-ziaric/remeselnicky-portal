@@ -46,6 +46,7 @@ interface MilestoneItem {
   readonly sourceQuoteId: string | null;
   readonly sourceQuoteRevision: number | null;
   readonly sourcePdfDownloadPath: string | null;
+  readonly sourceChangeOrderRevisionId: string | null;
   readonly responsibility: Responsibility | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
@@ -77,6 +78,7 @@ interface MilestoneHistoryEvent {
   readonly sourceQuoteId: string | null;
   readonly sourceQuoteRevision: number | null;
   readonly sourcePdfDownloadPath: string | null;
+  readonly sourceChangeOrderRevisionId: string | null;
   readonly recordedAt: Date;
 }
 interface MilestoneHistoryPage {
@@ -119,6 +121,7 @@ export interface JobMilestoneRouteDependencies {
       plannedStartOn?: string | null;
       plannedEndOn?: string | null;
       acceptedStageLabel?: string | null;
+      sourceChangeOrderRevisionId?: string | null;
       responsibility?: Responsibility | null;
     }): Promise<CommandResult>;
     edit(input: {
@@ -130,6 +133,7 @@ export interface JobMilestoneRouteDependencies {
       description?: string | null;
       plannedStartOn?: string | null;
       plannedEndOn?: string | null;
+      sourceChangeOrderRevisionId?: string | null;
     }): Promise<CommandResult>;
     setState(input: {
       actorUserId: string;
@@ -190,6 +194,7 @@ interface PlanBody {
   readonly description?: string | null;
   readonly plannedStartOn?: string | null;
   readonly plannedEndOn?: string | null;
+  readonly sourceChangeOrderRevisionId?: string | null;
 }
 interface CreateBody extends PlanBody {
   readonly acceptedStageLabel?: string | null;
@@ -321,6 +326,7 @@ export function registerJobMilestoneRoutes(
           "plannedStartOn",
           "plannedEndOn",
           "acceptedStageLabel",
+          "sourceChangeOrderRevisionId",
           "responsibility",
         ],
       ),
@@ -329,7 +335,11 @@ export function registerJobMilestoneRoutes(
     async (request, reply) => {
       const actor = await activeActor(request, reply, dependencies);
       if (actor === null) return;
-      if (!validPlan(request.body))
+      if (
+        !validPlan(request.body) ||
+        (request.body.acceptedStageLabel != null &&
+          request.body.sourceChangeOrderRevisionId != null)
+      )
         return reply.code(400).send({ code: "INVALID_REQUEST" });
       try {
         return sendCommand(
@@ -351,13 +361,10 @@ export function registerJobMilestoneRoutes(
     JOB_MILESTONE_PATHS.edit,
     {
       ...command,
-      preValidation: exactBody([
-        "commandId",
-        "title",
-        "description",
-        "plannedStartOn",
-        "plannedEndOn",
-      ]),
+      preValidation: exactBody(
+        ["commandId", "title", "description", "plannedStartOn", "plannedEndOn"],
+        ["sourceChangeOrderRevisionId"],
+      ),
       schema: { params: detailParams, body: editBody },
     },
     async (request, reply) => {
@@ -716,6 +723,7 @@ const planProperties = {
   description: optionalText(2_000),
   plannedStartOn: calendarDate,
   plannedEndOn: calendarDate,
+  sourceChangeOrderRevisionId: { anyOf: [uuid, { type: "null" }] },
 };
 const planBody = {
   type: "object",

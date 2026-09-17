@@ -15,6 +15,7 @@ const jobId = "86210000-0000-4000-8000-000000000002";
 const milestoneId = "86210000-0000-4000-8000-000000000003";
 const commandId = "86210000-0000-4000-8000-000000000004";
 const quoteId = "86210000-0000-4000-8000-000000000005";
+const approvedRevisionId = "86210000-0000-4000-8000-000000000006";
 const at = new Date("2026-09-17T08:00:00.000Z");
 const apps: FastifyInstance[] = [];
 afterEach(async () => Promise.all(apps.splice(0).map((app) => app.close())));
@@ -47,6 +48,7 @@ function build(
     sourceQuoteId: quoteId,
     sourceQuoteRevision: 2,
     sourcePdfDownloadPath: null,
+    sourceChangeOrderRevisionId: null,
     responsibility: null,
     createdAt: at,
     updatedAt: at,
@@ -84,6 +86,7 @@ function build(
             sourceQuoteId: quoteId,
             sourceQuoteRevision: 2,
             sourcePdfDownloadPath: null,
+            sourceChangeOrderRevisionId: null,
             recordedAt: at,
           },
         ],
@@ -259,7 +262,7 @@ describe("private Job milestone routes", () => {
       title: "Príprava pracoviska",
       plannedStartOn: "2026-09-20",
       plannedEndOn: "2026-09-21",
-      acceptedStageLabel: "Etapa 1",
+      sourceChangeOrderRevisionId: approvedRevisionId,
     };
     const denied = await app.inject({
       method: "POST",
@@ -285,6 +288,8 @@ describe("private Job milestone routes", () => {
       { ...body, priceCents: 100 },
       { ...body, plannedStartOn: "2026-02-30" },
       { ...body, plannedEndOn: "2026-09-19" },
+      { ...body, sourceChangeOrderRevisionId: "not-a-uuid" },
+      { ...body, acceptedStageLabel: "Etapa 1" },
     ]) {
       expect(
         (

@@ -43,6 +43,7 @@ const item = {
   sourceQuoteId: quoteId,
   sourceQuoteRevision: 2,
   sourcePdfDownloadPath: `/v1/media/${mediaId}/download`,
+  sourceChangeOrderRevisionId: null,
   responsibility: null,
   createdAt,
   updatedAt: createdAt,
@@ -73,6 +74,7 @@ const historyEvent = {
   sourceQuoteId: item.sourceQuoteId,
   sourceQuoteRevision: item.sourceQuoteRevision,
   sourcePdfDownloadPath: item.sourcePdfDownloadPath,
+  sourceChangeOrderRevisionId: item.sourceChangeOrderRevisionId,
   recordedAt: createdAt,
 };
 const createEvent = {
@@ -232,6 +234,12 @@ describe("Job milestone web boundary", () => {
     expect(
       parseMilestonePage(
         { ...page, items: [{ ...item, sourceQuoteId: null }] },
+        jobId,
+      ),
+    ).toBeNull();
+    expect(
+      parseMilestonePage(
+        { ...page, items: [{ ...item, sourceChangeOrderRevisionId: "bad" }] },
         jobId,
       ),
     ).toBeNull();
@@ -407,6 +415,7 @@ describe("Job milestone web boundary", () => {
           plannedStartOn: "",
           plannedEndOn: "",
           acceptedStageLabel: "",
+          sourceChangeOrderRevisionId: "",
         }}
         onChange={() => undefined}
         onSubmit={() => undefined}

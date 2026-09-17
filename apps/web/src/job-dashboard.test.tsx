@@ -24,6 +24,20 @@ function path(input: RequestInfo | URL): string {
 }
 
 function job() {
+  const quote = {
+    quoteId,
+    revision: 4,
+    authoringMode: "EXTERNAL_PDF",
+    commercialContent: {
+      title: "Oprava",
+      includedScope: ["Demontáž"],
+      excludedScope: ["Komín"],
+      totalAmountCents: 100000,
+      vatStatus: "INCLUDED",
+      warrantyInformation: "24 mesiacov",
+    },
+    pdfDownloadPath: `/v1/media/${assetId}/download`,
+  };
   return {
     id: jobId,
     state: "CONFIRMED",
@@ -57,19 +71,20 @@ function job() {
         siteInspection: "LIKELY",
       },
     },
-    quote: {
-      quoteId,
-      revision: 4,
-      authoringMode: "EXTERNAL_PDF",
-      commercialContent: {
-        title: "Oprava",
-        includedScope: ["Demontáž"],
-        excludedScope: ["Komín"],
-        totalAmountCents: 100000,
-        vatStatus: "INCLUDED",
-        warrantyInformation: "24 mesiacov",
+    quote,
+    currentCommercialState: {
+      base: {
+        source: "BASE_QUOTE",
+        quoteId: quote.quoteId,
+        revision: quote.revision,
+        authoringMode: quote.authoringMode,
+        commercialContent: quote.commercialContent,
       },
-      pdfDownloadPath: `/v1/media/${assetId}/download`,
+      approvedChanges: [],
+      originalTotalCents: null,
+      fixedDeltaCents: null,
+      exactTotalCents: null,
+      exactTotalUnavailableReason: "BASE_NOT_FIXED",
     },
     supportingDocuments: [
       {
@@ -277,6 +292,107 @@ describe("D17-A Job dashboard", () => {
     expect(html).toContain("Zrušiť zákazku");
     expect(html).not.toContain("Začať práce");
     expect(html).not.toContain("Pozvať remeselníka na zákazku");
+  });
+
+  it("shows a source-linked approved delta and rejects internal PDF identifiers", () => {
+    const baseline = job();
+    const commercialContent = {
+      ...baseline.quote.commercialContent,
+      priceMode: "FIXED",
+      currency: "EUR",
+      vatStatus: "VAT_INCLUDED",
+    };
+    const quote = { ...baseline.quote, commercialContent };
+    const changeOrderId = "94000000-0000-4000-8000-000000000007";
+    const revisionId = "94000000-0000-4000-8000-000000000008";
+    const change = {
+      source: "APPROVED_CHANGE_ORDER",
+      changeOrderId,
+      revisionId,
+      revisionNumber: 1,
+      approvedAt: "2026-09-17T10:00:00.000Z",
+      terms: {
+        title: "Doplnenie montáže",
+        reason: "Dohodnutý rozsah",
+        changeDescription: "Montáž svietidla",
+        scopeAdded: ["Svietidlo"],
+        scopeRemoved: [],
+        scopeChanged: [],
+        priceImpact: {
+          mode: "FIXED_DELTA",
+          amountCents: 20_000,
+          vatStatus: "VAT_INCLUDED",
+        },
+        scheduleImpact: { mode: "NONE" },
+        materialResponsibility: null,
+        warrantyChange: null,
+        otherConditionChange: null,
+        affectedMilestoneIds: [],
+      },
+    };
+    const projected = {
+      ...baseline,
+      quote,
+      currentCommercialState: {
+        base: {
+          source: "BASE_QUOTE",
+          quoteId,
+          revision: 4,
+          authoringMode: "EXTERNAL_PDF",
+          commercialContent,
+        },
+        approvedChanges: [change],
+        originalTotalCents: 100_000,
+        fixedDeltaCents: 20_000,
+        exactTotalCents: 120_000,
+        exactTotalUnavailableReason: null,
+      },
+    };
+    const parsed = parseJobDashboard(projected, jobId);
+    expect(parsed).not.toBeNull();
+    if (!parsed) return;
+    const parsedContacts = parseJobContacts(contacts(), parsed);
+    expect(parsedContacts).not.toBeNull();
+    if (!parsedContacts) return;
+    const html = renderToStaticMarkup(
+      <JobDashboardView job={parsed} contacts={parsedContacts} />,
+    );
+    expect(html).toContain("Aktuálna obchodná dohoda");
+    expect(html).toContain("Záväzné podrobnosti pôvodnej ponuky");
+    expect(html).toContain("1 200,00");
+    expect(html).toContain(
+      `/zakazky/${jobId}/zmeny/${changeOrderId}/revizie/${revisionId}`,
+    );
+    expect(html).toContain("Doplnenie montáže");
+    expect(
+      parseJobDashboard(
+        {
+          ...projected,
+          currentCommercialState: {
+            ...projected.currentCommercialState,
+            approvedChanges: [
+              {
+                ...change,
+                terms: { ...change.terms, externalPdfMediaAssetId: assetId },
+              },
+            ],
+          },
+        },
+        jobId,
+      ),
+    ).toBeNull();
+    expect(
+      parseJobDashboard(
+        {
+          ...projected,
+          currentCommercialState: {
+            ...projected.currentCommercialState,
+            exactTotalCents: 130_000,
+          },
+        },
+        jobId,
+      ),
+    ).toBeNull();
   });
 
   it("renders provider start and preserved cancellation history only in matching states", () => {

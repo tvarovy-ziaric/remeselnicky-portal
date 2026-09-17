@@ -208,11 +208,65 @@ test("change-order draft, exact counterproposal and approval preserve the origin
         expect.objectContaining({ revisionId: counterId, state: "APPROVED" }),
       ]),
     );
+    const afterApproval = await checked(
+      await customer.context.request.get(jobPath),
+      200,
+    );
+    expect(agreement(afterApproval)).toEqual(original);
+    const commercial = afterApproval.currentCommercialState;
+    if (!record(commercial) || !Array.isArray(commercial.approvedChanges))
+      throw new Error("Approved commercial projection missing");
     expect(
-      agreement(
-        await checked(await customer.context.request.get(jobPath), 200),
+      (commercial.approvedChanges as unknown[]).some(
+        (item) =>
+          record(item) &&
+          item.changeOrderId === createId &&
+          item.revisionId === counterId &&
+          record(item.terms) &&
+          item.terms.title === nextTerms.title,
       ),
-    ).toEqual(original);
+    ).toBe(true);
+    expect(JSON.stringify(commercial)).not.toContain("externalPdfMediaAssetId");
+    const milestoneId = randomUUID();
+    const milestonePath = `${jobPath}/milestones/${milestoneId}`;
+    expect(
+      await checked(
+        await post(provider, `${jobPath}/milestones`, {
+          commandId: milestoneId,
+          title: `Plán schválenej zmeny ${syntheticLabel()}`,
+          sourceChangeOrderRevisionId: counterId,
+        }),
+        201,
+      ),
+    ).toMatchObject({ milestoneId });
+    expect(
+      await checked(await customer.context.request.get(milestonePath), 200),
+    ).toMatchObject({ sourceChangeOrderRevisionId: counterId });
+    expect(
+      await checked(
+        await customer.context.request.get(`${milestonePath}/history`),
+        200,
+      ),
+    ).toMatchObject({
+      items: [
+        expect.objectContaining({ sourceChangeOrderRevisionId: counterId }),
+      ],
+    });
+    expect((await outsider.context.request.get(milestonePath)).status()).toBe(
+      404,
+    );
+    expect((await page.goto(`/zakazky/${jobId}`))?.status()).toBe(200);
+    await expect(
+      page.getByRole("heading", { name: "Aktuálna obchodná dohoda" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: `${nextTerms.title} · revízia 2` }).first(),
+    ).toBeVisible();
+    await expect(
+      page.getByText(`Väzba na schválenú revíziu zmeny: ${counterId}.`, {
+        exact: false,
+      }),
+    ).toBeVisible();
     expect((await outsider.context.request.get(detailPath)).status()).toBe(404);
   } finally {
     await Promise.all([

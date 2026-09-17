@@ -39,6 +39,27 @@ export interface JobDashboardData {
     commercialContent: Dict;
     pdfDownloadPath: string | null;
   };
+  currentCommercialState: {
+    base: {
+      source: "BASE_QUOTE";
+      quoteId: string;
+      revision: number;
+      authoringMode: "PLATFORM_STRUCTURED" | "EXTERNAL_PDF";
+      commercialContent: Dict;
+    };
+    approvedChanges: readonly {
+      source: "APPROVED_CHANGE_ORDER";
+      changeOrderId: string;
+      revisionId: string;
+      revisionNumber: number;
+      approvedAt: string;
+      terms: Dict & { title: string };
+    }[];
+    originalTotalCents: number | null;
+    fixedDeltaCents: number | null;
+    exactTotalCents: number | null;
+    exactTotalUnavailableReason: string | null;
+  };
   supportingDocuments: readonly {
     mediaAssetId: string;
     displayFilename: string | null;
@@ -193,6 +214,7 @@ export function parseJobDashboard(
       !privateDownload.test(value.quote.pdfDownloadPath)) ||
     (value.quote.authoringMode === "EXTERNAL_PDF" &&
       value.quote.pdfDownloadPath === null) ||
+    !validCommercialState(value.currentCommercialState, value.quote) ||
     !Array.isArray(value.supportingDocuments) ||
     !Array.isArray(value.timeline)
   )
@@ -251,6 +273,93 @@ export function parseJobDashboard(
   )
     return null;
   return value as unknown as JobDashboardData;
+}
+
+const commercialUnavailability = new Set([
+  "BASE_NOT_FIXED",
+  "BASE_AMOUNT_INVALID",
+  "BASE_CURRENCY_UNSUPPORTED",
+  "BASE_VAT_INVALID",
+  "NON_FIXED_DELTA",
+  "VAT_MISMATCH",
+  "UNSAFE_AMOUNT",
+  "INVALID_APPROVAL_PROVENANCE",
+  "CONFLICTING_APPROVALS",
+]);
+
+function validCommercialState(value: unknown, quote: Dict): boolean {
+  if (
+    !record(value) ||
+    Object.keys(value).length !== 6 ||
+    !record(value.base) ||
+    Object.keys(value.base).length !== 5 ||
+    value.base.source !== "BASE_QUOTE" ||
+    value.base.quoteId !== quote.quoteId ||
+    value.base.revision !== quote.revision ||
+    value.base.authoringMode !== quote.authoringMode ||
+    !record(value.base.commercialContent) ||
+    !safeContent(value.base.commercialContent) ||
+    JSON.stringify(value.base.commercialContent) !==
+      JSON.stringify(quote.commercialContent) ||
+    !Array.isArray(value.approvedChanges) ||
+    value.approvedChanges.length > 200 ||
+    !value.approvedChanges.every(
+      (change: unknown) =>
+        record(change) &&
+        Object.keys(change).length === 6 &&
+        change.source === "APPROVED_CHANGE_ORDER" &&
+        string(change.changeOrderId) &&
+        uuid.test(change.changeOrderId) &&
+        string(change.revisionId) &&
+        uuid.test(change.revisionId) &&
+        positiveInteger(change.revisionNumber) &&
+        date(change.approvedAt) &&
+        record(change.terms) &&
+        Object.keys(change.terms).every((key) =>
+          [
+            "title",
+            "reason",
+            "changeDescription",
+            "scopeAdded",
+            "scopeRemoved",
+            "scopeChanged",
+            "priceImpact",
+            "scheduleImpact",
+            "materialResponsibility",
+            "warrantyChange",
+            "otherConditionChange",
+            "affectedMilestoneIds",
+          ].includes(key),
+        ) &&
+        string(change.terms.title) &&
+        safeContent(change.terms),
+    ) ||
+    !["originalTotalCents", "fixedDeltaCents", "exactTotalCents"].every(
+      (key) =>
+        value[key] === null ||
+        (typeof value[key] === "number" && Number.isSafeInteger(value[key])),
+    ) ||
+    !(
+      value.exactTotalUnavailableReason === null ||
+      (typeof value.exactTotalUnavailableReason === "string" &&
+        commercialUnavailability.has(value.exactTotalUnavailableReason))
+    ) ||
+    (value.exactTotalUnavailableReason === null) !==
+      (value.exactTotalCents !== null) ||
+    (value.exactTotalCents !== null &&
+      (typeof value.originalTotalCents !== "number" ||
+        typeof value.fixedDeltaCents !== "number" ||
+        typeof value.exactTotalCents !== "number" ||
+        value.exactTotalCents !==
+          value.originalTotalCents + value.fixedDeltaCents))
+  )
+    return false;
+  const changes = value.approvedChanges as { revisionId: string }[];
+  if (
+    new Set(changes.map((change) => change.revisionId)).size !== changes.length
+  )
+    return false;
+  return true;
 }
 
 function validTimelineEvent(event: Dict): boolean {
@@ -536,6 +645,61 @@ export function JobDashboardView({
           </ul>
         )}
       </section>
+      <section aria-labelledby="job-current-commercial">
+        <h2 id="job-current-commercial">Aktuálna obchodná dohoda</h2>
+        <p>
+          Základ: prijatá ponuka · revízia{" "}
+          {job.currentCommercialState.base.revision}. Každá schválená zmena
+          nižšie má vlastný presný záznam; pôvodná dohoda zostáva nezmenená.
+        </p>
+        {job.quote.authoringMode === "EXTERNAL_PDF" && (
+          <p>
+            Cenový výpočet je prehľad zo štruktúrovaných údajov. Záväzné
+            podrobnosti pôvodnej ponuky a PDF dodatkov sú v ich dokumentoch.
+          </p>
+        )}
+        {job.currentCommercialState.exactTotalCents !== null ? (
+          <p>
+            Pôvodná uvedená suma:{" "}
+            {formatCommercialAmount(
+              job.currentCommercialState.originalTotalCents!,
+            )}
+            . Schválené pevné zmeny:{" "}
+            {formatCommercialAmount(
+              job.currentCommercialState.fixedDeltaCents!,
+            )}
+            . Vypočítaná aktuálna suma:{" "}
+            {formatCommercialAmount(job.currentCommercialState.exactTotalCents)}
+            .
+          </p>
+        ) : (
+          <p>
+            Presný aktuálny súčet nemožno bezpečne vypočítať z prijatej ponuky a
+            schválených zmien. Pozrite si ich jednotlivo vrátane ceny a DPH.
+          </p>
+        )}
+        <h3>Schválené zmeny</h3>
+        {job.currentCommercialState.approvedChanges.length === 0 ? (
+          <p>Zatiaľ žiadne. Platí pôvodná dohoda.</p>
+        ) : (
+          <ol>
+            {job.currentCommercialState.approvedChanges.map((change) => (
+              <li key={change.revisionId}>
+                <p>
+                  <Link
+                    href={`/zakazky/${job.id}/zmeny/${change.changeOrderId}/revizie/${change.revisionId}`}
+                  >
+                    {change.terms.title} · revízia {change.revisionNumber}
+                  </Link>{" "}
+                  · schválené{" "}
+                  {new Date(change.approvedAt).toLocaleString("sk-SK")}
+                </p>
+                <SnapshotValue value={change.terms} />
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
       <JobChangeOrders jobId={job.id} role={job.role} jobState={job.state} />
       <JobDocumentation
         jobId={job.id}
@@ -547,6 +711,7 @@ export function JobDashboardView({
         role={job.role}
         jobState={job.state}
         acceptedQuoteAvailable={job.quote.quoteId.length > 0}
+        approvedChanges={job.currentCommercialState.approvedChanges}
       />
       <JobRoster jobId={job.id} jobState={job.state} />
       {job.role === "PRIMARY_PROVIDER" && job.state !== "CANCELLED" && (
@@ -615,6 +780,13 @@ export function JobDashboardView({
       </section>
     </article>
   );
+}
+
+function formatCommercialAmount(cents: number): string {
+  return `${new Intl.NumberFormat("sk-SK", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(cents / 100)} €`;
 }
 
 function JobLifecycleActions({ job }: { job: JobDashboardData }) {

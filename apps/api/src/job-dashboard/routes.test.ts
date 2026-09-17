@@ -27,6 +27,20 @@ const detail: JobDashboard = {
     quoteId: "86200000-0000-4000-8000-000000000003",
     revision: 1,
   },
+  currentCommercialState: {
+    base: {
+      source: "BASE_QUOTE",
+      quoteId: "86200000-0000-4000-8000-000000000003",
+      revision: 1,
+      authoringMode: "PLATFORM_STRUCTURED",
+      commercialContent: { priceMode: "FIXED", totalAmountCents: 100_000 },
+    },
+    approvedChanges: [],
+    originalTotalCents: 100_000,
+    fixedDeltaCents: null,
+    exactTotalCents: null,
+    exactTotalUnavailableReason: "BASE_CURRENCY_UNSUPPORTED",
+  },
   request: {
     contentRevision: 1,
     description: "Montáž",
