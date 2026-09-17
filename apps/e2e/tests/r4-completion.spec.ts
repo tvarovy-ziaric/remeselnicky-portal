@@ -220,7 +220,7 @@ async function createJob(customer: Actor, provider: Actor): Promise<string> {
           relatedProfessionCodes: [],
           skillCodes: [],
           specializationCode: null,
-          title: `Syntetické odovzdanie ${randomUUID().slice(0, 8)}`,
+          title: `Syntetické odovzdanie ${syntheticLabel()}`,
         },
       },
     }),
@@ -398,6 +398,11 @@ function requiredString(value: unknown): string {
   if (typeof value !== "string" || value.length === 0)
     throw new Error("Required synthetic response field missing");
   return value;
+}
+function syntheticLabel(): string {
+  return randomUUID()
+    .slice(0, 8)
+    .replace(/[0-9]/gu, (digit) => String.fromCharCode(103 + Number(digit)));
 }
 function requiredEnv(name: string): string {
   const value = process.env[name];
