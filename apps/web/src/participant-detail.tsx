@@ -21,6 +21,12 @@ const record = (value: unknown): value is Record<string, unknown> =>
 const exact = (value: Record<string, unknown>, keys: readonly string[]) =>
   Object.keys(value).length === keys.length &&
   keys.every((key) => Object.hasOwn(value, key));
+const verifiedRoleLabels = {
+  MEMBER: "Člen",
+  LEAD: "Vedúci",
+  COORDINATOR: "Koordinátor",
+  SITE_MANAGER: "Stavbyvedúci",
+} as const;
 
 export interface JobParticipantDetail {
   readonly participantId: string;
@@ -40,6 +46,11 @@ export interface JobParticipantDetail {
   readonly invitedAt: string;
   readonly acceptedAt: string | null;
   readonly leftAt: string | null;
+  readonly verifiedCompletedWork: boolean;
+  readonly verifiedProfessionCodes: readonly string[];
+  readonly verifiedRoles: readonly (
+    "MEMBER" | "LEAD" | "COORDINATOR" | "SITE_MANAGER"
+  )[];
   readonly canDecide: boolean;
   readonly canLeave: boolean;
 }
@@ -62,6 +73,9 @@ export function parseJobParticipantDetail(
       "invitedAt",
       "acceptedAt",
       "leftAt",
+      "verifiedCompletedWork",
+      "verifiedProfessionCodes",
+      "verifiedRoles",
       "canDecide",
       "canLeave",
     ]) ||
@@ -100,6 +114,28 @@ export function parseJobParticipantDetail(
     !isoDate(value.invitedAt) ||
     (value.acceptedAt !== null && !isoDate(value.acceptedAt)) ||
     (value.leftAt !== null && !isoDate(value.leftAt)) ||
+    typeof value.verifiedCompletedWork !== "boolean" ||
+    !Array.isArray(value.verifiedProfessionCodes) ||
+    value.verifiedProfessionCodes.length > 32 ||
+    !value.verifiedProfessionCodes.every(
+      (code: unknown) =>
+        typeof code === "string" &&
+        /^(?:PROF|TEST):[A-Z0-9][A-Z0-9_]{1,62}$/u.test(code),
+    ) ||
+    new Set(value.verifiedProfessionCodes).size !==
+      value.verifiedProfessionCodes.length ||
+    !Array.isArray(value.verifiedRoles) ||
+    value.verifiedRoles.length > 4 ||
+    !value.verifiedRoles.every((role: unknown) =>
+      ["MEMBER", "LEAD", "COORDINATOR", "SITE_MANAGER"].includes(String(role)),
+    ) ||
+    new Set(value.verifiedRoles).size !== value.verifiedRoles.length ||
+    value.verifiedCompletedWork !== value.verifiedRoles.includes("MEMBER") ||
+    (value.verifiedCompletedWork &&
+      (value.jobState !== "COMPLETED" || value.acceptedAt === null)) ||
+    (!value.verifiedCompletedWork &&
+      value.verifiedProfessionCodes.length > 0) ||
+    (!value.verifiedCompletedWork && value.verifiedRoles.length > 0) ||
     typeof value.canDecide !== "boolean" ||
     typeof value.canLeave !== "boolean" ||
     (value.state === "INVITED" || value.state === "DECLINED") !==
@@ -319,6 +355,25 @@ export function ParticipantDetail({
         </p>
       )}
       {detail.jobState === "CANCELLED" && <p>Zákazka bola zrušená.</p>}
+      {detail.verifiedCompletedWork && (
+        <div>
+          <p>
+            Overená účasť na dokončenej zákazke. Nie je to hodnotenie kvality.
+          </p>
+          <p>
+            Overené roly:{" "}
+            {detail.verifiedRoles
+              .map((role) => verifiedRoleLabels[role])
+              .join(", ")}
+          </p>
+          {detail.verifiedProfessionCodes.length > 0 && (
+            <p>Overené profesie: {detail.verifiedProfessionCodes.join(", ")}</p>
+          )}
+        </div>
+      )}
+      {detail.jobState === "COMPLETED" && !detail.verifiedCompletedWork && (
+        <p>Táto účasť sa nepočíta ako overená práca na dokončenej zákazke.</p>
+      )}
       {notice && <p role="status">{notice}</p>}
       {error && <p role="alert">{error}</p>}
       {context === "INVITATION" && detail.canDecide && (

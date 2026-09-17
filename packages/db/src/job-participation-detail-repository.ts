@@ -21,6 +21,11 @@ export interface JobParticipationDetail {
   readonly invitedAt: Date;
   readonly acceptedAt: Date | null;
   readonly leftAt: Date | null;
+  readonly verifiedCompletedWork: boolean;
+  readonly verifiedProfessionCodes: readonly string[];
+  readonly verifiedRoles: readonly (
+    "MEMBER" | "LEAD" | "COORDINATOR" | "SITE_MANAGER"
+  )[];
   readonly canDecide: boolean;
   readonly canLeave: boolean;
 }
@@ -69,7 +74,24 @@ export function createJobParticipationDetailRepository(
             AS "primaryProfessionCode",
           participant.invited_at AS "invitedAt",
           participant.accepted_at AS "acceptedAt",
-          participant.left_at AS "leftAt"
+          participant.left_at AS "leftAt",
+          EXISTS (
+            SELECT 1 FROM verified_individual_completed_job_participation evidence
+            WHERE evidence.participant_id = participant.id
+          ) AS "verifiedCompletedWork",
+          ARRAY(
+            SELECT DISTINCT capability.profession_code
+            FROM verified_completed_job_capabilities capability
+            WHERE capability.participant_id = participant.id
+              AND capability.kind = 'PROFESSION'
+            ORDER BY capability.profession_code
+          ) AS "verifiedProfessionCodes",
+          ARRAY(
+            SELECT DISTINCT verified_role.role
+            FROM verified_completed_job_roles verified_role
+            WHERE verified_role.participant_id = participant.id
+            ORDER BY verified_role.role
+          ) AS "verifiedRoles"
         FROM current_job_participants participant
         JOIN jobs job ON job.id = participant.job_id
         JOIN current_job_states state ON state.job_id = job.id
@@ -121,6 +143,11 @@ export function createJobParticipationDetailRepository(
         invitedAt: row.invitedAt,
         acceptedAt: row.acceptedAt,
         leftAt: row.leftAt,
+        verifiedCompletedWork: row.verifiedCompletedWork,
+        verifiedProfessionCodes: Object.freeze([
+          ...row.verifiedProfessionCodes,
+        ]),
+        verifiedRoles: Object.freeze([...row.verifiedRoles]),
         canDecide:
           activeJob &&
           row.viewerRole === "PARTICIPANT" &&
@@ -168,7 +195,30 @@ function validRow(row: DetailRow): boolean {
       (row.acceptedAt === null) &&
     (row.state === "LEFT" || row.state === "REMOVED") ===
       (row.leftAt !== null) &&
-    (row.viewerRole !== "CUSTOMER" || row.acceptedAt !== null)
+    (row.viewerRole !== "CUSTOMER" || row.acceptedAt !== null) &&
+    typeof row.verifiedCompletedWork === "boolean" &&
+    Array.isArray(row.verifiedProfessionCodes) &&
+    row.verifiedProfessionCodes.length <= 32 &&
+    row.verifiedProfessionCodes.every(
+      (code) =>
+        typeof code === "string" &&
+        /^(?:PROF|TEST):[A-Z0-9][A-Z0-9_]{1,62}$/u.test(code),
+    ) &&
+    new Set(row.verifiedProfessionCodes).size ===
+      row.verifiedProfessionCodes.length &&
+    Array.isArray(row.verifiedRoles) &&
+    row.verifiedRoles.length <= 4 &&
+    row.verifiedRoles.every(
+      (role: unknown) =>
+        typeof role === "string" &&
+        ["MEMBER", "LEAD", "COORDINATOR", "SITE_MANAGER"].includes(role),
+    ) &&
+    new Set(row.verifiedRoles).size === row.verifiedRoles.length &&
+    row.verifiedCompletedWork === row.verifiedRoles.includes("MEMBER") &&
+    (row.verifiedCompletedWork || row.verifiedProfessionCodes.length === 0) &&
+    (row.verifiedCompletedWork || row.verifiedRoles.length === 0) &&
+    (!row.verifiedCompletedWork ||
+      (row.jobState === "COMPLETED" && row.acceptedAt !== null))
   );
 }
 

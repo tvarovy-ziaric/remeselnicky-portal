@@ -93,11 +93,13 @@ export async function runJobParticipantCapabilityIntegrationAssertions(
   ).toMatchObject({ status: "APPLIED", state: "ACCEPTED" });
 
   const [profession] = await sql<Array<{ code: string }>>`
-    SELECT profession_code AS code FROM current_profession_taxonomy
-    WHERE state = 'ACTIVE' ORDER BY profession_code LIMIT 1
+    SELECT profession_code AS code
+    FROM current_searchable_craftsman_professions
+    WHERE craftsman_profile_id = ${fixture.targetProfileId}
+    ORDER BY profession_code LIMIT 1
   `;
   if (!profession)
-    throw new Error("Active profession taxonomy fixture missing.");
+    throw new Error("Participant's published profession fixture missing.");
   const professionCommandId = randomUUID();
   const professionInput = {
     actorUserId: fixture.providerUserId,

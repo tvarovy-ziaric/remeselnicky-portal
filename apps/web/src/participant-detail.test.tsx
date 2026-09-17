@@ -23,6 +23,9 @@ const detail = {
   invitedAt: "2026-09-16T08:00:00.000Z",
   acceptedAt: null,
   leftAt: null,
+  verifiedCompletedWork: false,
+  verifiedProfessionCodes: [],
+  verifiedRoles: [],
   canDecide: true,
   canLeave: false,
 };
@@ -72,8 +75,26 @@ describe("private Job participation detail", () => {
       { ...detail, jobState: "CANCELLED" },
       { ...detail, canLeave: true },
       { ...detail, participantDisplayName: "<script>" + "\u0000" },
+      { ...detail, verifiedCompletedWork: true },
+      { ...detail, verifiedRoles: ["LEAD"] },
+      { ...detail, verifiedProfessionCodes: ["PROF:ALPHA_SYNTHETIC"] },
     ])
       expect(parseJobParticipantDetail(invalid)).toBeNull();
+  });
+
+  it("accepts precise verified completed-work facts without treating them as a rating", () => {
+    expect(
+      parseJobParticipantDetail({
+        ...detail,
+        state: "ACCEPTED",
+        jobState: "COMPLETED",
+        acceptedAt: detail.invitedAt,
+        canDecide: false,
+        verifiedCompletedWork: true,
+        verifiedProfessionCodes: ["PROF:ALPHA_SYNTHETIC"],
+        verifiedRoles: ["MEMBER", "LEAD"],
+      }),
+    ).toMatchObject({ verifiedCompletedWork: true });
   });
 
   it("denies invalid ids before fetching and does not reveal denied resources", async () => {

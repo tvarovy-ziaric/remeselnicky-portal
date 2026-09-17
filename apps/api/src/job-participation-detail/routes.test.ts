@@ -59,6 +59,9 @@ describe("private exact Job participation detail", () => {
         invitedAt: at,
         acceptedAt: null,
         leftAt: null,
+        verifiedCompletedWork: false,
+        verifiedProfessionCodes: [],
+        verifiedRoles: [],
         canDecide: true,
         canLeave: false,
       }),
@@ -76,6 +79,9 @@ describe("private exact Job participation detail", () => {
       participantId,
       viewerRole: "PARTICIPANT",
       canDecide: true,
+      verifiedCompletedWork: false,
+      verifiedProfessionCodes: [],
+      verifiedRoles: [],
     });
     expect(response.body).not.toMatch(/exactAddress|customerContact|reason/u);
   });

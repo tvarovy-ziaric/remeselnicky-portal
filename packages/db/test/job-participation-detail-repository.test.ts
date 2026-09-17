@@ -38,6 +38,9 @@ const row = {
   invitedAt,
   acceptedAt: null,
   leftAt: null,
+  verifiedCompletedWork: false,
+  verifiedProfessionCodes: [],
+  verifiedRoles: [],
 };
 
 describe("exact Job participation detail", () => {
@@ -65,6 +68,13 @@ describe("exact Job participation detail", () => {
       "participant.accepted_at IS NOT NULL",
     );
     expect(fixture.statements[0]).not.toContain("exact_address");
+    expect(fixture.statements[0]).toContain(
+      "verified_individual_completed_job_participation",
+    );
+    expect(fixture.statements[0]).toContain(
+      "verified_completed_job_capabilities",
+    );
+    expect(fixture.statements[0]).toContain("verified_completed_job_roles");
   });
 
   it("allows only the invitee to decide a pending invitation", async () => {
@@ -113,5 +123,44 @@ describe("exact Job participation detail", () => {
         participantId,
       }),
     ).rejects.toThrow("Invalid Job participation detail provenance");
+  });
+
+  it("shows completed-work facts only from the verified evidence views", async () => {
+    const fixture = fakeSql([
+      {
+        ...row,
+        state: "LEFT",
+        jobState: "COMPLETED",
+        acceptedAt,
+        leftAt: new Date("2026-09-16T12:00:00.000Z"),
+        verifiedCompletedWork: true,
+        verifiedProfessionCodes: ["PROF:ALPHA_SYNTHETIC"],
+        verifiedRoles: ["MEMBER", "LEAD"],
+      },
+    ]);
+    const result = await createJobParticipationDetailRepository(
+      fixture.sql,
+    ).getForViewer({ actorUserId, participantId });
+    expect(result).toMatchObject({
+      verifiedCompletedWork: true,
+      verifiedProfessionCodes: ["PROF:ALPHA_SYNTHETIC"],
+      verifiedRoles: ["MEMBER", "LEAD"],
+    });
+  });
+
+  it("fails closed on a false verified claim or role without completed participation", async () => {
+    for (const invalid of [
+      { ...row, verifiedCompletedWork: true, verifiedRoles: ["MEMBER"] },
+      { ...row, verifiedCompletedWork: false, verifiedRoles: ["LEAD"] },
+      { ...row, verifiedProfessionCodes: ["PROF:UNCONFIRMED"] },
+    ]) {
+      const fixture = fakeSql([invalid]);
+      await expect(
+        createJobParticipationDetailRepository(fixture.sql).getForViewer({
+          actorUserId,
+          participantId,
+        }),
+      ).rejects.toThrow("Invalid Job participation detail provenance");
+    }
   });
 });
