@@ -235,6 +235,16 @@ export type {
   JobWorkGroupListPage,
 } from "./job-work-group-command-repository.js";
 import { createJobParticipationRepository } from "./job-participation-repository.js";
+import { createJobParticipantRoleDecisionRepository } from "./job-participant-role-decision-repository.js";
+export {
+  createJobParticipantRoleDecisionRepository,
+  JobParticipantRoleDecisionIdempotencyError,
+} from "./job-participant-role-decision-repository.js";
+export type {
+  DecideJobParticipantRoleInput,
+  DecideJobParticipantRoleResult,
+  PendingJobParticipantRoleAssignment,
+} from "./job-participant-role-decision-repository.js";
 import { createJobParticipationDetailRepository } from "./job-participation-detail-repository.js";
 export { createJobParticipationDetailRepository } from "./job-participation-detail-repository.js";
 export type { JobParticipationDetail } from "./job-participation-detail-repository.js";
@@ -1094,6 +1104,9 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly jobParticipantCapabilities: ReturnType<
     typeof createJobParticipantCapabilityRepository
   >;
+  readonly jobParticipantRoleDecisions: ReturnType<
+    typeof createJobParticipantRoleDecisionRepository
+  >;
   readonly jobOperations: ReturnType<typeof createJobOperationalRepository>;
   readonly jobMilestones: ReturnType<typeof createJobMilestoneRepository>;
   readonly changeOrders: ReturnType<typeof createChangeOrderRepository>;
@@ -1238,6 +1251,8 @@ export function createDatabase(
   const jobParticipationDetail = createJobParticipationDetailRepository(sql);
   const jobParticipantCapabilities =
     createJobParticipantCapabilityRepository(sql);
+  const jobParticipantRoleDecisions =
+    createJobParticipantRoleDecisionRepository(sql);
   const jobOperations = createJobOperationalRepository(sql);
   const jobMilestones = createJobMilestoneRepository(sql);
   const changeOrders = createChangeOrderRepository(sql);
@@ -1333,6 +1348,7 @@ export function createDatabase(
     jobParticipation,
     jobParticipationDetail,
     jobParticipantCapabilities,
+    jobParticipantRoleDecisions,
     jobOperations,
     jobMilestones,
     changeOrders,

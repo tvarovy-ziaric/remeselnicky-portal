@@ -119,6 +119,11 @@ export {
 } from "./job-participation-detail/routes.js";
 export type { JobParticipationDetailRouteDependencies } from "./job-participation-detail/routes.js";
 export {
+  JOB_PARTICIPATION_ROLE_DECISION_PATHS,
+  registerJobParticipationRoleDecisionRoutes,
+} from "./job-participation-role-decisions/routes.js";
+export type { JobParticipationRoleDecisionRouteDependencies } from "./job-participation-role-decisions/routes.js";
+export {
   JOB_WORK_GROUP_PATHS,
   registerJobWorkGroupRoutes,
 } from "./job-work-groups/routes.js";

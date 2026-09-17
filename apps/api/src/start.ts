@@ -186,6 +186,9 @@ const app = buildApi({
       capabilities: database.jobParticipantCapabilities,
     },
     jobParticipationDetail: { detail: database.jobParticipationDetail },
+    jobParticipationRoleDecisions: {
+      roles: database.jobParticipantRoleDecisions,
+    },
     jobWorkGroups: { workGroups: database.jobWorkGroups },
     quoteLifecycle: { lifecycle: database.quoteLifecycle },
     quoteAuthoring: {

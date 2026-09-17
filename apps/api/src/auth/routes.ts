@@ -122,6 +122,10 @@ import {
   type JobParticipationDetailRouteDependencies,
 } from "../job-participation-detail/routes.js";
 import {
+  registerJobParticipationRoleDecisionRoutes,
+  type JobParticipationRoleDecisionRouteDependencies,
+} from "../job-participation-role-decisions/routes.js";
+import {
   registerJobWorkGroupRoutes,
   type JobWorkGroupRouteDependencies,
 } from "../job-work-groups/routes.js";
@@ -253,6 +257,10 @@ export interface AuthModuleDependencies {
   readonly jobParticipationDetail?: Pick<
     JobParticipationDetailRouteDependencies,
     "detail"
+  >;
+  readonly jobParticipationRoleDecisions?: Pick<
+    JobParticipationRoleDecisionRouteDependencies,
+    "roles"
   >;
   readonly jobWorkGroups?: Pick<JobWorkGroupRouteDependencies, "workGroups">;
   readonly quoteAuthoring?: Pick<
@@ -673,6 +681,17 @@ async function configureAuthModule(
         timeWindowMs: config.rateLimitWindowMs,
       },
       ...dependencies.jobParticipationDetail,
+    });
+  }
+  if (dependencies.jobParticipationRoleDecisions !== undefined) {
+    registerJobParticipationRoleDecisionRoutes(app, {
+      csrfProtection: csrfProtection(app),
+      guard,
+      rateLimit: {
+        max: config.rateLimitMax,
+        timeWindowMs: config.rateLimitWindowMs,
+      },
+      ...dependencies.jobParticipationRoleDecisions,
     });
   }
   if (dependencies.jobWorkGroups !== undefined) {

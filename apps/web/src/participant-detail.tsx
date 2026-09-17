@@ -8,6 +8,7 @@ import {
   type ParticipantDecision,
 } from "./participant-invitation-inbox";
 import { leaveParticipation } from "./participant-history";
+import { ParticipantRoleDecisions } from "./participant-role-decisions";
 
 const uuid =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -343,6 +344,12 @@ export function ParticipantDetail({
           Ukončiť moju účasť
         </button>
       )}
+      {detail.viewerRole === "PARTICIPANT" &&
+        detail.state === "ACCEPTED" &&
+        (detail.jobState === "CONFIRMED" ||
+          detail.jobState === "IN_PROGRESS") && (
+          <ParticipantRoleDecisions participantId={detail.participantId} />
+        )}
       {context === "JOB_PARTY" && (
         <p>
           <a href={`/zakazky/${detail.jobId}`}>Späť na zákazku</a>
