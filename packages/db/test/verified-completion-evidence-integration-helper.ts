@@ -109,6 +109,65 @@ export async function runVerifiedCompletionEvidenceIntegrationAssertions(
           claimId: activeClaimId,
         }),
       ).toMatchObject({ status: "APPLIED", claimId: activeClaimId });
+      const leadAssignmentId = randomUUID();
+      expect(
+        await participation.changeRole({
+          actorUserId: fixture.providerUserId,
+          commandId: leadAssignmentId,
+          participantId: activeParticipantId,
+          role: "LEAD",
+          action: "ASSIGN",
+        }),
+      ).toMatchObject({ status: "APPLIED", role: "LEAD" });
+      const leadConfirmationId = randomUUID();
+      await tx`
+        INSERT INTO job_participant_role_decisions (
+          decision_id, assignment_event_id, actor_user_id,
+          decision_kind, reason, payload_fingerprint
+        ) VALUES (${leadConfirmationId}, ${leadAssignmentId},
+          ${fixture.participantUserId}, 'CONFIRM', NULL, ${"c".repeat(64)})
+      `;
+      const unconfirmedAssignmentId = randomUUID();
+      expect(
+        await participation.changeRole({
+          actorUserId: fixture.providerUserId,
+          commandId: unconfirmedAssignmentId,
+          participantId: activeParticipantId,
+          role: "COORDINATOR",
+          action: "ASSIGN",
+        }),
+      ).toMatchObject({ status: "APPLIED", role: "COORDINATOR" });
+      const correctionAssignmentId = randomUUID();
+      expect(
+        await participation.changeRole({
+          actorUserId: fixture.providerUserId,
+          commandId: correctionAssignmentId,
+          participantId: activeParticipantId,
+          role: "SITE_MANAGER",
+          action: "ASSIGN",
+        }),
+      ).toMatchObject({ status: "APPLIED", role: "SITE_MANAGER" });
+      await tx`
+        INSERT INTO job_participant_role_decisions (
+          decision_id, assignment_event_id, actor_user_id,
+          decision_kind, reason, payload_fingerprint
+        ) VALUES (${randomUUID()}, ${correctionAssignmentId},
+          ${fixture.participantUserId}, 'REQUEST_CORRECTION',
+          'Túto rolu som nevykonával.', ${"d".repeat(64)})
+      `;
+      await expect(
+        tx.savepoint(async (savepoint) => {
+          await savepoint`
+            INSERT INTO job_participant_role_decisions (
+              decision_id, assignment_event_id, actor_user_id,
+              decision_kind, reason, payload_fingerprint
+            ) VALUES (${randomUUID()}, ${unconfirmedAssignmentId},
+              ${fixture.providerUserId}, 'CONFIRM', NULL, ${"e".repeat(64)})
+          `;
+        }),
+      ).rejects.toThrow(
+        "active assigned role and participant confirmation required",
+      );
       expect(
         await participation.decide({
           actorUserId: fixture.participantUserId,
@@ -192,6 +251,55 @@ export async function runVerifiedCompletionEvidenceIntegrationAssertions(
         claimId: activeClaimId,
         professionCode: fixture.professionCode,
       });
+      const roles = await tx<
+        Array<{
+          role: string;
+          assignmentEventId: string | null;
+          roleDecisionId: string | null;
+          endedAt: Date;
+          completedAt: Date;
+        }>
+      >`
+        SELECT role, assignment_event_id AS "assignmentEventId",
+          role_decision_id AS "roleDecisionId",
+          role_ended_at AS "endedAt", completed_at AS "completedAt"
+        FROM verified_completed_job_roles
+        WHERE participant_id = ${activeParticipantId}
+        ORDER BY role
+      `;
+      expect(roles.map(({ role }) => role)).toEqual(["LEAD", "MEMBER"]);
+      expect(roles[0]).toMatchObject({
+        assignmentEventId: leadAssignmentId,
+        roleDecisionId: leadConfirmationId,
+      });
+      expect(roles[1]).toMatchObject({
+        assignmentEventId: null,
+        roleDecisionId: null,
+      });
+      expect(
+        roles.every(({ endedAt, completedAt }) => endedAt <= completedAt),
+      ).toBe(true);
+      await expect(
+        tx.savepoint(async (savepoint) => {
+          await savepoint`
+            INSERT INTO job_participant_role_decisions (
+              decision_id, assignment_event_id, actor_user_id,
+              decision_kind, reason, payload_fingerprint
+            ) VALUES (${randomUUID()}, ${unconfirmedAssignmentId},
+              ${fixture.participantUserId}, 'CONFIRM', NULL, ${"e".repeat(64)})
+          `;
+        }),
+      ).rejects.toThrow(
+        "active assigned role and participant confirmation required",
+      );
+      await expect(
+        tx.savepoint(async (savepoint) => {
+          await savepoint`
+            UPDATE job_participant_role_decisions SET reason = 'Zmenené'
+            WHERE decision_id = ${leadConfirmationId}
+          `;
+        }),
+      ).rejects.toThrow("Job participant role decisions are immutable");
       const [volume] = await tx<
         Array<{ workCount: number; professionCount: number }>
       >`
