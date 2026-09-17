@@ -214,6 +214,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
           "0087_customer_completion_proposals.sql",
           "0088_admin_job_force_completion.sql",
           "0089_verified_completed_job_evidence.sql",
+          "0090_completed_job_work_volume.sql",
         ],
         alreadyApplied: 0,
       });
@@ -222,7 +223,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         testDatabaseUrl,
         migrationsDirectory,
       );
-      expect(secondRun).toEqual({ applied: [], alreadyApplied: 90 });
+      expect(secondRun).toEqual({ applied: [], alreadyApplied: 91 });
 
       const sql = postgres(testDatabaseUrl, { max: 5 });
       try {
@@ -268,7 +269,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         `;
 
         expect(postgis?.extversion).toMatch(/^3\./);
-        expect(ledger?.count).toBe(90);
+        expect(ledger?.count).toBe(91);
         expect(created).toMatchObject({ account_state: "ACTIVE" });
         expect(created?.id).toMatch(
           /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,

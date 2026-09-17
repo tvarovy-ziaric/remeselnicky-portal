@@ -30,9 +30,11 @@ export async function runJobParticipantCapabilityIntegrationAssertions(
     JOIN craftsman_profiles provider ON provider.id = job.primary_craftsman_profile_id
     JOIN craftsman_profiles target ON target.profile_type = 'INDIVIDUAL'
       AND target.owner_user_id <> provider.owner_user_id
+    JOIN current_searchable_craftsman_profiles searchable
+      ON searchable.craftsman_profile_id = target.id
     JOIN users target_owner ON target_owner.id = target.owner_user_id
     JOIN auth_credentials target_credential ON target_credential.user_id = target_owner.id
-    WHERE state.state IN ('CONFIRMED', 'IN_PROGRESS')
+    WHERE state.state = 'CONFIRMED'
       AND target_owner.account_state = 'ACTIVE'
       AND target_credential.email_verified_at IS NOT NULL
       AND target_credential.phone_verified_at IS NOT NULL
