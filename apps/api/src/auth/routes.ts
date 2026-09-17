@@ -82,6 +82,10 @@ import {
   type CompletionProposalRouteDependencies,
 } from "../job-completion/proposal-routes.js";
 import {
+  registerAdminJobCompletionRoutes,
+  type AdminJobCompletionRouteDependencies,
+} from "../job-completion/admin-routes.js";
+import {
   registerJobDocumentationRoutes,
   type JobDocumentationRouteDependencies,
 } from "../job-documentation/routes.js";
@@ -218,6 +222,10 @@ export interface AuthModuleDependencies {
   readonly completionProposals?: Pick<
     CompletionProposalRouteDependencies,
     "proposals"
+  >;
+  readonly adminJobCompletion?: Pick<
+    AdminJobCompletionRouteDependencies,
+    "completion"
   >;
   readonly jobDocumentation?: Pick<
     JobDocumentationRouteDependencies,
@@ -713,6 +721,18 @@ async function configureAuthModule(
       persistence: dependencies.persistence,
       service: dependencies.adminAccess.service,
     });
+    if (dependencies.adminJobCompletion !== undefined) {
+      registerAdminJobCompletionRoutes(app, {
+        adminAccess: dependencies.adminAccess.service,
+        completion: dependencies.adminJobCompletion.completion,
+        guard,
+        csrfProtection: csrfProtection(app),
+        rateLimit: {
+          max: config.rateLimitMax,
+          timeWindowMs: config.rateLimitWindowMs,
+        },
+      });
+    }
   }
   const emailVerification =
     dependencies.emailVerification === undefined

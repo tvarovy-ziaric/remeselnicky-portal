@@ -42,6 +42,11 @@ type CompletionAttempt = {
 type CompletionPage = {
   readonly jobState: string;
   readonly attempts: readonly CompletionAttempt[];
+  readonly administrativeCompletion?: {
+    readonly commandId: string;
+    readonly recordedAt: Date;
+    readonly reason: string;
+  } | null;
 };
 type RequestBody = {
   readonly commandId: string;
@@ -126,6 +131,14 @@ export function registerJobCompletionRoutes(
         if (page === null) return reply.code(404).send({ code: "NOT_FOUND" });
         return reply.send({
           jobState: page.jobState,
+          administrativeCompletion: page.administrativeCompletion
+            ? {
+                commandId: page.administrativeCompletion.commandId,
+                recordedAt:
+                  page.administrativeCompletion.recordedAt.toISOString(),
+                reason: page.administrativeCompletion.reason,
+              }
+            : null,
           attempts: page.attempts.map((attempt) => ({
             id: attempt.id,
             attemptNumber: attempt.attemptNumber,

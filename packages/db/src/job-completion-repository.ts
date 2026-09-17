@@ -61,6 +61,11 @@ export interface JobCompletionAttempt {
 export interface JobCompletionHistory {
   readonly jobState: JobState;
   readonly attempts: readonly JobCompletionAttempt[];
+  readonly administrativeCompletion: Readonly<{
+    commandId: string;
+    recordedAt: Date;
+    reason: string;
+  }> | null;
 }
 
 export type JobCompletionResult =
@@ -288,8 +293,15 @@ export function createJobCompletionRepository(sql: RootSql) {
         WHERE attempt.job_id = ${input.jobId}
         ORDER BY attempt.attempt_number DESC
       `;
+      const [administrativeCompletion] = await tx<
+        Array<{ commandId: string; recordedAt: Date; reason: string }>
+      >`
+        SELECT command_id AS "commandId", recorded_at AS "recordedAt", reason
+        FROM job_admin_completion_commands WHERE job_id = ${input.jobId}
+      `;
       return Object.freeze({
         jobState: state,
+        administrativeCompletion: administrativeCompletion ?? null,
         attempts: Object.freeze(
           rows.map((row) =>
             Object.freeze({

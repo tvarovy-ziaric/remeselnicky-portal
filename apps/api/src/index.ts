@@ -69,6 +69,11 @@ export {
 } from "./job-completion/proposal-routes.js";
 export type { CompletionProposalRouteDependencies } from "./job-completion/proposal-routes.js";
 export {
+  ADMIN_JOB_COMPLETION_PATH,
+  registerAdminJobCompletionRoutes,
+} from "./job-completion/admin-routes.js";
+export type { AdminJobCompletionRouteDependencies } from "./job-completion/admin-routes.js";
+export {
   JOB_DOCUMENTATION_PATH,
   registerJobDocumentationRoutes,
 } from "./job-documentation/routes.js";

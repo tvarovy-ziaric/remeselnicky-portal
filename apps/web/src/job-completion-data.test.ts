@@ -54,6 +54,28 @@ describe("private completion client", () => {
       }),
     ).toBeNull();
     expect(parseCompletionPage({ ...page, jobState: "COMPLETED" })).toBeNull();
+    const administrativeCompletion = {
+      commandId,
+      recordedAt: "2026-09-17T10:00:00.000Z",
+      reason: "Výnimočné uzavretie po kontrole zákazky.",
+    };
+    expect(
+      parseCompletionPage({
+        ...page,
+        jobState: "COMPLETED",
+        administrativeCompletion,
+      }),
+    ).toMatchObject({ administrativeCompletion });
+    expect(
+      parseCompletionPage({
+        ...page,
+        jobState: "COMPLETED",
+        administrativeCompletion: {
+          ...administrativeCompletion,
+          payment: true,
+        },
+      }),
+    ).toBeNull();
     const accepted = {
       ...attempt,
       outcome: "ACCEPTED",

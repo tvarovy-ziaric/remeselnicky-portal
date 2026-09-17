@@ -57,6 +57,11 @@ export interface CompletionAttempt {
 export interface CompletionPage {
   readonly jobState: CompletionState;
   readonly attempts: readonly CompletionAttempt[];
+  readonly administrativeCompletion: Readonly<{
+    commandId: string;
+    recordedAt: string;
+    reason: string;
+  }> | null;
 }
 export type CompletionLoad =
   | { readonly status: "OK"; readonly page: CompletionPage }
@@ -78,7 +83,10 @@ const attemptKeys = [
 export function parseCompletionPage(value: unknown): CompletionPage | null {
   if (
     !record(value) ||
-    !exact(value, ["jobState", "attempts"]) ||
+    !(
+      exact(value, ["jobState", "attempts"]) ||
+      exact(value, ["jobState", "attempts", "administrativeCompletion"])
+    ) ||
     ![
       "CONFIRMED",
       "IN_PROGRESS",
@@ -88,6 +96,17 @@ export function parseCompletionPage(value: unknown): CompletionPage | null {
     ].includes(String(value.jobState)) ||
     !Array.isArray(value.attempts) ||
     value.attempts.length > 10_000
+  )
+    return null;
+  const administrativeCompletion = value.administrativeCompletion ?? null;
+  if (
+    administrativeCompletion !== null &&
+    (!record(administrativeCompletion) ||
+      !exact(administrativeCompletion, ["commandId", "recordedAt", "reason"]) ||
+      typeof administrativeCompletion.commandId !== "string" ||
+      !uuid.test(administrativeCompletion.commandId) ||
+      !instant(administrativeCompletion.recordedAt) ||
+      !bounded(administrativeCompletion.reason, 8, 1000))
   )
     return null;
   let pending = 0;
@@ -151,16 +170,28 @@ export function parseCompletionPage(value: unknown): CompletionPage | null {
     (attempts.length > 0 && attempts.at(-1)?.attemptNumber !== 1) ||
     new Set(attempts.map((attempt) => attempt.id)).size !== attempts.length ||
     (pending === 1 &&
-      (value.jobState !== "COMPLETION_REQUESTED" ||
+      ((value.jobState !== "COMPLETION_REQUESTED" &&
+        !(
+          value.jobState === "COMPLETED" && administrativeCompletion !== null
+        )) ||
         attempts[0]?.outcome !== "PENDING")) ||
     (accepted === 1 &&
       (value.jobState !== "COMPLETED" ||
         attempts[0]?.outcome !== "ACCEPTED")) ||
     (value.jobState === "COMPLETION_REQUESTED" && pending !== 1) ||
-    (value.jobState === "COMPLETED" && accepted !== 1)
+    (value.jobState === "COMPLETED" &&
+      accepted !== 1 &&
+      administrativeCompletion === null) ||
+    (administrativeCompletion !== null &&
+      (value.jobState !== "COMPLETED" || accepted !== 0))
   )
     return null;
-  return { jobState: value.jobState as CompletionState, attempts };
+  return {
+    jobState: value.jobState as CompletionState,
+    attempts,
+    administrativeCompletion:
+      administrativeCompletion as CompletionPage["administrativeCompletion"],
+  };
 }
 
 export async function loadCompletionPage(input: {

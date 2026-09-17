@@ -40,6 +40,40 @@ function event(input: {
 }
 
 describe("R3 demand-side notification catalog", () => {
+  it("notifies both parties of administrative closure without an audit reason", () => {
+    const jobId = randomUUID();
+    const commandId = randomUUID();
+    const draft = mapDemandSideNotificationEvent(
+      event({
+        entityId: jobId,
+        entityType: "JOB",
+        name: "job.completion.admin_forced",
+        payload: { command_id: commandId, job_id: jobId },
+      }),
+    )?.[0];
+    expect(draft).toMatchObject({
+      channels: ["IN_APP", "EMAIL"],
+      context: { path: `/zakazky/${jobId}` },
+      payload: { action: "ADMIN_COMPLETION", command_id: commandId },
+      priority: "IMPORTANT",
+    });
+    expect(JSON.stringify(draft)).not.toMatch(/reason|address|body/iu);
+    expect(() => validateNotificationDraft(draft as never)).not.toThrow();
+    expect(() =>
+      mapDemandSideNotificationEvent(
+        event({
+          entityId: jobId,
+          entityType: "JOB",
+          name: "job.completion.admin_forced",
+          payload: {
+            command_id: commandId,
+            job_id: jobId,
+            reason: "Súkromný dôvod",
+          },
+        }),
+      ),
+    ).toThrow();
+  });
   it.each([
     ["job.completion.proposed", "REVIEW_COMPLETION_PROPOSAL"],
     ["job.completion.proposal_agreed", "COMPLETION_PROPOSAL_AGREED"],

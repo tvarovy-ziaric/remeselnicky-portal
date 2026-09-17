@@ -241,6 +241,19 @@ export function JobCompletion({
       )}
       {status === "OK" && page && (
         <>
+          {page.administrativeCompletion && (
+            <div role="status">
+              <h3>Výnimočné administrátorské dokončenie</h3>
+              <p>
+                Zákazka bola uzavretá administrátorským zásahom, nie potvrdením
+                zákazníka. Zásah je samostatne zaznamenaný v audite.
+              </p>
+              <p>Dôvod: {page.administrativeCompletion.reason}</p>
+              <time dateTime={page.administrativeCompletion.recordedAt}>
+                {dateTime(page.administrativeCompletion.recordedAt)}
+              </time>
+            </div>
+          )}
           <section aria-labelledby="customer-completion-proposal-heading">
             <h3 id="customer-completion-proposal-heading">
               Návrh dokončenia od zákazníka

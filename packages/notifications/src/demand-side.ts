@@ -31,6 +31,7 @@ export const DEMAND_SIDE_EXTENSION_EVENT_NAMES = Object.freeze({
   jobCompletionProposed: "job.completion.proposed",
   jobCompletionProposalAgreed: "job.completion.proposal_agreed",
   jobCompletionProposalDisagreed: "job.completion.proposal_disagreed",
+  jobCompletionAdminForced: "job.completion.admin_forced",
   jobParticipantInvited: "job_participant.invited",
   jobParticipantAccepted: "job_participant.accepted",
   jobParticipantDeclined: "job_participant.declined",
@@ -180,6 +181,8 @@ export function mapDemandSideNotificationEvent(
     case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobCompletionProposalAgreed:
     case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobCompletionProposalDisagreed:
       return mapCompletionProposal(event, recipientUserId);
+    case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobCompletionAdminForced:
+      return mapAdminCompletion(event, recipientUserId);
     case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantInvited:
     case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantAccepted:
     case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantDeclined:
@@ -541,6 +544,32 @@ function mapCompletionProposal(
   );
 }
 
+function mapAdminCompletion(
+  event: PersistedDomainEvent,
+  recipientUserId: string,
+): readonly NotificationDraft[] {
+  assertEntity(event, "JOB");
+  const jobId = requiredUuid(event.payload["job_id"], "Job");
+  const commandId = requiredUuid(event.payload["command_id"], "Command");
+  if (event.entity.id !== jobId)
+    throw new TypeError("Administrative completion Job is incoherent.");
+  return one(
+    event,
+    recipientUserId,
+    {
+      context: {
+        entityId: jobId,
+        entityType: "JOB",
+        path: `/zakazky/${jobId}`,
+      },
+      payload: { action: "ADMIN_COMPLETION", command_id: commandId },
+    },
+    event.name,
+    "IMPORTANT",
+    ["IN_APP", "EMAIL"],
+  );
+}
+
 function mapJobParticipant(
   event: PersistedDomainEvent,
   recipientUserId: string,
@@ -697,6 +726,8 @@ function assertDemandSidePayloadKeys(event: PersistedDomainEvent): void {
       case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobCompletionProposalAgreed:
       case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobCompletionProposalDisagreed:
         return ["job_id", "proposal_id", "recipient_user_id"];
+      case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobCompletionAdminForced:
+        return ["command_id", "job_id", "recipient_user_id"];
       case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantInvited:
       case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantAccepted:
       case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantDeclined:
@@ -811,6 +842,7 @@ function isKnownDemandSideEvent(name: string): boolean {
     DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobCompletionProposed,
     DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobCompletionProposalAgreed,
     DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobCompletionProposalDisagreed,
+    DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobCompletionAdminForced,
     DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantInvited,
     DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantAccepted,
     DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantDeclined,

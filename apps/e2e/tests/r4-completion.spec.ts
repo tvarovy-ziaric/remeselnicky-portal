@@ -13,7 +13,7 @@ test.skip(
   "Synthetic public Alpha is not provisioned",
 );
 
-test("fresh synthetic Job preserves bilateral completion attempts and private history", async ({
+test("fresh synthetic Job preserves customer proposals and bilateral handover history", async ({
   browser,
   browserName,
 }) => {
@@ -26,6 +26,7 @@ test("fresh synthetic Job preserves bilateral completion attempts and private hi
     const jobId = await createJob(customer, provider);
     const jobPath = `/v1/me/jobs/${jobId}`;
     const completionPath = `${jobPath}/completion`;
+    const proposalsPath = `${completionPath}/proposals`;
     const original = agreement(await get(customer, jobPath));
     expect((await outsider.context.request.get(completionPath)).status()).toBe(
       404,
@@ -37,6 +38,64 @@ test("fresh synthetic Job preserves bilateral completion attempts and private hi
         })
       ).status(),
     ).toBe(404);
+    expect((await outsider.context.request.get(proposalsPath)).status()).toBe(
+      404,
+    );
+    const customerProposal = await checked(
+      await post(customer, proposalsPath, {
+        commandId: randomUUID(),
+        note: "Syntetický zákazník navrhuje odovzdanie.",
+      }),
+      201,
+    );
+    const firstProposalId = requiredString(customerProposal.proposalId);
+    expect((await get(customer, jobPath)).state).toBe("IN_PROGRESS");
+    expect(
+      (
+        await post(provider, `${completionPath}/request`, {
+          commandId: randomUUID(),
+        })
+      ).status(),
+    ).toBe(409);
+    expect(
+      (
+        await post(customer, `${proposalsPath}/${firstProposalId}/agree`, {
+          commandId: randomUUID(),
+        })
+      ).status(),
+    ).toBe(404);
+    expect(
+      (
+        await post(provider, `${proposalsPath}/${firstProposalId}/disagree`, {
+          commandId: randomUUID(),
+          reason: "Práca ešte nie je dokončená.",
+        })
+      ).status(),
+    ).toBe(201);
+    const secondProposal = await checked(
+      await post(customer, proposalsPath, {
+        commandId: randomUUID(),
+      }),
+      201,
+    );
+    const secondProposalId = requiredString(secondProposal.proposalId);
+    expect(
+      (
+        await post(provider, `${proposalsPath}/${secondProposalId}/agree`, {
+          commandId: randomUUID(),
+        })
+      ).status(),
+    ).toBe(201);
+    expect((await get(customer, jobPath)).state).toBe("IN_PROGRESS");
+    const proposalHistory = await get(customer, proposalsPath);
+    expect(proposalHistory.proposals).toEqual([
+      expect.objectContaining({ id: secondProposalId, outcome: "AGREE" }),
+      expect.objectContaining({
+        id: firstProposalId,
+        outcome: "DISAGREE",
+        disagreementReason: "Práca ešte nie je dokončená.",
+      }),
+    ]);
     const first = await checked(
       await post(provider, `${completionPath}/request`, {
         commandId: randomUUID(),
