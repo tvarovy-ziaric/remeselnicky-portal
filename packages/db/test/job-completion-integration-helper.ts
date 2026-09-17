@@ -78,7 +78,10 @@ export async function runJobCompletionIntegrationAssertions(
         }),
       ).toEqual({ status: "STALE_PROPOSAL" });
       expect(
-        await proposals.list({ actorUserId: job.providerUserId, jobId: job.id }),
+        await proposals.list({
+          actorUserId: job.providerUserId,
+          jobId: job.id,
+        }),
       ).toMatchObject([{ id: proposalId, outcome: "PENDING" }]);
       expect(
         await repository.request({
@@ -122,7 +125,10 @@ export async function runJobCompletionIntegrationAssertions(
         proposalId,
       });
       expect(
-        await proposals.list({ actorUserId: job.customerUserId, jobId: job.id }),
+        await proposals.list({
+          actorUserId: job.customerUserId,
+          jobId: job.id,
+        }),
       ).toMatchObject([{ id: proposalId, outcome: "DISAGREE" }]);
       const secondProposalId = randomUUID();
       expect(
@@ -153,7 +159,9 @@ export async function runJobCompletionIntegrationAssertions(
         SELECT state::text FROM current_job_states WHERE job_id = ${job.id}
       `;
       expect(stateAfterAgreement?.state).toBe("IN_PROGRESS");
-      const proposalNotices = await tx<Array<{ eventName: string; payload: unknown }>>`
+      const proposalNotices = await tx<
+        Array<{ eventName: string; payload: unknown }>
+      >`
         SELECT event_name AS "eventName", payload FROM domain_outbox_events
         WHERE idempotency_key IN (
           ${`job.completion.proposal.${proposalId}`},
@@ -168,7 +176,9 @@ export async function runJobCompletionIntegrationAssertions(
         "job.completion.proposed",
       ]);
       expect(JSON.stringify(proposalNotices)).not.toContain(proposed.note);
-      expect(JSON.stringify(proposalNotices)).not.toContain(disagreement.reason);
+      expect(JSON.stringify(proposalNotices)).not.toContain(
+        disagreement.reason,
+      );
       await expect(
         tx.savepoint(async (savepoint) => {
           await savepoint`DELETE FROM job_completion_proposals WHERE id = ${proposalId}`;
