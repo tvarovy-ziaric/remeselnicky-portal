@@ -58,7 +58,16 @@ const detail = {
   createdBySide: "PRIMARY_PROVIDER",
   createdAt: now,
   revisions: [revision],
-  actions: [{ id: commandId, revisionId, action: "PROPOSE", occurredAt: now }],
+  actions: [
+    {
+      id: commandId,
+      revisionId,
+      sequence: 1,
+      action: "PROPOSE",
+      supersededByRevisionId: null,
+      occurredAt: now,
+    },
+  ],
 };
 const page = {
   items: [
@@ -115,6 +124,13 @@ describe("R4-012 exact change order boundary", () => {
   });
   it("rejects a cross-job detail, unknown actor data and oversized collection", () => {
     expect(parseChangeDetail(detail, jobId, changeOrderId)).not.toBeNull();
+    expect(
+      parseChangeDetail(
+        { ...detail, actions: [{ ...detail.actions[0], sequence: 0 }] },
+        jobId,
+        changeOrderId,
+      ),
+    ).toBeNull();
     expect(parseChangeDetail(detail, commandId, changeOrderId)).toBeNull();
     expect(
       parseChangeDetail(

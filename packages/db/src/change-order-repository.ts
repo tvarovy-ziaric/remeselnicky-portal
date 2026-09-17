@@ -301,6 +301,8 @@ export function createChangeOrderRepository(sql: RootSql) {
         );
       if (!open(party.state)) return { status: "STALE_STATE" };
       const head = await currentHead(tx, input.changeOrderId);
+      if (head?.state === "DRAFT" && head.authoredSide !== party.side)
+        return { status: "NOT_FOUND" };
       if (
         !head ||
         head.revisionId !== input.expectedRevisionId ||
@@ -398,6 +400,8 @@ export function createChangeOrderRepository(sql: RootSql) {
         );
       if (!open(party.state)) return { status: "STALE_STATE" };
       const head = await currentHead(tx, input.changeOrderId);
+      if (head?.state === "DRAFT" && head.authoredSide !== party.side)
+        return { status: "NOT_FOUND" };
       if (
         !head ||
         head.revisionId !== input.revisionId ||

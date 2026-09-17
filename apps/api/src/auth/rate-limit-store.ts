@@ -34,7 +34,13 @@ export function createPostgresRateLimitStoreConstructor(input: {
       const method = Array.isArray(route?.method)
         ? route.method.join("+")
         : route?.method;
-      store.scope = `${String(method).toLowerCase()}:${route?.url ?? "auth"}`;
+      const routeScope = `${String(method).toLowerCase()}:${route?.url ?? "auth"}`;
+      // The database bounds scope to 80 characters. Long parameterized routes
+      // still need distinct, stable buckets rather than a failed request.
+      store.scope =
+        routeScope.length <= 80
+          ? routeScope
+          : `route:${createHash("sha256").update(routeScope).digest("hex")}`;
       return store;
     }
 

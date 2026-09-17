@@ -32,7 +32,7 @@ test("change-order draft, exact counterproposal and approval preserve the origin
       await checked(await customer.context.request.get(jobPath), 200),
     );
     const collection = `${jobPath}/change-orders`;
-    const title = `Syntetická zmena ${randomUUID().slice(0, 8)}`;
+    const title = `Syntetická zmena ${syntheticLabel()}`;
     const createId = randomUUID(),
       firstRevisionId = randomUUID();
     const firstTerms = terms(title, "Zákazník žiada ďalšiu montáž.");
@@ -245,7 +245,7 @@ test("rejected revision cannot be approved, and competitor cannot bind a change"
         commandId,
         revisionId,
         terms: terms(
-          `Syntetické odmietnutie ${randomUUID().slice(0, 8)}`,
+          `Syntetické odmietnutie ${syntheticLabel()}`,
           "Návrh na odmietnutie.",
         ),
       }),
@@ -334,21 +334,23 @@ test("provider PDF addendum is bound only after READY and delivered only to its 
       reservationId: changeOrderId,
       revisionNumber: 1,
     });
+    const customerReservationId = randomUUID();
     expect(
       (
         await post(customer, reservationPath, {
-          commandId: randomUUID(),
-          changeOrderId: randomUUID(),
+          commandId: customerReservationId,
+          changeOrderId: customerReservationId,
           revisionId: randomUUID(),
           expectedRevisionId: null,
         })
       ).status(),
     ).toBe(404);
+    const outsiderReservationId = randomUUID();
     expect(
       (
         await post(outsider, reservationPath, {
-          commandId: randomUUID(),
-          changeOrderId: randomUUID(),
+          commandId: outsiderReservationId,
+          changeOrderId: outsiderReservationId,
           revisionId: randomUUID(),
           expectedRevisionId: null,
         })
@@ -386,7 +388,7 @@ test("provider PDF addendum is bound only after READY and delivered only to its 
       await new Promise((resolve) => setTimeout(resolve, 2_000));
     }
     expect(ready, "Synthetic PDF processing did not reach READY").toBe(true);
-    const title = `Syntetický PDF dodatok ${randomUUID().slice(0, 8)}`;
+    const title = `Syntetický PDF dodatok ${syntheticLabel()}`;
     const created = await checked(
       await post(provider, collection, {
         commandId: changeOrderId,
@@ -470,7 +472,11 @@ async function authenticated(browser: Browser, role: Role): Promise<Actor> {
   const baseURL = requiredEnv("STAGING_E2E_BASE_URL");
   const context = await browser.newContext({
     baseURL,
-    storageState: requiredEnv(`STAGING_E2E_${role}_AUTH_STATE`),
+    storageState: requiredEnv(
+      role === "CUSTOMER_A"
+        ? "STAGING_E2E_CUSTOMER_AUTH_STATE"
+        : `STAGING_E2E_${role}_AUTH_STATE`,
+    ),
     httpCredentials: {
       origin: baseURL,
       username: requiredEnv("STAGING_E2E_BASIC_AUTH_USERNAME"),
@@ -530,6 +536,13 @@ function terms(title: string, reason: string) {
     affectedMilestoneIds: [],
     externalPdfMediaAssetId: null,
   };
+}
+function syntheticLabel(): string {
+  // The commercial-text contact guard rejects an eight-digit random suffix.
+  // Preserve unique E2E labels without generating phone-like test content.
+  return randomUUID()
+    .slice(0, 8)
+    .replace(/[0-9]/gu, (digit) => String.fromCharCode(103 + Number(digit)));
 }
 function agreement(job: Record<string, unknown>) {
   return { acceptedAt: job.acceptedAt, request: job.request, quote: job.quote };

@@ -1,6 +1,6 @@
 # ADR 0017 — Revisioned Change orders outside the immutable Job baseline
 
-Status: proposed (R4-012, 2026-09-17)
+Status: accepted (R4-012, 2026-09-17)
 
 ## Context
 

@@ -148,7 +148,17 @@ export async function runChangeOrderIntegrationAssertions(
       revisionId: replacementId,
       revisionNumber: 2,
     }),
-  ).toEqual({ status: "STALE_STATE" });
+  ).toEqual({ status: "NOT_FOUND" });
+  expect(
+    await repository.counterpropose({
+      actorUserId: job.providerUserId,
+      commandId: randomUUID(),
+      jobId: job.jobId,
+      changeOrderId,
+      expectedRevisionId: replacementId,
+      terms,
+    }),
+  ).toEqual({ status: "NOT_FOUND" });
   const submit = {
     actorUserId: job.customerUserId,
     commandId: randomUUID(),

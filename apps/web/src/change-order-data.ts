@@ -101,7 +101,9 @@ export interface ChangeDetail {
   actions: {
     id: string;
     revisionId: string;
+    sequence: number;
     action: string;
+    supersededByRevisionId: string | null;
     occurredAt: string;
   }[];
 }
@@ -332,12 +334,21 @@ export function parseChangeDetail(
     !v.actions.every(
       (a) =>
         record(a) &&
-        exact(a, ["id", "revisionId", "action", "occurredAt"]) &&
+        exact(a, [
+          "id",
+          "revisionId",
+          "sequence",
+          "action",
+          "supersededByRevisionId",
+          "occurredAt",
+        ]) &&
         id(a.id) &&
         id(a.revisionId) &&
+        integer(a.sequence, 1, 2147483647) &&
         ["PROPOSE", "APPROVE", "REJECT", "WITHDRAW", "SUPERSEDE"].includes(
           String(a.action),
         ) &&
+        nullable(a.supersededByRevisionId, id) &&
         time(a.occurredAt),
     )
   )
