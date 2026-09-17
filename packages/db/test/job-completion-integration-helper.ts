@@ -7,6 +7,10 @@ import {
   createJobCompletionRepository,
   JobCompletionIdempotencyError,
 } from "../src/job-completion-repository.js";
+import {
+  CompletionProposalIdempotencyError,
+  createCustomerCompletionProposalRepository,
+} from "../src/customer-completion-proposal-repository.js";
 
 const rollback = new Error("rollback isolated completion assertions");
 
@@ -38,6 +42,128 @@ export async function runJobCompletionIntegrationAssertions(
         'CONFIRMED', 'PRIMARY_PROVIDER', NULL, ${"a".repeat(64)})
     `;
       const repository = createJobCompletionRepository(tx);
+      const proposals = createCustomerCompletionProposalRepository(tx);
+      expect(
+        await proposals.list({ actorUserId: randomUUID(), jobId: job.id }),
+      ).toBeNull();
+      expect(
+        await proposals.propose({
+          actorUserId: job.providerUserId,
+          commandId: randomUUID(),
+          jobId: job.id,
+        }),
+      ).toEqual({ status: "NOT_FOUND" });
+      const proposalId = randomUUID();
+      const proposed = {
+        actorUserId: job.customerUserId,
+        commandId: proposalId,
+        jobId: job.id,
+        note: "Práce sa javia ako dokončené.",
+      };
+      expect(await proposals.propose(proposed)).toMatchObject({
+        status: "APPLIED",
+        proposalId,
+      });
+      expect(await proposals.propose(proposed)).toMatchObject({
+        status: "DEDUPLICATED",
+        proposalId,
+      });
+      await expect(
+        proposals.propose({ ...proposed, note: "Iný obsah návrhu." }),
+      ).rejects.toBeInstanceOf(CompletionProposalIdempotencyError);
+      expect(
+        await proposals.propose({
+          ...proposed,
+          commandId: randomUUID(),
+        }),
+      ).toEqual({ status: "STALE_PROPOSAL" });
+      expect(
+        await proposals.list({ actorUserId: job.providerUserId, jobId: job.id }),
+      ).toMatchObject([{ id: proposalId, outcome: "PENDING" }]);
+      await expect(
+        repository.request({
+          actorUserId: job.providerUserId,
+          commandId: randomUUID(),
+          jobId: job.id,
+        }),
+      ).rejects.toThrow("resolve customer completion proposal first");
+      expect(
+        await proposals.agree({
+          actorUserId: job.customerUserId,
+          commandId: randomUUID(),
+          jobId: job.id,
+          proposalId,
+        }),
+      ).toEqual({ status: "NOT_FOUND" });
+      const disagreementId = randomUUID();
+      const disagreement = {
+        actorUserId: job.providerUserId,
+        commandId: disagreementId,
+        jobId: job.id,
+        proposalId,
+        reason: "Ešte treba dokončiť odovzdanie.",
+      };
+      expect(await proposals.disagree(disagreement)).toMatchObject({
+        status: "APPLIED",
+        proposalId,
+      });
+      expect(await proposals.disagree(disagreement)).toMatchObject({
+        status: "DEDUPLICATED",
+        proposalId,
+      });
+      expect(
+        await proposals.list({ actorUserId: job.customerUserId, jobId: job.id }),
+      ).toMatchObject([{ id: proposalId, outcome: "DISAGREE" }]);
+      const secondProposalId = randomUUID();
+      expect(
+        await proposals.propose({
+          actorUserId: job.customerUserId,
+          commandId: secondProposalId,
+          jobId: job.id,
+        }),
+      ).toMatchObject({ status: "APPLIED", proposalId: secondProposalId });
+      expect(
+        await proposals.agree({
+          actorUserId: job.providerUserId,
+          commandId: randomUUID(),
+          jobId: job.id,
+          proposalId,
+        }),
+      ).toEqual({ status: "STALE_PROPOSAL" });
+      const agreementId = randomUUID();
+      expect(
+        await proposals.agree({
+          actorUserId: job.providerUserId,
+          commandId: agreementId,
+          jobId: job.id,
+          proposalId: secondProposalId,
+        }),
+      ).toMatchObject({ status: "APPLIED", proposalId: secondProposalId });
+      const [stateAfterAgreement] = await tx<Array<{ state: string }>>`
+        SELECT state::text FROM current_job_states WHERE job_id = ${job.id}
+      `;
+      expect(stateAfterAgreement?.state).toBe("IN_PROGRESS");
+      const proposalNotices = await tx<Array<{ eventName: string; payload: unknown }>>`
+        SELECT event_name AS "eventName", payload FROM domain_outbox_events
+        WHERE idempotency_key IN (
+          ${`job.completion.proposal.${proposalId}`},
+          ${`job.completion.proposal.${disagreementId}`},
+          ${`job.completion.proposal.${secondProposalId}`},
+          ${`job.completion.proposal.${agreementId}`})
+      `;
+      expect(proposalNotices.map((notice) => notice.eventName).sort()).toEqual([
+        "job.completion.proposal_agreed",
+        "job.completion.proposal_disagreed",
+        "job.completion.proposed",
+        "job.completion.proposed",
+      ]);
+      expect(JSON.stringify(proposalNotices)).not.toContain(proposed.note);
+      expect(JSON.stringify(proposalNotices)).not.toContain(disagreement.reason);
+      await expect(
+        tx.savepoint(async (savepoint) => {
+          await savepoint`DELETE FROM job_completion_proposals WHERE id = ${proposalId}`;
+        }),
+      ).rejects.toThrow("immutable");
       expect(
         await repository.list({ actorUserId: randomUUID(), jobId: job.id }),
       ).toBeNull();
