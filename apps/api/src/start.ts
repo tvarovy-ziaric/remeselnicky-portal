@@ -164,6 +164,7 @@ const app = buildApi({
     jobDashboard: { dashboard: database.jobDashboard },
     jobLifecycle: { lifecycle: database.jobLifecycle },
     jobCompletion: { completion: database.jobCompletion },
+    completionProposals: { proposals: database.customerCompletionProposals },
     jobDocumentation: { documentation: database.jobDocumentation },
     jobRoster: { roster: database.jobRoster },
     jobParticipation: { participation: database.jobParticipation },

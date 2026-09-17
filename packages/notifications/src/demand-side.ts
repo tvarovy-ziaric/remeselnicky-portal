@@ -28,6 +28,9 @@ export const DEMAND_SIDE_EXTENSION_EVENT_NAMES = Object.freeze({
   jobCompletionAccepted: "job.completion.accepted",
   jobCompletionRejected: "job.completion.rejected",
   jobCompletionWithdrawn: "job.completion.withdrawn",
+  jobCompletionProposed: "job.completion.proposed",
+  jobCompletionProposalAgreed: "job.completion.proposal_agreed",
+  jobCompletionProposalDisagreed: "job.completion.proposal_disagreed",
   jobParticipantInvited: "job_participant.invited",
   jobParticipantAccepted: "job_participant.accepted",
   jobParticipantDeclined: "job_participant.declined",
@@ -173,6 +176,10 @@ export function mapDemandSideNotificationEvent(
     case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobCompletionRejected:
     case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobCompletionWithdrawn:
       return mapCompletion(event, recipientUserId);
+    case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobCompletionProposed:
+    case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobCompletionProposalAgreed:
+    case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobCompletionProposalDisagreed:
+      return mapCompletionProposal(event, recipientUserId);
     case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantInvited:
     case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantAccepted:
     case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantDeclined:
@@ -496,6 +503,44 @@ function mapCompletion(
   );
 }
 
+function mapCompletionProposal(
+  event: PersistedDomainEvent,
+  recipientUserId: string,
+): readonly NotificationDraft[] {
+  assertEntity(event, "JOB");
+  const jobId = requiredUuid(event.payload["job_id"], "Job");
+  const proposalId = requiredUuid(event.payload["proposal_id"], "Proposal");
+  if (event.entity.id !== jobId)
+    throw new TypeError("Completion proposal notification Job is incoherent.");
+  const action = (() => {
+    switch (event.name) {
+      case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobCompletionProposed:
+        return "REVIEW_COMPLETION_PROPOSAL";
+      case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobCompletionProposalAgreed:
+        return "COMPLETION_PROPOSAL_AGREED";
+      case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobCompletionProposalDisagreed:
+        return "COMPLETION_PROPOSAL_DISAGREED";
+      default:
+        throw new TypeError("Unsupported completion proposal notification.");
+    }
+  })();
+  return one(
+    event,
+    recipientUserId,
+    {
+      context: {
+        entityId: jobId,
+        entityType: "JOB",
+        path: `/zakazky/${jobId}`,
+      },
+      payload: { action, proposal_id: proposalId },
+    },
+    event.name,
+    "IMPORTANT",
+    ["IN_APP", "EMAIL"],
+  );
+}
+
 function mapJobParticipant(
   event: PersistedDomainEvent,
   recipientUserId: string,
@@ -648,6 +693,10 @@ function assertDemandSidePayloadKeys(event: PersistedDomainEvent): void {
       case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobCompletionRejected:
       case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobCompletionWithdrawn:
         return ["attempt_id", "job_id", "recipient_user_id"];
+      case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobCompletionProposed:
+      case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobCompletionProposalAgreed:
+      case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobCompletionProposalDisagreed:
+        return ["job_id", "proposal_id", "recipient_user_id"];
       case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantInvited:
       case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantAccepted:
       case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantDeclined:
@@ -759,6 +808,9 @@ function isKnownDemandSideEvent(name: string): boolean {
     DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobCompletionAccepted,
     DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobCompletionRejected,
     DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobCompletionWithdrawn,
+    DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobCompletionProposed,
+    DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobCompletionProposalAgreed,
+    DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobCompletionProposalDisagreed,
     DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantInvited,
     DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantAccepted,
     DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantDeclined,

@@ -41,6 +41,52 @@ function event(input: {
 
 describe("R3 demand-side notification catalog", () => {
   it.each([
+    ["job.completion.proposed", "REVIEW_COMPLETION_PROPOSAL"],
+    ["job.completion.proposal_agreed", "COMPLETION_PROPOSAL_AGREED"],
+    ["job.completion.proposal_disagreed", "COMPLETION_PROPOSAL_DISAGREED"],
+  ] as const)(
+    "maps %s without the private proposal note or reason",
+    (name, action) => {
+      const jobId = randomUUID();
+      const proposalId = randomUUID();
+      const draft = mapDemandSideNotificationEvent(
+        event({
+          entityId: jobId,
+          entityType: "JOB",
+          name,
+          payload: { job_id: jobId, proposal_id: proposalId },
+        }),
+      )?.[0];
+      expect(draft).toEqual({
+        channels: ["IN_APP", "EMAIL"],
+        context: {
+          entityId: jobId,
+          entityType: "JOB",
+          path: `/zakazky/${jobId}`,
+        },
+        payload: { action, proposal_id: proposalId },
+        priority: "IMPORTANT",
+        recipientUserId,
+        type: name,
+      });
+      expect(() => validateNotificationDraft(draft as never)).not.toThrow();
+      expect(JSON.stringify(draft)).not.toMatch(
+        /note|reason|body|media|address/iu,
+      );
+      expect(() =>
+        mapDemandSideNotificationEvent(
+          event({
+            entityId: randomUUID(),
+            entityType: "JOB",
+            name,
+            payload: { job_id: jobId, proposal_id: proposalId },
+          }),
+        ),
+      ).toThrow();
+    },
+  );
+
+  it.each([
     [
       "job.completion.requested",
       "REVIEW_COMPLETION",

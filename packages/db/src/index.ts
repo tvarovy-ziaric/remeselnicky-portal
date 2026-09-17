@@ -158,6 +158,18 @@ export type {
 } from "./job-dashboard-repository.js";
 import { createJobLifecycleRepository } from "./job-lifecycle-repository.js";
 import { createJobCompletionRepository } from "./job-completion-repository.js";
+import { createCustomerCompletionProposalRepository } from "./customer-completion-proposal-repository.js";
+export {
+  createCustomerCompletionProposalRepository,
+  CompletionProposalIdempotencyError,
+} from "./customer-completion-proposal-repository.js";
+export type {
+  CustomerCompletionProposalRepository,
+  CompletionProposal,
+  CompletionProposalResult,
+  ProposeCompletionInput,
+  DecideCompletionProposalInput,
+} from "./customer-completion-proposal-repository.js";
 export {
   createJobCompletionRepository,
   JobCompletionIdempotencyError,
@@ -1051,6 +1063,9 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly jobDashboard: ReturnType<typeof createJobDashboardRepository>;
   readonly jobLifecycle: ReturnType<typeof createJobLifecycleRepository>;
   readonly jobCompletion: ReturnType<typeof createJobCompletionRepository>;
+  readonly customerCompletionProposals: ReturnType<
+    typeof createCustomerCompletionProposalRepository
+  >;
   readonly jobDocumentation: ReturnType<
     typeof createJobDocumentationRepository
   >;
@@ -1201,6 +1216,8 @@ export function createDatabase(
   const jobDashboard = createJobDashboardRepository(sql);
   const jobLifecycle = createJobLifecycleRepository(sql);
   const jobCompletion = createJobCompletionRepository(sql);
+  const customerCompletionProposals =
+    createCustomerCompletionProposalRepository(sql);
   const jobDocumentation = createJobDocumentationRepository(sql);
   const jobRoster = createJobRosterRepository(sql);
   const jobWorkGroups = createJobWorkGroupCommandRepository(sql);
@@ -1295,6 +1312,7 @@ export function createDatabase(
     jobDashboard,
     jobLifecycle,
     jobCompletion,
+    customerCompletionProposals,
     jobDocumentation,
     jobRoster,
     jobWorkGroups,

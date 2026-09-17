@@ -136,6 +136,14 @@ export function createJobCompletionRepository(sql: RootSql) {
         );
       const current = await jobState(tx, input.jobId);
       if (current !== "IN_PROGRESS") return { status: "STALE_STATE" };
+      const [pendingCustomerProposal] = await tx<Array<{ id: string }>>`
+        SELECT proposal.id FROM job_completion_proposals proposal
+        LEFT JOIN job_completion_proposal_decisions decision
+          ON decision.proposal_id = proposal.id
+        WHERE proposal.job_id = ${input.jobId} AND decision.id IS NULL
+        LIMIT 1
+      `;
+      if (pendingCustomerProposal) return { status: "STALE_STATE" };
       const [{ nextNumber } = { nextNumber: 1 }] = await tx<
         Array<{ nextNumber: number }>
       >`

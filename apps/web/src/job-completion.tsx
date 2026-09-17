@@ -13,6 +13,12 @@ import {
   type CompletionPage,
   type CompletionState,
 } from "./job-completion-data";
+import {
+  loadCustomerCompletionProposals,
+  sendCustomerCompletionProposalCommand,
+  type CustomerCompletionProposalCommand,
+  type ProposalLoad,
+} from "./customer-completion-proposal-data";
 
 const categoryName: Record<CompletionCategory, string> = {
   UNFINISHED_SCOPE: "Nedokončený rozsah",
@@ -38,12 +44,15 @@ export function JobCompletion({
   jobState: CompletionState;
 }) {
   const [page, setPage] = useState<CompletionPage | null>(null);
+  const [proposalLoad, setProposalLoad] = useState<ProposalLoad | null>(null);
   const [status, setStatus] = useState<"LOADING" | "OK" | "ERROR">("LOADING");
   const [pending, setPending] = useState(false);
   const [notice, setNotice] = useState("");
   const [note, setNote] = useState("");
   const [finishedOn, setFinishedOn] = useState("");
   const [reason, setReason] = useState("");
+  const [proposalNote, setProposalNote] = useState("");
+  const [proposalReason, setProposalReason] = useState("");
   const [category, setCategory] =
     useState<CompletionCategory>("UNFINISHED_SCOPE");
   const [media, setMedia] = useState<readonly JobDocumentItem[]>([]);
@@ -67,6 +76,12 @@ export function JobCompletion({
         }
       },
     );
+    void loadCustomerCompletionProposals({
+      fetch: globalThis.fetch,
+      jobId,
+    }).then((result) => {
+      if (active) setProposalLoad(result);
+    });
     if (jobState === "IN_PROGRESS" || jobState === "COMPLETION_REQUESTED") {
       void loadJobDocumentPage({
         fetch: globalThis.fetch,
@@ -166,6 +181,39 @@ export function JobCompletion({
     }
     setPending(false);
   };
+  const submitProposal = async (
+    key: string,
+    command: CustomerCompletionProposalCommand,
+  ) => {
+    if (pending) return;
+    const intent = JSON.stringify(command);
+    const previous = retries.current.get(key);
+    const commandId =
+      previous?.intent === intent ? previous.commandId : crypto.randomUUID();
+    retries.current.set(key, { intent, commandId });
+    setPending(true);
+    setNotice("");
+    const result = await sendCustomerCompletionProposalCommand({
+      fetch: globalThis.fetch,
+      jobId,
+      commandId,
+      command,
+    });
+    if (result.status === "OK") {
+      retries.current.delete(key);
+      setNotice("Návrh a rozhodnutie sú uložené v histórii.");
+      window.location.reload();
+    } else {
+      setNotice(
+        result.status === "CONFLICT"
+          ? "Návrh sa medzitým zmenil. Obnovte stránku."
+          : result.status === "AUTH_REQUIRED"
+            ? "Relácia sa skončila. Prihláste sa znova."
+            : "Výsledok návrhu sa nepodarilo potvrdiť. Zopakujte nezmenenú akciu.",
+      );
+    }
+    setPending(false);
+  };
   const toggleMedia = (id: string) =>
     setSelectedMedia((ids) =>
       ids.includes(id)
@@ -175,6 +223,9 @@ export function JobCompletion({
           : ids,
     );
   const latest = page?.attempts[0];
+  const latestProposal =
+    proposalLoad?.status === "OK" ? proposalLoad.proposals[0] : undefined;
+  const proposalPending = latestProposal?.outcome === "PENDING";
   return (
     <section aria-labelledby="job-completion-heading">
       <h2 id="job-completion-heading">Dokončenie zákazky</h2>
@@ -190,6 +241,141 @@ export function JobCompletion({
       )}
       {status === "OK" && page && (
         <>
+          <section aria-labelledby="customer-completion-proposal-heading">
+            <h3 id="customer-completion-proposal-heading">
+              Návrh dokončenia od zákazníka
+            </h3>
+            <p>
+              Návrh zákazníka sám zákazku nedokončí. Poskytovateľ musí výslovne
+              rozhodnúť a následne podať bežnú žiadosť o odovzdanie.
+            </p>
+            {proposalLoad === null && (
+              <p role="status">Načítavajú sa zákaznícke návrhy…</p>
+            )}
+            {proposalLoad !== null && proposalLoad.status !== "OK" && (
+              <p role="alert">
+                Zákaznícke návrhy sa nepodarilo bezpečne načítať.
+              </p>
+            )}
+            {proposalLoad?.status === "OK" && (
+              <>
+                {jobState === "IN_PROGRESS" &&
+                  role === "CUSTOMER" &&
+                  !proposalPending && (
+                    <div>
+                      <label htmlFor="customer-completion-proposal-note">
+                        Prečo podľa vás možno prácu uzavrieť? (nepovinné)
+                      </label>
+                      <textarea
+                        id="customer-completion-proposal-note"
+                        maxLength={1000}
+                        disabled={pending}
+                        value={proposalNote}
+                        onChange={(event) =>
+                          setProposalNote(event.target.value)
+                        }
+                      />
+                      <button
+                        type="button"
+                        disabled={pending || proposalNote.length > 1000}
+                        onClick={() =>
+                          void submitProposal("PROPOSE", {
+                            kind: "PROPOSE",
+                            ...(proposalNote.trim()
+                              ? { note: proposalNote.trim() }
+                              : {}),
+                          })
+                        }
+                      >
+                        Navrhnúť dokončenie
+                      </button>
+                    </div>
+                  )}
+                {jobState === "IN_PROGRESS" &&
+                  role === "PRIMARY_PROVIDER" &&
+                  proposalPending &&
+                  latestProposal && (
+                    <div>
+                      <p>
+                        Zákazník navrhol dokončenie. Súhlas nie je žiadosť o
+                        potvrdenie dokončenia; po súhlase ešte odošlite
+                        záverečné odovzdanie.
+                      </p>
+                      <button
+                        type="button"
+                        disabled={pending}
+                        onClick={() =>
+                          void submitProposal(`AGREE:${latestProposal.id}`, {
+                            kind: "AGREE",
+                            proposalId: latestProposal.id,
+                          })
+                        }
+                      >
+                        Súhlasím, práca je hotová
+                      </button>
+                      <label htmlFor="customer-completion-disagree-reason">
+                        Ak práca pokračuje, uveďte dôvod
+                      </label>
+                      <textarea
+                        id="customer-completion-disagree-reason"
+                        minLength={8}
+                        maxLength={1000}
+                        disabled={pending}
+                        value={proposalReason}
+                        onChange={(event) =>
+                          setProposalReason(event.target.value)
+                        }
+                      />
+                      <button
+                        type="button"
+                        disabled={
+                          pending ||
+                          proposalReason.trim().length < 8 ||
+                          proposalReason.length > 1000
+                        }
+                        onClick={() =>
+                          void submitProposal(`DISAGREE:${latestProposal.id}`, {
+                            kind: "DISAGREE",
+                            proposalId: latestProposal.id,
+                            reason: proposalReason.trim(),
+                          })
+                        }
+                      >
+                        Nesúhlasím, práca pokračuje
+                      </button>
+                    </div>
+                  )}
+                {proposalPending && role === "CUSTOMER" && (
+                  <p>Čaká sa na vyjadrenie poskytovateľa.</p>
+                )}
+                {proposalLoad.proposals.length === 0 ? (
+                  <p>Zatiaľ bez návrhu od zákazníka.</p>
+                ) : (
+                  <ol>
+                    {proposalLoad.proposals.map((proposal) => (
+                      <li key={proposal.id}>
+                        <p>
+                          Návrh {proposal.proposalNumber} ·{" "}
+                          {proposal.outcome === "PENDING"
+                            ? "Čaká na poskytovateľa"
+                            : proposal.outcome === "AGREE"
+                              ? "Poskytovateľ súhlasil"
+                              : "Poskytovateľ nesúhlasil"}
+                        </p>
+                        <time dateTime={proposal.proposedAt}>
+                          {dateTime(proposal.proposedAt)}
+                        </time>
+                        {proposal.note && <p>Poznámka: {proposal.note}</p>}
+                        {proposal.disagreementReason && (
+                          <p>Dôvod nesúhlasu: {proposal.disagreementReason}</p>
+                        )}
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </>
+            )}
+          </section>
           {jobState === "IN_PROGRESS" && role === "PRIMARY_PROVIDER" && (
             <div>
               <h3>Požiadať o potvrdenie dokončenia</h3>
@@ -199,6 +385,11 @@ export function JobCompletion({
               </p>
               {milestoneWarning && <p role="alert">{milestoneWarning}</p>}
               {rosterWarning && <p role="alert">{rosterWarning}</p>}
+              {proposalPending && (
+                <p role="alert">
+                  Najprv výslovne odpovedzte na návrh zákazníka.
+                </p>
+              )}
               <label htmlFor="completion-note">
                 Poznámka k odovzdaniu (nepovinná)
               </label>
@@ -230,7 +421,12 @@ export function JobCompletion({
               />
               <button
                 type="button"
-                disabled={pending || note.length > 1000}
+                disabled={
+                  pending ||
+                  note.length > 1000 ||
+                  proposalLoad?.status !== "OK" ||
+                  proposalPending
+                }
                 onClick={() =>
                   void submit("REQUEST", {
                     kind: "REQUEST",

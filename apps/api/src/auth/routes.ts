@@ -78,6 +78,10 @@ import {
   type JobCompletionRouteDependencies,
 } from "../job-completion/routes.js";
 import {
+  registerCompletionProposalRoutes,
+  type CompletionProposalRouteDependencies,
+} from "../job-completion/proposal-routes.js";
+import {
   registerJobDocumentationRoutes,
   type JobDocumentationRouteDependencies,
 } from "../job-documentation/routes.js";
@@ -211,6 +215,10 @@ export interface AuthModuleDependencies {
   readonly jobDashboard?: Pick<JobDashboardRouteDependencies, "dashboard">;
   readonly jobLifecycle?: Pick<JobLifecycleRouteDependencies, "lifecycle">;
   readonly jobCompletion?: Pick<JobCompletionRouteDependencies, "completion">;
+  readonly completionProposals?: Pick<
+    CompletionProposalRouteDependencies,
+    "proposals"
+  >;
   readonly jobDocumentation?: Pick<
     JobDocumentationRouteDependencies,
     "documentation"
@@ -550,6 +558,17 @@ async function configureAuthModule(
         timeWindowMs: config.rateLimitWindowMs,
       },
       ...dependencies.jobCompletion,
+    });
+  }
+  if (dependencies.completionProposals !== undefined) {
+    registerCompletionProposalRoutes(app, {
+      csrfProtection: csrfProtection(app),
+      guard,
+      rateLimit: {
+        max: config.rateLimitMax,
+        timeWindowMs: config.rateLimitWindowMs,
+      },
+      ...dependencies.completionProposals,
     });
   }
   if (dependencies.jobDocumentation !== undefined) {
