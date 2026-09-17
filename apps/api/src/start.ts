@@ -20,6 +20,7 @@ import {
   createPublicPortfolioDeliveryResolver,
   createPurposeBoundMediaEntityAccessResolver,
   createQuoteDocumentUploadService,
+  createChangeOrderDocumentUploadService,
 } from "@portal/media";
 import {
   createCentralErrorTracker,
@@ -47,6 +48,8 @@ import {
 } from "./auth/index.js";
 import { createDatabaseFrontendErrorAdmission } from "./observability.js";
 import { createDatabaseConversationWriteAdmission } from "./conversations/write-admission.js";
+import { createJobMilestoneRouteAdapter } from "./job-milestones/adapter.js";
+import { createChangeOrderRouteAdapter } from "./change-orders/adapter.js";
 import {
   createDatabasePublicSearchAdmission,
   PUBLIC_SEARCH_RATE_LIMIT_MULTIPLIER,
@@ -153,14 +156,48 @@ const app = buildApi({
     jobInvitations: { invitations: database.jobInvitations },
     conversations: { conversations: database.conversations },
     quoteComparison: { comparison: database.quoteComparison },
+    quoteAcceptance: { acceptance: database.quoteAcceptance },
+    jobContacts: {
+      clarifications: database.jobLocationClarifications,
+      contacts: database.jobContacts,
+    },
+    jobDashboard: { dashboard: database.jobDashboard },
+    jobLifecycle: { lifecycle: database.jobLifecycle },
+    jobDocumentation: { documentation: database.jobDocumentation },
+    jobRoster: { roster: database.jobRoster },
+    jobParticipation: { participation: database.jobParticipation },
+    jobOperations: { operations: database.jobOperations },
+    jobMilestones: {
+      milestones: createJobMilestoneRouteAdapter(database.jobMilestones),
+    },
+    jobMilestoneContext: { context: database.jobMilestoneContext },
+    changeOrders: {
+      changeOrders: createChangeOrderRouteAdapter(database.changeOrders, {
+        documentDownloadsEnabled: mediaRuntime !== undefined,
+      }),
+      pdfReservations: database.changeOrderPdfUploads,
+      ...(mediaRuntime === undefined
+        ? {}
+        : { documentUploads: mediaRuntime.changeOrderDocumentUploads }),
+    },
+    jobParticipantCapabilities: {
+      capabilities: database.jobParticipantCapabilities,
+    },
+    jobParticipationDetail: { detail: database.jobParticipationDetail },
+    jobWorkGroups: { workGroups: database.jobWorkGroups },
     quoteLifecycle: { lifecycle: database.quoteLifecycle },
     quoteAuthoring: {
       core: quoteAuthoring,
       ...(mediaRuntime === undefined
         ? {}
-        : { documentUploads: mediaRuntime.quoteDocumentUploads }),
+        : {
+            documentUploads: mediaRuntime.quoteDocumentUploads,
+            supportingDocumentUploads:
+              mediaRuntime.quoteSupportingDocumentUploads,
+          }),
       externalPdf: database.externalPdfQuotes,
       structured: structuredQuoteAuthoring,
+      supportingDocuments: database.quoteSupportingDocuments,
     },
     r3Analytics: { observations: database.r3AnalyticsObservations },
     conversationChat: {
@@ -233,6 +270,9 @@ function createApiMediaRuntime() {
       publicBaseUrl: storageConfig.publicBaseUrl,
       region: storageConfig.region,
       secretAccessKey: storageSecrets.secretAccessKey,
+      ...(storageConfig.signingEndpoint === undefined
+        ? {}
+        : { signingEndpoint: storageConfig.signingEndpoint }),
     }),
     topology: defineStorageTopology({
       privateContainer: storageConfig.privateContainer,
@@ -267,6 +307,7 @@ function createApiMediaRuntime() {
         JOB_REQUEST_DOCUMENT: database.jobRequestMediaAccess,
         JOB_REQUEST_IMAGE: database.jobRequestMediaAccess,
         QUOTE_DOCUMENT: database.quoteDocumentMediaAccess,
+        CHANGE_ORDER_DOCUMENT: database.changeOrderDocumentMediaAccess,
       },
     }),
     repository: database.privateMediaDelivery,
@@ -286,6 +327,16 @@ function createApiMediaRuntime() {
     privateMediaDelivery,
     quoteDocumentUploads: createQuoteDocumentUploadService({
       authorization: database.quoteDocumentUploads,
+      processing,
+      uploads,
+    }),
+    changeOrderDocumentUploads: createChangeOrderDocumentUploadService({
+      authorization: database.changeOrderPdfUploads,
+      processing,
+      uploads,
+    }),
+    quoteSupportingDocumentUploads: createQuoteDocumentUploadService({
+      authorization: database.quoteSupportingDocumentUploads,
       processing,
       uploads,
     }),

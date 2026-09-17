@@ -19,6 +19,32 @@ const apps: FastifyInstance[] = [];
 afterEach(async () => Promise.all(apps.splice(0).map((app) => app.close())));
 
 describe("Quote lifecycle routes", () => {
+  it("reads the exact requested revision and rejects malformed revision selectors", async () => {
+    const readOwnedContext = vi.fn(() =>
+      Promise.resolve(context("SUBMITTED", true)),
+    );
+    const app = build({ readOwnedContext });
+    const response = await app.inject({
+      method: "GET",
+      url: `${path(QUOTE_LIFECYCLE_PATHS.context)}?quoteRevision=1`,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(readOwnedContext).toHaveBeenCalledWith({
+      actorUserId,
+      quoteId,
+      quoteRevision: 1,
+    });
+    expect(
+      (
+        await app.inject({
+          method: "GET",
+          url: `${path(QUOTE_LIFECYCLE_PATHS.context)}?quoteRevision=0`,
+        })
+      ).statusCode,
+    ).toBe(400);
+    expect(readOwnedContext).toHaveBeenCalledTimes(1);
+  });
+
   it("derives the provider actor, applies CSRF and exposes no system EXPIRE route", async () => {
     const withdraw = vi.fn(() =>
       Promise.resolve({
@@ -123,6 +149,7 @@ describe("Quote lifecycle routes", () => {
 
 function build(overrides: {
   csrf?: ReturnType<typeof vi.fn>;
+  readOwnedContext?: ReturnType<typeof vi.fn>;
   reconfirm?: ReturnType<typeof vi.fn>;
   status?: "ACTIVE" | "ACCOUNT_NOT_ACTIVE" | "AUTHENTICATION_REQUIRED";
   withdraw?: ReturnType<typeof vi.fn>;
@@ -148,9 +175,9 @@ function build(overrides: {
       ),
     },
     lifecycle: {
-      readOwnedContext: vi.fn(() =>
-        Promise.resolve(context("SUBMITTED", true)),
-      ),
+      readOwnedContext:
+        overrides.readOwnedContext ??
+        vi.fn(() => Promise.resolve(context("SUBMITTED", true))),
       reconfirm:
         overrides.reconfirm ??
         vi.fn(() => Promise.resolve({ status: "STALE_REVISION" as const })),

@@ -11,16 +11,14 @@ const quoteId = "85100000-0000-4000-8000-000000000002" as QuoteId;
 const commandId = "85100000-0000-4000-8000-000000000003";
 
 describe("Quote lifecycle repository", () => {
-  it("claims a bounded ordered due batch with SKIP LOCKED", async () => {
+  it("selects a bounded due batch without taking invitation row locks before request serialization", async () => {
     const fixture = scriptedSql([[]]);
     await expect(
       createQuoteLifecycleRepository(fixture.sql).expireDueSubmitted(),
     ).resolves.toEqual([]);
     expect(fixture.statements[0]).toContain("current_submitted_quotes");
     expect(fixture.statements[0]).toContain("clock_timestamp()");
-    expect(fixture.statements[0]).toContain(
-      "FOR UPDATE OF invitation SKIP LOCKED",
-    );
+    expect(fixture.statements[0]).not.toContain("FOR UPDATE OF invitation");
     expect(fixture.statements[0]).toContain("LIMIT");
   });
 
@@ -38,6 +36,9 @@ describe("Quote lifecycle repository", () => {
       )
       .digest("hex");
     const fixture = scriptedSql([
+      [{}],
+      [{ id: actorUserId }],
+      [{ jobRequestId: "85100000-0000-4000-8000-000000000006" }],
       [{}],
       [{ id: actorUserId }],
       [
@@ -66,11 +67,13 @@ describe("Quote lifecycle repository", () => {
       createQuoteLifecycleRepository(fixture.sql).withdraw(input),
     ).resolves.toMatchObject({ status: "DEDUPLICATED" });
     expect(fixture.statements[1]).toContain("account_state = 'ACTIVE'");
-    expect(fixture.statements[3]).toContain("job_invitations");
-    expect(fixture.statements[4]).toContain("conversations");
-    expect(fixture.statements[5]).toContain("FROM quotes");
-    expect(fixture.statements[6]).toContain("'CRAFTSMAN', true");
-    expect(fixture.statements[7]).toContain("quote_lifecycle_commands");
+    expect(fixture.statements[2]).toContain("job_request_id");
+    expect(fixture.statements[3]).toContain("pg_advisory_xact_lock");
+    expect(fixture.statements[6]).toContain("job_invitations");
+    expect(fixture.statements[7]).toContain("conversations");
+    expect(fixture.statements[8]).toContain("FROM quotes");
+    expect(fixture.statements[9]).toContain("'CRAFTSMAN', true");
+    expect(fixture.statements[10]).toContain("quote_lifecycle_commands");
   });
 
   it("denies a suspended provider before probing private Quote identity", async () => {
@@ -98,6 +101,8 @@ describe("Quote lifecycle repository", () => {
         },
       ],
       [{}],
+      [{ id: actorUserId }],
+      [{}],
       [{}],
       [{}],
       [{}],
@@ -116,15 +121,16 @@ describe("Quote lifecycle repository", () => {
         sourceState: "EXPIRED",
       }),
     ).resolves.toEqual({ status: "STALE_REVISION" });
-    expect(fixture.statements[2]).toContain("job_invitations");
-    expect(fixture.statements[3]).toContain("conversations");
-    expect(fixture.statements[4]).toContain("job_requests");
-    expect(fixture.statements[5]).toContain("FROM quotes");
-    expect(fixture.statements[6]).toContain("quote_active_participant_context");
-    expect(fixture.statements[7]).toContain("quote_core_commands");
-    expect(fixture.statements[8]).toContain("head.quote_revision =");
-    expect(fixture.statements[8]).toContain("max(revision)");
-    expect(fixture.statements[8]).toContain("current_quote_drafts");
+    expect(fixture.statements[2]).toContain("pg_advisory_xact_lock");
+    expect(fixture.statements[4]).toContain("job_invitations");
+    expect(fixture.statements[5]).toContain("conversations");
+    expect(fixture.statements[6]).toContain("job_requests");
+    expect(fixture.statements[7]).toContain("FROM quotes");
+    expect(fixture.statements[8]).toContain("quote_active_participant_context");
+    expect(fixture.statements[9]).toContain("quote_core_commands");
+    expect(fixture.statements[10]).toContain("head.quote_revision =");
+    expect(fixture.statements[10]).toContain("max(revision)");
+    expect(fixture.statements[10]).toContain("current_quote_drafts");
   });
 });
 

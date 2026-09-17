@@ -9,6 +9,7 @@ import { createAdminAccessService } from "@portal/admin-auth";
 import type { UserId } from "@portal/domain";
 
 import { migratePostgres } from "../src/migrator.js";
+import { createMunicipalityAutocompleteRepository } from "../src/municipality-autocomplete-repository.js";
 import {
   createAdminAccessRepository,
   createAuthRepository,
@@ -75,6 +76,27 @@ import {
 } from "./r3-analytics-integration-helper.js";
 import { runR3DemandSideSecurityIntegrationAssertions } from "./r3-demand-side-security-integration-helper.js";
 import { runMediaProcessingQueueIntegrationAssertions } from "./media-processing-queue-integration-helper.js";
+import { runJobAcceptanceIdentityIntegrationAssertions } from "./job-acceptance-identity-integration-helper.js";
+import { runQuoteAcceptanceRepositoryIntegrationAssertions } from "./quote-acceptance-repository-integration-helper.js";
+import { runQuoteAcceptanceCommittedRaceIntegrationAssertions } from "./quote-acceptance-committed-race-integration-helper.js";
+import { runJobLifecycleIntegrationAssertions } from "./job-lifecycle-integration-helper.js";
+import { runJobDocumentationIntegrationAssertions } from "./job-documentation-integration-helper.js";
+import {
+  runJobRosterCancelledIntegrationAssertions,
+  runJobRosterIdentityIntegrationAssertions,
+} from "./job-roster-identity-integration-helper.js";
+import {
+  runJobRosterCancelledReadIntegrationAssertions,
+  runJobRosterReadIntegrationAssertions,
+} from "./job-roster-read-integration-helper.js";
+import { runJobParticipationCommandsIntegrationAssertions } from "./job-participation-commands-integration-helper.js";
+import { runJobParticipantCapabilityIntegrationAssertions } from "./job-participant-capability-integration-helper.js";
+import { runJobOperationalIntegrationAssertions } from "./job-operational-integration-helper.js";
+import { runJobOperationalMediaIntegrationAssertions } from "./job-operational-media-integration-helper.js";
+import { runJobMilestoneIntegrationAssertions } from "./job-milestone-integration-helper.js";
+import { runJobMilestoneContextIntegrationAssertions } from "./job-milestone-context-integration-helper.js";
+import { runChangeOrderIntegrationAssertions } from "./change-order-integration-helper.js";
+import { runChangeOrderPdfIntegrationAssertions } from "./change-order-pdf-integration-helper.js";
 
 const testDatabaseUrl = process.env["TEST_DATABASE_URL"];
 const migrationsDirectory = fileURLToPath(
@@ -155,6 +177,35 @@ describe.skipIf(testDatabaseUrl === undefined)(
           "0052_demand_side_notifications.sql",
           "0053_r3_analytics_funnel.sql",
           "0054_media_processing_queue.sql",
+          "0055_job_acceptance_identity.sql",
+          "0056_quote_request_serialization.sql",
+          "0057_job_agreement_snapshot.sql",
+          "0058_job_request_converted_state.sql",
+          "0059_job_request_conversion_projection.sql",
+          "0060_quote_acceptance_state_events.sql",
+          "0061_job_qualification_snapshot.sql",
+          "0062_job_acceptance_event.sql",
+          "0063_job_conversation_media.sql",
+          "0064_quote_supporting_documents.sql",
+          "0065_job_contact_unlock_location.sql",
+          "0066_job_location_clarification.sql",
+          "0067_job_execution_state_labels.sql",
+          "0068_job_lifecycle_commands.sql",
+          "0069_job_roster_identities.sql",
+          "0070_job_participation_events.sql",
+          "0071_job_work_group_composition.sql",
+          "0072_job_participant_roles.sql",
+          "0073_crew_membership_history.sql",
+          "0074_job_participant_invitation_idempotency.sql",
+          "0075_job_participation_timeline.sql",
+          "0076_job_participant_capability_evidence.sql",
+          "0077_job_participation_notifications.sql",
+          "0078_job_operational_updates.sql",
+          "0079_job_operational_media.sql",
+          "0080_job_milestones.sql",
+          "0081_job_milestone_context.sql",
+          "0082_change_order_foundation.sql",
+          "0083_change_order_pdf_reservations.sql",
         ],
         alreadyApplied: 0,
       });
@@ -163,7 +214,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         testDatabaseUrl,
         migrationsDirectory,
       );
-      expect(secondRun).toEqual({ applied: [], alreadyApplied: 55 });
+      expect(secondRun).toEqual({ applied: [], alreadyApplied: 84 });
 
       const sql = postgres(testDatabaseUrl, { max: 5 });
       try {
@@ -209,7 +260,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         `;
 
         expect(postgis?.extversion).toMatch(/^3\./);
-        expect(ledger?.count).toBe(55);
+        expect(ledger?.count).toBe(84);
         expect(created).toMatchObject({ account_state: "ACTIVE" });
         expect(created?.id).toMatch(
           /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
@@ -1724,6 +1775,11 @@ describe.skipIf(testDatabaseUrl === undefined)(
         await runCraftsmanProfessionIntegrationAssertions(sql);
         await runCraftsmanCapabilityIntegrationAssertions(sql);
         await runCraftsmanServiceAreaIntegrationAssertions(sql);
+        await expect(
+          createMunicipalityAutocompleteRepository(sql).suggest("Testovacia"),
+        ).resolves.toContainEqual(
+          expect.objectContaining({ code: "TEST:MUNICIPALITY_BASE" }),
+        );
         await runIndicativePricingIntegrationAssertions(sql);
         await runCraftsmanExperienceIntegrationAssertions(sql);
         await runCraftsmanAvailabilityIntegrationAssertions(sql);
@@ -1765,6 +1821,9 @@ describe.skipIf(testDatabaseUrl === undefined)(
         );
         await runExternalPdfQuoteIntegrationAssertions(sql);
         await runR3DemandSideSecurityIntegrationAssertions(sql);
+        await runJobAcceptanceIdentityIntegrationAssertions(sql);
+        const acceptanceSource =
+          await runQuoteAcceptanceRepositoryIntegrationAssertions(sql);
         await runQuoteLifecycleIntegrationAssertions(sql);
         await runDemandSideNotificationIntegrationAssertions(sql);
         await runR3AnalyticsIntegrationAssertions(sql);
@@ -1773,6 +1832,24 @@ describe.skipIf(testDatabaseUrl === undefined)(
         await runConversationReadOnlyIntegrationAssertions(sql);
         await runConversationChatReadOnlyIntegrationAssertions(sql);
         await runMediaProcessingQueueIntegrationAssertions(sql);
+        await runQuoteAcceptanceCommittedRaceIntegrationAssertions(
+          sql,
+          acceptanceSource,
+        );
+        await runJobRosterIdentityIntegrationAssertions(sql);
+        await runJobRosterReadIntegrationAssertions(sql);
+        await runJobParticipationCommandsIntegrationAssertions(sql);
+        await runJobParticipantCapabilityIntegrationAssertions(sql);
+        await runJobOperationalIntegrationAssertions(sql);
+        await runJobOperationalMediaIntegrationAssertions(sql);
+        await runJobMilestoneIntegrationAssertions(sql);
+        await runJobMilestoneContextIntegrationAssertions(sql);
+        await runChangeOrderIntegrationAssertions(sql);
+        await runChangeOrderPdfIntegrationAssertions(sql);
+        await runJobLifecycleIntegrationAssertions(sql);
+        await runJobRosterCancelledIntegrationAssertions(sql);
+        await runJobRosterCancelledReadIntegrationAssertions(sql);
+        await runJobDocumentationIntegrationAssertions(sql);
 
         await adminAccess.revokePrivilegedSession(superSessionDigest);
         await expect(

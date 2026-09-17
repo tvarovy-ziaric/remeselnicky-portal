@@ -2,6 +2,11 @@ packages:
   - "apps/*"
   - "packages/*"
 
+# Allow reproducible container builds on slower links without disabling checks.
+networkConcurrency: 8
+fetchRetries: 4
+fetchTimeout: 300000
+
 catalog:
   "@types/node": 26.5.1
   "@types/react": 19.3.0

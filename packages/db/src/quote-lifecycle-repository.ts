@@ -85,14 +85,11 @@ async function expireDueSubmitted(
       SELECT submitted.state_revision AS "expectedStateRevision",
         submitted.quote_id AS "quoteId", submitted.revision AS "quoteRevision"
       FROM current_submitted_quotes submitted
-      JOIN quotes quote ON quote.id = submitted.quote_id
-      JOIN job_invitations invitation ON invitation.id = quote.invitation_id
       WHERE quote_revision_valid_until(submitted.quote_id, submitted.revision,
           submitted.authoring_mode) <= clock_timestamp()
       ORDER BY quote_revision_valid_until(submitted.quote_id, submitted.revision,
         submitted.authoring_mode), submitted.quote_id
-      LIMIT ${QUOTE_EXPIRY_BATCH_LIMIT}
-      FOR UPDATE OF invitation SKIP LOCKED`;
+      LIMIT ${QUOTE_EXPIRY_BATCH_LIMIT}`;
     const expired: QuoteLifecycleExpiredRevision[] = [];
     for (const candidate of candidates) {
       const input: ExpireQuoteRevisionInput = {
@@ -126,6 +123,17 @@ async function execute(
   try {
     return await transaction(sql, async (tx) => {
       await tx`SELECT pg_advisory_xact_lock(hashtextextended(${input.commandId}, 51001))`;
+      if (kind === "WITHDRAW") {
+        const active = await tx`
+          SELECT id FROM users
+          WHERE id = ${(input as QuoteLifecycleCommandInput).actorUserId}
+            AND account_state = 'ACTIVE'
+        `;
+        if (active.length !== 1) return { status: "NOT_FOUND" };
+      }
+      if (!(await lockLifecycleRequest(tx, input.quoteId))) {
+        return { status: "NOT_FOUND" };
+      }
       if (
         kind === "WITHDRAW" &&
         !(await authorizeProvider(tx, input as QuoteLifecycleCommandInput))
@@ -182,6 +190,25 @@ async function execute(
   }
 }
 
+async function lockLifecycleRequest(
+  tx: TransactionSql,
+  quoteId: string,
+): Promise<boolean> {
+  const [row] = await tx<Array<{ jobRequestId: string }>>`
+    SELECT invitation.job_request_id AS "jobRequestId"
+    FROM quotes quote
+    JOIN job_invitations invitation ON invitation.id = quote.invitation_id
+    WHERE quote.id = ${quoteId}
+  `;
+  if (row === undefined) return false;
+  await tx`
+    SELECT pg_advisory_xact_lock(
+      hashtextextended(${row.jobRequestId}::text, 41007)
+    )
+  `;
+  return true;
+}
+
 async function authorizeProvider(
   tx: TransactionSql,
   input: QuoteLifecycleCommandInput,
@@ -210,7 +237,7 @@ async function readOwnedContext(
   if (actor.length !== 1) return null;
   const [owned] = await tx<
     Array<{ quoteRevision: number }>
-  >`SELECT context.quote_revision AS "quoteRevision" FROM current_quote_acceptance_context context JOIN quotes quote ON quote.id = context.quote_id JOIN current_conversations conversation ON conversation.id = quote.conversation_id JOIN customer_profiles customer ON customer.id = conversation.customer_profile_id JOIN craftsman_profiles craftsman ON craftsman.id = conversation.craftsman_profile_id WHERE context.quote_id = ${input.quoteId} AND (customer.owner_user_id = ${input.actorUserId} OR craftsman.owner_user_id = ${input.actorUserId}) ORDER BY context.quote_revision DESC LIMIT 1 FOR UPDATE OF quote, customer, craftsman`;
+  >`SELECT context.quote_revision AS "quoteRevision" FROM current_quote_acceptance_context context JOIN quotes quote ON quote.id = context.quote_id JOIN current_conversations conversation ON conversation.id = quote.conversation_id JOIN customer_profiles customer ON customer.id = conversation.customer_profile_id JOIN craftsman_profiles craftsman ON craftsman.id = conversation.craftsman_profile_id WHERE context.quote_id = ${input.quoteId} AND (${input.quoteRevision === undefined} OR context.quote_revision = ${input.quoteRevision ?? 0}) AND (customer.owner_user_id = ${input.actorUserId} OR craftsman.owner_user_id = ${input.actorUserId}) ORDER BY context.quote_revision DESC LIMIT 1 FOR UPDATE OF quote, customer, craftsman`;
   return owned === undefined
     ? null
     : readContext(tx, input.quoteId, owned.quoteRevision);
@@ -238,9 +265,11 @@ async function readContext(
 
 async function reconfirm(sql: RootSql, input: ReconfirmQuoteInput) {
   return transaction(sql, async (tx) => {
-    const actor =
-      await tx`SELECT id FROM users WHERE id = ${input.actorUserId} AND account_state = 'ACTIVE' FOR UPDATE`;
-    if (actor.length !== 1) return { status: "NOT_FOUND" } as const;
+    const active = await tx`
+      SELECT id FROM users
+      WHERE id = ${input.actorUserId} AND account_state = 'ACTIVE'
+    `;
+    if (active.length !== 1) return { status: "NOT_FOUND" } as const;
     const [identity] = await tx<
       Array<{
         conversationId: string;
@@ -257,6 +286,15 @@ async function reconfirm(sql: RootSql, input: ReconfirmQuoteInput) {
       WHERE quote.id = ${input.quoteId}
         AND craftsman.owner_user_id = ${input.actorUserId}`;
     if (identity === undefined) return { status: "NOT_FOUND" } as const;
+
+    await tx`
+      SELECT pg_advisory_xact_lock(
+        hashtextextended(${identity.jobRequestId}::text, 41007)
+      )
+    `;
+    const actor =
+      await tx`SELECT id FROM users WHERE id = ${input.actorUserId} AND account_state = 'ACTIVE' FOR UPDATE`;
+    if (actor.length !== 1) return { status: "NOT_FOUND" } as const;
 
     // Canonical write order shared with invitation/conversation/Quote commands.
     await tx`SELECT id FROM job_invitations WHERE id = ${identity.invitationId} FOR UPDATE`;

@@ -188,6 +188,43 @@ describe("S3-compatible object storage adapter", () => {
         secretAccessKey: "secret",
       }),
     ).toThrow(/endpoint/u);
+    expect(() =>
+      createS3CompatibleObjectStorageAdapter({
+        accessKeyId: "access",
+        endpoint: "https://objects.internal",
+        publicBaseUrl: "https://cdn.example/assets/",
+        region: "eu-central-1",
+        secretAccessKey: "secret",
+        signingEndpoint: "https://user:secret@objects.example",
+      }),
+    ).toThrow(/signing endpoint/u);
+  });
+
+  it("mints downloads against a distinct public signing endpoint", async () => {
+    const adapter = createS3CompatibleObjectStorageAdapter(
+      {
+        accessKeyId: "access-key",
+        endpoint: "https://minio.internal:9000",
+        forcePathStyle: true,
+        publicBaseUrl: "https://objects-alpha.example/public/",
+        region: "eu-central-1",
+        secretAccessKey: "secret-key",
+        signingEndpoint: "https://objects-alpha.example",
+      },
+      { clock: () => new Date("2026-09-15T00:00:00.000Z") },
+    );
+
+    const url = await adapter.issuePrivateDownload({
+      container: "portal-private",
+      contentDisposition: 'attachment; filename="portal-document.pdf"',
+      contentType: "application/pdf",
+      expiresAt: new Date("2026-09-15T00:00:45.000Z"),
+      key: privateKey,
+    });
+
+    expect(url.origin).toBe("https://objects-alpha.example");
+    expect(url.pathname).toContain("/portal-private/private/");
+    expect(url.searchParams.get("X-Amz-Signature")).toMatch(/^[0-9a-f]{64}$/u);
   });
 });
 

@@ -33,6 +33,37 @@ describe("public search cards web boundary", () => {
     expect(html).not.toMatch(/score|rank|credential|customerProfileId/iu);
   });
 
+  it("offers participant invitation only for an individual in an unambiguous Job context", () => {
+    const individual = renderToStaticMarkup(
+      <PublicSearchCardList
+        cards={[card()]}
+        jobId="99000000-0000-4000-8000-000000000020"
+      />,
+    );
+    expect(individual).toContain("Pozvať na zákazku");
+    expect(individual).not.toContain("Pozvať k zákazke");
+    const company = renderToStaticMarkup(
+      <PublicSearchCardList
+        cards={[
+          {
+            ...card(),
+            identity: { ...card().identity, profileType: "COMPANY" },
+          },
+        ]}
+        jobId="99000000-0000-4000-8000-000000000020"
+      />,
+    );
+    expect(company).not.toContain("Pozvať na zákazku");
+    const ambiguous = renderToStaticMarkup(
+      <PublicSearchCardList
+        cards={[card()]}
+        jobId="99000000-0000-4000-8000-000000000020"
+        jobRequestId="99000000-0000-4000-8000-000000000010"
+      />,
+    );
+    expect(ambiguous).not.toMatch(/Pozvať na zákazku|Pozvať k zákazke/u);
+  });
+
   it("loads with no-store and fails closed on malformed outward data", async () => {
     const fetcher = vi.fn<typeof fetch>(() =>
       Promise.resolve(
@@ -67,6 +98,28 @@ describe("public search cards web boundary", () => {
     });
     await expect(
       malformed({ professionCode: "PROF:TILER" }),
+    ).resolves.toBeNull();
+    await expect(
+      loadResponse({
+        items: [
+          {
+            ...card(),
+            identity: { ...card().identity, profileType: "UNKNOWN" },
+          },
+        ],
+        nextCursor: null,
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      loadResponse({
+        items: [
+          {
+            ...card(),
+            identity: { primaryName: "Majster", secondaryName: null },
+          },
+        ],
+        nextCursor: null,
+      }),
     ).resolves.toBeNull();
   });
 
@@ -134,6 +187,7 @@ describe("public search cards web boundary", () => {
       ...card(),
       identity: {
         primaryName: "<img src=x onerror=alert(1)>",
+        profileType: "INDIVIDUAL" as const,
         secondaryName: null,
       },
     };
@@ -163,7 +217,11 @@ function card(): PublicSearchCardViewModel & {
   return {
     availability: "NO_POSITIVE_SIGNAL",
     badges: [],
-    identity: { primaryName: "Majster Ján", secondaryName: "Ján Remeselný" },
+    identity: {
+      primaryName: "Majster Ján",
+      profileType: "INDIVIDUAL",
+      secondaryName: "Ján Remeselný",
+    },
     indicativePrice: null,
     location: { approximateDistanceKm: 8, municipalityName: "Bratislava" },
     professions: [{ kind: "PROF:TILER", label: "Obkladač" }],

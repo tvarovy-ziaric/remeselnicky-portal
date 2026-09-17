@@ -14,6 +14,7 @@ WORKDIR /workspace
 FROM toolchain AS dependencies
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json ./
 COPY apps/api/package.json apps/api/package.json
+COPY apps/e2e/package.json apps/e2e/package.json
 COPY apps/web/package.json apps/web/package.json
 COPY apps/worker/package.json apps/worker/package.json
 COPY packages/config/package.json packages/config/package.json
@@ -36,7 +37,8 @@ COPY packages/queue/package.json packages/queue/package.json
 COPY packages/storage/package.json packages/storage/package.json
 COPY packages/taxonomy/package.json packages/taxonomy/package.json
 COPY packages/search/package.json packages/search/package.json
-RUN pnpm install --frozen-lockfile
+RUN --mount=type=cache,target=/pnpm/store \
+    pnpm install --frozen-lockfile
 
 FROM dependencies AS build
 COPY . .
@@ -44,7 +46,7 @@ ARG DEPLOYMENT_ENV=production
 ARG RELEASE_REVISION=development
 ENV NEXT_PUBLIC_APP_ENV=$DEPLOYMENT_ENV \
     NEXT_PUBLIC_RELEASE_REVISION=$RELEASE_REVISION
-RUN pnpm --filter @portal/web... build
+RUN ./node_modules/.bin/turbo run build --filter=@portal/web...
 
 FROM node:24.8.0-bookworm-slim AS runtime
 ARG RELEASE_REVISION=unknown

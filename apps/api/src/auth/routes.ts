@@ -58,6 +58,62 @@ import {
   type QuoteLifecycleRouteDependencies,
 } from "../quote-lifecycle/routes.js";
 import {
+  registerQuoteAcceptanceRoutes,
+  type QuoteAcceptanceRouteDependencies,
+} from "../quote-acceptance/routes.js";
+import {
+  registerJobContactRoutes,
+  type JobContactRouteDependencies,
+} from "../job-contacts/routes.js";
+import {
+  registerJobDashboardRoutes,
+  type JobDashboardRouteDependencies,
+} from "../job-dashboard/routes.js";
+import {
+  registerJobLifecycleRoutes,
+  type JobLifecycleRouteDependencies,
+} from "../job-lifecycle/routes.js";
+import {
+  registerJobDocumentationRoutes,
+  type JobDocumentationRouteDependencies,
+} from "../job-documentation/routes.js";
+import {
+  registerJobRosterRoutes,
+  type JobRosterRouteDependencies,
+} from "../job-roster/routes.js";
+import {
+  registerJobParticipationRoutes,
+  type JobParticipationRouteDependencies,
+} from "../job-participation/routes.js";
+import {
+  registerJobOperationRoutes,
+  type JobOperationRouteDependencies,
+} from "../job-operations/routes.js";
+import {
+  registerJobMilestoneRoutes,
+  type JobMilestoneRouteDependencies,
+} from "../job-milestones/routes.js";
+import {
+  registerJobMilestoneContextRoutes,
+  type JobMilestoneContextRouteDependencies,
+} from "../job-milestones/context-routes.js";
+import {
+  registerChangeOrderRoutes,
+  type ChangeOrderRouteDependencies,
+} from "../change-orders/routes.js";
+import {
+  registerJobParticipantCapabilityRoutes,
+  type JobParticipantCapabilityRouteDependencies,
+} from "../job-participant-capabilities/routes.js";
+import {
+  registerJobParticipationDetailRoute,
+  type JobParticipationDetailRouteDependencies,
+} from "../job-participation-detail/routes.js";
+import {
+  registerJobWorkGroupRoutes,
+  type JobWorkGroupRouteDependencies,
+} from "../job-work-groups/routes.js";
+import {
   registerQuoteAuthoringRoutes,
   type QuoteAuthoringRouteDependencies,
 } from "../quotes/routes.js";
@@ -140,9 +196,52 @@ export interface AuthModuleDependencies {
     "comparison"
   >;
   readonly quoteLifecycle?: Pick<QuoteLifecycleRouteDependencies, "lifecycle">;
+  readonly quoteAcceptance?: Pick<
+    QuoteAcceptanceRouteDependencies,
+    "acceptance"
+  >;
+  readonly jobContacts?: Pick<
+    JobContactRouteDependencies,
+    "clarifications" | "contacts"
+  >;
+  readonly jobDashboard?: Pick<JobDashboardRouteDependencies, "dashboard">;
+  readonly jobLifecycle?: Pick<JobLifecycleRouteDependencies, "lifecycle">;
+  readonly jobDocumentation?: Pick<
+    JobDocumentationRouteDependencies,
+    "documentation"
+  >;
+  readonly jobRoster?: Pick<JobRosterRouteDependencies, "roster">;
+  readonly jobParticipation?: Pick<
+    JobParticipationRouteDependencies,
+    "participation"
+  >;
+  readonly jobOperations?: Pick<JobOperationRouteDependencies, "operations">;
+  readonly jobMilestones?: Pick<JobMilestoneRouteDependencies, "milestones">;
+  readonly jobMilestoneContext?: Pick<
+    JobMilestoneContextRouteDependencies,
+    "context"
+  >;
+  readonly changeOrders?: Pick<
+    ChangeOrderRouteDependencies,
+    "changeOrders" | "pdfReservations" | "documentUploads"
+  >;
+  readonly jobParticipantCapabilities?: Pick<
+    JobParticipantCapabilityRouteDependencies,
+    "capabilities"
+  >;
+  readonly jobParticipationDetail?: Pick<
+    JobParticipationDetailRouteDependencies,
+    "detail"
+  >;
+  readonly jobWorkGroups?: Pick<JobWorkGroupRouteDependencies, "workGroups">;
   readonly quoteAuthoring?: Pick<
     QuoteAuthoringRouteDependencies,
-    "core" | "documentUploads" | "externalPdf" | "structured"
+    | "core"
+    | "documentUploads"
+    | "externalPdf"
+    | "structured"
+    | "supportingDocumentUploads"
+    | "supportingDocuments"
   >;
   readonly r3Analytics?: Pick<R3AnalyticsRouteDependencies, "observations">;
   readonly conversationChat?: {
@@ -392,6 +491,156 @@ async function configureAuthModule(
       csrfProtection: csrfProtection(app),
       guard,
       ...dependencies.quoteLifecycle,
+    });
+  }
+  if (dependencies.quoteAcceptance !== undefined) {
+    registerQuoteAcceptanceRoutes(app, {
+      csrfProtection: csrfProtection(app),
+      guard,
+      rateLimit: {
+        max: config.rateLimitMax,
+        timeWindowMs: config.rateLimitWindowMs,
+      },
+      ...dependencies.quoteAcceptance,
+    });
+  }
+  if (dependencies.jobContacts !== undefined) {
+    registerJobContactRoutes(app, {
+      csrfProtection: csrfProtection(app),
+      guard,
+      rateLimit: {
+        max: config.rateLimitMax,
+        timeWindowMs: config.rateLimitWindowMs,
+      },
+      ...dependencies.jobContacts,
+    });
+  }
+  if (dependencies.jobDashboard !== undefined) {
+    registerJobDashboardRoutes(app, {
+      guard,
+      rateLimit: {
+        max: config.rateLimitMax,
+        timeWindowMs: config.rateLimitWindowMs,
+      },
+      ...dependencies.jobDashboard,
+    });
+  }
+  if (dependencies.jobLifecycle !== undefined) {
+    registerJobLifecycleRoutes(app, {
+      csrfProtection: csrfProtection(app),
+      guard,
+      rateLimit: {
+        max: config.rateLimitMax,
+        timeWindowMs: config.rateLimitWindowMs,
+      },
+      ...dependencies.jobLifecycle,
+    });
+  }
+  if (dependencies.jobDocumentation !== undefined) {
+    registerJobDocumentationRoutes(app, {
+      guard,
+      rateLimit: {
+        max: config.rateLimitMax * 6,
+        timeWindowMs: config.rateLimitWindowMs,
+      },
+      ...dependencies.jobDocumentation,
+    });
+  }
+  if (dependencies.jobRoster !== undefined) {
+    registerJobRosterRoutes(app, {
+      guard,
+      rateLimit: {
+        max: config.rateLimitMax * 6,
+        timeWindowMs: config.rateLimitWindowMs,
+      },
+      ...dependencies.jobRoster,
+    });
+  }
+  if (dependencies.jobParticipation !== undefined) {
+    registerJobParticipationRoutes(app, {
+      csrfProtection: csrfProtection(app),
+      guard,
+      rateLimit: {
+        max: config.rateLimitMax,
+        timeWindowMs: config.rateLimitWindowMs,
+      },
+      ...dependencies.jobParticipation,
+    });
+  }
+  if (dependencies.jobOperations !== undefined) {
+    registerJobOperationRoutes(app, {
+      csrfProtection: csrfProtection(app),
+      guard,
+      rateLimit: {
+        max: config.rateLimitMax,
+        timeWindowMs: config.rateLimitWindowMs,
+      },
+      ...dependencies.jobOperations,
+    });
+  }
+  if (dependencies.jobMilestones !== undefined) {
+    registerJobMilestoneRoutes(app, {
+      csrfProtection: csrfProtection(app),
+      guard,
+      rateLimit: {
+        max: config.rateLimitMax,
+        timeWindowMs: config.rateLimitWindowMs,
+      },
+      ...dependencies.jobMilestones,
+    });
+  }
+  if (dependencies.jobMilestoneContext !== undefined) {
+    registerJobMilestoneContextRoutes(app, {
+      csrfProtection: csrfProtection(app),
+      guard,
+      rateLimit: {
+        max: config.rateLimitMax,
+        timeWindowMs: config.rateLimitWindowMs,
+      },
+      ...dependencies.jobMilestoneContext,
+    });
+  }
+  if (dependencies.changeOrders !== undefined) {
+    registerChangeOrderRoutes(app, {
+      csrfProtection: csrfProtection(app),
+      guard,
+      rateLimit: {
+        max: config.rateLimitMax,
+        timeWindowMs: config.rateLimitWindowMs,
+      },
+      ...dependencies.changeOrders,
+    });
+  }
+  if (dependencies.jobParticipantCapabilities !== undefined) {
+    registerJobParticipantCapabilityRoutes(app, {
+      csrfProtection: csrfProtection(app),
+      guard,
+      rateLimit: {
+        max: config.rateLimitMax,
+        timeWindowMs: config.rateLimitWindowMs,
+      },
+      ...dependencies.jobParticipantCapabilities,
+    });
+  }
+  if (dependencies.jobParticipationDetail !== undefined) {
+    registerJobParticipationDetailRoute(app, {
+      guard,
+      rateLimit: {
+        max: config.rateLimitMax * 6,
+        timeWindowMs: config.rateLimitWindowMs,
+      },
+      ...dependencies.jobParticipationDetail,
+    });
+  }
+  if (dependencies.jobWorkGroups !== undefined) {
+    registerJobWorkGroupRoutes(app, {
+      csrfProtection: csrfProtection(app),
+      guard,
+      rateLimit: {
+        max: config.rateLimitMax,
+        timeWindowMs: config.rateLimitWindowMs,
+      },
+      ...dependencies.jobWorkGroups,
     });
   }
   if (dependencies.quoteAuthoring !== undefined) {

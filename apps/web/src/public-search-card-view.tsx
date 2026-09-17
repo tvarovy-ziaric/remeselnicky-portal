@@ -3,12 +3,14 @@ import React from "react";
 
 import { CustomerInvitationButton } from "./customer-invitation-button";
 import { CustomerShortlistToggle } from "./customer-shortlist-toggle";
+import { ProviderParticipantInvitationButton } from "./provider-participant-invitation-button";
 
 export interface PublicSearchCardViewModel {
   readonly availability: "INDICATIVELY_AVAILABLE" | "NO_POSITIVE_SIGNAL";
   readonly badges: readonly Readonly<{ kind: string; label: string }>[];
   readonly identity: Readonly<{
     primaryName: string;
+    profileType: "INDIVIDUAL" | "COMPANY";
     secondaryName: string | null;
   }>;
   readonly location: Readonly<{
@@ -28,9 +30,11 @@ export interface PublicSearchCardViewModel {
 export function PublicSearchCardList({
   cards,
   jobRequestId,
+  jobId,
 }: {
   readonly cards: readonly PublicSearchCardViewModel[];
   readonly jobRequestId?: string;
+  readonly jobId?: string;
 }) {
   if (cards.length === 0) return <p>Nenašli sa žiadni vhodní remeselníci.</p>;
   return (
@@ -50,10 +54,20 @@ export function PublicSearchCardList({
               </Link>
             </h2>
             <CustomerShortlistToggle craftsmanProfileId={card.profileId} />
-            {jobRequestId === undefined ? null : (
+            {jobRequestId === undefined || jobId !== undefined ? null : (
               <CustomerInvitationButton
                 craftsmanProfileId={card.profileId}
                 jobRequestId={jobRequestId}
+              />
+            )}
+            {jobId === undefined ||
+            jobRequestId !== undefined ||
+            card.identity.profileType !== "INDIVIDUAL" ? null : (
+              <ProviderParticipantInvitationButton
+                craftsmanProfileId={card.profileId}
+                jobId={jobId}
+                key={`${jobId}:${card.profileId}`}
+                profileType={card.identity.profileType}
               />
             )}
             {card.identity.secondaryName === null ? null : (

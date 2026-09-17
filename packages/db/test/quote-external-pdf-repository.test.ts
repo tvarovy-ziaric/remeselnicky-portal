@@ -159,11 +159,11 @@ describe("external PDF Quote repository", () => {
       [
         {
           actorStateChangedAt: new Date("2026-09-15T10:00:00Z"),
+          bindingKind: "EXTERNAL_PDF",
           contentRevision: 2,
           participantRole: "CUSTOMER",
           quoteId,
           quoteRevision: 1,
-          selectedPdfAssetId: assetId,
           state: "SUBMITTED",
           stateRevision: 2,
         },
@@ -175,10 +175,10 @@ describe("external PDF Quote repository", () => {
       ).resolvePrivateMediaAccess(snapshot()),
     ).resolves.toMatchObject({ grants: ["QUOTE_REQUEST_CUSTOMER"] });
     expect(fixture.statements[0]).toContain(
-      "JOIN current_quote_external_pdf_content content",
+      "LEFT JOIN current_quote_external_pdf_content pdf_content",
     );
     expect(fixture.statements[0]).toContain(
-      "content.pdf_media_asset_id = asset.id",
+      "pdf_content.pdf_media_asset_id = asset.id",
     );
   });
 
@@ -187,11 +187,11 @@ describe("external PDF Quote repository", () => {
       [
         {
           actorStateChangedAt: new Date("2026-09-15T10:00:00Z"),
+          bindingKind: "EXTERNAL_PDF",
           contentRevision: 2,
           participantRole: "ADMIN",
           quoteId,
           quoteRevision: 1,
-          selectedPdfAssetId: assetId,
           state: "SUBMITTED",
           stateRevision: 2,
         },

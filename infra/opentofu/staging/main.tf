@@ -45,7 +45,7 @@ resource "digitalocean_database_cluster" "postgres" {
   region               = var.region
   node_count           = 1
   private_network_uuid = digitalocean_vpc.staging.id
-  tags                  = local.tags
+  tags                 = local.tags
 
   lifecycle {
     prevent_destroy = true

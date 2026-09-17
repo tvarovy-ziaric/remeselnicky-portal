@@ -23,6 +23,8 @@ describe("JobRequest", () => {
     expect(transitionJobRequest("EXPIRED", "REACTIVATE")).toBe("ACTIVE");
     expect(transitionJobRequest("ACTIVE", "CANCEL")).toBe("CANCELLED");
     expect(transitionJobRequest("CANCELLED", "REACTIVATE")).toBeNull();
+    expect(transitionJobRequest("CONVERTED", "CANCEL")).toBeNull();
+    expect(transitionJobRequest("CONVERTED", "REACTIVATE")).toBeNull();
   });
 
   it("derives the private customer owner during first draft creation", async () => {

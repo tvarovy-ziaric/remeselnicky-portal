@@ -88,6 +88,10 @@ describe("customer Quote comparison", () => {
     expect(html).toContain("Porovnanie ponúk");
     expect(html).toContain("Neuvedené");
     expect(html).toContain("Otvoriť konverzáciu");
+    expect(html).toContain("Vybrať túto ponuku");
+    expect(html).toContain(
+      `/ziadosti/${jobRequestId}/ponuky/83000000-0000-4000-8000-000000000002/potvrdenie`,
+    );
     expect(html).not.toMatch(
       /najlepšia ponuka|ownerUserId|storageKey|competitor/iu,
     );
@@ -104,6 +108,7 @@ describe("customer Quote comparison", () => {
       `/v1/me/job-requests/${jobRequestId}/quote-comparison`,
       { cache: "no-store", credentials: "same-origin" },
     );
+    expect(fetcher.mock.contexts[0]).toBe(globalThis);
     const leaked = vi
       .fn<typeof fetch>()
       .mockResolvedValue(
@@ -133,6 +138,7 @@ describe("customer Quote comparison", () => {
     );
     expect(html).toContain('role="alert"');
     expect(html).toContain("podstatne zmenila");
+    expect(html).not.toContain("Vybrať túto ponuku");
   });
 });
 

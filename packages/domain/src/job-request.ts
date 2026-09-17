@@ -16,6 +16,7 @@ export const JOB_REQUEST_STATES = Object.freeze([
   "ACTIVE",
   "EXPIRED",
   "CANCELLED",
+  "CONVERTED",
 ] as const);
 export const JOB_REQUEST_SUBMISSION_REQUIREMENTS = Object.freeze([
   "PRIMARY_PROFESSION",

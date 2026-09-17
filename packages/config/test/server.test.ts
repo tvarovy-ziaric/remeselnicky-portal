@@ -139,6 +139,26 @@ describe("server configuration", () => {
     ).toThrow(/OBJECT_STORAGE_ENDPOINT/u);
   });
 
+  it("keeps internal storage operations separate from the public signing endpoint", () => {
+    const config = parseServerConfig({
+      ...productionEnvironment,
+      OBJECT_STORAGE_SIGNING_ENDPOINT: "https://objects-alpha.example",
+    });
+
+    expect(config.objectStorage).toEqual(
+      expect.objectContaining({
+        endpoint: "https://objects.example",
+        signingEndpoint: "https://objects-alpha.example",
+      }),
+    );
+    expect(() =>
+      parseServerConfig({
+        ...productionEnvironment,
+        OBJECT_STORAGE_SIGNING_ENDPOINT: "http://objects-alpha.example",
+      }),
+    ).toThrow(/OBJECT_STORAGE_SIGNING_ENDPOINT/u);
+  });
+
   it.each([
     ["ADMIN_MFA_CHALLENGE_TTL_SECONDS", "59"],
     ["ADMIN_PRIVILEGED_SESSION_TTL_SECONDS", "43201"],

@@ -15,6 +15,22 @@ export const DEMAND_SIDE_EXTENSION_EVENT_NAMES = Object.freeze({
   invitationWithdrawnByCustomer: "job_invitation.withdrawn_by_customer",
   invitationWithdrawnByProvider: "job_invitation.withdrawn_by_provider",
   jobRequestMateriallyUpdated: "job_request.materially_updated",
+  jobStarted: "job.started",
+  jobCancelled: "job.cancelled",
+  jobProgressCreated: "job.progress.created",
+  jobIssueCreated: "job.issue.created",
+  jobChangeOrderProposed: "job.change_order.proposed",
+  jobChangeOrderCounterproposed: "job.change_order.counterproposed",
+  jobChangeOrderApproved: "job.change_order.approved",
+  jobChangeOrderRejected: "job.change_order.rejected",
+  jobChangeOrderWithdrawn: "job.change_order.withdrawn",
+  jobParticipantInvited: "job_participant.invited",
+  jobParticipantAccepted: "job_participant.accepted",
+  jobParticipantDeclined: "job_participant.declined",
+  jobParticipantJoined: "job_participant.joined",
+  jobParticipantLeft: "job_participant.left",
+  jobParticipantDeparted: "job_participant.departed",
+  jobParticipantRemoved: "job_participant.removed",
   quoteExpired: "quote.expired",
   quoteRejected: "quote.rejected",
   quoteRevised: "quote.revised",
@@ -122,6 +138,40 @@ export function mapDemandSideNotificationEvent(
       return mapConversationMessage(event, recipientUserId);
     case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobRequestMateriallyUpdated:
       return mapMaterialUpdate(event, recipientUserId);
+    case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobStarted:
+      return mapJobLifecycle(event, recipientUserId, "WORK_STARTED");
+    case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobCancelled:
+      return mapJobLifecycle(event, recipientUserId, "WORK_CANCELLED");
+    case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobProgressCreated:
+      return mapJobOperation(
+        event,
+        recipientUserId,
+        "progress_update_id",
+        "priebeh",
+        "INFO",
+      );
+    case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobIssueCreated:
+      return mapJobOperation(
+        event,
+        recipientUserId,
+        "issue_id",
+        "problemy",
+        "IMPORTANT",
+      );
+    case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobChangeOrderProposed:
+    case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobChangeOrderCounterproposed:
+    case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobChangeOrderApproved:
+    case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobChangeOrderRejected:
+    case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobChangeOrderWithdrawn:
+      return mapChangeOrder(event, recipientUserId);
+    case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantInvited:
+    case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantAccepted:
+    case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantDeclined:
+    case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantJoined:
+    case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantLeft:
+    case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantDeparted:
+    case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantRemoved:
+      return mapJobParticipant(event, recipientUserId);
     case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.quoteSubmitted:
       return mapQuote(
         event,
@@ -272,6 +322,178 @@ function mapMaterialUpdate(
   );
 }
 
+function mapJobLifecycle(
+  event: PersistedDomainEvent,
+  recipientUserId: string,
+  action: "WORK_STARTED" | "WORK_CANCELLED",
+): readonly NotificationDraft[] {
+  assertEntity(event, "JOB");
+  const stateRevision = requiredPositiveInteger(
+    event.payload["job_state_revision"],
+    "Job state revision",
+  );
+  if (stateRevision > 2) {
+    throw new TypeError("Job state revision is invalid.");
+  }
+  return one(
+    event,
+    recipientUserId,
+    {
+      context: {
+        entityId: event.entity.id,
+        entityRevision: stateRevision,
+        entityType: "JOB",
+        path: `/zakazky/${event.entity.id}`,
+      },
+      payload: { action, job_state_revision: stateRevision },
+    },
+    event.name,
+    "IMPORTANT",
+    ["IN_APP", "EMAIL"],
+  );
+}
+
+function mapJobOperation(
+  event: PersistedDomainEvent,
+  recipientUserId: string,
+  itemKey: "progress_update_id" | "issue_id",
+  pathSegment: "priebeh" | "problemy",
+  priority: Priority,
+): readonly NotificationDraft[] {
+  assertEntity(event, "JOB");
+  const itemId = requiredUuid(event.payload[itemKey], itemKey);
+  if (
+    itemKey === "issue_id" &&
+    !["PROBLEM", "DELAY", "WAITING"].includes(
+      String(event.payload["issue_kind"]),
+    )
+  ) {
+    throw new TypeError("Issue kind is invalid.");
+  }
+  return one(
+    event,
+    recipientUserId,
+    {
+      context: {
+        entityId: event.entity.id,
+        entityType: "JOB",
+        path: `/zakazky/${event.entity.id}/${pathSegment}/${itemId}`,
+      },
+      payload: {
+        action: itemKey === "issue_id" ? "REVIEW_ISSUE" : "READ_PROGRESS",
+        [itemKey]: itemId,
+      },
+    },
+    event.name,
+    priority,
+    ["IN_APP"],
+  );
+}
+
+function mapChangeOrder(
+  event: PersistedDomainEvent,
+  recipientUserId: string,
+): readonly NotificationDraft[] {
+  assertEntity(event, "CHANGE_ORDER_REVISION");
+  const jobId = requiredUuid(event.payload["job_id"], "Job");
+  const changeOrderId = requiredUuid(
+    event.payload["change_order_id"],
+    "Change order",
+  );
+  const revisionId = requiredUuid(event.payload["revision_id"], "Revision");
+  if (event.entity.id !== revisionId) {
+    throw new TypeError("Change-order notification entity is incoherent.");
+  }
+  const revisionNumber = requiredPositiveInteger(
+    event.payload["revision_number"],
+    "Change-order revision",
+  );
+  const action = (() => {
+    switch (event.name) {
+      case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobChangeOrderProposed:
+        return "REVIEW_CHANGE_ORDER";
+      case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobChangeOrderCounterproposed:
+        return "REVIEW_CHANGE_ORDER_REVISION";
+      case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobChangeOrderApproved:
+        return "CHANGE_ORDER_APPROVED";
+      case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobChangeOrderRejected:
+        return "CHANGE_ORDER_REJECTED";
+      case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobChangeOrderWithdrawn:
+        return "CHANGE_ORDER_WITHDRAWN";
+      default:
+        throw new TypeError("Unsupported Change-order notification event.");
+    }
+  })();
+  return one(
+    event,
+    recipientUserId,
+    {
+      context: {
+        entityId: revisionId,
+        entityRevision: revisionNumber,
+        entityType: "CHANGE_ORDER_REVISION",
+        path: `/zakazky/${jobId}/zmeny/${changeOrderId}/revizie/${revisionId}`,
+      },
+      payload: { action, revision_number: revisionNumber },
+    },
+    event.name,
+    "IMPORTANT",
+    ["IN_APP", "EMAIL"],
+  );
+}
+
+function mapJobParticipant(
+  event: PersistedDomainEvent,
+  recipientUserId: string,
+): readonly NotificationDraft[] {
+  assertEntity(event, "JOB_PARTICIPANT");
+  const participantId = requiredUuid(
+    event.payload["participant_id"],
+    "participant",
+  );
+  if (event.entity.id !== participantId) {
+    throw new TypeError("Job participant notification entity is incoherent.");
+  }
+  const jobId = requiredUuid(event.payload["job_id"], "Job");
+  const revision = requiredPositiveInteger(
+    event.payload["participation_revision"],
+    "participation revision",
+  );
+  const invited =
+    event.name === DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantInvited;
+  const removed =
+    event.name === DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantRemoved;
+  const important =
+    invited ||
+    event.name ===
+      DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantAccepted ||
+    event.name === DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantDeclined;
+  const path = invited
+    ? `/ucasti/pozvanky/${participantId}`
+    : removed
+      ? `/ucasti/historia/${participantId}`
+      : `/zakazky/${jobId}/ucastnici/${participantId}`;
+  return one(
+    event,
+    recipientUserId,
+    {
+      context: {
+        entityId: participantId,
+        entityRevision: revision,
+        entityType: "JOB_PARTICIPANT",
+        path,
+      },
+      payload: {
+        action: event.name.split(".")[1]?.toUpperCase() ?? "OPEN_PARTICIPANT",
+        participation_revision: revision,
+      },
+    },
+    event.name,
+    important ? "IMPORTANT" : "INFO",
+    important ? ["IN_APP", "EMAIL"] : ["IN_APP"],
+  );
+}
+
 function mapQuote(
   event: PersistedDomainEvent,
   recipientUserId: string,
@@ -347,6 +569,38 @@ function assertDemandSidePayloadKeys(event: PersistedDomainEvent): void {
           "recipient_user_id",
           "request_content_revision",
           "request_visible_version",
+        ];
+      case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobStarted:
+      case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobCancelled:
+        return ["job_state_revision", "recipient_user_id"];
+      case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobProgressCreated:
+        return ["progress_update_id", "recipient_user_id"];
+      case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobIssueCreated:
+        return ["issue_id", "issue_kind", "recipient_user_id"];
+      case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobChangeOrderProposed:
+      case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobChangeOrderCounterproposed:
+      case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobChangeOrderApproved:
+      case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobChangeOrderRejected:
+      case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobChangeOrderWithdrawn:
+        return [
+          "change_order_id",
+          "job_id",
+          "recipient_user_id",
+          "revision_id",
+          "revision_number",
+        ];
+      case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantInvited:
+      case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantAccepted:
+      case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantDeclined:
+      case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantJoined:
+      case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantLeft:
+      case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantDeparted:
+      case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantRemoved:
+        return [
+          "job_id",
+          "participant_id",
+          "participation_revision",
+          "recipient_user_id",
         ];
       case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.quoteExpired:
       case DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.quoteRejected:
@@ -433,6 +687,22 @@ function isKnownDemandSideEvent(name: string): boolean {
     DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.invitationWithdrawnByCustomer,
     DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.invitationWithdrawnByProvider,
     DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobRequestMateriallyUpdated,
+    DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobStarted,
+    DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobCancelled,
+    DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobProgressCreated,
+    DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobIssueCreated,
+    DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobChangeOrderProposed,
+    DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobChangeOrderCounterproposed,
+    DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobChangeOrderApproved,
+    DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobChangeOrderRejected,
+    DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobChangeOrderWithdrawn,
+    DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantInvited,
+    DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantAccepted,
+    DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantDeclined,
+    DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantJoined,
+    DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantLeft,
+    DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantDeparted,
+    DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantRemoved,
     DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.quoteExpired,
     DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.quoteRejected,
     DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.quoteRevised,

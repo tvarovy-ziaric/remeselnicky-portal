@@ -59,11 +59,11 @@ interface ContentRow {
 }
 interface DeliveryRow {
   readonly actorStateChangedAt: Date;
+  readonly bindingKind: "EXTERNAL_PDF" | "SUPPORTING";
   readonly contentRevision: number;
   readonly participantRole: "CRAFTSMAN" | "CUSTOMER";
   readonly quoteId: string;
   readonly quoteRevision: number;
-  readonly selectedPdfAssetId: string;
   readonly state: string;
   readonly stateRevision: number;
 }
@@ -424,34 +424,52 @@ export function createQuoteDocumentMediaAccessResolver(
       const [row] = await sql<DeliveryRow[]>`
         SELECT quote.id AS "quoteId", revision.revision AS "quoteRevision",
           head.state::text AS state, head.state_revision AS "stateRevision",
-          content.content_revision AS "contentRevision",
-          content.pdf_media_asset_id AS "selectedPdfAssetId",
+          coalesce(pdf_content.content_revision,
+            structured_content.content_revision, 0) AS "contentRevision",
+          CASE WHEN supporting.media_asset_id IS NOT NULL
+            THEN 'SUPPORTING' ELSE 'EXTERNAL_PDF' END AS "bindingKind",
           actor.account_state_changed_at AS "actorStateChangedAt",
           CASE WHEN craftsman.owner_user_id = actor.id THEN 'CRAFTSMAN' ELSE 'CUSTOMER' END AS "participantRole"
         FROM media_assets asset
-        JOIN quote_external_pdf_documents document ON document.pdf_media_asset_id = asset.id
-        JOIN quotes quote ON quote.id = document.quote_id
+        JOIN quotes quote ON quote.id = asset.provenance_entity_id
         JOIN quote_revision_identities revision ON revision.quote_id = quote.id
-          AND revision.revision = document.quote_revision AND revision.authoring_mode = 'EXTERNAL_PDF'
+          AND revision.revision = asset.provenance_entity_revision
         JOIN quote_revision_heads head ON head.quote_id = quote.id AND head.quote_revision = revision.revision
-        JOIN current_quote_external_pdf_content content ON content.quote_id = quote.id
-          AND content.quote_revision = revision.revision
+        LEFT JOIN quote_external_pdf_documents document
+          ON document.quote_id = quote.id
+          AND document.quote_revision = revision.revision
+          AND document.pdf_media_asset_id = asset.id
+        LEFT JOIN current_quote_revision_supporting_documents supporting
+          ON supporting.quote_id = quote.id
+          AND supporting.quote_revision = revision.revision
+          AND supporting.media_asset_id = asset.id
+        LEFT JOIN current_quote_external_pdf_content pdf_content
+          ON pdf_content.quote_id = quote.id
+          AND pdf_content.quote_revision = revision.revision
+        LEFT JOIN current_quote_structured_content structured_content
+          ON structured_content.quote_id = quote.id
+          AND structured_content.quote_revision = revision.revision
         JOIN current_conversations conversation ON conversation.id = quote.conversation_id
         JOIN customer_profiles customer ON customer.id = conversation.customer_profile_id
         JOIN craftsman_profiles craftsman ON craftsman.id = conversation.craftsman_profile_id
         JOIN users actor ON actor.id = ${snapshot.actor.userId} AND actor.account_state = 'ACTIVE'
         WHERE asset.id = ${snapshot.asset.id} AND asset.owner_user_id = craftsman.owner_user_id
           AND asset.provenance_entity_id = quote.id AND asset.provenance_entity_revision = revision.revision
+          AND (document.pdf_media_asset_id IS NOT NULL
+            OR supporting.media_asset_id IS NOT NULL)
           AND (craftsman.owner_user_id = actor.id OR (customer.owner_user_id = actor.id
-            AND head.state <> 'DRAFT' AND content.pdf_media_asset_id = asset.id))
+            AND head.state <> 'DRAFT'
+            AND (supporting.media_asset_id IS NOT NULL
+              OR pdf_content.pdf_media_asset_id = asset.id)))
       `;
       if (
         row === undefined ||
         !uuidPattern.test(row.quoteId) ||
-        !uuidPattern.test(row.selectedPdfAssetId) ||
         row.quoteRevision < 1 ||
         !Number.isSafeInteger(row.contentRevision) ||
-        row.contentRevision < 1 ||
+        row.contentRevision < 0 ||
+        (row.bindingKind !== "EXTERNAL_PDF" &&
+          row.bindingKind !== "SUPPORTING") ||
         !quoteRevisionStatePattern.test(row.state) ||
         (row.participantRole !== "CRAFTSMAN" &&
           row.participantRole !== "CUSTOMER") ||
@@ -468,13 +486,14 @@ export function createQuoteDocumentMediaAccessResolver(
             : "QUOTE_REQUEST_CUSTOMER",
         ],
         revision: [
-          "quote-pdf",
+          "quote-document",
           row.quoteId,
           row.quoteRevision,
+          row.bindingKind,
           row.state,
           row.stateRevision,
           row.contentRevision,
-          row.selectedPdfAssetId,
+          snapshot.asset.id,
           row.actorStateChangedAt.toISOString(),
         ].join(":"),
       });

@@ -10,6 +10,8 @@ export default function HomePage() {
         <nav className="home-actions" aria-label="Hlavné možnosti">
           <a href="/dopyt">Vytvoriť dopyt</a>
           <a href="/remeselnici">Nájsť remeselníka</a>
+          <a href="/zakazky">Moje zákazky</a>
+          <a href="/ucasti/pozvanky">Pozvánky na účasť</a>
         </nav>
         <p className="contract">Zdieľaný kontrakt API: {appInfo.apiVersion}</p>
       </section>

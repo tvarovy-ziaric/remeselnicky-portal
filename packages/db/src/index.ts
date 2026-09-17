@@ -138,6 +138,176 @@ import { createQuoteComparisonRepository } from "./quote-comparison-repository.j
 export { createQuoteComparisonRepository } from "./quote-comparison-repository.js";
 import { createQuoteLifecycleRepository } from "./quote-lifecycle-repository.js";
 export { createQuoteLifecycleRepository } from "./quote-lifecycle-repository.js";
+import { createQuoteAcceptanceRepository } from "./quote-acceptance-repository.js";
+export { createQuoteAcceptanceRepository } from "./quote-acceptance-repository.js";
+import { createJobContactRepository } from "./job-contact-repository.js";
+export { createJobContactRepository } from "./job-contact-repository.js";
+export type { JobContactDetails } from "./job-contact-repository.js";
+import { createJobDashboardRepository } from "./job-dashboard-repository.js";
+export { createJobDashboardRepository } from "./job-dashboard-repository.js";
+export type {
+  JobDashboard,
+  JobDashboardSummary,
+} from "./job-dashboard-repository.js";
+import { createJobLifecycleRepository } from "./job-lifecycle-repository.js";
+export {
+  createJobLifecycleRepository,
+  JobLifecycleIdempotencyError,
+} from "./job-lifecycle-repository.js";
+export type {
+  CancelJobInput,
+  JobLifecycleResult,
+  StartJobInput,
+} from "./job-lifecycle-repository.js";
+import { createJobDocumentationRepository } from "./job-documentation-repository.js";
+export { createJobDocumentationRepository } from "./job-documentation-repository.js";
+export type {
+  JobDocumentationCursor,
+  JobDocumentationItem,
+  JobDocumentationPage,
+} from "./job-documentation-repository.js";
+import { createJobRosterRepository } from "./job-roster-repository.js";
+export { createJobRosterRepository } from "./job-roster-repository.js";
+export type {
+  JobRosterCursor,
+  JobRosterPage,
+  JobRosterParticipant,
+  JobRosterRole,
+  JobRosterWorkGroup,
+} from "./job-roster-repository.js";
+import { createJobWorkGroupCommandRepository } from "./job-work-group-command-repository.js";
+export {
+  createJobWorkGroupCommandRepository,
+  JobWorkGroupIdempotencyError,
+} from "./job-work-group-command-repository.js";
+export type {
+  CreateJobWorkGroupInput,
+  CreateJobWorkGroupResult,
+  AssignJobWorkGroupInput,
+  AssignJobWorkGroupResult,
+  DepartJobWorkGroupInput,
+  DepartJobWorkGroupResult,
+  JobWorkGroupCursor,
+  JobWorkGroupListPage,
+} from "./job-work-group-command-repository.js";
+import { createJobParticipationRepository } from "./job-participation-repository.js";
+import { createJobParticipationDetailRepository } from "./job-participation-detail-repository.js";
+export { createJobParticipationDetailRepository } from "./job-participation-detail-repository.js";
+export type { JobParticipationDetail } from "./job-participation-detail-repository.js";
+import { createJobParticipantCapabilityRepository } from "./job-participant-capability-repository.js";
+import { createJobOperationalRepository } from "./job-operational-repository.js";
+export {
+  createJobOperationalRepository,
+  JobOperationalIdempotencyError,
+} from "./job-operational-repository.js";
+import { createJobMilestoneRepository } from "./job-milestone-repository.js";
+import {
+  createChangeOrderRepository,
+  createChangeOrderDocumentMediaAccessResolver,
+} from "./change-order-repository.js";
+import { createChangeOrderPdfUploadRepository } from "./change-order-pdf-upload-repository.js";
+export { createChangeOrderPdfUploadRepository } from "./change-order-pdf-upload-repository.js";
+export type {
+  ReserveChangeOrderPdfUploadInput,
+  ReserveChangeOrderPdfUploadResult,
+  PrepareChangeOrderPdfUploadResult,
+  ChangeOrderPdfUploadStatus,
+} from "./change-order-pdf-upload-repository.js";
+export {
+  createChangeOrderRepository,
+  createChangeOrderDocumentMediaAccessResolver,
+  ChangeOrderIdempotencyError,
+} from "./change-order-repository.js";
+export type {
+  ChangeOrderTerms,
+  ChangeOrderPriceImpact,
+  ChangeOrderScheduleImpact,
+  ChangeOrderCommandResult,
+  ChangeOrderDetail,
+  ChangeOrderPage,
+  ChangeOrderRevision,
+  ChangeOrderRevisionPage,
+  ChangeOrderSummary,
+  CreateChangeOrderInput,
+  ChangeOrderRevisionInput,
+  ChangeOrderDecisionInput,
+} from "./change-order-repository.js";
+export {
+  createJobMilestoneRepository,
+  JobMilestoneIdempotencyError,
+} from "./job-milestone-repository.js";
+export type {
+  JobMilestoneItem,
+  JobMilestonePage,
+  JobMilestoneHistoryEvent,
+} from "./job-milestone-repository.js";
+import { createJobMilestoneContextRepository } from "./job-milestone-context-repository.js";
+export {
+  createJobMilestoneContextRepository,
+  JobMilestoneContextIdempotencyError,
+} from "./job-milestone-context-repository.js";
+export type {
+  JobMilestoneProposal,
+  JobMilestoneComment,
+  JobMilestoneMedia,
+  JobMilestoneContextPage,
+} from "./job-milestone-context-repository.js";
+export {
+  createJobParticipantCapabilityRepository,
+  JobParticipantCapabilityIdempotencyError,
+} from "./job-participant-capability-repository.js";
+export type {
+  ConfirmJobParticipantCapabilityInput,
+  ConfirmJobParticipantCapabilityResult,
+  JobParticipantCapabilityCursor,
+  JobParticipantCapabilityItem,
+  JobParticipantCapabilityKind,
+  JobParticipantCapabilityPage,
+  ProposeJobParticipantCapabilityInput,
+  ProposeJobParticipantCapabilityResult,
+} from "./job-participant-capability-repository.js";
+export {
+  createJobParticipationRepository,
+  JobParticipationIdempotencyError,
+} from "./job-participation-repository.js";
+export type {
+  DecideJobParticipationInput,
+  DecideJobParticipationResult,
+  ChangeJobParticipantRoleInput,
+  ChangeJobParticipantRoleResult,
+  InviteJobParticipantInput,
+  InviteJobParticipantResult,
+  JobParticipationInboxCursor,
+  JobParticipationInboxPage,
+  OwnJobParticipationHistoryItem,
+  OwnJobParticipationHistoryPage,
+  PendingJobParticipationInvitation,
+} from "./job-participation-repository.js";
+import { createJobLocationClarificationRepository } from "./job-location-clarification-repository.js";
+export {
+  createJobLocationClarificationRepository,
+  JobLocationIdempotencyError,
+} from "./job-location-clarification-repository.js";
+export type {
+  ClarifyJobLocationInput,
+  ClarifyJobLocationResult,
+  JobWorkLocation,
+} from "./job-location-clarification-repository.js";
+import {
+  createQuoteSupportingDocumentRepository,
+  createQuoteSupportingDocumentUploadAuthorization,
+} from "./quote-supporting-document-repository.js";
+export {
+  createQuoteSupportingDocumentRepository,
+  createQuoteSupportingDocumentUploadAuthorization,
+  QuoteSupportingDocumentIdempotencyError,
+} from "./quote-supporting-document-repository.js";
+export type {
+  AttachQuoteSupportingDocumentInput,
+  AttachQuoteSupportingDocumentResult,
+  QuoteSupportingDocument,
+  ReadQuoteSupportingDocumentsInput,
+} from "./quote-supporting-document-repository.js";
 import {
   createConversationAttachmentMediaAccessResolver,
   createConversationAttachmentUploadAuthorization,
@@ -166,6 +336,7 @@ import type {
   QuoteComparisonPersistence,
   QuoteLifecyclePersistence,
   QuoteLifecycleMaintenancePersistence,
+  QuoteAcceptancePersistence,
   QuotePersistence,
   StructuredQuotePersistence,
 } from "@portal/domain";
@@ -852,6 +1023,43 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly quoteComparison: QuoteComparisonPersistence;
   readonly quoteLifecycle: QuoteLifecyclePersistence &
     QuoteLifecycleMaintenancePersistence;
+  readonly quoteAcceptance: QuoteAcceptancePersistence;
+  readonly jobContacts: ReturnType<typeof createJobContactRepository>;
+  readonly jobDashboard: ReturnType<typeof createJobDashboardRepository>;
+  readonly jobLifecycle: ReturnType<typeof createJobLifecycleRepository>;
+  readonly jobDocumentation: ReturnType<
+    typeof createJobDocumentationRepository
+  >;
+  readonly jobRoster: ReturnType<typeof createJobRosterRepository>;
+  readonly jobWorkGroups: ReturnType<
+    typeof createJobWorkGroupCommandRepository
+  >;
+  readonly jobParticipation: ReturnType<
+    typeof createJobParticipationRepository
+  >;
+  readonly jobParticipationDetail: ReturnType<
+    typeof createJobParticipationDetailRepository
+  >;
+  readonly jobParticipantCapabilities: ReturnType<
+    typeof createJobParticipantCapabilityRepository
+  >;
+  readonly jobOperations: ReturnType<typeof createJobOperationalRepository>;
+  readonly jobMilestones: ReturnType<typeof createJobMilestoneRepository>;
+  readonly changeOrders: ReturnType<typeof createChangeOrderRepository>;
+  readonly changeOrderPdfUploads: ReturnType<
+    typeof createChangeOrderPdfUploadRepository
+  >;
+  readonly changeOrderDocumentMediaAccess: MediaEntityAccessResolver;
+  readonly jobMilestoneContext: ReturnType<
+    typeof createJobMilestoneContextRepository
+  >;
+  readonly jobLocationClarifications: ReturnType<
+    typeof createJobLocationClarificationRepository
+  >;
+  readonly quoteSupportingDocuments: ReturnType<
+    typeof createQuoteSupportingDocumentRepository
+  >;
+  readonly quoteSupportingDocumentUploads: QuoteDocumentUploadAuthorization;
   readonly quoteDocumentUploads: QuoteDocumentUploadAuthorization;
   readonly quoteDocumentMediaAccess: MediaEntityAccessResolver;
   readonly conversationAttachmentUploads: ConversationAttachmentUploadAuthorization;
@@ -904,7 +1112,15 @@ export function createDatabase(
     max: options.maxConnections ?? 10,
     prepare: true,
   });
-  const query = drizzle(sql, { schema });
+  // Drizzle installs its own serializers on the client. Raw SQL repositories
+  // need postgres.js serializers for Date and JSON parameters instead.
+  const drizzleSql = postgres(options.connectionString, {
+    connect_timeout: options.connectTimeoutSeconds ?? 5,
+    idle_timeout: options.idleTimeoutSeconds ?? 20,
+    max: options.maxConnections ?? 10,
+    prepare: true,
+  });
+  const query = drizzle(drizzleSql, { schema });
   const auth = createAuthRepository(sql);
   const adminAccess = createAdminAccessRepository(sql);
   const audit = createAuditRepository(sql);
@@ -956,6 +1172,29 @@ export function createDatabase(
   const externalPdfQuotes = createExternalPdfQuoteRepository(sql);
   const quoteComparison = createQuoteComparisonRepository(sql);
   const quoteLifecycle = createQuoteLifecycleRepository(sql);
+  const quoteAcceptance = createQuoteAcceptanceRepository(sql);
+  const jobContacts = createJobContactRepository(sql);
+  const jobDashboard = createJobDashboardRepository(sql);
+  const jobLifecycle = createJobLifecycleRepository(sql);
+  const jobDocumentation = createJobDocumentationRepository(sql);
+  const jobRoster = createJobRosterRepository(sql);
+  const jobWorkGroups = createJobWorkGroupCommandRepository(sql);
+  const jobParticipation = createJobParticipationRepository(sql);
+  const jobParticipationDetail = createJobParticipationDetailRepository(sql);
+  const jobParticipantCapabilities =
+    createJobParticipantCapabilityRepository(sql);
+  const jobOperations = createJobOperationalRepository(sql);
+  const jobMilestones = createJobMilestoneRepository(sql);
+  const changeOrders = createChangeOrderRepository(sql);
+  const changeOrderPdfUploads = createChangeOrderPdfUploadRepository(sql);
+  const changeOrderDocumentMediaAccess =
+    createChangeOrderDocumentMediaAccessResolver(sql);
+  const jobMilestoneContext = createJobMilestoneContextRepository(sql);
+  const jobLocationClarifications =
+    createJobLocationClarificationRepository(sql);
+  const quoteSupportingDocuments = createQuoteSupportingDocumentRepository(sql);
+  const quoteSupportingDocumentUploads =
+    createQuoteSupportingDocumentUploadAuthorization(sql);
   const quoteDocumentUploads = createQuoteDocumentUploadAuthorization(sql);
   const quoteDocumentMediaAccess = createQuoteDocumentMediaAccessResolver(sql);
   const conversationAttachmentUploads =
@@ -1026,6 +1265,25 @@ export function createDatabase(
     externalPdfQuotes,
     quoteComparison,
     quoteLifecycle,
+    quoteAcceptance,
+    jobContacts,
+    jobDashboard,
+    jobLifecycle,
+    jobDocumentation,
+    jobRoster,
+    jobWorkGroups,
+    jobParticipation,
+    jobParticipationDetail,
+    jobParticipantCapabilities,
+    jobOperations,
+    jobMilestones,
+    changeOrders,
+    changeOrderPdfUploads,
+    changeOrderDocumentMediaAccess,
+    jobMilestoneContext,
+    jobLocationClarifications,
+    quoteSupportingDocuments,
+    quoteSupportingDocumentUploads,
     quoteDocumentUploads,
     quoteDocumentMediaAccess,
     conversationAttachmentUploads,
@@ -1047,7 +1305,10 @@ export function createDatabase(
       return health.ping();
     },
     async close(): Promise<void> {
-      await sql.end({ timeout: 5 });
+      await Promise.all([
+        sql.end({ timeout: 5 }),
+        drizzleSql.end({ timeout: 5 }),
+      ]);
     },
   });
 }

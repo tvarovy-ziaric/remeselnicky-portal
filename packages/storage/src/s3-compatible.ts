@@ -37,6 +37,8 @@ export interface S3CompatibleStorageConfig {
   readonly publicBaseUrl: string;
   readonly region: string;
   readonly secretAccessKey: string;
+  /** Public HTTPS endpoint used only for SigV4 download URLs. */
+  readonly signingEndpoint?: string;
 }
 
 export interface S3CompatibleStorageOperations {
@@ -55,7 +57,11 @@ export function createS3CompatibleObjectStorageAdapter(
 ): ObjectStorageAdapter {
   const normalized = normalizeConfig(config);
   const operations =
-    dependencies.operations ?? createAwsOperations(normalized.clientConfig);
+    dependencies.operations ??
+    createAwsOperations(
+      normalized.clientConfig,
+      normalized.signingClientConfig,
+    );
   const clock = dependencies.clock ?? (() => new Date());
 
   return Object.freeze({
@@ -132,8 +138,11 @@ export function createS3CompatibleObjectStorageAdapter(
 
 function createAwsOperations(
   config: S3ClientConfig,
+  signingConfig: S3ClientConfig = config,
 ): S3CompatibleStorageOperations {
   const client = new S3Client(config);
+  const signingClient =
+    signingConfig === config ? client : new S3Client(signingConfig);
   return Object.freeze({
     async delete(command: DeleteObjectCommand): Promise<void> {
       await client.send(command);
@@ -145,7 +154,7 @@ function createAwsOperations(
       await client.send(command);
     },
     sign(command: GetObjectCommand, expiresIn: number): Promise<string> {
-      return getSignedUrl(client, command, { expiresIn });
+      return getSignedUrl(signingClient, command, { expiresIn });
     },
   });
 }
@@ -153,6 +162,7 @@ function createAwsOperations(
 function normalizeConfig(config: S3CompatibleStorageConfig): Readonly<{
   clientConfig: S3ClientConfig;
   publicBaseUrl: URL;
+  signingClientConfig: S3ClientConfig;
 }> {
   const region = config.region.trim().toLowerCase();
   if (!regionPattern.test(region)) throw new Error("Storage region is invalid");
@@ -173,6 +183,18 @@ function normalizeConfig(config: S3CompatibleStorageConfig): Readonly<{
     throw new Error("Storage endpoint cannot contain query or fragment");
   }
   const endpoint = endpointUrl?.toString();
+  const signingEndpointUrl =
+    config.signingEndpoint === undefined
+      ? endpointUrl
+      : safeServiceUrl(config.signingEndpoint, "storage signing endpoint");
+  if (
+    signingEndpointUrl !== undefined &&
+    (signingEndpointUrl.search !== "" || signingEndpointUrl.hash !== "")
+  ) {
+    throw new Error(
+      "Storage signing endpoint cannot contain query or fragment",
+    );
+  }
   const publicBaseUrl = safeServiceUrl(
     config.publicBaseUrl,
     "public storage base URL",
@@ -180,14 +202,23 @@ function normalizeConfig(config: S3CompatibleStorageConfig): Readonly<{
   if (publicBaseUrl.search !== "" || publicBaseUrl.hash !== "") {
     throw new Error("Public storage base URL cannot contain query or fragment");
   }
+  const clientConfig: S3ClientConfig = {
+    credentials: { accessKeyId, secretAccessKey },
+    ...(endpoint === undefined ? {} : { endpoint }),
+    forcePathStyle: config.forcePathStyle ?? false,
+    region,
+  };
+  const signingEndpoint = signingEndpointUrl?.toString();
   return Object.freeze({
-    clientConfig: {
-      credentials: { accessKeyId, secretAccessKey },
-      ...(endpoint === undefined ? {} : { endpoint }),
-      forcePathStyle: config.forcePathStyle ?? false,
-      region,
-    },
+    clientConfig,
     publicBaseUrl,
+    signingClientConfig:
+      signingEndpoint === endpoint
+        ? clientConfig
+        : {
+            ...clientConfig,
+            endpoint: signingEndpoint as string,
+          },
   });
 }
 

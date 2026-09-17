@@ -117,6 +117,87 @@ section {
   background: #dce7de;
 }
 
+.public-search-page {
+  display: block;
+  padding: clamp(1rem, 4vw, 3rem);
+}
+
+.public-search-shell {
+  width: min(100%, 64rem);
+  margin: 0 auto;
+  padding: clamp(1.25rem, 4vw, 3rem);
+}
+
+.public-search-form {
+  display: grid;
+  gap: 0.75rem;
+  margin: 2rem 0;
+}
+
+.public-search-form label {
+  font-weight: 750;
+}
+
+.public-search-form > input {
+  width: 100%;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid #a8b2aa;
+  border-radius: 0.6rem;
+}
+
+.public-search-form > button {
+  justify-self: start;
+  padding: 0.8rem 1.2rem;
+  border: 0;
+  border-radius: 0.6rem;
+  background: #234d31;
+  color: #fff;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.public-search-form > button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.login-page {
+  padding: clamp(1rem, 4vw, 3rem);
+}
+
+.login-shell {
+  width: min(100%, 32rem);
+}
+
+.login-form {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.login-form input {
+  width: 100%;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid #a8b2aa;
+  border-radius: 0.6rem;
+}
+
+.login-form button {
+  margin-top: 0.5rem;
+  padding: 0.8rem 1.2rem;
+  border: 0;
+  border-radius: 0.6rem;
+  background: #234d31;
+  color: #fff;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.login-form button:disabled {
+  cursor: wait;
+  opacity: 0.5;
+}
+
 .job-request-page {
   display: block;
   min-height: 100vh;
@@ -134,6 +215,25 @@ section {
 .job-request-shell > h1 {
   margin: 0.35rem 0 0.75rem;
   font-size: clamp(2rem, 7vw, 3.5rem);
+}
+
+.job-request-shell > .primary-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  margin-top: 1.25rem;
+  padding: 0.75rem 1.25rem;
+  border-radius: 0.6rem;
+  background: #234d31;
+  color: #fff;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.job-request-shell > .primary-action:focus-visible {
+  outline: 3px solid #d3943b;
+  outline-offset: 3px;
 }
 
 .job-request-progress {
@@ -551,6 +651,196 @@ p {
   background: #fffdf7;
 }
 
+.job-dashboard {
+  width: min(100%, 64rem);
+  padding: clamp(1.25rem, 4vw, 3rem);
+  border: 1px solid #d8d4c8;
+  border-radius: 1rem;
+  background: #fffdf7;
+  overflow-wrap: anywhere;
+}
+
+.job-dashboard section {
+  width: 100%;
+  margin-top: 2rem;
+  padding: 1.5rem 0 0;
+  border: 0;
+  border-top: 1px solid #d8d4c8;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.job-dashboard dd {
+  margin: 0.25rem 0 0.75rem;
+}
+
+.job-documentation-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.job-documentation-filters button[aria-pressed="true"] {
+  background: #214e3b;
+  color: #fff;
+}
+
+.job-documentation-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.job-documentation-list li {
+  padding: 1rem;
+  border: 1px solid #d8d4c8;
+  border-radius: 0.75rem;
+}
+
+.job-documentation-list img {
+  display: block;
+  width: 100%;
+  max-height: 16rem;
+  object-fit: contain;
+  border-radius: 0.5rem;
+  background: #f0eee7;
+}
+
+.job-roster-groups {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.job-roster-groups h3 {
+  margin-bottom: 0.5rem;
+}
+
+.job-roster-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: 0.75rem;
+  padding: 0;
+  list-style: none;
+}
+
+.job-roster-card {
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid #d8d4c8;
+  border-radius: 0.75rem;
+  background: #fff;
+}
+
+.job-roster-card h4 {
+  margin: 0 0 0.5rem;
+}
+
+.job-roster-card ul {
+  padding-left: 1.25rem;
+}
+
+.job-roster-role-controls {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #d8d4c8;
+}
+
+.job-roster-role-controls > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.job-roster-role-controls button {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #355b43;
+  border-radius: 0.5rem;
+  background: #f4f8f3;
+  color: #214e3b;
+}
+
+.job-roster-role-controls button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.job-work-group-controls {
+  padding: 1rem;
+  border: 1px solid #d8d4c8;
+  border-radius: 0.75rem;
+  background: #f8f6ef;
+}
+
+.job-work-group-controls h3 {
+  margin-top: 0;
+}
+
+.job-work-group-controls form {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  max-width: 32rem;
+}
+
+.job-work-group-controls input,
+.job-work-group-controls select {
+  min-height: 2.5rem;
+  padding: 0.5rem;
+  border: 1px solid #9eaa9d;
+  border-radius: 0.5rem;
+}
+
+.job-work-group-controls form button {
+  justify-self: start;
+  padding: 0.6rem 0.9rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: #214e3b;
+  color: #fff;
+}
+
+.job-work-group-controls button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.job-work-group-list {
+  display: grid;
+  gap: 0.5rem;
+  padding-left: 1.25rem;
+}
+
+.job-work-group-removal {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+}
+
+.job-work-group-removal textarea {
+  min-height: 4rem;
+  padding: 0.5rem;
+  border: 1px solid #9eaa9d;
+  border-radius: 0.5rem;
+}
+
+.job-work-group-removal button {
+  justify-self: start;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #7b432d;
+  border-radius: 0.5rem;
+  background: #fff8f4;
+  color: #653521;
+}
+
+.job-work-group-removal button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .invitation-detail h2 {
   margin-top: 2rem;
 }
@@ -568,6 +858,33 @@ p {
 
 .invitation-detail dd {
   margin: 0;
+}
+
+.quote-acceptance-recap section {
+  width: 100%;
+  margin-top: 1.5rem;
+  padding: 1.5rem 0 0;
+  border: 0;
+  border-top: 1px solid #d8d4c8;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.quote-acceptance-recap h2 {
+  margin-top: 0;
+}
+
+.quote-acceptance-recap dl {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: 1rem;
+}
+
+.quote-acceptance-recap dl > div {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .invitation-actions {
@@ -641,4 +958,32 @@ p {
 .invitation-inbox a:focus-visible {
   border-color: #355b43;
   background: #f4f8f3;
+}
+
+.participant-invitation-list {
+  display: grid;
+  gap: 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.participant-invitation-list li {
+  padding: 1rem;
+  border: 1px solid #d8d4c8;
+  border-radius: 0.75rem;
+  background: #fff;
+}
+
+.participant-invitation-list h2 {
+  margin-top: 0;
+}
+
+.participant-invitation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.participant-invitation-action {
+  margin-block: 0.75rem;
 }

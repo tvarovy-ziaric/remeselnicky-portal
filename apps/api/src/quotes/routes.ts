@@ -17,6 +17,10 @@ import {
   type UserId,
 } from "@portal/domain";
 import { createAuthenticatedAuthorizationActor } from "@portal/authorization";
+import {
+  QuoteSupportingDocumentIdempotencyError,
+  type createQuoteSupportingDocumentRepository,
+} from "@portal/db";
 import type {
   FastifyInstance,
   FastifyReply,
@@ -35,6 +39,12 @@ export const QUOTE_AUTHORING_PATHS = Object.freeze({
   external: "/v1/me/quotes/:quoteId/revisions/:quoteRevision/external-pdf",
   externalDocument:
     "/v1/me/quotes/:quoteId/revisions/:quoteRevision/external-pdf/document",
+  supportingDocuments:
+    "/v1/me/quotes/:quoteId/revisions/:quoteRevision/supporting-documents",
+  supportingDocumentRemoval:
+    "/v1/me/quotes/:quoteId/revisions/:quoteRevision/supporting-documents/:mediaAssetId/remove",
+  supportingDocumentUpload:
+    "/v1/me/quotes/:quoteId/revisions/:quoteRevision/supporting-documents/upload",
   quote: "/v1/me/quotes/:quoteId",
   reject: "/v1/me/quotes/:quoteId/revisions/:quoteRevision/reject",
   revision: "/v1/me/quotes/:quoteId/revisions",
@@ -56,6 +66,10 @@ export interface QuoteAuthoringRouteDependencies {
   readonly csrfProtection: onRequestHookHandler;
   readonly externalPdf: ExternalPdfQuotePersistence;
   readonly documentUploads?: QuoteDocumentUploadService;
+  readonly supportingDocumentUploads?: QuoteDocumentUploadService;
+  readonly supportingDocuments?: ReturnType<
+    typeof createQuoteSupportingDocumentRepository
+  >;
   readonly guard: Guard;
   readonly rateLimit: {
     readonly max: number;
@@ -89,6 +103,7 @@ export function registerQuoteAuthoringRoutes(
     }
     done(null, payload);
   });
+  registerSupportingDocumentRoutes(app, dependencies);
 
   app.get<{ Params: { readonly invitationId: string } }>(
     QUOTE_AUTHORING_PATHS.byInvitation,
@@ -499,6 +514,207 @@ function registerExternalPdfRoutes(
   );
 }
 
+function registerSupportingDocumentRoutes(
+  app: FastifyInstance,
+  dependencies: QuoteAuthoringRouteDependencies,
+): void {
+  if (dependencies.supportingDocuments === undefined) return;
+
+  app.get<{
+    Params: { readonly quoteId: string; readonly quoteRevision: number };
+  }>(
+    QUOTE_AUTHORING_PATHS.supportingDocuments,
+    { schema: { params: revisionParamsSchema } },
+    async (request, reply) => {
+      const actorUserId = await requireActor(
+        request,
+        reply,
+        dependencies.guard,
+      );
+      if (actorUserId === undefined) return;
+      try {
+        const documents = await dependencies.supportingDocuments!.readOwned({
+          actorUserId,
+          quoteId: request.params.quoteId,
+          quoteRevision: request.params.quoteRevision,
+        });
+        return documents === null
+          ? reply.code(404).send({ code: "NOT_FOUND" })
+          : reply.send({ documents });
+      } catch {
+        return reply.code(503).send({ code: "TEMPORARILY_UNAVAILABLE" });
+      }
+    },
+  );
+
+  app.post<{
+    Body: { readonly commandId: string; readonly mediaAssetId: string };
+    Params: { readonly quoteId: string; readonly quoteRevision: number };
+  }>(
+    QUOTE_AUTHORING_PATHS.supportingDocuments,
+    {
+      config: {
+        rateLimit: {
+          max: dependencies.rateLimit.max,
+          timeWindow: dependencies.rateLimit.timeWindowMs,
+        },
+      },
+      onRequest: dependencies.csrfProtection,
+      schema: {
+        body: supportingDocumentBindSchema,
+        params: revisionParamsSchema,
+      },
+    },
+    async (request, reply) => {
+      const actorUserId = await requireActor(
+        request,
+        reply,
+        dependencies.guard,
+      );
+      if (actorUserId === undefined) return;
+      try {
+        const result = await dependencies.supportingDocuments!.attach({
+          actorUserId,
+          commandId: request.body.commandId,
+          mediaAssetId: request.body.mediaAssetId,
+          quoteId: request.params.quoteId,
+          quoteRevision: request.params.quoteRevision,
+        });
+        if ("document" in result)
+          return reply.code(result.status === "ATTACHED" ? 201 : 200).send({
+            document: {
+              attachedAt: result.document.attachedAt.toISOString(),
+              downloadPath: result.document.downloadPath,
+              mediaAssetId: result.document.mediaAssetId,
+            },
+            status: result.status,
+          });
+        return reply
+          .code(result.status === "NOT_FOUND" ? 404 : 409)
+          .send({ code: result.status });
+      } catch (error) {
+        if (error instanceof QuoteSupportingDocumentIdempotencyError)
+          return reply.code(409).send({ code: "IDEMPOTENCY_CONFLICT" });
+        if (error instanceof TypeError)
+          return reply.code(400).send({ code: "INVALID_REQUEST" });
+        return reply.code(503).send({ code: "TEMPORARILY_UNAVAILABLE" });
+      }
+    },
+  );
+
+  app.post<{
+    Body: Buffer;
+    Params: { readonly quoteId: string; readonly quoteRevision: number };
+  }>(
+    QUOTE_AUTHORING_PATHS.supportingDocumentUpload,
+    {
+      bodyLimit: MEDIA_UPLOAD_LIMITS.documentMaxBytes,
+      config: {
+        rateLimit: {
+          max: dependencies.rateLimit.max,
+          timeWindow: dependencies.rateLimit.timeWindowMs,
+        },
+      },
+      onRequest: dependencies.csrfProtection,
+      schema: { params: revisionParamsSchema },
+    },
+    async (request, reply) => {
+      const actorUserId = await requireActor(
+        request,
+        reply,
+        dependencies.guard,
+      );
+      if (actorUserId === undefined) return;
+      if (dependencies.supportingDocumentUploads === undefined)
+        return reply.code(503).send({ code: "UPLOAD_UNAVAILABLE" });
+      if (
+        !Buffer.isBuffer(request.body) ||
+        request.body.byteLength < 1 ||
+        request.headers["content-type"]?.trim().toLowerCase() !==
+          "application/pdf"
+      ) {
+        return reply.code(400).send({ code: "INVALID_FILE" });
+      }
+      try {
+        const result = await dependencies.supportingDocumentUploads.upload({
+          actor: createAuthenticatedAuthorizationActor({
+            accountState: "ACTIVE",
+            id: actorUserId,
+          }),
+          body: request.body,
+          declaredContentType: "application/pdf",
+          quoteId: request.params.quoteId,
+          quoteRevision: request.params.quoteRevision,
+        });
+        return result.status === "PROCESSING"
+          ? reply.code(202).send(result)
+          : reply.code(404).send({ code: "UPLOAD_UNAVAILABLE" });
+      } catch (error) {
+        if (error instanceof MediaUploadRejectedError)
+          return reply.code(error.code === "FILE_TOO_LARGE" ? 413 : 400).send({
+            code:
+              error.code === "FILE_TOO_LARGE"
+                ? "FILE_TOO_LARGE"
+                : "INVALID_FILE",
+          });
+        return reply.code(503).send({ code: "UPLOAD_UNAVAILABLE" });
+      }
+    },
+  );
+
+  app.post<{
+    Body: { readonly commandId: string };
+    Params: {
+      readonly mediaAssetId: string;
+      readonly quoteId: string;
+      readonly quoteRevision: number;
+    };
+  }>(
+    QUOTE_AUTHORING_PATHS.supportingDocumentRemoval,
+    {
+      config: {
+        rateLimit: {
+          max: dependencies.rateLimit.max,
+          timeWindow: dependencies.rateLimit.timeWindowMs,
+        },
+      },
+      onRequest: dependencies.csrfProtection,
+      schema: {
+        body: supportingDocumentRemovalSchema,
+        params: supportingDocumentParamsSchema,
+      },
+    },
+    async (request, reply) => {
+      const actorUserId = await requireActor(
+        request,
+        reply,
+        dependencies.guard,
+      );
+      if (actorUserId === undefined) return;
+      try {
+        const result = await dependencies.supportingDocuments!.remove({
+          actorUserId,
+          commandId: request.body.commandId,
+          mediaAssetId: request.params.mediaAssetId,
+          quoteId: request.params.quoteId,
+          quoteRevision: request.params.quoteRevision,
+        });
+        return result.status === "NOT_FOUND"
+          ? reply.code(404).send({ code: "NOT_FOUND" })
+          : result.status === "ALREADY_REMOVED"
+            ? reply.code(409).send({ code: "ALREADY_REMOVED" })
+            : reply.send({ status: result.status });
+      } catch (error) {
+        if (error instanceof QuoteSupportingDocumentIdempotencyError)
+          return reply.code(409).send({ code: "IDEMPOTENCY_CONFLICT" });
+        if (error instanceof TypeError)
+          return reply.code(400).send({ code: "INVALID_REQUEST" });
+        return reply.code(503).send({ code: "TEMPORARILY_UNAVAILABLE" });
+      }
+    },
+  );
+}
+
 function registerPdfBodyParser(app: FastifyInstance): void {
   if (app.hasContentTypeParser("application/pdf")) return;
   app.addContentTypeParser(
@@ -677,6 +893,10 @@ const conversationParamsSchema = object({ conversationId: uuid }, [
 const revisionParamsSchema = object(
   { quoteId: uuid, quoteRevision: positiveInteger },
   ["quoteId", "quoteRevision"],
+);
+const supportingDocumentParamsSchema = object(
+  { mediaAssetId: uuid, quoteId: uuid, quoteRevision: positiveInteger },
+  ["mediaAssetId", "quoteId", "quoteRevision"],
 );
 const authoringMode = {
   enum: ["PLATFORM_STRUCTURED", "EXTERNAL_PDF"],
@@ -863,6 +1083,13 @@ const externalSaveSchema = object(
   },
   ["commandId", "envelope", "expectedContentRevision", "pdfAssetId"],
 );
+const supportingDocumentBindSchema = object(
+  { commandId: uuid, mediaAssetId: uuid },
+  ["commandId", "mediaAssetId"],
+);
+const supportingDocumentRemovalSchema = object({ commandId: uuid }, [
+  "commandId",
+]);
 
 function object<
   Properties extends Readonly<Record<string, unknown>>,

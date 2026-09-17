@@ -71,12 +71,14 @@ function parsePage(value: unknown): PublicSearchCardPageViewModel | null {
 function parseCard(value: unknown): PublicSearchCardViewModel | null {
   if (!record(value) || !uuid(value["profileId"])) return null;
   const identity = value["identity"];
+  const profileType = record(identity) ? identity["profileType"] : null;
   const location = value["location"];
   const rating = value["rating"];
   const image = value["representativePortfolioImage"];
   if (
     !record(identity) ||
     !text(identity["primaryName"]) ||
+    (profileType !== "INDIVIDUAL" && profileType !== "COMPANY") ||
     (identity["secondaryName"] !== null && !text(identity["secondaryName"])) ||
     !record(location) ||
     !text(location["municipalityName"]) ||
@@ -116,6 +118,8 @@ function parseCard(value: unknown): PublicSearchCardViewModel | null {
   ) {
     return null;
   }
+  const normalizedProfileType: PublicSearchCardViewModel["identity"]["profileType"] =
+    profileType === "INDIVIDUAL" ? "INDIVIDUAL" : "COMPANY";
   return Object.freeze({
     availability: value[
       "availability"
@@ -123,6 +127,7 @@ function parseCard(value: unknown): PublicSearchCardViewModel | null {
     badges: badges as PublicSearchCardViewModel["badges"],
     identity: {
       primaryName: identity["primaryName"],
+      profileType: normalizedProfileType,
       secondaryName: identity["secondaryName"],
     },
     location: {

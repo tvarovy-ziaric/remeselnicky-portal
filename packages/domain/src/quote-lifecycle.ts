@@ -41,6 +41,7 @@ export interface ReconfirmQuoteInput {
 export interface QuoteAcceptanceContextReadInput {
   readonly actorUserId: UserId;
   readonly quoteId: QuoteId;
+  readonly quoteRevision?: number;
 }
 
 export interface QuoteAcceptanceContext {
@@ -115,6 +116,8 @@ export function assertQuoteAcceptanceContextReadInput(
   record(input);
   uuid(input.actorUserId, "actorUserId");
   uuid(input.quoteId, "quoteId");
+  if (input.quoteRevision !== undefined)
+    positive(input.quoteRevision, "quoteRevision");
 }
 export function assertReconfirmQuoteInput(input: ReconfirmQuoteInput): void {
   record(input);

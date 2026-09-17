@@ -146,6 +146,9 @@ function createMediaRuntime() {
       publicBaseUrl: storageConfig.publicBaseUrl,
       region: storageConfig.region,
       secretAccessKey: storageSecrets.secretAccessKey,
+      ...(storageConfig.signingEndpoint === undefined
+        ? {}
+        : { signingEndpoint: storageConfig.signingEndpoint }),
     }),
     topology: defineStorageTopology({
       privateContainer: storageConfig.privateContainer,

@@ -6,6 +6,13 @@ export {
   createServerMediaProvenance,
   isServerMediaProvenance,
 } from "./model.js";
+export { createChangeOrderDocumentUploadService } from "./change-order-document.js";
+export type {
+  ChangeOrderDocumentProcessingDispatcher,
+  ChangeOrderDocumentUploadAuthorization,
+  ChangeOrderDocumentUploadService,
+  PrepareChangeOrderDocumentUploadResult,
+} from "./change-order-document.js";
 export type {
   CleanDocumentScanEvidence,
   CompleteDocumentProcessingInput,

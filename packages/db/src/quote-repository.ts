@@ -145,6 +145,18 @@ async function execute(
           : Object.freeze({ quote: replay, status: "DEDUPLICATED" as const });
       }
 
+      const active = await transaction`
+        SELECT id FROM users
+        WHERE id = ${input.actorUserId} AND account_state = 'ACTIVE'
+      `;
+      if (active.length !== 1) {
+        return Object.freeze({ status: "NOT_FOUND" as const });
+      }
+
+      if (!(await lockQuoteRequest(transaction, input))) {
+        return Object.freeze({ status: "NOT_FOUND" as const });
+      }
+
       const command = await insertCommand(
         transaction,
         kind,
@@ -228,6 +240,37 @@ async function execute(
     if (error instanceof QuoteIdempotencyError) throw error;
     return mapCommandError(error);
   }
+}
+
+async function lockQuoteRequest(
+  transaction: TransactionSql,
+  input:
+    | CreateQuoteDraftInput
+    | CreateQuoteRevisionInput
+    | RejectQuoteRevisionInput
+    | SubmitQuoteRevisionInput,
+): Promise<boolean> {
+  const [row] =
+    "conversationId" in input
+      ? await transaction<Array<{ jobRequestId: string }>>`
+        SELECT invitation.job_request_id AS "jobRequestId"
+        FROM conversations conversation
+        JOIN job_invitations invitation ON invitation.id = conversation.invitation_id
+        WHERE conversation.id = ${input.conversationId}
+      `
+      : await transaction<Array<{ jobRequestId: string }>>`
+        SELECT invitation.job_request_id AS "jobRequestId"
+        FROM quotes quote
+        JOIN job_invitations invitation ON invitation.id = quote.invitation_id
+        WHERE quote.id = ${input.quoteId}
+      `;
+  if (row === undefined) return false;
+  await transaction`
+    SELECT pg_advisory_xact_lock(
+      hashtextextended(${row.jobRequestId}::text, 41007)
+    )
+  `;
+  return true;
 }
 
 async function insertCommand(

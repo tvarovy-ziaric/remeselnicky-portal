@@ -85,6 +85,7 @@ const serverEnvironmentSchema = z
       .regex(/^[a-z0-9][a-z0-9-]{0,62}$/u)
       .optional(),
     OBJECT_STORAGE_SECRET_ACCESS_KEY: z.string().min(1).max(1_024).optional(),
+    OBJECT_STORAGE_SIGNING_ENDPOINT: z.string().url().optional(),
     PORT: portSchema.optional(),
     RELEASE_REVISION: z.string().trim().min(1),
     SESSION_SECRET: z.string().min(32),
@@ -173,6 +174,10 @@ const serverEnvironmentSchema = z
 
     for (const [field, rawUrl] of [
       ["OBJECT_STORAGE_ENDPOINT", environment.OBJECT_STORAGE_ENDPOINT],
+      [
+        "OBJECT_STORAGE_SIGNING_ENDPOINT",
+        environment.OBJECT_STORAGE_SIGNING_ENDPOINT,
+      ],
       [
         "OBJECT_STORAGE_PUBLIC_BASE_URL",
         environment.OBJECT_STORAGE_PUBLIC_BASE_URL,
@@ -285,6 +290,8 @@ export interface ObjectStorageServerConfig {
   readonly publicBaseUrl: string;
   readonly publicDerivativeContainer: string;
   readonly region: string;
+  /** Optional public S3 endpoint used only when minting short-lived downloads. */
+  readonly signingEndpoint?: string;
 }
 
 export interface MalwareScannerServerConfig {
@@ -439,6 +446,9 @@ function parseObjectStorageConfig(
       publicDerivativeContainer:
         environment.OBJECT_STORAGE_PUBLIC_DERIVATIVE_CONTAINER,
       region: environment.OBJECT_STORAGE_REGION,
+      ...(environment.OBJECT_STORAGE_SIGNING_ENDPOINT === undefined
+        ? {}
+        : { signingEndpoint: environment.OBJECT_STORAGE_SIGNING_ENDPOINT }),
     }),
     secrets: Object.freeze({
       accessKeyId: environment.OBJECT_STORAGE_ACCESS_KEY_ID,

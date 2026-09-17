@@ -869,7 +869,9 @@ async function selectRevision(
 
 function toRecord(row: CurrentRow): JobRequestLifecycleRecord {
   if (
-    !["ACTIVE", "CANCELLED", "DRAFT", "EXPIRED"].includes(row.state) ||
+    !["ACTIVE", "CANCELLED", "CONVERTED", "DRAFT", "EXPIRED"].includes(
+      row.state,
+    ) ||
     !(row.createdAt instanceof Date) ||
     !(row.changedAt instanceof Date) ||
     (row.activatedAt !== null && !(row.activatedAt instanceof Date)) ||

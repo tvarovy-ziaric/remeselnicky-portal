@@ -49,9 +49,21 @@ export function registerQuoteLifecycleRoutes(
     }
     done(null, payload);
   });
-  app.get<{ Params: { quoteId: string } }>(
+  app.get<{
+    Params: { quoteId: string };
+    Querystring: { quoteRevision?: number };
+  }>(
     QUOTE_LIFECYCLE_PATHS.context,
-    { schema: { params: paramsSchema } },
+    {
+      schema: {
+        params: paramsSchema,
+        querystring: {
+          additionalProperties: false,
+          properties: { quoteRevision: { type: "integer", minimum: 1 } },
+          type: "object",
+        },
+      },
+    },
     async (request, reply) => {
       const actorUserId = await requireActor(
         request,
@@ -63,6 +75,9 @@ export function registerQuoteLifecycleRoutes(
         const context = await dependencies.lifecycle.readOwnedContext({
           actorUserId,
           quoteId: request.params.quoteId as QuoteId,
+          ...(request.query.quoteRevision === undefined
+            ? {}
+            : { quoteRevision: request.query.quoteRevision }),
         });
         return context === null
           ? reply.code(404).send({ code: "NOT_FOUND" })

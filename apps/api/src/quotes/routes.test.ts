@@ -10,6 +10,7 @@ import type {
   UserId,
 } from "@portal/domain";
 import type { QuoteDocumentUploadService } from "@portal/media";
+import type { createQuoteSupportingDocumentRepository } from "@portal/db";
 import Fastify, {
   type FastifyInstance,
   type onRequestHookHandler,
@@ -34,6 +35,110 @@ const apps: FastifyInstance[] = [];
 afterEach(async () => Promise.all(apps.splice(0).map((app) => app.close())));
 
 describe("Quote authoring routes", () => {
+  it("binds and privately reads only explicit supporting PDFs", async () => {
+    const fixture = build();
+    fixture.supportingDocumentUploads.upload.mockResolvedValue({
+      assetId: pdfAssetId,
+      status: "PROCESSING",
+    });
+    const upload = await fixture.app.inject({
+      headers: { "content-type": "application/pdf" },
+      method: "POST",
+      payload: Buffer.from("%PDF-1.7\nsynthetic"),
+      url: revisionPath(QUOTE_AUTHORING_PATHS.supportingDocumentUpload),
+    });
+    expect(upload.statusCode).toBe(202);
+    expect(fixture.supportingDocumentUploads.upload).toHaveBeenCalledWith(
+      expect.objectContaining({
+        quoteId,
+        quoteRevision: 1,
+      }),
+    );
+    fixture.supportingDocuments.attach.mockResolvedValue({
+      document: {
+        attachedAt: now,
+        downloadPath: `/v1/media/${pdfAssetId}/download`,
+        mediaAssetId: pdfAssetId,
+      },
+      status: "ATTACHED",
+    });
+    const attached = await fixture.app.inject({
+      method: "POST",
+      payload: { commandId, mediaAssetId: pdfAssetId },
+      url: revisionPath(QUOTE_AUTHORING_PATHS.supportingDocuments),
+    });
+    expect(attached.statusCode).toBe(201);
+    expect(fixture.supportingDocuments.attach).toHaveBeenCalledWith({
+      actorUserId,
+      commandId,
+      mediaAssetId: pdfAssetId,
+      quoteId,
+      quoteRevision: 1,
+    });
+    expect(attached.body).not.toMatch(/storage|hash|scanner/iu);
+    fixture.supportingDocuments.readOwned.mockResolvedValue([
+      {
+        attachedAt: now,
+        downloadPath: `/v1/media/${pdfAssetId}/download`,
+        mediaAssetId: pdfAssetId,
+      },
+    ]);
+    const listed = await fixture.app.inject({
+      method: "GET",
+      url: revisionPath(QUOTE_AUTHORING_PATHS.supportingDocuments),
+    });
+    expect(listed.statusCode).toBe(200);
+    expect(JSON.parse(listed.body)).toEqual({
+      documents: [
+        {
+          attachedAt: now.toISOString(),
+          downloadPath: `/v1/media/${pdfAssetId}/download`,
+          mediaAssetId: pdfAssetId,
+        },
+      ],
+    });
+    expect(listed.headers["cache-control"]).toBe("private, no-store");
+    fixture.supportingDocuments.remove.mockResolvedValue({
+      status: "REMOVED",
+    });
+    const removed = await fixture.app.inject({
+      method: "POST",
+      payload: { commandId },
+      url: path(QUOTE_AUTHORING_PATHS.supportingDocumentRemoval, {
+        mediaAssetId: pdfAssetId,
+        quoteId,
+        quoteRevision: "1",
+      }),
+    });
+    expect(removed.statusCode).toBe(200);
+    expect(JSON.parse(removed.body)).toEqual({ status: "REMOVED" });
+    expect(fixture.supportingDocuments.remove).toHaveBeenCalledWith({
+      actorUserId,
+      commandId,
+      mediaAssetId: pdfAssetId,
+      quoteId,
+      quoteRevision: 1,
+    });
+  });
+
+  it("keeps supporting-document operations behind session and exact intent", async () => {
+    const fixture = build("AUTHENTICATION_REQUIRED");
+    const unauthenticated = await fixture.app.inject({
+      method: "POST",
+      payload: { commandId, mediaAssetId: pdfAssetId },
+      url: revisionPath(QUOTE_AUTHORING_PATHS.supportingDocuments),
+    });
+    expect(unauthenticated.statusCode).toBe(401);
+    expect(fixture.supportingDocuments.attach).not.toHaveBeenCalled();
+    const malformed = await fixture.app.inject({
+      method: "POST",
+      payload: { commandId, mediaAssetId: "not-a-uuid" },
+      url: revisionPath(QUOTE_AUTHORING_PATHS.supportingDocuments),
+    });
+    expect(malformed.statusCode).toBe(400);
+    expect(fixture.supportingDocuments.attach).not.toHaveBeenCalled();
+  });
+
   it("uploads an external Quote PDF through the exact provider boundary", async () => {
     const fixture = build();
     fixture.documentUploads.upload.mockResolvedValue({
@@ -314,6 +419,23 @@ function build(
   const documentUploads = {
     upload: vi.fn<QuoteDocumentUploadService["upload"]>(),
   };
+  const supportingDocumentUploads = {
+    upload: vi.fn<QuoteDocumentUploadService["upload"]>(),
+  };
+  const supportingDocuments = {
+    attach:
+      vi.fn<
+        ReturnType<typeof createQuoteSupportingDocumentRepository>["attach"]
+      >(),
+    readOwned:
+      vi.fn<
+        ReturnType<typeof createQuoteSupportingDocumentRepository>["readOwned"]
+      >(),
+    remove:
+      vi.fn<
+        ReturnType<typeof createQuoteSupportingDocumentRepository>["remove"]
+      >(),
+  };
   registerQuoteAuthoringRoutes(app, {
     core,
     csrfProtection: csrf,
@@ -330,8 +452,19 @@ function build(
     },
     rateLimit: { max: 50, timeWindowMs: 60_000 },
     structured,
+    supportingDocumentUploads,
+    supportingDocuments,
   });
-  return { app, core, csrf, documentUploads, externalPdf, structured };
+  return {
+    app,
+    core,
+    csrf,
+    documentUploads,
+    externalPdf,
+    structured,
+    supportingDocumentUploads,
+    supportingDocuments,
+  };
 }
 
 function revisionPath(template: string) {

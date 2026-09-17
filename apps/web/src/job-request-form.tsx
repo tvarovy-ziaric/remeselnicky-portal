@@ -310,8 +310,10 @@ export function JobRequestForm({
   if (status === "AUTHENTICATION_REQUIRED")
     return (
       <FormMessage
+        action="/prihlasenie"
+        actionLabel="Prihlásiť sa"
         title="Najprv sa prihláste"
-        text="Po prihlásení sa váš rozpracovaný dopyt automaticky obnoví."
+        text="Po prihlásení môžete vytvoriť nový dopyt alebo pokračovať v uloženom koncepte."
       />
     );
   if (status === "UNAVAILABLE")

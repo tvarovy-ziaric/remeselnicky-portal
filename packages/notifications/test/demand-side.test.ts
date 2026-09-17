@@ -40,6 +40,287 @@ function event(input: {
 }
 
 describe("R3 demand-side notification catalog", () => {
+  it.each([
+    ["job.change_order.proposed", "REVIEW_CHANGE_ORDER"],
+    ["job.change_order.counterproposed", "REVIEW_CHANGE_ORDER_REVISION"],
+    ["job.change_order.approved", "CHANGE_ORDER_APPROVED"],
+    ["job.change_order.rejected", "CHANGE_ORDER_REJECTED"],
+    ["job.change_order.withdrawn", "CHANGE_ORDER_WITHDRAWN"],
+  ] as const)(
+    "maps %s to the exact private revision without commercial content",
+    (name, action) => {
+      const jobId = randomUUID();
+      const changeOrderId = randomUUID();
+      const revisionId = randomUUID();
+      const draft = mapDemandSideNotificationEvent(
+        event({
+          entityId: revisionId,
+          entityType: "CHANGE_ORDER_REVISION",
+          name,
+          payload: {
+            job_id: jobId,
+            change_order_id: changeOrderId,
+            revision_id: revisionId,
+            revision_number: 3,
+          },
+        }),
+      )?.[0];
+      expect(draft).toEqual({
+        channels: ["IN_APP", "EMAIL"],
+        context: {
+          entityId: revisionId,
+          entityRevision: 3,
+          entityType: "CHANGE_ORDER_REVISION",
+          path: `/zakazky/${jobId}/zmeny/${changeOrderId}/revizie/${revisionId}`,
+        },
+        payload: { action, revision_number: 3 },
+        priority: "IMPORTANT",
+        recipientUserId,
+        type: name,
+      });
+      expect(() => validateNotificationDraft(draft as never)).not.toThrow();
+      expect(JSON.stringify(draft)).not.toMatch(
+        /price|amount|reason|body|email_address|phone|address|storage|filename|document|pdf/iu,
+      );
+    },
+  );
+
+  it("rejects malformed Change-order envelopes, spoofed revision IDs and sensitive payload additions", () => {
+    const jobId = randomUUID();
+    const changeOrderId = randomUUID();
+    const revisionId = randomUUID();
+    const base = {
+      job_id: jobId,
+      change_order_id: changeOrderId,
+      revision_id: revisionId,
+      revision_number: 2,
+    };
+    const standard = {
+      entityId: revisionId,
+      entityType: "CHANGE_ORDER_REVISION",
+      name: DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobChangeOrderProposed,
+    };
+    expect(() =>
+      mapDemandSideNotificationEvent(event({ ...standard, payload: base })),
+    ).not.toThrow();
+    expect(() =>
+      mapDemandSideNotificationEvent(
+        event({ ...standard, entityId: randomUUID(), payload: base }),
+      ),
+    ).toThrow();
+    expect(() =>
+      mapDemandSideNotificationEvent(
+        event({ ...standard, entityType: "JOB", payload: base }),
+      ),
+    ).toThrow();
+    expect(() =>
+      mapDemandSideNotificationEvent(
+        event({ ...standard, schemaVersion: 2, payload: base }),
+      ),
+    ).toThrow();
+    for (const payload of [
+      { ...base, revision_number: 0 },
+      { ...base, revision_number: 1.5 },
+      { ...base, revision_id: "not-a-uuid" },
+      { ...base, job_id: "not-a-uuid" },
+      { ...base, change_order_id: "not-a-uuid" },
+      { ...base, recipient_user_id: "private@example.test" },
+      { ...base, price_cents: 50000 },
+      { ...base, body: "private" },
+      {
+        job_id: jobId,
+        change_order_id: changeOrderId,
+        revision_id: revisionId,
+      },
+    ]) {
+      expect(() =>
+        mapDemandSideNotificationEvent(event({ ...standard, payload })),
+      ).toThrow();
+    }
+  });
+  it.each([
+    ["job.progress.created", "progress_update_id", "priebeh", "INFO"],
+    ["job.issue.created", "issue_id", "problemy", "IMPORTANT"],
+  ] as const)(
+    "maps %s to exact private Job context without content",
+    (name, key, segment, priority) => {
+      const jobId = randomUUID();
+      const itemId = randomUUID();
+      const payload =
+        key === "issue_id"
+          ? { issue_id: itemId, issue_kind: "DELAY" }
+          : { progress_update_id: itemId };
+      const draft = mapDemandSideNotificationEvent(
+        event({
+          entityId: jobId,
+          entityType: "JOB",
+          name,
+          payload,
+        }),
+      )?.[0];
+      expect(draft).toEqual({
+        channels: ["IN_APP"],
+        context: {
+          entityId: jobId,
+          entityType: "JOB",
+          path: `/zakazky/${jobId}/${segment}/${itemId}`,
+        },
+        payload: {
+          action: key === "issue_id" ? "REVIEW_ISSUE" : "READ_PROGRESS",
+          [key]: itemId,
+        },
+        priority,
+        recipientUserId,
+        type: name,
+      });
+      expect(() => validateNotificationDraft(draft as never)).not.toThrow();
+      expect(() =>
+        mapDemandSideNotificationEvent(
+          event({
+            entityId: jobId,
+            entityType: "JOB",
+            name,
+            payload: { ...payload, body: "private" },
+          }),
+        ),
+      ).toThrow();
+    },
+  );
+  it.each([
+    [
+      "job_participant.invited",
+      "INVITED",
+      ["IN_APP", "EMAIL"],
+      "IMPORTANT",
+      "INVITEE",
+    ],
+    [
+      "job_participant.accepted",
+      "ACCEPTED",
+      ["IN_APP", "EMAIL"],
+      "IMPORTANT",
+      "JOB",
+    ],
+    [
+      "job_participant.declined",
+      "DECLINED",
+      ["IN_APP", "EMAIL"],
+      "IMPORTANT",
+      "JOB",
+    ],
+    ["job_participant.joined", "JOINED", ["IN_APP"], "INFO", "JOB"],
+    ["job_participant.left", "LEFT", ["IN_APP"], "INFO", "JOB"],
+    ["job_participant.departed", "DEPARTED", ["IN_APP"], "INFO", "JOB"],
+    ["job_participant.removed", "REMOVED", ["IN_APP"], "INFO", "HISTORY"],
+  ] as const)(
+    "maps %s to an exact guarded context without private details",
+    (name, action, channels, priority, destination) => {
+      const participantId = randomUUID();
+      const jobId = randomUUID();
+      const draft = mapDemandSideNotificationEvent(
+        event({
+          entityId: participantId,
+          entityType: "JOB_PARTICIPANT",
+          name,
+          payload: {
+            job_id: jobId,
+            participant_id: participantId,
+            participation_revision: 1,
+          },
+        }),
+      )?.[0];
+      const path =
+        destination === "INVITEE"
+          ? `/ucasti/pozvanky/${participantId}`
+          : destination === "HISTORY"
+            ? `/ucasti/historia/${participantId}`
+            : `/zakazky/${jobId}/ucastnici/${participantId}`;
+      expect(draft).toEqual({
+        channels,
+        context: {
+          entityId: participantId,
+          entityRevision: 1,
+          entityType: "JOB_PARTICIPANT",
+          path,
+        },
+        payload: { action, participation_revision: 1 },
+        priority,
+        recipientUserId,
+        type: name,
+      });
+      expect(() => validateNotificationDraft(draft as never)).not.toThrow();
+    },
+  );
+
+  it("rejects participant notification spoofing, reason and hidden address fields", () => {
+    const participantId = randomUUID();
+    const jobId = randomUUID();
+    const base = {
+      entityId: participantId,
+      entityType: "JOB_PARTICIPANT",
+      name: DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobParticipantJoined,
+      payload: {
+        job_id: jobId,
+        participant_id: participantId,
+        participation_revision: 1,
+      },
+    };
+    expect(() =>
+      mapDemandSideNotificationEvent(
+        event({ ...base, entityId: randomUUID() }),
+      ),
+    ).toThrow();
+    for (const key of ["reason", "exact_address", "customer_contact"]) {
+      expect(() =>
+        mapDemandSideNotificationEvent(
+          event({ ...base, payload: { ...base.payload, [key]: "private" } }),
+        ),
+      ).toThrow();
+    }
+  });
+
+  it.each([
+    [DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobStarted, "WORK_STARTED"],
+    [DEMAND_SIDE_NOTIFICATION_EVENT_NAMES.jobCancelled, "WORK_CANCELLED"],
+  ] as const)(
+    "notifies the other primary party of %s without a reason",
+    (name, action) => {
+      const jobId = randomUUID();
+      const draft = mapDemandSideNotificationEvent(
+        event({
+          entityId: jobId,
+          entityType: "JOB",
+          name,
+          payload: { job_state_revision: 1 },
+        }),
+      )?.[0];
+      expect(draft).toEqual({
+        channels: ["IN_APP", "EMAIL"],
+        context: {
+          entityId: jobId,
+          entityRevision: 1,
+          entityType: "JOB",
+          path: `/zakazky/${jobId}`,
+        },
+        payload: { action, job_state_revision: 1 },
+        priority: "IMPORTANT",
+        recipientUserId,
+        type: name,
+      });
+      expect(() => validateNotificationDraft(draft as never)).not.toThrow();
+      expect(() =>
+        mapDemandSideNotificationEvent(
+          event({
+            entityId: jobId,
+            entityType: "JOB",
+            name,
+            payload: { job_state_revision: 1, reason: "private reason" },
+          }),
+        ),
+      ).toThrow();
+    },
+  );
+
   it("owns a catalog disjoint from the delegated invitation events", () => {
     const delegated = new Set(
       Object.values(JOB_INVITATION_NOTIFICATION_EVENT_NAMES),

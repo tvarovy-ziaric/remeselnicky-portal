@@ -1,5 +1,6 @@
 .git
 .github
+.alpha
 .pnpm-store
 .turbo
 .env
@@ -10,8 +11,8 @@
 **/dist
 **/node_modules
 **/*.tsbuildinfo
+backups
 deploy
 docs
 ROADMAP.md
 IMPLEMENTATION_BACKLOG.md
-

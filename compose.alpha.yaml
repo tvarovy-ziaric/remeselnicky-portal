@@ -1,0 +1,524 @@
+name: remeselnicky-alpha
+
+x-app-environment: &app-environment
+  APP_ENV: staging
+  APP_ORIGIN: https://${ALPHA_APP_HOSTNAME:?Set ALPHA_APP_HOSTNAME in .env.alpha}
+  NODE_EXTRA_CA_CERTS: /run/alpha-tls/ca.crt
+  OBJECT_STORAGE_ACCESS_KEY_ID_FILE: /run/secrets/minio_access_key
+  OBJECT_STORAGE_ENDPOINT: https://minio:9000
+  OBJECT_STORAGE_FORCE_PATH_STYLE: "true"
+  OBJECT_STORAGE_PRIVATE_CONTAINER: ${OBJECT_STORAGE_PRIVATE_CONTAINER:-portal-alpha-private}
+  OBJECT_STORAGE_PUBLIC_BASE_URL: https://${ALPHA_OBJECT_HOSTNAME:?Set ALPHA_OBJECT_HOSTNAME in .env.alpha}/${OBJECT_STORAGE_PUBLIC_DERIVATIVE_CONTAINER:-portal-alpha-public}/
+  OBJECT_STORAGE_PUBLIC_DERIVATIVE_CONTAINER: ${OBJECT_STORAGE_PUBLIC_DERIVATIVE_CONTAINER:-portal-alpha-public}
+  OBJECT_STORAGE_REGION: ${OBJECT_STORAGE_REGION:-eu-central-1}
+  OBJECT_STORAGE_SECRET_ACCESS_KEY_FILE: /run/secrets/minio_secret_key
+  OBJECT_STORAGE_SIGNING_ENDPOINT: https://${ALPHA_OBJECT_HOSTNAME}
+  PORTAL_APP_DB_PASSWORD_FILE: /run/secrets/postgres_app_password
+  PORTAL_APP_DB_USER: ${PORTAL_APP_DB_USER:-portal_alpha_app}
+  PORTAL_POSTGRES_DB: ${PORTAL_POSTGRES_DB:-portal_alpha}
+  RELEASE_REVISION: ${ALPHA_RELEASE_REVISION:?Set ALPHA_RELEASE_REVISION in .env.alpha}
+
+x-app-secrets: &app-secrets
+  - postgres_app_password
+  - minio_access_key
+  - minio_secret_key
+
+x-app-security: &app-security
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  read_only: true
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,nodev,size=64m
+
+services:
+  postgres:
+    build:
+      context: .
+      dockerfile: infra/alpha/postgres.Dockerfile
+    environment:
+      POSTGRES_DB: ${PORTAL_POSTGRES_DB:-portal_alpha}
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_owner_password
+      POSTGRES_USER: ${PORTAL_POSTGRES_USER:-portal_alpha_owner}
+      PORTAL_APP_DB_PASSWORD_FILE: /run/secrets/postgres_app_password
+      PORTAL_APP_DB_USER: ${PORTAL_APP_DB_USER:-portal_alpha_app}
+      PORTAL_DATABASE_ENVIRONMENT: staging
+    secrets:
+      - postgres_owner_password
+      - postgres_app_password
+    volumes:
+      - alpha-postgres-data:/var/lib/postgresql/data
+      - ./.alpha/tls:/run/alpha-tls:ro
+      - ./packages/db/migrations/0000_enable_postgis.sql:/docker-entrypoint-initdb.d/0000_enable_postgis.sql:ro
+      - ./infra/postgres/init/010-create-application-role.sh:/docker-entrypoint-initdb.d/010-create-application-role.sh:ro
+    networks: [alpha-internal]
+    healthcheck:
+      test:
+        [
+          CMD-SHELL,
+          "pg_isready --username=$${POSTGRES_USER} --dbname=$${POSTGRES_DB}",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+    restart: unless-stopped
+    mem_limit: 1536m
+    cpus: 1.5
+    security_opt: [no-new-privileges:true]
+
+  migrate:
+    image: remeselnicky-alpha-api:${ALPHA_RELEASE_REVISION}
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      args:
+        RELEASE_REVISION: ${ALPHA_RELEASE_REVISION}
+    entrypoint: [/bin/sh, /app/infra/alpha/container-entrypoint.sh]
+    command: [node, packages/db/dist/migrate-cli.js]
+    environment:
+      ALPHA_DATABASE_ROLE: owner
+      NODE_EXTRA_CA_CERTS: /run/alpha-tls/ca.crt
+      PORTAL_DB_OWNER_PASSWORD_FILE: /run/secrets/postgres_owner_password
+      PORTAL_POSTGRES_DB: ${PORTAL_POSTGRES_DB:-portal_alpha}
+      PORTAL_POSTGRES_USER: ${PORTAL_POSTGRES_USER:-portal_alpha_owner}
+    secrets: [postgres_owner_password]
+    volumes:
+      - ./.alpha/tls:/run/alpha-tls:ro
+    networks: [alpha-internal]
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: "no"
+    <<: *app-security
+    mem_limit: 512m
+    cpus: 1.0
+
+  grant-runtime:
+    image: postgis/postgis:17-3.5-alpine
+    entrypoint: [/bin/sh, /workspace/infra/alpha/grant-runtime.sh]
+    environment:
+      PORTAL_APP_DB_USER: ${PORTAL_APP_DB_USER:-portal_alpha_app}
+      PORTAL_POSTGRES_DB: ${PORTAL_POSTGRES_DB:-portal_alpha}
+      PORTAL_POSTGRES_USER: ${PORTAL_POSTGRES_USER:-portal_alpha_owner}
+    secrets:
+      - postgres_owner_password
+      - postgres_app_password
+    volumes:
+      - ./infra/alpha/grant-runtime.sh:/workspace/infra/alpha/grant-runtime.sh:ro
+      - ./.alpha/tls:/run/alpha-tls:ro
+    networks: [alpha-internal]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    restart: "no"
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m
+    cpus: 0.5
+
+  seed:
+    image: remeselnicky-alpha-api:${ALPHA_RELEASE_REVISION}
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      args:
+        RELEASE_REVISION: ${ALPHA_RELEASE_REVISION}
+    entrypoint: [/bin/sh, /app/infra/alpha/container-entrypoint.sh]
+    command: [/bin/sh, /app/infra/alpha/seed-synthetic.sh]
+    environment:
+      ALPHA_SYNTHETIC_FIXTURE: "1"
+      ALPHA_DATABASE_ROLE: runtime
+      APP_ENV: staging
+      NODE_EXTRA_CA_CERTS: /run/alpha-tls/ca.crt
+      PORTAL_APP_DB_PASSWORD_FILE: /run/secrets/postgres_app_password
+      PORTAL_APP_DB_USER: ${PORTAL_APP_DB_USER:-portal_alpha_app}
+      PORTAL_POSTGRES_DB: ${PORTAL_POSTGRES_DB:-portal_alpha}
+      SYNTHETIC_SEED_PASSWORD_FILE: /run/secrets/synthetic_seed_password
+    secrets:
+      - postgres_app_password
+      - synthetic_seed_password
+    volumes:
+      - ./.alpha/tls:/run/alpha-tls:ro
+    networks: [alpha-internal]
+    depends_on:
+      grant-runtime: { condition: service_completed_successfully }
+    restart: "no"
+    <<: *app-security
+    mem_limit: 512m
+    cpus: 1.0
+
+  minio:
+    image: remeselnicky-alpha-minio:RELEASE.2025-10-15T17-29-55Z
+    build:
+      context: .
+      dockerfile: infra/alpha/minio.Dockerfile
+    entrypoint: [/bin/sh, /workspace/infra/alpha/minio-entrypoint.sh]
+    secrets:
+      - minio_access_key
+      - minio_secret_key
+    volumes:
+      - alpha-minio-data:/data
+      - ./infra/alpha/minio-entrypoint.sh:/workspace/infra/alpha/minio-entrypoint.sh:ro
+      - ./.alpha/tls:/run/alpha-tls:ro
+    networks: [alpha-internal]
+    healthcheck:
+      test:
+        [
+          CMD-SHELL,
+          "curl --fail --insecure https://127.0.0.1:9000/minio/health/live >/dev/null",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 15s
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 1024m
+    cpus: 1.0
+
+  minio-init:
+    image: remeselnicky-alpha-mc:RELEASE.2025-08-13T08-35-41Z
+    build:
+      context: .
+      dockerfile: infra/alpha/mc.Dockerfile
+    entrypoint: [/bin/sh, /workspace/infra/alpha/minio-init.sh]
+    environment:
+      OBJECT_STORAGE_PRIVATE_CONTAINER: ${OBJECT_STORAGE_PRIVATE_CONTAINER:-portal-alpha-private}
+      OBJECT_STORAGE_PUBLIC_DERIVATIVE_CONTAINER: ${OBJECT_STORAGE_PUBLIC_DERIVATIVE_CONTAINER:-portal-alpha-public}
+      SSL_CERT_FILE: /run/alpha-tls/ca.crt
+    secrets:
+      - minio_access_key
+      - minio_secret_key
+    volumes:
+      - ./infra/alpha/minio-init.sh:/workspace/infra/alpha/minio-init.sh:ro
+      - ./.alpha/tls:/run/alpha-tls:ro
+    networks: [alpha-internal]
+    depends_on:
+      minio: { condition: service_healthy }
+    restart: "no"
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+    cpus: 0.25
+
+  clamav:
+    image: clamav/clamav:1.5.4-debian13-slim@sha256:cc16781fe005e49de6a8fc1231b63b265f74b18fc2a6347c670c35716914c3b6
+    entrypoint:
+      - /bin/sh
+      - -c
+      - cp /run/alpha-embedded-eicar.ndb /var/lib/clamav/embedded-eicar-test.ndb && exec /init
+    environment:
+      CLAMD_CONF_TCPAddr: 127.0.0.1
+      CLAMD_CONF_StreamMaxLength: 25M
+      CLAMD_CONF_MaxFileSize: 25M
+      CLAMD_STARTUP_TIMEOUT: "600"
+      FRESHCLAM_CHECKS: "12"
+    volumes:
+      - alpha-clamav-database:/var/lib/clamav
+      - ./infra/alpha/embedded-eicar-test.ndb:/run/alpha-embedded-eicar.ndb:ro
+      - alpha-clamav-log:/var/log/clamav
+      - alpha-clamav-run:/run/clamav
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
+    networks: [alpha-internal, alpha-egress]
+    healthcheck:
+      test: [CMD, /usr/local/bin/clamdcheck.sh]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+      start_period: 30s
+    restart: unless-stopped
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETUID, SETGID]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 4g
+    cpus: 1.0
+
+  api:
+    image: remeselnicky-alpha-api:${ALPHA_RELEASE_REVISION}
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      args:
+        RELEASE_REVISION: ${ALPHA_RELEASE_REVISION}
+    entrypoint: [/bin/sh, /app/infra/alpha/container-entrypoint.sh]
+    command: [node, apps/api/dist/start.js]
+    environment:
+      <<: *app-environment
+      ALPHA_DATABASE_ROLE: runtime
+      PORT: "3001"
+      SESSION_SECRET_FILE: /run/secrets/session_secret
+    secrets:
+      - postgres_app_password
+      - minio_access_key
+      - minio_secret_key
+      - session_secret
+    volumes:
+      - ./.alpha/tls:/run/alpha-tls:ro
+    networks: [alpha-internal]
+    depends_on:
+      grant-runtime: { condition: service_completed_successfully }
+      minio-init: { condition: service_completed_successfully }
+      seed: { condition: service_completed_successfully }
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://127.0.0.1:3001/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+    <<: *app-security
+    mem_limit: 768m
+    cpus: 1.0
+
+  worker:
+    image: remeselnicky-alpha-worker:${ALPHA_RELEASE_REVISION}
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+      args:
+        RELEASE_REVISION: ${ALPHA_RELEASE_REVISION}
+    entrypoint: [/bin/sh, /app/infra/alpha/container-entrypoint.sh]
+    command: [node, apps/worker/dist/start.js]
+    environment:
+      <<: *app-environment
+      ALPHA_DATABASE_ROLE: runtime
+      MALWARE_SCANNER_HOST: 127.0.0.1
+      MALWARE_SCANNER_PORT: "3310"
+      SESSION_SECRET_FILE: /run/secrets/session_secret
+    secrets:
+      - postgres_app_password
+      - minio_access_key
+      - minio_secret_key
+      - session_secret
+    volumes:
+      - ./.alpha/tls:/run/alpha-tls:ro
+    network_mode: service:clamav
+    depends_on:
+      clamav: { condition: service_healthy }
+      grant-runtime: { condition: service_completed_successfully }
+      minio-init: { condition: service_completed_successfully }
+      seed: { condition: service_completed_successfully }
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://127.0.0.1:9465/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    restart: unless-stopped
+    <<: *app-security
+    mem_limit: 768m
+    cpus: 1.0
+
+  web:
+    image: remeselnicky-alpha-web:${ALPHA_RELEASE_REVISION}
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        DEPLOYMENT_ENV: staging
+        RELEASE_REVISION: ${ALPHA_RELEASE_REVISION}
+    environment:
+      PORTAL_API_ORIGIN: http://api:3001
+    networks: [alpha-internal]
+    depends_on:
+      api: { condition: service_healthy }
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://127.0.0.1:3000/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+    <<: *app-security
+    mem_limit: 512m
+    cpus: 0.75
+
+  reverse-proxy:
+    image: nginx:1.28.0-alpine
+    environment:
+      ALPHA_APP_HOSTNAME: ${ALPHA_APP_HOSTNAME}
+      ALPHA_OBJECT_HOSTNAME: ${ALPHA_OBJECT_HOSTNAME}
+      NGINX_ENVSUBST_FILTER: ^(ALPHA_|OBJECT_STORAGE_)
+      OBJECT_STORAGE_PRIVATE_CONTAINER: ${OBJECT_STORAGE_PRIVATE_CONTAINER:-portal-alpha-private}
+    volumes:
+      - ./infra/alpha/nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ./.alpha/tls:/run/alpha-tls:ro
+    secrets: [quick_gate_htpasswd]
+    ports:
+      - 127.0.0.1:${ALPHA_DIAGNOSTIC_PORT:-8080}:8080
+    networks: [alpha-internal, alpha-edge]
+    depends_on:
+      api: { condition: service_healthy }
+      web: { condition: service_healthy }
+      minio: { condition: service_healthy }
+    healthcheck:
+      test:
+        [
+          CMD-SHELL,
+          "wget -qO- --header='Host: '$${ALPHA_APP_HOSTNAME} http://127.0.0.1:8080/health/live >/dev/null",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETGID, SETUID]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+    cpus: 0.25
+
+  cloudflared:
+    profiles: [tunnel]
+    image: cloudflare/cloudflared:2026.9.1
+    command:
+      [
+        tunnel,
+        --no-autoupdate,
+        run,
+        --token-file,
+        /run/secrets/cloudflare_tunnel_token,
+      ]
+    secrets: [cloudflare_tunnel_token]
+    networks: [alpha-edge]
+    depends_on:
+      reverse-proxy: { condition: service_healthy }
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    mem_limit: 256m
+    cpus: 0.25
+
+  quick-app:
+    profiles: [quick]
+    image: cloudflare/cloudflared:2026.9.1
+    command: [tunnel, --no-autoupdate, --url, http://reverse-proxy:8082]
+    networks: [alpha-edge]
+    depends_on:
+      reverse-proxy: { condition: service_healthy }
+    restart: "no"
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    mem_limit: 256m
+    cpus: 0.25
+
+  quick-object:
+    profiles: [quick]
+    image: cloudflare/cloudflared:2026.9.1
+    command: [tunnel, --no-autoupdate, --url, http://reverse-proxy:8081]
+    networks: [alpha-edge]
+    depends_on:
+      reverse-proxy: { condition: service_healthy }
+    restart: "no"
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    mem_limit: 256m
+    cpus: 0.25
+
+  quick-object-probe:
+    profiles: [ops]
+    image: remeselnicky-alpha-api:${ALPHA_RELEASE_REVISION}
+    entrypoint: [node, /app/infra/alpha/verify-quick-object.mjs]
+    environment:
+      ALPHA_OBJECT_HOSTNAME: ${ALPHA_OBJECT_HOSTNAME}
+      NODE_EXTRA_CA_CERTS: /run/alpha-tls/ca.crt
+      OBJECT_STORAGE_PRIVATE_CONTAINER: ${OBJECT_STORAGE_PRIVATE_CONTAINER:-portal-alpha-private}
+      OBJECT_STORAGE_REGION: ${OBJECT_STORAGE_REGION:-eu-central-1}
+    secrets: [minio_access_key, minio_secret_key]
+    volumes:
+      - ./infra/alpha/verify-quick-object.mjs:/app/infra/alpha/verify-quick-object.mjs:ro
+      - ./.alpha/tls:/run/alpha-tls:ro
+    networks: [alpha-internal, alpha-egress]
+    depends_on:
+      minio: { condition: service_healthy }
+    restart: "no"
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    mem_limit: 256m
+    cpus: 0.25
+
+  storage-maintenance:
+    profiles: [ops]
+    image: remeselnicky-alpha-mc:RELEASE.2025-08-13T08-35-41Z
+    build:
+      context: .
+      dockerfile: infra/alpha/mc.Dockerfile
+    entrypoint: [/bin/sh, /workspace/infra/alpha/storage-maintenance.sh]
+    environment:
+      OBJECT_STORAGE_PRIVATE_CONTAINER: ${OBJECT_STORAGE_PRIVATE_CONTAINER:-portal-alpha-private}
+      OBJECT_STORAGE_PUBLIC_DERIVATIVE_CONTAINER: ${OBJECT_STORAGE_PUBLIC_DERIVATIVE_CONTAINER:-portal-alpha-public}
+      SSL_CERT_FILE: /run/alpha-tls/ca.crt
+    secrets:
+      - minio_access_key
+      - minio_secret_key
+    volumes:
+      - ./infra/alpha/storage-maintenance.sh:/workspace/infra/alpha/storage-maintenance.sh:ro
+      - ./.alpha/tls:/run/alpha-tls:ro
+      - ./backups/alpha:/backup
+    networks: [alpha-internal]
+    restart: "no"
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m
+    cpus: 0.5
+
+networks:
+  alpha-internal:
+    name: remeselnicky-alpha-internal
+    internal: true
+  alpha-egress:
+    name: remeselnicky-alpha-egress
+  alpha-edge:
+    name: remeselnicky-alpha-edge
+
+volumes:
+  alpha-postgres-data:
+    name: remeselnicky-alpha-postgres
+  alpha-minio-data:
+    name: remeselnicky-alpha-minio
+  alpha-clamav-database:
+    name: remeselnicky-alpha-clamav-db
+  alpha-clamav-log:
+    name: remeselnicky-alpha-clamav-log
+  alpha-clamav-run:
+    name: remeselnicky-alpha-clamav-run
+
+secrets:
+  postgres_owner_password:
+    file: ./.alpha/secrets/postgres_owner_password
+  postgres_app_password:
+    file: ./.alpha/secrets/postgres_app_password
+  minio_access_key:
+    file: ./.alpha/secrets/minio_access_key
+  minio_secret_key:
+    file: ./.alpha/secrets/minio_secret_key
+  session_secret:
+    file: ./.alpha/secrets/session_secret
+  synthetic_seed_password:
+    file: ./.alpha/secrets/synthetic_seed_password
+  cloudflare_tunnel_token:
+    file: ./.alpha/secrets/cloudflare_tunnel_token
+  quick_gate_htpasswd:
+    file: ./.alpha/secrets/quick_gate_htpasswd

@@ -17,6 +17,11 @@ import {
 } from "../src/quote-external-pdf-repository.js";
 import { createPrivateMediaDeliveryRepository } from "../src/media-delivery-repository.js";
 import { createQuoteRepository } from "../src/quote-repository.js";
+import {
+  createQuoteSupportingDocumentRepository,
+  createQuoteSupportingDocumentUploadAuthorization,
+  QuoteSupportingDocumentIdempotencyError,
+} from "../src/quote-supporting-document-repository.js";
 import { createStructuredQuoteRepository } from "../src/quote-structured-repository.js";
 import { runQuoteComparisonIntegrationAssertions } from "./quote-comparison-integration-helper.js";
 
@@ -37,7 +42,10 @@ export async function runExternalPdfQuoteIntegrationAssertions(
   sql: Sql,
 ): Promise<void> {
   const fixture = await findFixture(sql);
-  await expectStructuredQuoteDocumentAllowed(sql);
+  const structuredSupportingPdf = await expectStructuredQuoteDocumentAllowed(
+    sql,
+    fixture,
+  );
   await expect(
     sql<Array<{ readonly eligible: boolean }>>`
       SELECT quote_revision_authoring_is_eligible(
@@ -80,6 +88,12 @@ export async function runExternalPdfQuoteIntegrationAssertions(
       revision: fixture.structuredDraftRevision,
     }),
   ).resolves.toMatchObject({ status: "APPLIED" });
+  await expectDeliveryGrant(
+    sql,
+    fixture.customerOwnerId,
+    structuredSupportingPdf,
+    303,
+  );
 
   const created = await quotes.createRevision({
     actorUserId: fixture.providerOwnerId,
@@ -304,6 +318,43 @@ export async function runExternalPdfQuoteIntegrationAssertions(
     quoteRevision,
     true,
   );
+  const supportingPdf = await createDocument(
+    sql,
+    fixture.providerOwnerId,
+    quoteId,
+    quoteRevision,
+    true,
+  );
+  await assertSupportingDocumentBinding(
+    sql,
+    fixture,
+    quoteId,
+    quoteRevision,
+    supportingPdf,
+  );
+  const removedPdf = await createDocument(
+    sql,
+    fixture.providerOwnerId,
+    quoteId,
+    quoteRevision,
+    true,
+  );
+  await assertSupportingDocumentRemoval(
+    sql,
+    fixture,
+    quoteId,
+    quoteRevision,
+    removedPdf,
+  );
+  await assertRevokedSupportingDocumentFailClosed(
+    sql,
+    fixture,
+    quoteId,
+    quoteRevision,
+  );
+  await expectDeliveryGrant(sql, fixture.providerOwnerId, supportingPdf, 303);
+  await expectDeliveryGrant(sql, fixture.customerOwnerId, supportingPdf, 404);
+  await expectDeliveryGrant(sql, fixture.providerOwnerId, removedPdf, 404);
   await external.saveDraft(
     saveInput(fixture, quoteId, quoteRevision, validPdf, 4),
   );
@@ -348,8 +399,44 @@ export async function runExternalPdfQuoteIntegrationAssertions(
     pdfDownloadPath: `/v1/media/${validPdf}/download`,
   });
   await expectDeliveryGrant(sql, fixture.customerOwnerId, validPdf, 303);
+  await expectDeliveryGrant(sql, fixture.customerOwnerId, supportingPdf, 303);
+  await expectDeliveryGrant(sql, fixture.customerOwnerId, removedPdf, 404);
+  await expect(
+    createQuoteSupportingDocumentRepository(sql).readOwned({
+      actorUserId: fixture.customerOwnerId,
+      quoteId,
+      quoteRevision,
+    }),
+  ).resolves.toEqual([
+    expect.objectContaining({ mediaAssetId: supportingPdf }),
+  ]);
   await expectDeliveryGrant(sql, fixture.customerOwnerId, pdfC, 404);
   await expectDeliveryGrant(sql, fixture.providerOwnerId, pdfC, 303);
+  await expect(sql`
+    INSERT INTO quote_revision_supporting_documents (
+      quote_id, quote_revision, media_asset_id, attachment_command_id,
+      attached_by_user_id, content_sha256, attached_at
+    ) VALUES (
+      ${quoteId}, ${quoteRevision}, ${latePdf}, ${randomUUID()},
+      ${fixture.providerOwnerId}, ${"a".repeat(64)}, clock_timestamp()
+    )
+  `).rejects.toThrow(/owned draft Quote required/u);
+  await expect(
+    createQuoteSupportingDocumentRepository(sql).remove({
+      actorUserId: fixture.providerOwnerId,
+      commandId: randomUUID(),
+      mediaAssetId: supportingPdf,
+      quoteId,
+      quoteRevision,
+    }),
+  ).resolves.toEqual({ status: "NOT_FOUND" });
+  await assertAcceptedSupportingDocumentSnapshot(
+    sql,
+    fixture,
+    quoteId,
+    quoteRevision,
+    supportingPdf,
+  );
   await runQuoteComparisonIntegrationAssertions(sql, "EXTERNAL_PDF");
 
   const second = await quotes.createRevision({
@@ -365,6 +452,12 @@ export async function runExternalPdfQuoteIntegrationAssertions(
   expect(second).toMatchObject({
     quote: { currentDraft: { revision: secondRevision } },
   });
+  await assertSupportingDocumentTechnicalLimit(
+    sql,
+    fixture,
+    quoteId,
+    secondRevision,
+  );
   await expectDeliveryGrant(sql, fixture.customerOwnerId, validPdf, 303);
   await expect(
     external.saveDraft(
@@ -475,40 +568,39 @@ export async function runExternalPdfQuoteIntegrationAssertions(
     WHERE quote_id = ${quoteId}`).rejects.toThrow(/append-only/u);
 }
 
-async function expectStructuredQuoteDocumentAllowed(sql: Sql): Promise<void> {
-  const [draft] = await sql<
-    Array<{
-      readonly providerOwnerId: UserId;
-      readonly quoteId: QuoteId;
-      readonly quoteRevision: number;
-    }>
-  >`
-    SELECT craftsman.owner_user_id AS "providerOwnerId", quote.id AS "quoteId",
-      revision.revision AS "quoteRevision"
-    FROM quotes quote
-    JOIN quote_revision_identities revision ON revision.quote_id = quote.id
-      AND revision.authoring_mode = 'PLATFORM_STRUCTURED'
-    JOIN quote_revision_heads head ON head.quote_id = quote.id
-      AND head.quote_revision = revision.revision AND head.state = 'DRAFT'
-    JOIN current_conversations conversation ON conversation.id = quote.conversation_id
-      AND conversation.access_state = 'WRITABLE'
-    JOIN craftsman_profiles craftsman ON craftsman.id = conversation.craftsman_profile_id
-    JOIN users actor ON actor.id = craftsman.owner_user_id
-      AND actor.account_state = 'ACTIVE'
-    LIMIT 1
-  `;
-  if (draft === undefined)
-    throw new Error(
-      "Expected a structured Quote draft for support-document guard.",
-    );
+async function expectStructuredQuoteDocumentAllowed(
+  sql: Sql,
+  fixture: Fixture,
+): Promise<string> {
   await expect(
-    sql`INSERT INTO media_assets (id, owner_user_id, uploaded_by_user_id, kind,
-      purpose, status, declared_content_type, byte_size, provenance_entity_type,
-      provenance_entity_id, provenance_entity_revision)
-      VALUES (${randomUUID()}, ${draft.providerOwnerId}, ${draft.providerOwnerId},
-        'DOCUMENT', 'QUOTE_DOCUMENT', 'PROCESSING', 'application/pdf', 100,
-        'QUOTE_REVISION', ${draft.quoteId}, ${draft.quoteRevision})`,
-  ).resolves.toBeDefined();
+    createQuoteSupportingDocumentUploadAuthorization(sql).prepareUpload({
+      actorUserId: fixture.providerOwnerId,
+      quoteId: fixture.quoteId,
+      quoteRevision: fixture.structuredDraftRevision,
+    }),
+  ).resolves.toMatchObject({
+    purpose: "QUOTE_DOCUMENT",
+    status: "AUTHORIZED",
+  });
+  const assetId = await createDocument(
+    sql,
+    fixture.providerOwnerId,
+    fixture.quoteId,
+    fixture.structuredDraftRevision,
+    true,
+  );
+  await expect(
+    createQuoteSupportingDocumentRepository(sql).attach({
+      actorUserId: fixture.providerOwnerId,
+      commandId: randomUUID(),
+      mediaAssetId: assetId,
+      quoteId: fixture.quoteId,
+      quoteRevision: fixture.structuredDraftRevision,
+    }),
+  ).resolves.toMatchObject({ status: "ATTACHED" });
+  await expectDeliveryGrant(sql, fixture.providerOwnerId, assetId, 303);
+  await expectDeliveryGrant(sql, fixture.customerOwnerId, assetId, 404);
+  return assetId;
 }
 
 async function findFixture(sql: Sql): Promise<Fixture> {
@@ -543,7 +635,7 @@ async function findFixture(sql: Sql): Promise<Fixture> {
 }
 
 async function createDocument(
-  sql: Sql,
+  sql: Sql | TransactionSql,
   owner: UserId,
   quoteId: QuoteId,
   revision: number,
@@ -557,6 +649,364 @@ async function createDocument(
       'PROCESSING', 'application/pdf', 100, 'QUOTE_REVISION', ${quoteId}, ${revision})`;
   if (ready) await markReady(sql, assetId);
   return assetId;
+}
+
+async function assertSupportingDocumentBinding(
+  sql: Sql,
+  fixture: Fixture,
+  quoteId: QuoteId,
+  quoteRevision: number,
+  assetId: string,
+): Promise<void> {
+  const processing = await createDocument(
+    sql,
+    fixture.providerOwnerId,
+    quoteId,
+    quoteRevision,
+    false,
+  );
+  await expect(sql`
+    INSERT INTO quote_revision_supporting_documents (
+      quote_id, quote_revision, media_asset_id, attachment_command_id,
+      attached_by_user_id, content_sha256, attached_at
+    ) VALUES (
+      ${quoteId}, ${quoteRevision}, ${processing}, ${randomUUID()},
+      ${fixture.providerOwnerId}, ${"f".repeat(64)}, clock_timestamp()
+    )
+  `).rejects.toThrow(/exact READY private Quote supporting PDF required/u);
+  await expect(sql`
+    INSERT INTO quote_revision_supporting_documents (
+      quote_id, quote_revision, media_asset_id, attachment_command_id,
+      attached_by_user_id, content_sha256, attached_at
+    ) VALUES (
+      ${quoteId}, ${quoteRevision}, ${assetId}, ${randomUUID()},
+      ${fixture.customerOwnerId}, ${"f".repeat(64)}, clock_timestamp()
+    )
+  `).rejects.toThrow(/owned draft Quote required/u);
+  const commandId = randomUUID();
+  const repository = createQuoteSupportingDocumentRepository(sql);
+  const input = {
+    actorUserId: fixture.providerOwnerId,
+    commandId,
+    mediaAssetId: assetId,
+    quoteId,
+    quoteRevision,
+  };
+  await expect(repository.attach(input)).resolves.toMatchObject({
+    document: { mediaAssetId: assetId },
+    status: "ATTACHED",
+  });
+  await expect(repository.attach(input)).resolves.toMatchObject({
+    status: "DEDUPLICATED",
+  });
+  await expect(
+    repository.attach({ ...input, mediaAssetId: processing }),
+  ).rejects.toBeInstanceOf(QuoteSupportingDocumentIdempotencyError);
+  await expect(
+    repository.readOwned({
+      actorUserId: fixture.providerOwnerId,
+      quoteId,
+      quoteRevision,
+    }),
+  ).resolves.toEqual([expect.objectContaining({ mediaAssetId: assetId })]);
+  await expect(
+    repository.readOwned({
+      actorUserId: fixture.customerOwnerId,
+      quoteId,
+      quoteRevision,
+    }),
+  ).resolves.toBeNull();
+  const [bound] = await sql<Array<{ attachedAt: Date; contentSha256: string }>>`
+    SELECT content_sha256 AS "contentSha256",
+      attached_at AS "attachedAt"
+    FROM quote_revision_supporting_documents
+    WHERE attachment_command_id = ${commandId}
+  `;
+  expect(bound?.contentSha256).toBe("a".repeat(64));
+  expect(bound?.attachedAt.getUTCFullYear()).toBeGreaterThan(2020);
+  await expect(sql`
+    UPDATE quote_revision_supporting_documents
+    SET content_sha256 = ${"b".repeat(64)}
+    WHERE attachment_command_id = ${commandId}
+  `).rejects.toThrow(/inclusion is immutable/u);
+  await expect(sql`
+    DELETE FROM quote_revision_supporting_documents
+    WHERE attachment_command_id = ${commandId}
+  `).rejects.toThrow(/inclusion is immutable/u);
+}
+
+async function assertSupportingDocumentRemoval(
+  sql: Sql,
+  fixture: Fixture,
+  quoteId: QuoteId,
+  quoteRevision: number,
+  assetId: string,
+): Promise<void> {
+  const repository = createQuoteSupportingDocumentRepository(sql);
+  await expect(
+    repository.attach({
+      actorUserId: fixture.providerOwnerId,
+      commandId: randomUUID(),
+      mediaAssetId: assetId,
+      quoteId,
+      quoteRevision,
+    }),
+  ).resolves.toMatchObject({ status: "ATTACHED" });
+  const commandId = randomUUID();
+  const input = {
+    actorUserId: fixture.providerOwnerId,
+    commandId,
+    mediaAssetId: assetId,
+    quoteId,
+    quoteRevision,
+  };
+  await expect(repository.remove(input)).resolves.toEqual({
+    status: "REMOVED",
+  });
+  await expect(repository.remove(input)).resolves.toEqual({
+    status: "DEDUPLICATED",
+  });
+  await expect(
+    repository.remove({ ...input, mediaAssetId: randomUUID() }),
+  ).rejects.toBeInstanceOf(QuoteSupportingDocumentIdempotencyError);
+  const active = await repository.readOwned({
+    actorUserId: fixture.providerOwnerId,
+    quoteId,
+    quoteRevision,
+  });
+  expect(active?.some((document) => document.mediaAssetId === assetId)).toBe(
+    false,
+  );
+  const [history] = await sql<Array<{ included: number; removed: number }>>`
+    SELECT (SELECT count(*)::integer FROM quote_revision_supporting_documents
+      WHERE media_asset_id = ${assetId}) AS included,
+      (SELECT count(*)::integer
+        FROM quote_revision_supporting_document_removals
+        WHERE media_asset_id = ${assetId}) AS removed
+  `;
+  expect(history).toEqual({ included: 1, removed: 1 });
+  await expect(sql`
+    DELETE FROM quote_revision_supporting_document_removals
+    WHERE removal_command_id = ${commandId}
+  `).rejects.toThrow(/immutable/u);
+}
+
+async function assertRevokedSupportingDocumentFailClosed(
+  sql: Sql,
+  fixture: Fixture,
+  quoteId: QuoteId,
+  quoteRevision: number,
+): Promise<void> {
+  const assetId = await createDocument(
+    sql,
+    fixture.providerOwnerId,
+    quoteId,
+    quoteRevision,
+    true,
+  );
+  const repository = createQuoteSupportingDocumentRepository(sql);
+  await expect(
+    repository.attach({
+      actorUserId: fixture.providerOwnerId,
+      commandId: randomUUID(),
+      mediaAssetId: assetId,
+      quoteId,
+      quoteRevision,
+    }),
+  ).resolves.toMatchObject({ status: "ATTACHED" });
+  await sql`
+    UPDATE media_asset_storage_objects SET revoked_at = clock_timestamp()
+    WHERE media_asset_id = ${assetId} AND role = 'CANONICAL'
+  `;
+  await expect(
+    repository.readOwned({
+      actorUserId: fixture.providerOwnerId,
+      quoteId,
+      quoteRevision,
+    }),
+  ).resolves.toBeNull();
+  await expect(
+    repository.remove({
+      actorUserId: fixture.providerOwnerId,
+      commandId: randomUUID(),
+      mediaAssetId: assetId,
+      quoteId,
+      quoteRevision,
+    }),
+  ).resolves.toEqual({ status: "REMOVED" });
+}
+
+async function assertSupportingDocumentTechnicalLimit(
+  sql: Sql,
+  fixture: Fixture,
+  quoteId: QuoteId,
+  quoteRevision: number,
+): Promise<void> {
+  const marker = new Error("rollback supporting-document limit assertions");
+  await expect(
+    sql.begin(async (transaction) => {
+      const attached: string[] = [];
+      for (let index = 0; index < 10; index += 1) {
+        const assetId = await createDocument(
+          transaction,
+          fixture.providerOwnerId,
+          quoteId,
+          quoteRevision,
+          true,
+        );
+        await transaction`
+          INSERT INTO quote_revision_supporting_documents (
+            quote_id, quote_revision, media_asset_id,
+            attachment_command_id, attached_by_user_id,
+            content_sha256, attached_at
+          ) VALUES (
+            ${quoteId}, ${quoteRevision}, ${assetId}, ${randomUUID()},
+            ${fixture.providerOwnerId}, ${"0".repeat(64)}, clock_timestamp()
+          )
+        `;
+        attached.push(assetId);
+      }
+      const overflow = await createDocument(
+        transaction,
+        fixture.providerOwnerId,
+        quoteId,
+        quoteRevision,
+        true,
+      );
+      await expect(
+        transaction.savepoint(
+          async (savepoint) => savepoint`
+          INSERT INTO quote_revision_supporting_documents (
+            quote_id, quote_revision, media_asset_id,
+            attachment_command_id, attached_by_user_id,
+            content_sha256, attached_at
+          ) VALUES (
+            ${quoteId}, ${quoteRevision}, ${overflow}, ${randomUUID()},
+            ${fixture.providerOwnerId}, ${"0".repeat(64)}, clock_timestamp()
+          )
+        `,
+        ),
+      ).rejects.toThrow(/Quote supporting document limit reached/u);
+      await transaction`
+        INSERT INTO quote_revision_supporting_document_removals (
+          quote_id, quote_revision, media_asset_id,
+          removal_command_id, removed_by_user_id, removed_at
+        ) VALUES (
+          ${quoteId}, ${quoteRevision}, ${attached[0]!}, ${randomUUID()},
+          ${fixture.providerOwnerId}, clock_timestamp()
+        )
+      `;
+      await expect(transaction`
+        INSERT INTO quote_revision_supporting_documents (
+          quote_id, quote_revision, media_asset_id,
+          attachment_command_id, attached_by_user_id,
+          content_sha256, attached_at
+        ) VALUES (
+          ${quoteId}, ${quoteRevision}, ${overflow}, ${randomUUID()},
+          ${fixture.providerOwnerId}, ${"0".repeat(64)}, clock_timestamp()
+        )
+      `).resolves.toBeDefined();
+      throw marker;
+    }),
+  ).rejects.toBe(marker);
+}
+
+async function assertAcceptedSupportingDocumentSnapshot(
+  sql: Sql,
+  fixture: Fixture,
+  quoteId: QuoteId,
+  quoteRevision: number,
+  assetId: string,
+): Promise<void> {
+  const [source] = await sql<
+    Array<{
+      craftsmanProfileId: string;
+      customerProfileId: string;
+      invitationId: string;
+      jobRequestId: string;
+      requestContentRevision: number;
+      requestVisibleVersion: number;
+    }>
+  >`
+    SELECT invitation.id AS "invitationId",
+      invitation.job_request_id AS "jobRequestId",
+      invitation.customer_profile_id AS "customerProfileId",
+      invitation.craftsman_profile_id AS "craftsmanProfileId",
+      identity.request_content_revision AS "requestContentRevision",
+      identity.request_visible_version AS "requestVisibleVersion"
+    FROM quotes quote
+    JOIN job_invitations invitation ON invitation.id = quote.invitation_id
+    JOIN quote_revision_identities identity ON identity.quote_id = quote.id
+      AND identity.revision = ${quoteRevision}
+    WHERE quote.id = ${quoteId}
+  `;
+  if (source === undefined) throw new Error("Accepted Quote source missing.");
+  const marker = new Error("rollback supporting-document Job assertions");
+  await expect(
+    sql.begin(async (transaction) => {
+      await expect(
+        transaction.savepoint(async (savepoint) => {
+          await savepoint`
+        UPDATE media_asset_storage_objects SET revoked_at = clock_timestamp()
+        WHERE media_asset_id = ${assetId} AND role = 'CANONICAL'
+      `;
+          await savepoint`
+        INSERT INTO jobs (
+          job_request_id, customer_profile_id, primary_craftsman_profile_id,
+          winning_invitation_id, winning_conversation_id, accepted_quote_id,
+          accepted_quote_revision, accepted_request_content_revision,
+          accepted_request_visible_version, acceptance_command_id,
+          acceptance_payload_fingerprint, accepted_by_user_id
+        ) VALUES (
+          ${source.jobRequestId}, ${source.customerProfileId},
+          ${source.craftsmanProfileId}, ${source.invitationId},
+          ${fixture.conversationId}, ${quoteId}, ${quoteRevision},
+          ${source.requestContentRevision}, ${source.requestVisibleVersion},
+          ${randomUUID()}, ${"c".repeat(64)}, ${fixture.customerOwnerId}
+        )
+      `;
+        }),
+      ).rejects.toThrow(
+        /complete accepted Quote supporting documents required/u,
+      );
+      const [job] = await transaction<Array<{ id: string }>>`
+      INSERT INTO jobs (
+        job_request_id, customer_profile_id, primary_craftsman_profile_id,
+        winning_invitation_id, winning_conversation_id, accepted_quote_id,
+        accepted_quote_revision, accepted_request_content_revision,
+        accepted_request_visible_version, acceptance_command_id,
+        acceptance_payload_fingerprint, accepted_by_user_id
+      ) VALUES (
+        ${source.jobRequestId}, ${source.customerProfileId},
+        ${source.craftsmanProfileId}, ${source.invitationId},
+        ${fixture.conversationId}, ${quoteId}, ${quoteRevision},
+        ${source.requestContentRevision}, ${source.requestVisibleVersion},
+        ${randomUUID()}, ${"d".repeat(64)}, ${fixture.customerOwnerId}
+      ) RETURNING id
+    `;
+      if (job === undefined) throw new Error("Job snapshot fixture missing.");
+      const snapshots = await transaction<
+        Array<{ contentSha256: string; mediaAssetId: string }>
+      >`
+      SELECT media_asset_id AS "mediaAssetId",
+        content_sha256 AS "contentSha256"
+      FROM job_quote_supporting_document_snapshots
+      WHERE job_id = ${job.id}
+    `;
+      expect(snapshots).toEqual([
+        { contentSha256: "a".repeat(64), mediaAssetId: assetId },
+      ]);
+      await expect(
+        transaction.savepoint(
+          async (savepoint) => savepoint`
+      DELETE FROM job_quote_supporting_document_snapshots
+      WHERE job_id = ${job.id}
+    `,
+        ),
+      ).rejects.toThrow(/inclusion is immutable/u);
+      throw marker;
+    }),
+  ).rejects.toBe(marker);
 }
 
 async function expectRawMediaGuards(
@@ -643,7 +1093,10 @@ async function expectRawCommandGuards(
   ).rejects.toThrow(/quote_external_pdf_command_effect_fk/u);
 }
 
-async function markReady(sql: Sql, assetId: string): Promise<void> {
+async function markReady(
+  sql: Sql | TransactionSql,
+  assetId: string,
+): Promise<void> {
   const hash = "a".repeat(64);
   await sql`INSERT INTO media_asset_storage_objects (media_asset_id, role, storage_area,
     storage_key, content_type, byte_size, content_sha256)

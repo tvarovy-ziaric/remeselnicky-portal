@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   assertQuoteAcceptanceContext,
+  assertQuoteAcceptanceContextReadInput,
   assertQuoteLifecycleCommandInput,
   assertReconfirmQuoteInput,
 } from "../src/quote-lifecycle.js";
@@ -9,6 +10,22 @@ const actorUserId = "84000000-0000-4000-8000-000000000001" as never;
 const quoteId = "84000000-0000-4000-8000-000000000002" as never;
 
 describe("Quote lifecycle", () => {
+  it("bounds an exact-revision private context read", () => {
+    expect(() =>
+      assertQuoteAcceptanceContextReadInput({
+        actorUserId,
+        quoteId,
+        quoteRevision: 2,
+      }),
+    ).not.toThrow();
+    expect(() =>
+      assertQuoteAcceptanceContextReadInput({
+        actorUserId,
+        quoteId,
+        quoteRevision: 0,
+      }),
+    ).toThrow();
+  });
   it("accepts bounded explicit commands and reconfirm intent", () => {
     expect(() =>
       assertQuoteLifecycleCommandInput({

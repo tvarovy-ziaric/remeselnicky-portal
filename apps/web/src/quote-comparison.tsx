@@ -26,14 +26,14 @@ export async function recordQuoteComparisonObservation(input: {
   readonly quoteRevision?: number;
 }): Promise<void> {
   try {
-    const session = await input.fetch("/v1/auth/session", {
+    const session = await input.fetch.call(globalThis, "/v1/auth/session", {
       cache: "no-store",
       credentials: "same-origin",
     });
     if (!session.ok) return;
     const body = (await session.json()) as Record<string, unknown>;
     if (typeof body["csrfToken"] !== "string") return;
-    await input.fetch(R3_ANALYTICS_OBSERVATION_PATH, {
+    await input.fetch.call(globalThis, R3_ANALYTICS_OBSERVATION_PATH, {
       body: JSON.stringify({
         commandId: crypto.randomUUID(),
         jobRequestId: input.jobRequestId,
@@ -110,7 +110,8 @@ export async function loadQuoteComparison(input: {
       return { status: "UNAVAILABLE" };
     const suffix =
       input.sort === undefined ? "" : `?sort=${encodeURIComponent(input.sort)}`;
-    const response = await input.fetch(
+    const response = await input.fetch.call(
+      globalThis,
       `/v1/me/job-requests/${input.jobRequestId}/quote-comparison${suffix}`,
       {
         cache: "no-store",
@@ -400,6 +401,15 @@ function QuoteCard({
       <p>
         <Link href={item.conversationPath}>Otvoriť konverzáciu</Link>
       </p>
+      {item.lifecycleAcceptanceEligible ? (
+        <p>
+          <Link
+            href={`/ziadosti/${jobRequestId}/ponuky/${item.quoteId}/potvrdenie`}
+          >
+            Vybrať túto ponuku
+          </Link>
+        </p>
+      ) : null}
     </article>
   );
 }

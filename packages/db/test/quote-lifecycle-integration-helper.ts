@@ -97,6 +97,23 @@ export async function runQuoteLifecycleIntegrationAssertions(
   if (!("quote" in reconfirmed) || reconfirmed.quote.currentDraft === null)
     throw new Error("Expected a reconfirmed Quote draft.");
   const draftRevision = reconfirmed.quote.currentDraft.revision;
+  await expect(
+    lifecycle.readOwnedContext({
+      actorUserId: fixture.customerOwnerId,
+      quoteId: fixture.quoteId,
+      quoteRevision: fixture.quoteRevision,
+    }),
+  ).resolves.toMatchObject({
+    quoteRevision: fixture.quoteRevision,
+    state: "EXPIRED",
+  });
+  await expect(
+    lifecycle.readOwnedContext({
+      actorUserId: fixture.customerOwnerId,
+      quoteId: fixture.quoteId,
+      quoteRevision: draftRevision,
+    }),
+  ).resolves.toMatchObject({ quoteRevision: draftRevision, state: "DRAFT" });
   await expect(lifecycle.reconfirm(reconfirmInput)).resolves.toMatchObject({
     quote: { currentDraft: { revision: draftRevision } },
     status: "DEDUPLICATED",

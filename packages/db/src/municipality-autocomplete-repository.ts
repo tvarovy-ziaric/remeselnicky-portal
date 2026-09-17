@@ -26,24 +26,33 @@ export function createMunicipalityAutocompleteRepository(
       const normalized = normalizeQuery(query);
       if (normalized === null) return [];
       const rows = await sql<MunicipalityRow[]>`
-        SELECT
+        WITH candidates AS (
+          SELECT
           municipality.code,
           municipality.name_sk AS "name",
           district.name_sk AS "districtName",
-          region.name_sk AS "regionName"
-        FROM location_municipalities municipality
-        JOIN location_districts district
-          ON district.code = municipality.district_code
-         AND district.is_active
-        JOIN location_regions region
-          ON region.code = district.region_code
-         AND region.is_active
-        WHERE municipality.is_active
-          AND portal_normalize_sk_search_text(municipality.name_sk)
-            LIKE ${`${normalized}%`}
-        ORDER BY
-          portal_normalize_sk_search_text(municipality.name_sk),
-          municipality.code
+          region.name_sk AS "regionName",
+          btrim(regexp_replace(
+            translate(
+              lower(municipality.name_sk),
+              'áäčďéíĺľňóôŕšťúýž',
+              'aacdeillnoorstuyz'
+            ),
+            '[^a-z0-9]+', ' ', 'g'
+          )) AS normalized_name
+          FROM location_municipalities municipality
+          JOIN location_districts district
+            ON district.code = municipality.district_code
+           AND district.is_active
+          JOIN location_regions region
+            ON region.code = district.region_code
+           AND region.is_active
+          WHERE municipality.is_active
+        )
+        SELECT code, "name", "districtName", "regionName"
+        FROM candidates
+        WHERE normalized_name LIKE ${`${normalized}%`}
+        ORDER BY normalized_name, code
         LIMIT 10
       `;
       if (rows.length > 10) throw new Error("Municipality result is invalid.");
