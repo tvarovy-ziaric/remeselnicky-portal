@@ -1893,6 +1893,11 @@ describe.skipIf(testDatabaseUrl === undefined)(
           "CREATE_CONFIRMED_FIXTURE",
         );
         await runJobSupervisorEvaluationIntegrationAssertions(sql);
+        await runQuoteAcceptanceCommittedRaceIntegrationAssertions(
+          sql,
+          acceptanceSource,
+          "CREATE_CONFIRMED_FIXTURE",
+        );
         await runJobSupervisorEvaluationCommittedRaceAssertions(sql);
 
         await adminAccess.revokePrivilegedSession(superSessionDigest);
