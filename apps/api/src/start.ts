@@ -190,6 +190,7 @@ const app = buildApi({
       roles: database.jobParticipantRoleDecisions,
     },
     jobWorkGroups: { workGroups: database.jobWorkGroups },
+    jobMainReviews: { reviews: database.jobMainReviews },
     quoteLifecycle: { lifecycle: database.quoteLifecycle },
     quoteAuthoring: {
       core: quoteAuthoring,
