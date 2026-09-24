@@ -293,7 +293,7 @@ export async function runAdminDisputeIntegrationAssertions(
   >`
     SELECT payload FROM domain_outbox_events
     WHERE event_name = 'job.dispute.party_action'
-      AND aggregate_id = ${settlementDisputeId}::text
+      AND entity_id = ${settlementDisputeId}::text
     ORDER BY occurred_at DESC LIMIT 1`;
   expect(partyNotification?.payload).toEqual({
     action: "CONFIRM_SETTLEMENT",
