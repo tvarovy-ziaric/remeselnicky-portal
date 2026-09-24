@@ -1,4 +1,4 @@
-# Trust/evidence aggregation read model (R2-008, R4-016, R4-017)
+# Trust/evidence aggregation read model (R2-008, R4-016–R4-018)
 
 Migration `0034_trust_evidence_read_model.sql` established two additive,
 `security_invoker` views over the approved-public R2 discovery intersection.
@@ -41,6 +41,21 @@ R4 activation changes only facts backed by authoritative provenance:
 - raw comments, authors, customers, Jobs and exact timestamps never enter
   these aggregate views.
 
+R4-018 records optional customer reviews of an exact verified
+`JobParticipant` in a separate append-only stream. Each logical review
+snapshots only the professions, skills and confirmed operational roles that
+the participant actually carried on that completed Job. A participant with
+verified work but no confirmed profession remains reviewable, but contributes
+to no invented profession context. These records are not folded into the
+main-provider headline average: a cross-target weighting policy is not locked.
+
+Reviews of a concrete historical `JobWorkGroup` snapshot every qualifying
+assignment interval that overlapped verified execution. They remain a
+separate team-context signal and never change an individual member's review
+count or score. Reusable Crew membership is not an eligibility source and
+later Crew/group changes cannot rewrite the snapshot. No participant or team
+body is added to a public/search aggregate by migration `0095`.
+
 Small-sample confidence intentionally remains `INSUFFICIENT_SAMPLE`, and the
 search signal keeps `review_sample_sufficient = false`. Scores and evidence
 counts may be displayed, but score-driven ordering stays disabled until a
@@ -59,7 +74,6 @@ skill, and specialization facts. Attachment/photo/revision quantities are not
 counted. Paid status, founder status, profile completeness, profile photos, and
 tag quantity are absent and cannot improve the read model.
 
-R4-018–R4-019 may extend the remaining participant/workgroup and supervisor
-hooks only from sources that retain the locked provenance and anti-gaming
-constraints. Ranking policy remains separate and must not treat raw volume as
-an opaque quality score.
+R4-019 may extend supervisor hooks only from sources that retain the locked
+provenance and anti-gaming constraints. Ranking policy remains separate and
+must not treat raw volume as an opaque quality score.

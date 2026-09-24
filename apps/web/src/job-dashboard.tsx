@@ -5,6 +5,7 @@ import React, { useEffect, useRef, useState } from "react";
 
 import { JobChangeOrders } from "./change-orders";
 import { JobCompletion } from "./job-completion";
+import { JobContextReview } from "./job-context-review";
 import { JobDocumentation } from "./job-documentation";
 import { JobMainReview } from "./job-main-review";
 import { JobMilestones } from "./job-milestones";
@@ -731,6 +732,9 @@ export function JobDashboardView({
       <JobRoster jobId={job.id} jobState={job.state} />
       <JobCompletion jobId={job.id} role={job.role} jobState={job.state} />
       {job.state === "COMPLETED" && <JobMainReview jobId={job.id} />}
+      {job.state === "COMPLETED" && job.role === "CUSTOMER" && (
+        <JobContextReview jobId={job.id} />
+      )}
       {job.role === "PRIMARY_PROVIDER" &&
         ["CONFIRMED", "IN_PROGRESS"].includes(job.state) && (
           <p>

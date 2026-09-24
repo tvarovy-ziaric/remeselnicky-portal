@@ -139,6 +139,11 @@ export {
 } from "./job-main-reviews/routes.js";
 export type { JobMainReviewRouteDependencies } from "./job-main-reviews/routes.js";
 export {
+  JOB_CONTEXT_REVIEW_PATHS,
+  registerJobContextReviewRoutes,
+} from "./job-context-reviews/routes.js";
+export type { JobContextReviewRouteDependencies } from "./job-context-reviews/routes.js";
+export {
   QUOTE_AUTHORING_PATHS,
   registerQuoteAuthoringRoutes,
 } from "./quotes/routes.js";

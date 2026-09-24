@@ -134,6 +134,10 @@ import {
   type JobMainReviewRouteDependencies,
 } from "../job-main-reviews/routes.js";
 import {
+  registerJobContextReviewRoutes,
+  type JobContextReviewRouteDependencies,
+} from "../job-context-reviews/routes.js";
+import {
   registerQuoteAuthoringRoutes,
   type QuoteAuthoringRouteDependencies,
 } from "../quotes/routes.js";
@@ -268,6 +272,10 @@ export interface AuthModuleDependencies {
   >;
   readonly jobWorkGroups?: Pick<JobWorkGroupRouteDependencies, "workGroups">;
   readonly jobMainReviews?: Pick<JobMainReviewRouteDependencies, "reviews">;
+  readonly jobContextReviews?: Pick<
+    JobContextReviewRouteDependencies,
+    "reviews"
+  >;
   readonly quoteAuthoring?: Pick<
     QuoteAuthoringRouteDependencies,
     | "core"
@@ -719,6 +727,17 @@ async function configureAuthModule(
         timeWindowMs: config.rateLimitWindowMs,
       },
       ...dependencies.jobMainReviews,
+    });
+  }
+  if (dependencies.jobContextReviews !== undefined) {
+    registerJobContextReviewRoutes(app, {
+      csrfProtection: csrfProtection(app),
+      guard,
+      rateLimit: {
+        max: config.rateLimitMax,
+        timeWindowMs: config.rateLimitWindowMs,
+      },
+      ...dependencies.jobContextReviews,
     });
   }
   if (dependencies.quoteAuthoring !== undefined) {
