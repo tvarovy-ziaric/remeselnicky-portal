@@ -405,7 +405,9 @@ export async function runJobContextReviewIntegrationAssertions(
       ).toHaveLength(1);
 
       await tx`
-        UPDATE auth_credentials SET phone_verified_at = NULL
+        UPDATE auth_credentials
+        SET phone_verified_at = NULL, normalized_phone = NULL,
+          updated_at = clock_timestamp()
         WHERE user_id = ${fixture.customerUserId}
       `;
       expect(
