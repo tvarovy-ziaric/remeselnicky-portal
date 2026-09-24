@@ -10,7 +10,16 @@ interface MainReviewFixture {
   readonly customerReviewId: string;
   readonly customerUserId: string;
   readonly jobId: string;
+  readonly providerProfileId: string;
   readonly providerUserId: string;
+}
+
+export interface ModerationReviewIntegrationFixture {
+  readonly reportId: string;
+  readonly reporterUserId: string;
+  readonly reviewId: string;
+  readonly subjectUserId: string;
+  readonly targetProfileId: string;
 }
 
 interface SupervisorFixture {
@@ -30,11 +39,12 @@ const providerRatings = Object.freeze({
 
 export async function runReviewResponseReportIntegrationAssertions(
   sql: Sql,
-): Promise<void> {
+): Promise<ModerationReviewIntegrationFixture> {
   const [fixture] = await sql<MainReviewFixture[]>`
     SELECT job.id AS "jobId",
       customer.owner_user_id AS "customerUserId",
       provider.owner_user_id AS "providerUserId",
+      provider.id AS "providerProfileId",
       customer_review.event_id AS "customerReviewId"
     FROM jobs job
     JOIN customer_profiles customer ON customer.id = job.customer_profile_id
@@ -270,4 +280,12 @@ export async function runReviewResponseReportIntegrationAssertions(
       await tx`DELETE FROM moderation_reports WHERE report_id = ${reviewReportId}`;
     }),
   ).rejects.toThrow("moderation report history is immutable");
+
+  return Object.freeze({
+    reportId: reviewReportId,
+    reporterUserId: fixture.providerUserId,
+    reviewId: unlocked.revisionId,
+    subjectUserId: fixture.customerUserId,
+    targetProfileId: fixture.providerProfileId,
+  });
 }

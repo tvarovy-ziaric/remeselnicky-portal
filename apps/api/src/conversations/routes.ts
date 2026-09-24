@@ -502,6 +502,7 @@ function serializeTimelineEntry(entry: ConversationTimelineEntry) {
     createdAt: entry.createdAt.toISOString(),
     id: entry.id,
     kind: entry.kind,
+    hiddenByModeration: entry.hiddenByModeration,
     readByCounterpart: entry.readByCounterpart,
     replyToMessageId: entry.replyToMessageId,
     sequence: entry.sequence,

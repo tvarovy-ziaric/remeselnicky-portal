@@ -185,6 +185,11 @@ async function findInSnapshot(
           AND review.target_kind = 'CRAFTSMAN_PROFILE'
           AND review.target_profile_id = profile.id
           AND jsonb_typeof(rating.value) = 'number'
+          AND NOT EXISTS (
+            SELECT 1 FROM current_moderation_review_evidence_exclusions exclusion
+            WHERE exclusion.target_type = 'MAIN_REVIEW'
+              AND exclusion.target_id = review.revision_id
+          )
         GROUP BY review.job_id
       ) per_review
     ) reputation ON true
@@ -243,6 +248,11 @@ async function findInSnapshot(
           AND review.target_profile_id = profession.craftsman_profile_id
           AND review.accepted_profession_code = profession.profession_code
           AND jsonb_typeof(rating.value) = 'number'
+          AND NOT EXISTS (
+            SELECT 1 FROM current_moderation_review_evidence_exclusions exclusion
+            WHERE exclusion.target_type = 'MAIN_REVIEW'
+              AND exclusion.target_id = review.revision_id
+          )
         GROUP BY review.job_id
       ) per_review
     ) reputation ON true

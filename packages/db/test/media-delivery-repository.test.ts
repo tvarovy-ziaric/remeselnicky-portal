@@ -65,6 +65,9 @@ describe("private media delivery repository", () => {
     });
     expect(Object.isFrozen(result)).toBe(true);
     expect(execute).toHaveBeenCalledOnce();
+    expect(
+      (execute.mock.calls[0]?.[0] as readonly string[] | undefined)?.join(" "),
+    ).toContain("current_moderation_hidden_targets");
   });
 
   it("fails closed before SQL for malformed actor and asset identifiers", async () => {

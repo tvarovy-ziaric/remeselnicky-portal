@@ -199,6 +199,7 @@ const app = buildApi({
     reviewResponsesAndReports: {
       persistence: database.reviewResponsesAndReports,
     },
+    moderationAppeals: { moderation: database.moderation },
     jobDisputes: {
       disputes: database.jobDisputes,
       ...(mediaRuntime === undefined

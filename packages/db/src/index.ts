@@ -165,6 +165,7 @@ import { createCustomerCompletionProposalRepository } from "./customer-completio
 import { createAdminJobCompletionRepository } from "./admin-job-completion-repository.js";
 import { createAdminJobCancellationRepository } from "./admin-job-cancellation-repository.js";
 import { createAdminDisputeRepository } from "./admin-dispute-repository.js";
+import { createModerationRepository } from "./moderation-repository.js";
 export {
   createAdminJobCompletionRepository,
   AdminJobCompletionIdempotencyError,
@@ -187,6 +188,28 @@ export {
   ADMIN_DISPUTE_ACTIONS,
   DISPUTE_OUTCOME_CATEGORIES,
 } from "./admin-dispute-repository.js";
+export {
+  createModerationRepository,
+  ModerationAppealIdempotencyError,
+  ModerationIdempotencyError,
+} from "./moderation-repository.js";
+export type {
+  DecideModerationAppealInput,
+  DecideModerationAppealResult,
+  ModerationAdminCommand,
+  ModerationAppealDecision,
+  ModerationAppealDetail,
+  ModerationAppealQueueItem,
+  ModerationCommandResult,
+  ModerationEffectAction,
+  ModerationEnforcementScope,
+  ModerationQueueItem,
+  ModerationReportDetail,
+  ModerationReportState,
+  ModerationUserAction,
+  SubmitModerationAppealInput,
+  SubmitModerationAppealResult,
+} from "./moderation-repository.js";
 export type {
   AdminDisputeAction,
   AdminDisputeCaseDetail,
@@ -1235,6 +1258,7 @@ export interface DatabaseClient extends DatabaseHealthProbe {
     typeof createAdminJobCancellationRepository
   >;
   readonly adminDisputes: ReturnType<typeof createAdminDisputeRepository>;
+  readonly moderation: ReturnType<typeof createModerationRepository>;
   readonly customerCompletionProposals: ReturnType<
     typeof createCustomerCompletionProposalRepository
   >;
@@ -1409,6 +1433,7 @@ export function createDatabase(
   const adminJobCompletion = createAdminJobCompletionRepository(sql);
   const adminJobCancellation = createAdminJobCancellationRepository(sql);
   const adminDisputes = createAdminDisputeRepository(sql);
+  const moderation = createModerationRepository(sql);
   const customerCompletionProposals =
     createCustomerCompletionProposalRepository(sql);
   const jobDocumentation = createJobDocumentationRepository(sql);
@@ -1519,6 +1544,7 @@ export function createDatabase(
     adminJobCompletion,
     adminJobCancellation,
     adminDisputes,
+    moderation,
     customerCompletionProposals,
     jobDocumentation,
     jobRoster,

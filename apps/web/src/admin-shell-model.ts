@@ -35,7 +35,9 @@ export function parseAdminModule(
     return undefined;
   }
   if (
-    (value.id === "disputes" || value.id === "jobs") !==
+    (value.id === "disputes" ||
+      value.id === "jobs" ||
+      value.id === "reports") !==
     (value.state === "OPERATIONAL")
   )
     return undefined;

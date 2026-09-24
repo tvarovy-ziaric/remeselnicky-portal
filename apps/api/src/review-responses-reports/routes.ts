@@ -52,16 +52,44 @@ interface ResponseBody {
 interface ReportBody {
   readonly commandId: string;
   readonly targetType:
-    "MAIN_REVIEW" | "REVIEW_RESPONSE" | "SUPERVISOR_EVALUATION";
+    | "CRAFTSMAN_PROFILE"
+    | "PORTFOLIO_PROJECT"
+    | "MEDIA_ASSET"
+    | "MAIN_REVIEW"
+    | "REVIEW_RESPONSE"
+    | "JOB_CONTEXT_REVIEW"
+    | "SUPERVISOR_EVALUATION"
+    | "MESSAGE"
+    | "CONVERSATION"
+    | "JOB_ATTACHMENT"
+    | "JOB_REQUEST"
+    | "USER_BEHAVIOR";
   readonly targetId: string;
   readonly reason:
     | "PERSONAL_DATA_PRIVACY"
     | "HARASSMENT_ABUSE"
+    | "SPAM_SCAM"
+    | "INAPPROPRIATE_CONTENT"
+    | "IMPERSONATION_MISREPRESENTATION"
+    | "FRAUD"
+    | "ILLEGAL_SUSPICIOUS_ACTIVITY"
+    | "CONTACT_BYPASS_ABUSE"
     | "EXTORTION_RETALIATION"
     | "IRRELEVANT_CONTENT"
     | "SUSPECTED_FRAUD_FAKE_REVIEW"
+    | "FALSE_QUALIFICATION"
+    | "FALSE_IDENTITY"
+    | "MISLEADING_CLAIM"
+    | "NOT_THEIR_WORK"
+    | "CUSTOMER_PRIVACY"
+    | "STOLEN_IMAGES"
+    | "THREATS"
+    | "PLATFORM_BYPASS_ATTEMPT"
+    | "SUSPICIOUS_PAYMENT_SCAM"
     | "OTHER";
   readonly details?: string | null;
+  readonly evidenceReferenceType?: string | null;
+  readonly evidenceReferenceId?: string | null;
 }
 
 export function registerReviewResponseReportRoutes(
@@ -275,16 +303,38 @@ function exactReportBody(
     ) ||
     Object.keys(body).some(
       (key) =>
-        !["commandId", "details", "reason", "targetId", "targetType"].includes(
-          key,
-        ),
+        ![
+          "commandId",
+          "details",
+          "evidenceReferenceId",
+          "evidenceReferenceType",
+          "reason",
+          "targetId",
+          "targetType",
+        ].includes(key),
     ) ||
-    !validDetails(body["details"], Object.hasOwn(body, "details"))
+    !validDetails(body["details"], Object.hasOwn(body, "details")) ||
+    !validEvidence(body)
   ) {
     void reply.code(400).send({ code: "INVALID_REQUEST" });
     return;
   }
   done();
+}
+
+function validEvidence(body: Record<string, unknown>): boolean {
+  const hasType = Object.hasOwn(body, "evidenceReferenceType");
+  const hasId = Object.hasOwn(body, "evidenceReferenceId");
+  if (!hasType && !hasId) return true;
+  if (hasType !== hasId) return false;
+  if (body["evidenceReferenceType"] === null)
+    return body["evidenceReferenceId"] === null;
+  return (
+    typeof body["evidenceReferenceType"] === "string" &&
+    /^[A-Z][A-Z0-9_]{1,63}$/u.test(body["evidenceReferenceType"]) &&
+    typeof body["evidenceReferenceId"] === "string" &&
+    new RegExp(uuid.pattern, "u").test(body["evidenceReferenceId"])
+  );
 }
 
 function validDetails(value: unknown, supplied: boolean): boolean {
@@ -349,15 +399,43 @@ const reportBody = {
     commandId: uuid,
     targetId: uuid,
     targetType: {
-      enum: ["MAIN_REVIEW", "REVIEW_RESPONSE", "SUPERVISOR_EVALUATION"],
+      enum: [
+        "CRAFTSMAN_PROFILE",
+        "PORTFOLIO_PROJECT",
+        "MEDIA_ASSET",
+        "MAIN_REVIEW",
+        "REVIEW_RESPONSE",
+        "JOB_CONTEXT_REVIEW",
+        "SUPERVISOR_EVALUATION",
+        "MESSAGE",
+        "CONVERSATION",
+        "JOB_ATTACHMENT",
+        "JOB_REQUEST",
+        "USER_BEHAVIOR",
+      ],
     },
     reason: {
       enum: [
+        "SPAM_SCAM",
         "PERSONAL_DATA_PRIVACY",
         "HARASSMENT_ABUSE",
+        "INAPPROPRIATE_CONTENT",
+        "IMPERSONATION_MISREPRESENTATION",
+        "FRAUD",
+        "ILLEGAL_SUSPICIOUS_ACTIVITY",
+        "CONTACT_BYPASS_ABUSE",
         "EXTORTION_RETALIATION",
         "IRRELEVANT_CONTENT",
         "SUSPECTED_FRAUD_FAKE_REVIEW",
+        "FALSE_QUALIFICATION",
+        "FALSE_IDENTITY",
+        "MISLEADING_CLAIM",
+        "NOT_THEIR_WORK",
+        "CUSTOMER_PRIVACY",
+        "STOLEN_IMAGES",
+        "THREATS",
+        "PLATFORM_BYPASS_ATTEMPT",
+        "SUSPICIOUS_PAYMENT_SCAM",
         "OTHER",
       ],
     },
@@ -367,5 +445,12 @@ const reportBody = {
         { type: "null" },
       ],
     },
+    evidenceReferenceType: {
+      anyOf: [
+        { type: "string", pattern: "^[A-Z][A-Z0-9_]{1,63}$" },
+        { type: "null" },
+      ],
+    },
+    evidenceReferenceId: { anyOf: [uuid, { type: "null" }] },
   },
 } as const;

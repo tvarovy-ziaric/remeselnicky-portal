@@ -316,6 +316,7 @@ function humanEntry() {
     createdAt: new Date("2026-09-15T08:00:00Z"),
     id: messageId,
     kind: "HUMAN_MESSAGE",
+    hiddenByModeration: false,
     replyToMessageId: null,
     sequence: 2,
     systemEvent: null,

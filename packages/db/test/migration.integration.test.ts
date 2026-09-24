@@ -105,6 +105,7 @@ import { runJobContextReviewIntegrationAssertions } from "./job-context-review-i
 import { runJobSupervisorEvaluationCommittedRaceAssertions } from "./job-supervisor-evaluation-committed-race-integration-helper.js";
 import { runJobSupervisorEvaluationIntegrationAssertions } from "./job-supervisor-evaluation-integration-helper.js";
 import { runReviewResponseReportIntegrationAssertions } from "./review-response-report-integration-helper.js";
+import { runModerationIntegrationAssertions } from "./moderation-integration-helper.js";
 import { runJobDisputeIntegrationAssertions } from "./job-dispute-integration-helper.js";
 import { runAdminDisputeIntegrationAssertions } from "./admin-dispute-integration-helper.js";
 import { runVerifiedCompletionEvidenceIntegrationAssertions } from "./verified-completion-evidence-integration-helper.js";
@@ -237,6 +238,8 @@ describe.skipIf(testDatabaseUrl === undefined)(
           "0101_admin_job_force_cancellation.sql",
           "0102_dispute_party_transition_actions.sql",
           "0103_dispute_withdrawal_and_mutual_settlement.sql",
+          "0104_moderation_taxonomy.sql",
+          "0105_moderation_action_appeal_workflow.sql",
         ],
         alreadyApplied: 0,
       });
@@ -245,7 +248,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         testDatabaseUrl,
         migrationsDirectory,
       );
-      expect(secondRun).toEqual({ applied: [], alreadyApplied: 104 });
+      expect(secondRun).toEqual({ applied: [], alreadyApplied: 106 });
 
       const sql = postgres(testDatabaseUrl, { max: 5 });
       try {
@@ -1910,9 +1913,15 @@ describe.skipIf(testDatabaseUrl === undefined)(
           "CREATE_CONFIRMED_FIXTURE",
         );
         await runJobSupervisorEvaluationCommittedRaceAssertions(sql);
-        await runReviewResponseReportIntegrationAssertions(sql);
+        const moderationReview =
+          await runReviewResponseReportIntegrationAssertions(sql);
         await runJobDisputeIntegrationAssertions(sql);
         await runAdminDisputeIntegrationAssertions(sql, {
+          adminId,
+          privilegedSessionId: adminSessionId,
+        });
+        await runModerationIntegrationAssertions(sql, {
+          ...moderationReview,
           adminId,
           privilegedSessionId: adminSessionId,
         });

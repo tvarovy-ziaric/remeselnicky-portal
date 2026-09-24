@@ -73,6 +73,11 @@ export function createPrivateMediaDeliveryRepository(
           ON object.media_asset_id = asset.id
           AND object.role = 'CANONICAL'
         WHERE actor.id = ${input.actorUserId}
+          AND NOT EXISTS (
+            SELECT 1 FROM current_moderation_hidden_targets hidden
+            WHERE hidden.target_id = asset.id
+              AND hidden.target_type IN ('MEDIA_ASSET', 'JOB_ATTACHMENT')
+          )
         LIMIT 1
       `;
       if (row === undefined) return null;

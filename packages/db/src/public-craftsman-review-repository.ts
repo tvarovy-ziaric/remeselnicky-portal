@@ -133,6 +133,11 @@ async function listInSnapshot(
         AND review.direction = 'CUSTOMER_TO_PROVIDER'
         AND review.target_kind = 'CRAFTSMAN_PROFILE'
         AND review.revision_id = ${input.cursorRevisionId}
+        AND NOT EXISTS (
+          SELECT 1 FROM current_moderation_review_evidence_exclusions exclusion
+          WHERE exclusion.target_type = 'MAIN_REVIEW'
+            AND exclusion.target_id = review.revision_id
+        )
     `;
     if (cursorAnchor === undefined) {
       throw new PublicCraftsmanReviewQueryValidationError(
@@ -165,7 +170,11 @@ async function selectFirstPage(
     SELECT review.revision_id AS "revisionId",
       review.accepted_profession_code AS "professionCode",
       review.ratings,
-      review.comment,
+      CASE WHEN EXISTS (
+        SELECT 1 FROM current_moderation_hidden_targets hidden
+        WHERE hidden.target_type = 'MAIN_REVIEW'
+          AND hidden.target_id = review.revision_id
+      ) THEN NULL ELSE review.comment END AS comment,
       response.response_id AS "responseId",
       response.body AS "responseBody",
       to_char(
@@ -179,9 +188,19 @@ async function selectFirstPage(
     FROM current_unlocked_job_main_reviews review
     LEFT JOIN current_job_main_review_responses response
       ON response.review_revision_id = review.revision_id
+      AND NOT EXISTS (
+        SELECT 1 FROM current_moderation_hidden_targets hidden
+        WHERE hidden.target_type = 'REVIEW_RESPONSE'
+          AND hidden.target_id = response.response_id
+      )
     WHERE review.target_profile_id = ${input.craftsmanProfileId}
       AND review.direction = 'CUSTOMER_TO_PROVIDER'
       AND review.target_kind = 'CRAFTSMAN_PROFILE'
+      AND NOT EXISTS (
+        SELECT 1 FROM current_moderation_review_evidence_exclusions exclusion
+        WHERE exclusion.target_type = 'MAIN_REVIEW'
+          AND exclusion.target_id = review.revision_id
+      )
     ORDER BY review.unlocked_at DESC, review.revision_id DESC
     LIMIT ${input.limit + 1}
   `;
@@ -196,7 +215,11 @@ async function selectAfterCursor(
     SELECT review.revision_id AS "revisionId",
       review.accepted_profession_code AS "professionCode",
       review.ratings,
-      review.comment,
+      CASE WHEN EXISTS (
+        SELECT 1 FROM current_moderation_hidden_targets hidden
+        WHERE hidden.target_type = 'MAIN_REVIEW'
+          AND hidden.target_id = review.revision_id
+      ) THEN NULL ELSE review.comment END AS comment,
       response.response_id AS "responseId",
       response.body AS "responseBody",
       to_char(
@@ -210,9 +233,19 @@ async function selectAfterCursor(
     FROM current_unlocked_job_main_reviews review
     LEFT JOIN current_job_main_review_responses response
       ON response.review_revision_id = review.revision_id
+      AND NOT EXISTS (
+        SELECT 1 FROM current_moderation_hidden_targets hidden
+        WHERE hidden.target_type = 'REVIEW_RESPONSE'
+          AND hidden.target_id = response.response_id
+      )
     WHERE review.target_profile_id = ${input.craftsmanProfileId}
       AND review.direction = 'CUSTOMER_TO_PROVIDER'
       AND review.target_kind = 'CRAFTSMAN_PROFILE'
+      AND NOT EXISTS (
+        SELECT 1 FROM current_moderation_review_evidence_exclusions exclusion
+        WHERE exclusion.target_type = 'MAIN_REVIEW'
+          AND exclusion.target_id = review.revision_id
+      )
       AND (review.unlocked_at, review.revision_id)
         < (${anchor.unlockedAt}, ${anchor.revisionId}::uuid)
     ORDER BY review.unlocked_at DESC, review.revision_id DESC

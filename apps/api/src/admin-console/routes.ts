@@ -73,7 +73,9 @@ export function registerAdminConsoleRoutes(
         id: moduleId,
         label: module.label,
         state:
-          moduleId === "disputes" || moduleId === "jobs"
+          moduleId === "disputes" ||
+          moduleId === "jobs" ||
+          moduleId === "reports"
             ? "OPERATIONAL"
             : "PLACEHOLDER",
       });

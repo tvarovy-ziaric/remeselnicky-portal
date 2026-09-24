@@ -55,6 +55,7 @@ export interface ConversationTimelineEntry {
   readonly createdAt: Date;
   readonly id: ConversationMessageId;
   readonly kind: "HUMAN_MESSAGE" | "SYSTEM_EVENT";
+  readonly hiddenByModeration: boolean;
   readonly readByCounterpart: boolean | null;
   readonly replyToMessageId: ConversationMessageId | null;
   readonly sequence: number;

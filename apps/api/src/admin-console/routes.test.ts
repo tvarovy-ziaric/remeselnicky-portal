@@ -109,9 +109,9 @@ describe("admin console routes", () => {
     expect(response.json()).toEqual({ code: "PRIVILEGED_ACCESS_DENIED" });
   });
 
-  it("marks implemented dispute and Job modules as operational", async () => {
+  it("marks implemented dispute, Job and moderation modules as operational", async () => {
     const fixture = createFixture("ACTIVE", adminActor());
-    for (const moduleId of ["disputes", "jobs"] as const) {
+    for (const moduleId of ["disputes", "jobs", "reports"] as const) {
       const response = await fixture.app.inject({
         method: "GET",
         url: `${ADMIN_CONSOLE_BASE_PATH}/modules/${moduleId}`,

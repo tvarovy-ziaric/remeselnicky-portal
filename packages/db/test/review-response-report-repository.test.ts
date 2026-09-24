@@ -192,7 +192,7 @@ describe("review response and report repository", () => {
       expect(fake.statements).toEqual([]);
     }
     for (const invalid of [
-      reportInput({ targetType: "MESSAGE" }),
+      reportInput({ targetType: "UNKNOWN" }),
       reportInput({ reason: "NEGATIVE_REVIEW" }),
       reportInput({ details: " padded " }),
       reportInput({ details: "x".repeat(1_001) }),
@@ -304,9 +304,7 @@ describe("review response and report repository", () => {
       recordedAt,
     });
     const all = fake.statements.join("\n");
-    expect(all).toContain("current_unlocked_job_main_reviews");
-    expect(all).toContain("current_job_main_review_responses");
-    expect(all).toContain("job_supervisor_evaluations");
+    expect(all).toContain("moderation_target_is_reportable");
     expect(all).toContain("INSERT INTO moderation_reports");
     expect(all).not.toContain("UPDATE job_main_review_events");
     expect(all).not.toContain("UPDATE users");
@@ -320,6 +318,8 @@ describe("review response and report repository", () => {
       targetId: reviewId,
       reason: "IRRELEVANT_CONTENT",
       details: "Komentár nesúvisí s vykonanou zákazkou.",
+      evidenceReferenceType: null,
+      evidenceReferenceId: null,
       reportedAt: recordedAt,
     };
     await expect(

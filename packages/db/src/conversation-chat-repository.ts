@@ -43,6 +43,7 @@ interface EntryRow {
   readonly createdAt: Date;
   readonly id: string;
   readonly kind: "HUMAN_MESSAGE" | "SYSTEM_EVENT";
+  readonly hiddenByModeration: boolean;
   readonly replyToMessageId: string | null;
   readonly sequence: number;
   readonly systemEvent: "ENGAGEMENT" | null;
@@ -149,7 +150,9 @@ async function readTimeline(
   const rows = await transaction<EntryRow[]>`
     SELECT entry.id, entry.conversation_id AS "conversationId",
       entry.sequence::integer AS sequence, entry.entry_kind AS kind,
-      entry.author_user_id AS "authorUserId", entry.body,
+      entry.author_user_id AS "authorUserId",
+      CASE WHEN hidden.action_id IS NULL THEN entry.body ELSE NULL END AS body,
+      (hidden.action_id IS NOT NULL) AS "hiddenByModeration",
       entry.reply_to_message_id AS "replyToMessageId",
       entry.system_event AS "systemEvent", entry.created_at AS "createdAt",
       CASE
@@ -163,6 +166,8 @@ async function readTimeline(
       ON customer.id = current.customer_profile_id
     JOIN craftsman_profiles craftsman
       ON craftsman.id = current.craftsman_profile_id
+    LEFT JOIN current_moderation_hidden_targets hidden
+      ON hidden.target_type = 'MESSAGE' AND hidden.target_id = entry.id
     WHERE entry.conversation_id = ${input.conversationId}
       AND (${input.beforeSequence ?? null}::bigint IS NULL
         OR entry.sequence < ${input.beforeSequence ?? null})
@@ -181,7 +186,9 @@ async function readTimeline(
         row,
         input.actorUserId,
         counterpartState.lastReadSequence,
-        attachments.get(row.id) ?? Object.freeze([]),
+        row.hiddenByModeration
+          ? Object.freeze([])
+          : (attachments.get(row.id) ?? Object.freeze([])),
       ),
     ),
   );
@@ -601,7 +608,9 @@ async function loadEntry(
   const [row] = await transaction<EntryRow[]>`
     SELECT entry.id, entry.conversation_id AS "conversationId",
       entry.sequence::integer AS sequence, entry.entry_kind AS kind,
-      entry.author_user_id AS "authorUserId", entry.body,
+      entry.author_user_id AS "authorUserId",
+      CASE WHEN hidden.action_id IS NULL THEN entry.body ELSE NULL END AS body,
+      (hidden.action_id IS NOT NULL) AS "hiddenByModeration",
       entry.reply_to_message_id AS "replyToMessageId",
       entry.system_event AS "systemEvent", entry.created_at AS "createdAt",
       CASE
@@ -615,6 +624,8 @@ async function loadEntry(
       ON customer.id = current.customer_profile_id
     JOIN craftsman_profiles craftsman
       ON craftsman.id = current.craftsman_profile_id
+    LEFT JOIN current_moderation_hidden_targets hidden
+      ON hidden.target_type = 'MESSAGE' AND hidden.target_id = entry.id
     WHERE entry.id = ${messageId}
   `;
   if (row === undefined)
@@ -722,6 +733,7 @@ function toTimelineEntry(
       createdAt: new Date(row.createdAt),
       id: row.id as ConversationMessageId,
       kind: row.kind,
+      hiddenByModeration: false,
       readByCounterpart: null,
       replyToMessageId: null,
       sequence: row.sequence,
@@ -731,9 +743,11 @@ function toTimelineEntry(
   if (
     !isUuid(row.authorUserId) ||
     (row.authorRole !== "CUSTOMER" && row.authorRole !== "CRAFTSMAN") ||
-    typeof row.body !== "string" ||
-    row.body.length < 1 ||
-    row.body.length > 4_000 ||
+    (row.hiddenByModeration
+      ? row.body !== null
+      : typeof row.body !== "string" ||
+        row.body.length < 1 ||
+        row.body.length > 4_000) ||
     row.systemEvent !== null
   ) {
     throw new Error("Corrupt conversation human message.");
@@ -748,6 +762,7 @@ function toTimelineEntry(
     createdAt: new Date(row.createdAt),
     id: row.id as ConversationMessageId,
     kind: row.kind,
+    hiddenByModeration: row.hiddenByModeration,
     readByCounterpart: self ? counterpartLastRead >= row.sequence : null,
     replyToMessageId: row.replyToMessageId as ConversationMessageId | null,
     sequence: row.sequence,

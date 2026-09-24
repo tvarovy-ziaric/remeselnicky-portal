@@ -1094,6 +1094,7 @@ function messageEntry(target: TargetIds) {
     createdAt: now,
     id: uuid(900) as never,
     kind: "HUMAN_MESSAGE" as const,
+    hiddenByModeration: false,
     readByCounterpart: null,
     replyToMessageId: null,
     sequence: 1,

@@ -30,6 +30,7 @@ export async function runConversationChatIntegrationAssertions(
       expect.objectContaining({
         author: "SYSTEM",
         kind: "SYSTEM_EVENT",
+        hiddenByModeration: false,
         sequence: 1,
         systemEvent: "ENGAGEMENT",
       }),

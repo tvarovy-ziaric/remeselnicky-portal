@@ -89,6 +89,17 @@ export {
 } from "./admin-disputes/routes.js";
 export type { AdminDisputeRouteDependencies } from "./admin-disputes/routes.js";
 export {
+  ADMIN_MODERATION_PATHS,
+  MODERATION_ACTIONS_PATH,
+  MODERATION_APPEAL_PATH,
+  registerAdminModerationRoutes,
+  registerModerationAppealRoutes,
+} from "./moderation/routes.js";
+export type {
+  AdminModerationRouteDependencies,
+  ModerationAppealRouteDependencies,
+} from "./moderation/routes.js";
+export {
   JOB_DOCUMENTATION_PATH,
   registerJobDocumentationRoutes,
 } from "./job-documentation/routes.js";

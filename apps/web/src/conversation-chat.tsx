@@ -21,6 +21,7 @@ export interface ConversationTimelineEntryView {
   readonly createdAt: string;
   readonly id: string;
   readonly kind: "HUMAN_MESSAGE" | "SYSTEM_EVENT";
+  readonly hiddenByModeration: boolean;
   readonly readByCounterpart: boolean | null;
   readonly replyToMessageId: string | null;
   readonly sequence: number;
@@ -227,7 +228,11 @@ export function ConversationChat({
                 <p className="eyebrow">
                   {entry.author === "SELF" ? "Vy" : "Druhá strana"}
                 </p>
-                <p>{linkPlainText(entry.body ?? "")}</p>
+                <p>
+                  {entry.hiddenByModeration
+                    ? "Správa bola skrytá z dôvodu porušenia pravidiel."
+                    : linkPlainText(entry.body ?? "")}
+                </p>
                 {entry.attachments.length === 0 ? null : (
                   <ul aria-label="Prílohy správy">
                     {entry.attachments.map((attachment) => (
@@ -629,6 +634,7 @@ function parseEntry(value: unknown): ConversationTimelineEntryView | null {
       "createdAt",
       "id",
       "kind",
+      "hiddenByModeration",
       "readByCounterpart",
       "replyToMessageId",
       "sequence",
@@ -640,7 +646,8 @@ function parseEntry(value: unknown): ConversationTimelineEntryView | null {
     !validDate(value["createdAt"]) ||
     !positiveInteger(value["sequence"]) ||
     (value["replyToMessageId"] !== null && !uuid(value["replyToMessageId"])) ||
-    ![true, false, null].includes(value["readByCounterpart"] as never)
+    ![true, false, null].includes(value["readByCounterpart"] as never) ||
+    typeof value["hiddenByModeration"] !== "boolean"
   ) {
     return null;
   }
@@ -661,9 +668,11 @@ function parseEntry(value: unknown): ConversationTimelineEntryView | null {
   const human = value["kind"] === "HUMAN_MESSAGE";
   if (
     human
-      ? typeof value["body"] !== "string" ||
-        value["body"].length < 1 ||
-        value["body"].length > 4_000 ||
+      ? (value["hiddenByModeration"]
+          ? value["body"] !== null || attachments.length !== 0
+          : typeof value["body"] !== "string" ||
+            value["body"].length < 1 ||
+            value["body"].length > 4_000) ||
         value["systemEvent"] !== null ||
         (value["author"] !== "SELF" && value["author"] !== "COUNTERPART") ||
         (value["authorRole"] !== "CUSTOMER" &&
@@ -677,7 +686,8 @@ function parseEntry(value: unknown): ConversationTimelineEntryView | null {
         value["author"] !== "SYSTEM" ||
         value["authorRole"] !== null ||
         value["readByCounterpart"] !== null ||
-        value["replyToMessageId"] !== null
+        value["replyToMessageId"] !== null ||
+        value["hiddenByModeration"] !== false
   ) {
     return null;
   }

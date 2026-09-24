@@ -4,13 +4,39 @@ import type { Sql, TransactionSql } from "postgres";
 type RootSql = Sql | TransactionSql;
 
 export type ModerationReportTargetType =
-  "MAIN_REVIEW" | "REVIEW_RESPONSE" | "SUPERVISOR_EVALUATION";
+  | "CRAFTSMAN_PROFILE"
+  | "PORTFOLIO_PROJECT"
+  | "MEDIA_ASSET"
+  | "MAIN_REVIEW"
+  | "REVIEW_RESPONSE"
+  | "JOB_CONTEXT_REVIEW"
+  | "SUPERVISOR_EVALUATION"
+  | "MESSAGE"
+  | "CONVERSATION"
+  | "JOB_ATTACHMENT"
+  | "JOB_REQUEST"
+  | "USER_BEHAVIOR";
 export type ModerationReportReason =
+  | "SPAM_SCAM"
   | "PERSONAL_DATA_PRIVACY"
   | "HARASSMENT_ABUSE"
+  | "INAPPROPRIATE_CONTENT"
+  | "IMPERSONATION_MISREPRESENTATION"
+  | "FRAUD"
+  | "ILLEGAL_SUSPICIOUS_ACTIVITY"
+  | "CONTACT_BYPASS_ABUSE"
   | "EXTORTION_RETALIATION"
   | "IRRELEVANT_CONTENT"
   | "SUSPECTED_FRAUD_FAKE_REVIEW"
+  | "FALSE_QUALIFICATION"
+  | "FALSE_IDENTITY"
+  | "MISLEADING_CLAIM"
+  | "NOT_THEIR_WORK"
+  | "CUSTOMER_PRIVACY"
+  | "STOLEN_IMAGES"
+  | "THREATS"
+  | "PLATFORM_BYPASS_ATTEMPT"
+  | "SUSPICIOUS_PAYMENT_SCAM"
   | "OTHER";
 
 export interface JobMainReviewResponse {
@@ -49,6 +75,8 @@ export interface CreateModerationReportInput {
   readonly targetId: string;
   readonly reason: ModerationReportReason;
   readonly details?: string | null;
+  readonly evidenceReferenceType?: string | null;
+  readonly evidenceReferenceId?: string | null;
 }
 
 export type CreateModerationReportResult =
@@ -101,6 +129,8 @@ interface ExistingReportRow {
   readonly targetId: string;
   readonly reason: string;
   readonly details: string | null;
+  readonly evidenceReferenceType: string | null;
+  readonly evidenceReferenceId: string | null;
   readonly reportedAt: Date;
 }
 
@@ -108,16 +138,40 @@ const uuid =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const control = /[\p{Cc}]/u;
 const targetTypes = new Set<ModerationReportTargetType>([
+  "CRAFTSMAN_PROFILE",
+  "PORTFOLIO_PROJECT",
+  "MEDIA_ASSET",
   "MAIN_REVIEW",
   "REVIEW_RESPONSE",
+  "JOB_CONTEXT_REVIEW",
   "SUPERVISOR_EVALUATION",
+  "MESSAGE",
+  "CONVERSATION",
+  "JOB_ATTACHMENT",
+  "JOB_REQUEST",
+  "USER_BEHAVIOR",
 ]);
 const reasons = new Set<ModerationReportReason>([
+  "SPAM_SCAM",
   "PERSONAL_DATA_PRIVACY",
   "HARASSMENT_ABUSE",
+  "INAPPROPRIATE_CONTENT",
+  "IMPERSONATION_MISREPRESENTATION",
+  "FRAUD",
+  "ILLEGAL_SUSPICIOUS_ACTIVITY",
+  "CONTACT_BYPASS_ABUSE",
   "EXTORTION_RETALIATION",
   "IRRELEVANT_CONTENT",
   "SUSPECTED_FRAUD_FAKE_REVIEW",
+  "FALSE_QUALIFICATION",
+  "FALSE_IDENTITY",
+  "MISLEADING_CLAIM",
+  "NOT_THEIR_WORK",
+  "CUSTOMER_PRIVACY",
+  "STOLEN_IMAGES",
+  "THREATS",
+  "PLATFORM_BYPASS_ATTEMPT",
+  "SUSPICIOUS_PAYMENT_SCAM",
   "OTHER",
 ]);
 
@@ -266,7 +320,7 @@ export function createReviewResponseReportRepository(sql: RootSql) {
   async function createReport(
     input: CreateModerationReportInput,
   ): Promise<CreateModerationReportResult> {
-    const details = validateReportInput(input);
+    const normalized = validateReportInput(input);
     return transaction(sql, async (tx) => {
       await tx`
         SELECT pg_advisory_xact_lock(
@@ -276,7 +330,10 @@ export function createReviewResponseReportRepository(sql: RootSql) {
       const [existing] = await tx<ExistingReportRow[]>`
         SELECT report_id AS "reportId", reporter_user_id AS "reporterUserId",
           target_type::text AS "targetType", target_id AS "targetId",
-          reason::text, details, reported_at AS "reportedAt"
+          reason::text, details,
+          evidence_reference_type AS "evidenceReferenceType",
+          evidence_reference_id AS "evidenceReferenceId",
+          reported_at AS "reportedAt"
         FROM moderation_reports WHERE report_id = ${input.commandId}
       `;
       if (existing !== undefined) {
@@ -286,7 +343,9 @@ export function createReviewResponseReportRepository(sql: RootSql) {
           existing.targetType !== input.targetType ||
           existing.targetId !== input.targetId ||
           existing.reason !== input.reason ||
-          existing.details !== details
+          existing.details !== normalized.details ||
+          existing.evidenceReferenceType !== normalized.evidenceType ||
+          existing.evidenceReferenceId !== normalized.evidenceId
         )
           throw new ModerationReportIdempotencyError(
             "Moderation report command ID was reused for another intent.",
@@ -307,30 +366,10 @@ export function createReviewResponseReportRepository(sql: RootSql) {
             AND credential.phone_verified_at IS NOT NULL
           WHERE actor.id = ${input.actorUserId}
             AND actor.account_state = 'ACTIVE'
-            AND (
-              (${input.targetType} = 'MAIN_REVIEW' AND EXISTS (
-                SELECT 1 FROM current_unlocked_job_main_reviews review
-                WHERE review.revision_id = ${input.targetId}
-                  AND review.direction = 'CUSTOMER_TO_PROVIDER'
-                  AND review.target_kind = 'CRAFTSMAN_PROFILE'
-              )) OR
-              (${input.targetType} = 'REVIEW_RESPONSE' AND EXISTS (
-                SELECT 1 FROM current_job_main_review_responses response
-                JOIN current_unlocked_job_main_reviews review
-                  ON review.revision_id = response.review_revision_id
-                WHERE response.response_id = ${input.targetId}
-                  AND review.direction = 'CUSTOMER_TO_PROVIDER'
-                  AND review.target_kind = 'CRAFTSMAN_PROFILE'
-              )) OR
-              (${input.targetType} = 'SUPERVISOR_EVALUATION' AND EXISTS (
-                SELECT 1 FROM job_supervisor_evaluations evaluation
-                JOIN job_participants participant
-                  ON participant.id = evaluation.target_participant_id
-                JOIN craftsman_profiles profile
-                  ON profile.id = participant.craftsman_profile_id
-                WHERE evaluation.evaluation_id = ${input.targetId}
-                  AND profile.owner_user_id = ${input.actorUserId}
-              ))
+            AND moderation_target_is_reportable(
+              ${input.targetType}::moderation_report_target_type,
+              ${input.targetId}::uuid,
+              ${input.actorUserId}::uuid
             )
         ) AS reportable
       `;
@@ -345,10 +384,12 @@ export function createReviewResponseReportRepository(sql: RootSql) {
 
       const [inserted] = await tx<Array<{ readonly recordedAt: Date }>>`
         INSERT INTO moderation_reports (
-          report_id, reporter_user_id, target_type, target_id, reason, details
+          report_id, reporter_user_id, target_type, target_id, reason, details,
+          evidence_reference_type, evidence_reference_id
         ) VALUES (
           ${input.commandId}, ${input.actorUserId}, ${input.targetType},
-          ${input.targetId}, ${input.reason}, ${details}
+          ${input.targetId}, ${input.reason}, ${normalized.details},
+          ${normalized.evidenceType}, ${normalized.evidenceId}
         ) RETURNING reported_at AS "recordedAt"
       `;
       if (inserted === undefined || !validDate(inserted.recordedAt))
@@ -400,21 +441,34 @@ function validateResponseInput(input: SubmitJobMainReviewResponseInput): void {
     throw new TypeError("Invalid review response body.");
 }
 
-function validateReportInput(
-  input: CreateModerationReportInput,
-): string | null {
+function validateReportInput(input: CreateModerationReportInput): {
+  details: string | null;
+  evidenceType: string | null;
+  evidenceId: string | null;
+} {
   validIds(input.actorUserId, input.commandId, input.targetId);
   if (!targetTypes.has(input.targetType) || !reasons.has(input.reason))
     throw new TypeError("Invalid moderation report category.");
-  if (input.details === undefined || input.details === null) return null;
+  const details = input.details ?? null;
   if (
-    input.details !== input.details.trim() ||
-    input.details.length < 1 ||
-    input.details.length > 1_000 ||
-    control.test(input.details)
+    details !== null &&
+    (details !== details.trim() ||
+      details.length < 1 ||
+      details.length > 1_000 ||
+      control.test(details))
   )
     throw new TypeError("Invalid moderation report details.");
-  return input.details;
+  const evidenceType = input.evidenceReferenceType ?? null;
+  const evidenceId = input.evidenceReferenceId ?? null;
+  if ((evidenceType === null) !== (evidenceId === null))
+    throw new TypeError("Incomplete moderation evidence reference.");
+  if (
+    evidenceType !== null &&
+    (!/^[A-Z][A-Z0-9_]{1,63}$/u.test(evidenceType) ||
+      !uuid.test(evidenceId ?? ""))
+  )
+    throw new TypeError("Invalid moderation evidence reference.");
+  return { details, evidenceType, evidenceId };
 }
 
 function validBody(value: unknown): value is string {

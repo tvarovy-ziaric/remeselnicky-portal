@@ -94,6 +94,10 @@ import {
   type AdminDisputeRouteDependencies,
 } from "../admin-disputes/routes.js";
 import {
+  registerAdminModerationRoutes,
+  type AdminModerationRouteDependencies,
+} from "../moderation/routes.js";
+import {
   registerJobDocumentationRoutes,
   type JobDocumentationRouteDependencies,
 } from "../job-documentation/routes.js";
@@ -153,6 +157,10 @@ import {
   registerReviewResponseReportRoutes,
   type ReviewResponseReportRouteDependencies,
 } from "../review-responses-reports/routes.js";
+import {
+  registerModerationAppealRoutes,
+  type ModerationAppealRouteDependencies,
+} from "../moderation/routes.js";
 import {
   registerJobDisputeRoutes,
   type JobDisputeRouteDependencies,
@@ -264,6 +272,10 @@ export interface AuthModuleDependencies {
     "cancellation"
   >;
   readonly adminDisputes?: Pick<AdminDisputeRouteDependencies, "disputes">;
+  readonly adminModeration?: Pick<
+    AdminModerationRouteDependencies,
+    "moderation"
+  >;
   readonly jobDocumentation?: Pick<
     JobDocumentationRouteDependencies,
     "documentation"
@@ -308,6 +320,10 @@ export interface AuthModuleDependencies {
   readonly reviewResponsesAndReports?: Pick<
     ReviewResponseReportRouteDependencies,
     "persistence"
+  >;
+  readonly moderationAppeals?: Pick<
+    ModerationAppealRouteDependencies,
+    "moderation"
   >;
   readonly jobDisputes?: Pick<
     JobDisputeRouteDependencies,
@@ -811,6 +827,17 @@ async function configureAuthModule(
       ...dependencies.reviewResponsesAndReports,
     });
   }
+  if (dependencies.moderationAppeals !== undefined) {
+    registerModerationAppealRoutes(app, {
+      csrfProtection: csrfProtection(app),
+      guard,
+      rateLimit: {
+        max: config.rateLimitMax,
+        timeWindowMs: config.rateLimitWindowMs,
+      },
+      ...dependencies.moderationAppeals,
+    });
+  }
   if (dependencies.jobDisputes !== undefined) {
     registerJobDisputeRoutes(app, {
       csrfProtection: csrfProtection(app),
@@ -891,6 +918,18 @@ async function configureAuthModule(
       registerAdminDisputeRoutes(app, {
         adminAccess: dependencies.adminAccess.service,
         disputes: dependencies.adminDisputes.disputes,
+        guard,
+        csrfProtection: csrfProtection(app),
+        rateLimit: {
+          max: config.rateLimitMax,
+          timeWindowMs: config.rateLimitWindowMs,
+        },
+      });
+    }
+    if (dependencies.adminModeration !== undefined) {
+      registerAdminModerationRoutes(app, {
+        adminAccess: dependencies.adminAccess.service,
+        moderation: dependencies.adminModeration.moderation,
         guard,
         csrfProtection: csrfProtection(app),
         rateLimit: {
