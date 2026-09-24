@@ -99,6 +99,7 @@ import { runChangeOrderIntegrationAssertions } from "./change-order-integration-
 import { runChangeOrderPdfIntegrationAssertions } from "./change-order-pdf-integration-helper.js";
 import { runJobCompletionIntegrationAssertions } from "./job-completion-integration-helper.js";
 import { runMainBilateralReviewIntegrationAssertions } from "./main-bilateral-review-integration-helper.js";
+import { runMainBilateralReviewCommittedRaceAssertions } from "./main-bilateral-review-committed-race-integration-helper.js";
 import { runVerifiedCompletionEvidenceIntegrationAssertions } from "./verified-completion-evidence-integration-helper.js";
 
 const testDatabaseUrl = process.env["TEST_DATABASE_URL"];
@@ -1865,6 +1866,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         await runJobRosterCancelledIntegrationAssertions(sql);
         await runJobRosterCancelledReadIntegrationAssertions(sql);
         await runJobDocumentationIntegrationAssertions(sql);
+        await runMainBilateralReviewCommittedRaceAssertions(sql);
 
         await adminAccess.revokePrivilegedSession(superSessionDigest);
         await expect(
