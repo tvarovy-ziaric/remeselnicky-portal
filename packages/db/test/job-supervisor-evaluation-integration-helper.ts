@@ -129,30 +129,33 @@ export async function runJobSupervisorEvaluationIntegrationAssertions(
         }),
       ).toMatchObject({ claimId, status: "APPLIED" });
 
-      const candidates = await tx<Candidate[]>`
-        SELECT profile.id AS "profileId", profile.owner_user_id AS "userId"
-        FROM craftsman_profiles profile
-        JOIN users actor ON actor.id = profile.owner_user_id
-          AND actor.account_state = 'ACTIVE'
-        JOIN auth_credentials credential ON credential.user_id = actor.id
-          AND credential.email_verified_at IS NOT NULL
-          AND credential.phone_verified_at IS NOT NULL
-        WHERE profile.profile_type = 'INDIVIDUAL'
-          AND profile.id <> ${fixture.targetProfileId}
-          AND profile.owner_user_id NOT IN (
-            ${fixture.customerUserId}, ${fixture.providerUserId},
-            ${fixture.targetUserId}
+      const candidates: Candidate[] = [];
+      for (const suffix of ["coordinator", "lead", "unconfirmed"] as const) {
+        const userId = randomUUID();
+        await tx`INSERT INTO users (id) VALUES (${userId})`;
+        await tx`
+          INSERT INTO auth_credentials (
+            user_id, normalized_email, password_hash, email_verified_at,
+            normalized_phone, phone_verified_at
+          ) VALUES (
+            ${userId}, ${`${suffix}.${userId}@supervisor.fixture.test`},
+            'test-fixture-password-hash', clock_timestamp(),
+            '+4219' || lpad(
+              (abs(hashtextextended(${userId}::text, 96019)) % 100000000)::text,
+              8, '0'
+            ), clock_timestamp()
           )
-          AND NOT EXISTS (
-            SELECT 1 FROM current_job_participants participant
-            WHERE participant.job_id = ${fixture.jobId}
-              AND participant.craftsman_profile_id = profile.id
-              AND participant.state IN ('INVITED', 'ACCEPTED')
-          )
-        ORDER BY profile.id LIMIT 3
-      `;
-      if (candidates.length !== 3)
-        throw new Error("Supervisor relationship candidates missing.");
+        `;
+        const [profile] = await tx<Array<{ readonly id: string }>>`
+          INSERT INTO craftsman_profiles (
+            owner_user_id, profile_type, real_first_name, real_last_name
+          ) VALUES (${userId}, 'INDIVIDUAL', 'Testovací', ${suffix})
+          RETURNING id
+        `;
+        if (profile === undefined)
+          throw new Error("Supervisor relationship profile missing.");
+        candidates.push({ profileId: profile.id, userId });
+      }
       const accepted = new Map<string, string>();
       for (const candidate of candidates) {
         const extra = await participation.invite({
