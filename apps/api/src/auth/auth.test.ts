@@ -46,7 +46,10 @@ const VERIFICATION_TOKENS = [
   "email-verification-token-bbbbbbbbbbbbbbbbbbbb",
   "email-verification-token-cccccccccccccccccccc",
 ] as const;
-const NOW = new Date("2026-09-14T10:00:00.000Z");
+// Session middleware evaluates cookie expiry against the real wall clock even
+// when repository time is injected. Anchor fixtures at test start so this
+// suite cannot silently expire as the calendar advances.
+const NOW = new Date();
 
 const openApps: ReturnType<typeof buildApi>[] = [];
 
