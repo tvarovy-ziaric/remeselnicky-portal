@@ -6,6 +6,7 @@ import {
 } from "./job-invitation.js";
 import { mapJobMainReviewNotificationEvent } from "./main-review.js";
 import type { NotificationDraft } from "./model.js";
+import { mapJobSupervisorEvaluationNotificationEvent } from "./supervisor-evaluation.js";
 
 export const DEMAND_SIDE_EXTENSION_EVENT_NAMES = Object.freeze({
   conversationMessageCreated: "conversation.message_created",
@@ -72,16 +73,20 @@ export function mapDemandSideNotificationEvent(
 ): readonly NotificationDraft[] | undefined {
   const invitation = mapJobInvitationNotificationEvent(event);
   const mainReview = mapJobMainReviewNotificationEvent(event);
+  const supervisorEvaluation =
+    mapJobSupervisorEvaluationNotificationEvent(event);
   const extensionOwned = isKnownDemandSideEvent(event.name);
   const ownerCount =
     Number(invitation !== undefined) +
     Number(mainReview !== undefined) +
+    Number(supervisorEvaluation !== undefined) +
     Number(extensionOwned);
   if (ownerCount > 1) {
     throw new TypeError("Notification event catalog ownership collision.");
   }
   if (invitation !== undefined) return invitation;
   if (mainReview !== undefined) return mainReview;
+  if (supervisorEvaluation !== undefined) return supervisorEvaluation;
 
   if (!extensionOwned) return undefined;
   if (event.schemaVersion !== 1 || event.entity === undefined) {

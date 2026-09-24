@@ -273,6 +273,27 @@ export {
   participantReviewDimensions,
   workGroupReviewDimensions,
 } from "./job-context-review-repository.js";
+import { createJobSupervisorEvaluationRepository } from "./job-supervisor-evaluation-repository.js";
+export {
+  createJobSupervisorEvaluationRepository,
+  JobSupervisorEvaluationIdempotencyError,
+  jobSupervisorEvaluationDimensions,
+} from "./job-supervisor-evaluation-repository.js";
+export type {
+  JobSupervisorEvaluationContent,
+  JobSupervisorEvaluationDetail,
+  JobSupervisorEvaluationPage,
+  JobSupervisorEvaluationRating,
+  JobSupervisorEvaluationRatings,
+  JobSupervisorEvaluationRepository,
+  JobSupervisorEvaluationTarget,
+  JobSupervisorRelationshipKind,
+  JobSupervisorTargetRole,
+  ReceivedJobSupervisorEvaluation,
+  ReceivedJobSupervisorEvaluationPage,
+  SubmitJobSupervisorEvaluationInput,
+  SubmitJobSupervisorEvaluationResult,
+} from "./job-supervisor-evaluation-repository.js";
 export type {
   JobContextReviewContent,
   JobContextReviewPage,
@@ -1171,6 +1192,9 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly jobContextReviews: ReturnType<
     typeof createJobContextReviewRepository
   >;
+  readonly jobSupervisorEvaluations: ReturnType<
+    typeof createJobSupervisorEvaluationRepository
+  >;
   readonly jobOperations: ReturnType<typeof createJobOperationalRepository>;
   readonly jobMilestones: ReturnType<typeof createJobMilestoneRepository>;
   readonly changeOrders: ReturnType<typeof createChangeOrderRepository>;
@@ -1322,6 +1346,7 @@ export function createDatabase(
     createJobParticipantRoleDecisionRepository(sql);
   const jobMainReviews = createJobMainReviewRepository(sql);
   const jobContextReviews = createJobContextReviewRepository(sql);
+  const jobSupervisorEvaluations = createJobSupervisorEvaluationRepository(sql);
   const jobOperations = createJobOperationalRepository(sql);
   const jobMilestones = createJobMilestoneRepository(sql);
   const changeOrders = createChangeOrderRepository(sql);
@@ -1422,6 +1447,7 @@ export function createDatabase(
     jobParticipantRoleDecisions,
     jobMainReviews,
     jobContextReviews,
+    jobSupervisorEvaluations,
     jobOperations,
     jobMilestones,
     changeOrders,

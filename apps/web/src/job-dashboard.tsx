@@ -11,6 +11,7 @@ import { JobMainReview } from "./job-main-review";
 import { JobMilestones } from "./job-milestones";
 import { JobOperations } from "./job-operations";
 import { JobRoster } from "./job-roster";
+import { JobSupervisorEvaluations } from "./job-supervisor-evaluation";
 
 const uuid =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -734,6 +735,9 @@ export function JobDashboardView({
       {job.state === "COMPLETED" && <JobMainReview jobId={job.id} />}
       {job.state === "COMPLETED" && job.role === "CUSTOMER" && (
         <JobContextReview jobId={job.id} />
+      )}
+      {job.state === "COMPLETED" && job.role === "PRIMARY_PROVIDER" && (
+        <JobSupervisorEvaluations jobId={job.id} />
       )}
       {job.role === "PRIMARY_PROVIDER" &&
         ["CONFIRMED", "IN_PROGRESS"].includes(job.state) && (

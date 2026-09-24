@@ -45,6 +45,12 @@ export type {
   JobMainReviewNotificationCopy,
   JobMainReviewNotificationMaintenanceStore,
 } from "./main-review.js";
+export {
+  getJobSupervisorEvaluationNotificationCopy,
+  JOB_SUPERVISOR_EVALUATION_NOTIFICATION_EVENT_NAMES,
+  mapJobSupervisorEvaluationNotificationEvent,
+} from "./supervisor-evaluation.js";
+export type { JobSupervisorEvaluationNotificationCopy } from "./supervisor-evaluation.js";
 export type {
   ClaimEmailDeliveryOptions,
   EmailDelivery,

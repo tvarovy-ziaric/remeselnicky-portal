@@ -61,12 +61,14 @@ describe("public craftsman profile repository", () => {
           declaredProficiency: { level: "MASTER", source: "SELF_DECLARED" },
           evidenceSupportedProficiency: null,
           reviewCount: 0,
+          supervisorEvaluationCount: 0,
           verifiedJobCount: 0,
         },
       ],
       trust: {
         customerScore: null,
         reviewCount: 0,
+        supervisorEvaluationCount: 0,
         verifiedWorkCount: 0,
       },
     });
@@ -86,6 +88,8 @@ describe("public craftsman profile repository", () => {
     expect(gate).toContain("review.target_kind = 'CRAFTSMAN_PROFILE'");
     expect(gate).toContain("review.target_profile_id = profile.id");
     expect(gate).toContain("GROUP BY review.job_id");
+    expect(gate).toContain("current_searchable_trust_evidence_summaries");
+    expect(gate).toContain('AS "supervisorEvaluationCount"');
     expect(gate).not.toContain("job_main_review_events");
     const professionQuery =
       sql.queries.find((query) =>
@@ -94,6 +98,9 @@ describe("public craftsman profile repository", () => {
     expect(professionQuery).toContain("completed_job_profession_evidence");
     expect(professionQuery).toContain("count(DISTINCT completed.job_id)");
     expect(professionQuery).toContain("current_unlocked_job_main_reviews");
+    expect(professionQuery).toContain(
+      "current_searchable_profession_trust_evidence",
+    );
     expect(professionQuery).toContain(
       "review.direction = 'CUSTOMER_TO_PROVIDER'",
     );
@@ -177,6 +184,30 @@ describe("public craftsman profile repository", () => {
     });
     expect(JSON.stringify(profile)).not.toMatch(
       /ratings|comment|actorUserId|jobId|reviewer/iu,
+    );
+  });
+
+  it("exposes supervisor evidence only as separate profession-aware counts", async () => {
+    const responses = completeResponses();
+    responses[0] = [
+      {
+        ...(responses[0]?.[0] as Record<string, unknown>),
+        supervisorEvaluationCount: 2,
+      },
+    ];
+    responses[2] = [
+      {
+        ...(responses[2]?.[0] as Record<string, unknown>),
+        supervisorEvaluationCount: 1,
+      },
+    ];
+    const profile = await sqlRepository(scriptedSql(responses)).findPublic(
+      profileId,
+    );
+    expect(profile?.trust.supervisorEvaluationCount).toBe(2);
+    expect(profile?.professions[0]?.supervisorEvaluationCount).toBe(1);
+    expect(JSON.stringify(profile)).not.toMatch(
+      /supervisorScore|supervisorQuality|ratings|comment|evaluator/iu,
     );
   });
 
@@ -294,6 +325,7 @@ function completeResponses(): unknown[][] {
         realFirstName: "Ján",
         realLastName: "Remeselný",
         reviewCount: 0,
+        supervisorEvaluationCount: 0,
         verifiedWorkCount: 0,
         email: "must-not-leak@example.test",
         identityVerificationReference: "internal:identity",
@@ -307,6 +339,7 @@ function completeResponses(): unknown[][] {
         declaredLevel: "MASTER",
         evidenceSupportedLevel: null,
         reviewCount: 0,
+        supervisorEvaluationCount: 0,
         verifiedJobCount: 0,
         label: "Stolár",
       },

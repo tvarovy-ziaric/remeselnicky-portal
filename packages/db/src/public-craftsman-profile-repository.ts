@@ -21,6 +21,7 @@ interface ProfileRow {
   readonly realFirstName: string | null;
   readonly realLastName: string | null;
   readonly reviewCount: number;
+  readonly supervisorEvaluationCount: number;
   readonly verifiedWorkCount: number;
 }
 
@@ -31,6 +32,7 @@ interface ProfessionRow {
   readonly evidenceSupportedLevel: "BEGINNER" | "ADVANCED" | "MASTER" | null;
   readonly label: string;
   readonly reviewCount: number;
+  readonly supervisorEvaluationCount: number;
   readonly verifiedJobCount: number;
 }
 
@@ -155,6 +157,8 @@ async function findInSnapshot(
       area.normal_radius_meters AS "normalRadiusMeters",
       reputation.customer_score AS "customerScore",
       COALESCE(reputation.review_count, 0)::integer AS "reviewCount",
+      COALESCE(trust.supervisor_evaluation_count, 0)::integer
+        AS "supervisorEvaluationCount",
       (
         SELECT count(DISTINCT completed.job_id)::integer
         FROM completed_job_profile_evidence completed
@@ -184,6 +188,8 @@ async function findInSnapshot(
         GROUP BY review.job_id
       ) per_review
     ) reputation ON true
+    LEFT JOIN current_searchable_trust_evidence_summaries trust
+      ON trust.craftsman_profile_id = profile.id
     WHERE profile.id = ${profileId}
       AND publication.effectively_public
       AND publication.review_state = 'APPROVED'
@@ -211,6 +217,8 @@ async function findInSnapshot(
       profession.evidence_supported_level AS "evidenceSupportedLevel",
       reputation.customer_score AS "customerScore",
       COALESCE(reputation.review_count, 0)::integer AS "reviewCount",
+      COALESCE(trust.supervisor_evaluation_count, 0)::integer
+        AS "supervisorEvaluationCount",
       (
         SELECT count(DISTINCT completed.job_id)::integer
         FROM completed_job_profession_evidence completed
@@ -238,6 +246,9 @@ async function findInSnapshot(
         GROUP BY review.job_id
       ) per_review
     ) reputation ON true
+    LEFT JOIN current_searchable_profession_trust_evidence trust
+      ON trust.craftsman_profile_id = profession.craftsman_profile_id
+      AND trust.profession_code = profession.profession_code
     WHERE profession.craftsman_profile_id = ${profileId}
       AND profession.state = 'ACTIVE'
     ORDER BY profession.created_at, profession.id
@@ -415,6 +426,7 @@ async function findInSnapshot(
       customerScore: nullableScore(profession.customerScore),
       label: profession.label,
       reviewCount: profession.reviewCount,
+      supervisorEvaluationCount: profession.supervisorEvaluationCount,
       verifiedJobCount: profession.verifiedJobCount,
       declaredProficiency: {
         level: profession.declaredLevel,
@@ -441,6 +453,7 @@ async function findInSnapshot(
       companyRegistrationVerified: profile.companyRegistrationVerified,
       customerScore: nullableScore(profile.customerScore),
       reviewCount: profile.reviewCount,
+      supervisorEvaluationCount: profile.supervisorEvaluationCount,
       verifiedWorkCount: profile.verifiedWorkCount,
     },
     portfolio: portfolioProjects.map((project) => ({

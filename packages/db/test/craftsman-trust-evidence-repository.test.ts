@@ -135,6 +135,39 @@ describe("craftsman trust/evidence repository", () => {
     );
   });
 
+  it("returns supervisor volume separately while quality remains deliberately unavailable", async () => {
+    const responses = completeResponses();
+    responses[0] = [
+      {
+        ...(responses[0]?.[0] as object),
+        independentEvidenceSourceCount: 1,
+        supervisorEvaluationCount: 2,
+      },
+    ];
+    responses[1] = [
+      {
+        ...(responses[1]?.[0] as object),
+        independentEvidenceSourceCount: 1,
+        supervisorEvaluationCount: 2,
+      },
+    ];
+    const [result] = await createCraftsmanTrustEvidenceRepository(
+      scriptedSql(responses),
+    ).listCurrent({ profileIds: [profileId] });
+    expect(result?.volume).toMatchObject({
+      independentEvidenceSourceCount: 1,
+      supervisorEvaluationCount: 2,
+    });
+    expect(result?.professions[0]?.volume).toMatchObject({
+      independentEvidenceSourceCount: 1,
+      supervisorEvaluationCount: 2,
+    });
+    expect(result?.quality.supervisorQualityAvailable).toBe(false);
+    expect(JSON.stringify(result)).not.toMatch(
+      /evaluator|relationship|dimension|comment|jobId/iu,
+    );
+  });
+
   it("fails closed if review availability and score are incoherent", async () => {
     const responses = completeResponses();
     responses[0] = [

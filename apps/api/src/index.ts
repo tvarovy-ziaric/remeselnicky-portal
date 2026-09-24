@@ -144,6 +144,11 @@ export {
 } from "./job-context-reviews/routes.js";
 export type { JobContextReviewRouteDependencies } from "./job-context-reviews/routes.js";
 export {
+  JOB_SUPERVISOR_EVALUATION_PATHS,
+  registerJobSupervisorEvaluationRoutes,
+} from "./job-supervisor-evaluations/routes.js";
+export type { JobSupervisorEvaluationRouteDependencies } from "./job-supervisor-evaluations/routes.js";
+export {
   QUOTE_AUTHORING_PATHS,
   registerQuoteAuthoringRoutes,
 } from "./quotes/routes.js";

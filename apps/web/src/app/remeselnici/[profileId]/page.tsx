@@ -87,6 +87,10 @@ export default async function PublicCraftsmanProfilePage({
                   reviewCount={profession.reviewCount}
                 />
                 <span>
+                  Odborné hodnotenia z overených zákaziek:{" "}
+                  {profession.supervisorEvaluationCount}
+                </span>
+                <span>
                   Deklarovaná úroveň:{" "}
                   {proficiencyLabel(profession.declaredProficiency.level)}
                 </span>
@@ -134,6 +138,10 @@ export default async function PublicCraftsmanProfilePage({
               </li>
             )}
             <li>{profile.trust.reviewCount} zákazníckych hodnotení</li>
+            <li>
+              {profile.trust.supervisorEvaluationCount} odborných hodnotení od
+              oprávnených vedúcich
+            </li>
             <li>{profile.trust.verifiedWorkCount} overených realizácií</li>
           </ul>
           <div className="platform-cta">

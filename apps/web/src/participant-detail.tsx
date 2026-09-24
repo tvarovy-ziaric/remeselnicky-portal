@@ -9,6 +9,10 @@ import {
 } from "./participant-invitation-inbox";
 import { leaveParticipation } from "./participant-history";
 import { ParticipantRoleDecisions } from "./participant-role-decisions";
+import {
+  JobSupervisorEvaluations,
+  ReceivedSupervisorEvaluations,
+} from "./job-supervisor-evaluation";
 
 const uuid =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -404,6 +408,17 @@ export function ParticipantDetail({
         (detail.jobState === "CONFIRMED" ||
           detail.jobState === "IN_PROGRESS") && (
           <ParticipantRoleDecisions participantId={detail.participantId} />
+        )}
+      {detail.viewerRole === "PARTICIPANT" &&
+        detail.jobState === "COMPLETED" &&
+        detail.verifiedCompletedWork && (
+          <>
+            <JobSupervisorEvaluations jobId={detail.jobId} />
+            <ReceivedSupervisorEvaluations
+              jobId={detail.jobId}
+              participantId={detail.participantId}
+            />
+          </>
         )}
       {context === "JOB_PARTY" && (
         <p>

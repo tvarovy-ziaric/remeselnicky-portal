@@ -154,6 +154,46 @@ describe("public craftsman profile", () => {
     }
   });
 
+  it("exposes only coherent supervisor-evaluation counts without raw quality", () => {
+    const candidate = validCandidate();
+    const serialized = serializePublicCraftsmanProfile({
+      ...candidate,
+      trust: { ...candidate.trust, supervisorEvaluationCount: 2 },
+      professions: [
+        {
+          ...candidate.professions[0]!,
+          supervisorEvaluationCount: 1,
+        },
+      ],
+    });
+    expect(serialized?.trust.supervisorEvaluationCount).toBe(2);
+    expect(serialized?.professions[0]?.supervisorEvaluationCount).toBe(1);
+    expect(JSON.stringify(serialized)).not.toMatch(
+      /supervisorScore|supervisorQuality|ratings|comment/u,
+    );
+
+    for (const invalid of [-1, 1.5, Number.NaN]) {
+      expect(
+        serializePublicCraftsmanProfile({
+          ...candidate,
+          trust: { ...candidate.trust, supervisorEvaluationCount: invalid },
+        }),
+      ).toBeNull();
+    }
+    expect(
+      serializePublicCraftsmanProfile({
+        ...candidate,
+        trust: { ...candidate.trust, supervisorEvaluationCount: 1 },
+        professions: [
+          {
+            ...candidate.professions[0]!,
+            supervisorEvaluationCount: 2,
+          },
+        ],
+      }),
+    ).toBeNull();
+  });
+
   it("keeps profession review quality coherent and subordinate to the global summary", () => {
     const candidate = validCandidate();
     const serialized = serializePublicCraftsmanProfile({
@@ -239,6 +279,7 @@ function validCandidate(): PublicCraftsmanProfileCandidate {
         customerScore: null,
         label: "Stolár",
         reviewCount: 0,
+        supervisorEvaluationCount: 0,
         verifiedJobCount: 0,
         declaredProficiency: { level: "MASTER", source: "SELF_DECLARED" },
         evidenceSupportedProficiency: null,
@@ -254,6 +295,7 @@ function validCandidate(): PublicCraftsmanProfileCandidate {
       companyRegistrationVerified: false,
       customerScore: null,
       reviewCount: 0,
+      supervisorEvaluationCount: 0,
       verifiedWorkCount: 0,
     },
     portfolio: [validPortfolioProject()],

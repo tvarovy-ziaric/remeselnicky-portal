@@ -1,4 +1,4 @@
-# Trust/evidence aggregation read model (R2-008, R4-016–R4-018)
+# Trust/evidence aggregation read model (R2-008, R4-016–R4-019)
 
 Migration `0034_trust_evidence_read_model.sql` established two additive,
 `security_invoker` views over the approved-public R2 discovery intersection.
@@ -56,6 +56,22 @@ count or score. Reusable Crew membership is not an eligibility source and
 later Crew/group changes cannot rewrite the snapshot. No participant or team
 body is added to a public/search aggregate by migration `0095`.
 
+Migration `0096_job_supervisor_evaluations.sql` activates a separate
+profession-aware supervisor evidence count. Only customer-accepted completed
+Jobs and exact authorized main-contractor/confirmed-role relationships create
+an opportunity. Site managers and coordinators need positive temporal overlap;
+a lead also needs positive overlap in the same concrete historical
+`JobWorkGroup`. Same-Job presence, reusable Crew membership and self/controlled
+profiles do not qualify.
+
+Raw supervisor dimensions and comments stay private to evaluator, target and
+authorized admin. The public-safe count includes only edit-locked evaluations
+with a participant-confirmed completed-Job profession snapshot. It exposes no
+Job, evaluation, evaluator, role/relationship or timestamp identifier. The
+customer score is not changed or blended with supervisor evidence;
+`supervisorQualityAvailable` remains false because D05 defers a governed
+aggregation/weighting formula.
+
 Small-sample confidence intentionally remains `INSUFFICIENT_SAMPLE`, and the
 search signal keeps `review_sample_sufficient = false`. Scores and evidence
 counts may be displayed, but score-driven ordering stays disabled until a
@@ -74,6 +90,5 @@ skill, and specialization facts. Attachment/photo/revision quantities are not
 counted. Paid status, founder status, profile completeness, profile photos, and
 tag quantity are absent and cannot improve the read model.
 
-R4-019 may extend supervisor hooks only from sources that retain the locked
-provenance and anti-gaming constraints. Ranking policy remains separate and
-must not treat raw volume as an opaque quality score.
+Ranking policy remains separate and must not treat raw supervisor volume as an
+opaque quality score.

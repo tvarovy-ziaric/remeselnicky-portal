@@ -38,6 +38,7 @@ export interface PublicCraftsmanProfile {
     companyRegistrationVerified: boolean;
     customerScore: number | null;
     reviewCount: number;
+    supervisorEvaluationCount: number;
     verifiedWorkCount: number;
   }>;
   readonly callToAction: Readonly<{ kind: "PLATFORM_JOB_REQUEST" }>;
@@ -63,6 +64,7 @@ export interface PublicCraftsmanProfession {
   readonly label: string;
   readonly customerScore: number | null;
   readonly reviewCount: number;
+  readonly supervisorEvaluationCount: number;
   readonly verifiedJobCount: number;
   readonly declaredProficiency: Readonly<{
     level: "BEGINNER" | "ADVANCED" | "MASTER";
@@ -223,6 +225,8 @@ export function serializePublicCraftsmanProfile(
     ) ||
     !Number.isSafeInteger(candidate.trust.verifiedWorkCount) ||
     candidate.trust.verifiedWorkCount < 0 ||
+    !Number.isSafeInteger(candidate.trust.supervisorEvaluationCount) ||
+    candidate.trust.supervisorEvaluationCount < 0 ||
     candidate.professions.some(
       (profession) =>
         !Number.isSafeInteger(profession.verifiedJobCount) ||
@@ -232,7 +236,11 @@ export function serializePublicCraftsmanProfile(
           profession.customerScore,
           profession.reviewCount,
         ) ||
-        profession.reviewCount > candidate.trust.reviewCount,
+        profession.reviewCount > candidate.trust.reviewCount ||
+        !Number.isSafeInteger(profession.supervisorEvaluationCount) ||
+        profession.supervisorEvaluationCount < 0 ||
+        profession.supervisorEvaluationCount >
+          candidate.trust.supervisorEvaluationCount,
     )
   ) {
     return null;
@@ -251,6 +259,7 @@ export function serializePublicCraftsmanProfile(
       label: profession.label,
       customerScore: profession.customerScore,
       reviewCount: profession.reviewCount,
+      supervisorEvaluationCount: profession.supervisorEvaluationCount,
       verifiedJobCount: profession.verifiedJobCount,
       declaredProficiency: {
         level: profession.declaredProficiency.level,
@@ -282,6 +291,7 @@ export function serializePublicCraftsmanProfile(
       companyRegistrationVerified: candidate.trust.companyRegistrationVerified,
       customerScore: candidate.trust.customerScore,
       reviewCount: candidate.trust.reviewCount,
+      supervisorEvaluationCount: candidate.trust.supervisorEvaluationCount,
       verifiedWorkCount: candidate.trust.verifiedWorkCount,
     },
     callToAction: { kind: "PLATFORM_JOB_REQUEST" },

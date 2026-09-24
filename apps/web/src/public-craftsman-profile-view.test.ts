@@ -57,6 +57,7 @@ function profile(): PublicCraftsmanProfile {
       companyRegistrationVerified: true,
       customerScore: null,
       reviewCount: 0,
+      supervisorEvaluationCount: 0,
       verifiedWorkCount: 0,
     },
     callToAction: { kind: "PLATFORM_JOB_REQUEST" },
