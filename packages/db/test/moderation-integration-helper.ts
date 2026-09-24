@@ -84,7 +84,7 @@ export async function runModerationIntegrationAssertions(
     policyVersion: "D24-ALPHA-1",
     enforcementScope: "CONTENT" as const,
     userFacingReason: "Text recenzie bol skrytý pre ochranu osobných údajov.",
-    priorState: { textVisibility: "VISIBLE" },
+    priorState: { text_visibility: "VISIBLE" },
   };
   await expect(
     repository.hideContent({
@@ -323,7 +323,7 @@ export async function runModerationIntegrationAssertions(
       subjectUserId: input.reporterUserId,
       enforcementScope: "CONTENT",
       userFacingReason: "Profil bol skrytý počas preverenia verejnej identity.",
-      priorState: { ownerVisibility: "PUBLIC" },
+      priorState: { owner_visibility: "PUBLIC" },
     }),
   ).resolves.toMatchObject({ status: "APPLIED", state: "ACTIONED" });
   const [hiddenProfile] = await sql<
