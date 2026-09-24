@@ -40,6 +40,7 @@ interface Source {
 export async function runQuoteAcceptanceCommittedRaceIntegrationAssertions(
   sql: Sql,
   source: Source,
+  mode: "ASSERT_RACES" | "CREATE_CONFIRMED_FIXTURE" = "ASSERT_RACES",
 ): Promise<void> {
   const [provider] = await sql<
     Array<{ readonly ownerUserId: string; readonly profileId: string }>
@@ -178,6 +179,15 @@ export async function runQuoteAcceptanceCommittedRaceIntegrationAssertions(
     quoteId,
     quoteRevision,
   };
+  if (mode === "CREATE_CONFIRMED_FIXTURE") {
+    const result = await createQuoteAcceptanceRepository(sql).accept({
+      ...input,
+      commandId: randomUUID(),
+    });
+    if (result.status !== "APPLIED")
+      throw new Error(`Confirmed Job fixture failed: ${result.status}`);
+    return;
+  }
   await assertProviderSuspensionWinsRace(sql, provider.ownerUserId, input);
   await assertCredentialRevocationWinsRace(
     sql,

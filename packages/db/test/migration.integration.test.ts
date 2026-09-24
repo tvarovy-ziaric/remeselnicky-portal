@@ -1851,6 +1851,11 @@ describe.skipIf(testDatabaseUrl === undefined)(
           sql,
           acceptanceSource,
         );
+        await runQuoteAcceptanceCommittedRaceIntegrationAssertions(
+          sql,
+          acceptanceSource,
+          "CREATE_CONFIRMED_FIXTURE",
+        );
         await runJobRosterIdentityIntegrationAssertions(sql);
         await runJobRosterReadIntegrationAssertions(sql);
         await runJobParticipationCommandsIntegrationAssertions(sql);
