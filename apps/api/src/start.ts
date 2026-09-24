@@ -14,6 +14,7 @@ import {
 import {
   createControlledMediaUploadService,
   createConversationAttachmentUploadService,
+  createDisputeEvidenceUploadService,
   createJobRequestMediaUploadService,
   createMediaProcessingDispatcher,
   createPrivateMediaDeliveryService,
@@ -198,6 +199,12 @@ const app = buildApi({
     reviewResponsesAndReports: {
       persistence: database.reviewResponsesAndReports,
     },
+    jobDisputes: {
+      disputes: database.jobDisputes,
+      ...(mediaRuntime === undefined
+        ? {}
+        : { evidenceUploads: mediaRuntime.disputeEvidenceUploads }),
+    },
     quoteLifecycle: { lifecycle: database.quoteLifecycle },
     quoteAuthoring: {
       core: quoteAuthoring,
@@ -325,6 +332,7 @@ function createApiMediaRuntime() {
         JOB_REQUEST_IMAGE: database.jobRequestMediaAccess,
         QUOTE_DOCUMENT: database.quoteDocumentMediaAccess,
         CHANGE_ORDER_DOCUMENT: database.changeOrderDocumentMediaAccess,
+        DISPUTE_EVIDENCE: database.disputeEvidenceMediaAccess,
       },
     }),
     repository: database.privateMediaDelivery,
@@ -333,6 +341,11 @@ function createApiMediaRuntime() {
   return Object.freeze({
     conversationAttachmentUploads: createConversationAttachmentUploadService({
       authorization: database.conversationAttachmentUploads,
+      processing,
+      uploads,
+    }),
+    disputeEvidenceUploads: createDisputeEvidenceUploadService({
+      authorization: database.jobDisputes,
       processing,
       uploads,
     }),

@@ -80,6 +80,15 @@ export type {
   ConversationAttachmentUploadService,
   PrepareConversationAttachmentUploadResult,
 } from "./conversation-attachment.js";
+export { createDisputeEvidenceUploadService } from "./dispute-evidence.js";
+export type {
+  DisputeEvidenceMediaKind,
+  DisputeEvidenceProcessingDispatcher,
+  DisputeEvidenceUploadAuthorization,
+  DisputeEvidenceUploadResult,
+  DisputeEvidenceUploadService,
+  PrepareDisputeEvidenceUploadResult,
+} from "./dispute-evidence.js";
 export {
   PORTFOLIO_PUBLICATION_STATES,
   assertPortfolioPublicationCommand,

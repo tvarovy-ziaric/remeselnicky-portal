@@ -149,6 +149,11 @@ export {
 } from "./job-supervisor-evaluations/routes.js";
 export type { JobSupervisorEvaluationRouteDependencies } from "./job-supervisor-evaluations/routes.js";
 export {
+  JOB_DISPUTE_PATHS,
+  registerJobDisputeRoutes,
+} from "./job-disputes/routes.js";
+export type { JobDisputeRouteDependencies } from "./job-disputes/routes.js";
+export {
   QUOTE_AUTHORING_PATHS,
   registerQuoteAuthoringRoutes,
 } from "./quotes/routes.js";

@@ -146,6 +146,10 @@ import {
   type ReviewResponseReportRouteDependencies,
 } from "../review-responses-reports/routes.js";
 import {
+  registerJobDisputeRoutes,
+  type JobDisputeRouteDependencies,
+} from "../job-disputes/routes.js";
+import {
   registerQuoteAuthoringRoutes,
   type QuoteAuthoringRouteDependencies,
 } from "../quotes/routes.js";
@@ -291,6 +295,10 @@ export interface AuthModuleDependencies {
   readonly reviewResponsesAndReports?: Pick<
     ReviewResponseReportRouteDependencies,
     "persistence"
+  >;
+  readonly jobDisputes?: Pick<
+    JobDisputeRouteDependencies,
+    "disputes" | "evidenceUploads"
   >;
   readonly quoteAuthoring?: Pick<
     QuoteAuthoringRouteDependencies,
@@ -788,6 +796,23 @@ async function configureAuthModule(
         },
       },
       ...dependencies.reviewResponsesAndReports,
+    });
+  }
+  if (dependencies.jobDisputes !== undefined) {
+    registerJobDisputeRoutes(app, {
+      csrfProtection: csrfProtection(app),
+      guard,
+      rateLimit: {
+        read: {
+          max: config.rateLimitMax * 6,
+          timeWindowMs: config.rateLimitWindowMs,
+        },
+        write: {
+          max: config.rateLimitMax,
+          timeWindowMs: config.rateLimitWindowMs,
+        },
+      },
+      ...dependencies.jobDisputes,
     });
   }
   if (dependencies.quoteAuthoring !== undefined) {

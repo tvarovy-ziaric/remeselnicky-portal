@@ -7,6 +7,7 @@ import { JobChangeOrders } from "./change-orders";
 import { JobCompletion } from "./job-completion";
 import { JobContextReview } from "./job-context-review";
 import { JobDocumentation } from "./job-documentation";
+import { JobDisputes } from "./job-disputes";
 import { JobMainReview } from "./job-main-review";
 import { JobMilestones } from "./job-milestones";
 import { JobOperations } from "./job-operations";
@@ -722,6 +723,7 @@ export function JobDashboardView({
         jobId={job.id}
         winningInvitationId={job.winningInvitationId}
       />
+      <JobDisputes jobId={job.id} />
       <JobOperations jobId={job.id} role={job.role} jobState={job.state} />
       <JobMilestones
         jobId={job.id}

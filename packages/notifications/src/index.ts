@@ -37,6 +37,12 @@ export {
 } from "./job-invitation.js";
 export type { JobInvitationReminderStore } from "./job-invitation.js";
 export {
+  getJobDisputeNotificationCopy,
+  JOB_DISPUTE_NOTIFICATION_EVENT_NAMES,
+  mapJobDisputeNotificationEvent,
+} from "./job-dispute.js";
+export type { JobDisputeNotificationCopy } from "./job-dispute.js";
+export {
   getJobMainReviewNotificationCopy,
   JOB_MAIN_REVIEW_NOTIFICATION_EVENT_NAMES,
   mapJobMainReviewNotificationEvent,

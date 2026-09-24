@@ -105,6 +105,7 @@ import { runJobContextReviewIntegrationAssertions } from "./job-context-review-i
 import { runJobSupervisorEvaluationCommittedRaceAssertions } from "./job-supervisor-evaluation-committed-race-integration-helper.js";
 import { runJobSupervisorEvaluationIntegrationAssertions } from "./job-supervisor-evaluation-integration-helper.js";
 import { runReviewResponseReportIntegrationAssertions } from "./review-response-report-integration-helper.js";
+import { runJobDisputeIntegrationAssertions } from "./job-dispute-integration-helper.js";
 import { runVerifiedCompletionEvidenceIntegrationAssertions } from "./verified-completion-evidence-integration-helper.js";
 
 const testDatabaseUrl = process.env["TEST_DATABASE_URL"];
@@ -229,6 +230,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
           "0095_job_participant_work_group_reviews.sql",
           "0096_job_supervisor_evaluations.sql",
           "0097_review_responses_and_reports.sql",
+          "0098_job_dispute_cases.sql",
         ],
         alreadyApplied: 0,
       });
@@ -237,7 +239,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         testDatabaseUrl,
         migrationsDirectory,
       );
-      expect(secondRun).toEqual({ applied: [], alreadyApplied: 98 });
+      expect(secondRun).toEqual({ applied: [], alreadyApplied: 99 });
 
       const sql = postgres(testDatabaseUrl, { max: 5 });
       try {
@@ -283,7 +285,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         `;
 
         expect(postgis?.extversion).toMatch(/^3\./);
-        expect(ledger?.count).toBe(98);
+        expect(ledger?.count).toBe(99);
         expect(created).toMatchObject({ account_state: "ACTIVE" });
         expect(created?.id).toMatch(
           /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
@@ -1902,6 +1904,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         );
         await runJobSupervisorEvaluationCommittedRaceAssertions(sql);
         await runReviewResponseReportIntegrationAssertions(sql);
+        await runJobDisputeIntegrationAssertions(sql);
 
         await adminAccess.revokePrivilegedSession(superSessionDigest);
         await expect(

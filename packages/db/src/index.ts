@@ -285,6 +285,26 @@ export {
   ModerationReportIdempotencyError,
   ReviewResponseIdempotencyError,
 } from "./review-response-report-repository.js";
+import {
+  createDisputeEvidenceMediaAccessResolver,
+  createJobDisputeRepository,
+} from "./job-dispute-repository.js";
+export {
+  createDisputeEvidenceMediaAccessResolver,
+  createJobDisputeRepository,
+  DISPUTE_CATEGORIES,
+  DisputeIdempotencyError,
+} from "./job-dispute-repository.js";
+export type {
+  DisputeCaseDetail,
+  DisputeCaseState,
+  DisputeCaseSummary,
+  DisputeCategory,
+  DisputeCommandResult,
+  DisputeEvidence,
+  DisputePartyRole,
+  DisputeStatement,
+} from "./job-dispute-repository.js";
 export type {
   CreateModerationReportInput,
   CreateModerationReportResult,
@@ -1215,6 +1235,8 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly reviewResponsesAndReports: ReturnType<
     typeof createReviewResponseReportRepository
   >;
+  readonly jobDisputes: ReturnType<typeof createJobDisputeRepository>;
+  readonly disputeEvidenceMediaAccess: MediaEntityAccessResolver;
   readonly jobOperations: ReturnType<typeof createJobOperationalRepository>;
   readonly jobMilestones: ReturnType<typeof createJobMilestoneRepository>;
   readonly changeOrders: ReturnType<typeof createChangeOrderRepository>;
@@ -1368,6 +1390,9 @@ export function createDatabase(
   const jobContextReviews = createJobContextReviewRepository(sql);
   const jobSupervisorEvaluations = createJobSupervisorEvaluationRepository(sql);
   const reviewResponsesAndReports = createReviewResponseReportRepository(sql);
+  const jobDisputes = createJobDisputeRepository(sql);
+  const disputeEvidenceMediaAccess =
+    createDisputeEvidenceMediaAccessResolver(sql);
   const jobOperations = createJobOperationalRepository(sql);
   const jobMilestones = createJobMilestoneRepository(sql);
   const changeOrders = createChangeOrderRepository(sql);
@@ -1470,6 +1495,8 @@ export function createDatabase(
     jobContextReviews,
     jobSupervisorEvaluations,
     reviewResponsesAndReports,
+    jobDisputes,
+    disputeEvidenceMediaAccess,
     jobOperations,
     jobMilestones,
     changeOrders,

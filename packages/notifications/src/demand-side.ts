@@ -4,6 +4,7 @@ import {
   JOB_INVITATION_NOTIFICATION_EVENT_NAMES,
   mapJobInvitationNotificationEvent,
 } from "./job-invitation.js";
+import { mapJobDisputeNotificationEvent } from "./job-dispute.js";
 import { mapJobMainReviewNotificationEvent } from "./main-review.js";
 import type { NotificationDraft } from "./model.js";
 import { mapJobSupervisorEvaluationNotificationEvent } from "./supervisor-evaluation.js";
@@ -72,12 +73,14 @@ export function mapDemandSideNotificationEvent(
   event: PersistedDomainEvent,
 ): readonly NotificationDraft[] | undefined {
   const invitation = mapJobInvitationNotificationEvent(event);
+  const dispute = mapJobDisputeNotificationEvent(event);
   const mainReview = mapJobMainReviewNotificationEvent(event);
   const supervisorEvaluation =
     mapJobSupervisorEvaluationNotificationEvent(event);
   const extensionOwned = isKnownDemandSideEvent(event.name);
   const ownerCount =
     Number(invitation !== undefined) +
+    Number(dispute !== undefined) +
     Number(mainReview !== undefined) +
     Number(supervisorEvaluation !== undefined) +
     Number(extensionOwned);
@@ -85,6 +88,7 @@ export function mapDemandSideNotificationEvent(
     throw new TypeError("Notification event catalog ownership collision.");
   }
   if (invitation !== undefined) return invitation;
+  if (dispute !== undefined) return dispute;
   if (mainReview !== undefined) return mainReview;
   if (supervisorEvaluation !== undefined) return supervisorEvaluation;
 

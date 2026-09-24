@@ -275,6 +275,7 @@ describe("D17-A Job dashboard", () => {
       "24 mesiacov",
       "Príloha.pdf",
       "Ľudia na zákazke",
+      "Súkromné sporné prípady",
       "Súkromná 42",
       "customer@example.test",
       "+421900000000",
