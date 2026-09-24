@@ -6,6 +6,10 @@ const migration = readFileSync(
   new URL("../migrations/0098_job_dispute_cases.sql", import.meta.url),
   "utf8",
 );
+const repository = readFileSync(
+  new URL("../src/job-dispute-repository.ts", import.meta.url),
+  "utf8",
+);
 
 describe("R4-021 Job dispute schema", () => {
   it("models a separate exact-Job case with every locked alpha state and category", () => {
@@ -91,5 +95,11 @@ describe("R4-021 Job dispute schema", () => {
     expect(migration).not.toMatch(/UPDATE\s+moderation_/iu);
     expect(migration).not.toMatch(/UPDATE\s+craftsman_/iu);
     expect(migration).not.toMatch(/refund|escrow|guilty|not guilty/iu);
+  });
+
+  it("keeps the upload-readiness projection syntactically grouped before its alias", () => {
+    expect(repository).toContain('END AS "canonicalReady"');
+    expect(repository).toContain("WHEN asset.kind = 'IMAGE' THEN EXISTS");
+    expect(repository).toContain("WHEN asset.kind = 'DOCUMENT' THEN");
   });
 });

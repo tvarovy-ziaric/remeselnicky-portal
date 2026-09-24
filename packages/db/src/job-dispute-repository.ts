@@ -553,17 +553,18 @@ export function createJobDisputeRepository(sql: RootSql) {
         }>
       >`
         SELECT asset.status::text,
-          (asset.status = 'READY'
-            AND ((asset.kind = 'IMAGE' AND EXISTS (
+          CASE
+            WHEN asset.status <> 'READY' THEN false
+            WHEN asset.kind = 'IMAGE' THEN EXISTS (
               SELECT 1 FROM media_asset_storage_objects canonical
               WHERE canonical.media_asset_id = asset.id
                 AND canonical.role = 'CANONICAL'
                 AND canonical.storage_area = 'private'
                 AND canonical.content_type = 'image/webp'
                 AND canonical.revoked_at IS NULL
-            )) OR (asset.kind = 'DOCUMENT'
-              AND asset.malware_scan_verdict = 'CLEAN'
-              AND EXISTS (
+            )
+            WHEN asset.kind = 'DOCUMENT' THEN
+              asset.malware_scan_verdict = 'CLEAN' AND EXISTS (
                 SELECT 1 FROM media_asset_storage_objects canonical
                 WHERE canonical.media_asset_id = asset.id
                   AND canonical.role = 'CANONICAL'
@@ -571,7 +572,9 @@ export function createJobDisputeRepository(sql: RootSql) {
                   AND canonical.content_type = 'application/pdf'
                   AND canonical.content_sha256 = asset.document_content_sha256
                   AND canonical.revoked_at IS NULL
-              ))) AS "canonicalReady",
+              )
+            ELSE false
+          END AS "canonicalReady",
           EXISTS (SELECT 1 FROM dispute_case_evidence evidence
             WHERE evidence.dispute_id = ${input.disputeId}
               AND evidence.media_asset_id = asset.id) AS "alreadyBound"
