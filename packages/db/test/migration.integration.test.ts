@@ -98,6 +98,7 @@ import { runJobMilestoneContextIntegrationAssertions } from "./job-milestone-con
 import { runChangeOrderIntegrationAssertions } from "./change-order-integration-helper.js";
 import { runChangeOrderPdfIntegrationAssertions } from "./change-order-pdf-integration-helper.js";
 import { runJobCompletionIntegrationAssertions } from "./job-completion-integration-helper.js";
+import { runMainBilateralReviewIntegrationAssertions } from "./main-bilateral-review-integration-helper.js";
 import { runVerifiedCompletionEvidenceIntegrationAssertions } from "./verified-completion-evidence-integration-helper.js";
 
 const testDatabaseUrl = process.env["TEST_DATABASE_URL"];
@@ -216,6 +217,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
           "0089_verified_completed_job_evidence.sql",
           "0090_completed_job_work_volume.sql",
           "0091_job_participant_role_decisions.sql",
+          "0092_main_bilateral_review_foundation.sql",
         ],
         alreadyApplied: 0,
       });
@@ -224,7 +226,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         testDatabaseUrl,
         migrationsDirectory,
       );
-      expect(secondRun).toEqual({ applied: [], alreadyApplied: 92 });
+      expect(secondRun).toEqual({ applied: [], alreadyApplied: 93 });
 
       const sql = postgres(testDatabaseUrl, { max: 5 });
       try {
@@ -270,7 +272,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         `;
 
         expect(postgis?.extversion).toMatch(/^3\./);
-        expect(ledger?.count).toBe(92);
+        expect(ledger?.count).toBe(93);
         expect(created).toMatchObject({ account_state: "ACTIVE" });
         expect(created?.id).toMatch(
           /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
@@ -1858,6 +1860,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         await runChangeOrderIntegrationAssertions(sql);
         await runChangeOrderPdfIntegrationAssertions(sql);
         await runJobCompletionIntegrationAssertions(sql);
+        await runMainBilateralReviewIntegrationAssertions(sql);
         await runJobLifecycleIntegrationAssertions(sql);
         await runJobRosterCancelledIntegrationAssertions(sql);
         await runJobRosterCancelledReadIntegrationAssertions(sql);
