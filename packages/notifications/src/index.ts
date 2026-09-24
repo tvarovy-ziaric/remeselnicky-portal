@@ -13,6 +13,21 @@ export type {
   NotificationPriority,
   NotificationRecord,
 } from "./model.js";
+export {
+  ALPHA_NOTIFICATION_TYPES,
+  getNotificationPolicy,
+  getNotificationPresentation,
+  NOTIFICATION_CATEGORIES,
+} from "./catalog.js";
+export type {
+  NotificationCategory,
+  NotificationPolicy,
+  NotificationPresentation,
+} from "./catalog.js";
+export {
+  ALPHA_NOTIFICATION_EVENT_NAMES,
+  mapAlphaNotificationEvent,
+} from "./alpha.js";
 export { createNotificationOutboxPublisher } from "./consumer.js";
 export type {
   CreateNotificationInput,

@@ -108,10 +108,13 @@ export type {
   OutboxConsumerEffectRecord,
 } from "./outbox.js";
 export {
+  NOTIFICATION_CATEGORY_VALUES,
   NOTIFICATION_CHANNEL_VALUES,
   NOTIFICATION_DELIVERY_STATE_VALUES,
   NOTIFICATION_PRIORITY_VALUES,
   notificationChannelEnum,
+  notificationChannelPreferences,
+  notificationCategoryEnum,
   notificationDeliveries,
   notificationDeliveryStateEnum,
   notificationPriorityEnum,
@@ -120,6 +123,7 @@ export {
 export type {
   NewNotificationDeliveryRecord,
   NewNotificationRecord,
+  NotificationChannelPreferenceRecord,
   NotificationDeliveryRecord,
   NotificationRecord,
 } from "./notifications.js";

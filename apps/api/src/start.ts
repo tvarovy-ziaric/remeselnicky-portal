@@ -200,6 +200,7 @@ const app = buildApi({
       persistence: database.reviewResponsesAndReports,
     },
     moderationAppeals: { moderation: database.moderation },
+    notifications: { notifications: database.notifications },
     jobDisputes: {
       disputes: database.jobDisputes,
       ...(mediaRuntime === undefined

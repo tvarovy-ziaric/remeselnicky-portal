@@ -1,11 +1,13 @@
 import { sql } from "drizzle-orm";
 import {
   check,
+  boolean,
   index,
   integer,
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
@@ -30,6 +32,13 @@ export const NOTIFICATION_DELIVERY_STATE_VALUES = [
   "DELIVERED",
   "TERMINAL_FAILED",
 ] as const;
+export const NOTIFICATION_CATEGORY_VALUES = [
+  "CHAT",
+  "MARKETPLACE",
+  "JOB_OPERATIONS",
+  "REVIEWS",
+  "ACCOUNT_SECURITY",
+] as const;
 
 export const notificationPriorityEnum = pgEnum(
   "notification_priority",
@@ -42,6 +51,10 @@ export const notificationChannelEnum = pgEnum(
 export const notificationDeliveryStateEnum = pgEnum(
   "notification_delivery_state",
   NOTIFICATION_DELIVERY_STATE_VALUES,
+);
+export const notificationCategoryEnum = pgEnum(
+  "notification_category",
+  NOTIFICATION_CATEGORY_VALUES,
 );
 
 export const notifications = pgTable(
@@ -62,6 +75,14 @@ export const notifications = pgTable(
     deepLinkPath: text("deep_link_path").notNull(),
     priority: notificationPriorityEnum("priority").notNull(),
     payload: jsonb("payload").$type<EventPayload>().notNull().default({}),
+    requestedChannels: notificationChannelEnum("requested_channels")
+      .array()
+      .notNull()
+      .default(sql`ARRAY['IN_APP']::notification_channel[]`),
+    deliveryChannels: notificationChannelEnum("delivery_channels")
+      .array()
+      .notNull()
+      .default(sql`ARRAY['IN_APP']::notification_channel[]`),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -83,6 +104,28 @@ export const notifications = pgTable(
     check(
       "notifications_payload_is_safe",
       sql`notification_payload_is_safe(${table.payload})`,
+    ),
+  ],
+);
+
+export const notificationChannelPreferences = pgTable(
+  "notification_channel_preferences",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    category: notificationCategoryEnum("category").notNull(),
+    channel: notificationChannelEnum("channel").notNull(),
+    enabled: boolean("enabled").notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.category, table.channel] }),
+    check(
+      "notification_preference_mutable_channels_only",
+      sql`${table.channel} IN ('EMAIL', 'PUSH')`,
     ),
   ],
 );
@@ -138,3 +181,5 @@ export type NotificationDeliveryRecord =
   typeof notificationDeliveries.$inferSelect;
 export type NewNotificationDeliveryRecord =
   typeof notificationDeliveries.$inferInsert;
+export type NotificationChannelPreferenceRecord =
+  typeof notificationChannelPreferences.$inferSelect;

@@ -98,6 +98,9 @@ importers:
       '@portal/media':
         specifier: workspace:*
         version: link:../../packages/media
+      '@portal/notifications':
+        specifier: workspace:*
+        version: link:../../packages/notifications
       '@portal/observability':
         specifier: workspace:*
         version: link:../../packages/observability

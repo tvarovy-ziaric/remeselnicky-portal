@@ -3,10 +3,16 @@ import type {
   CreateNotificationInput,
   EmailDelivery,
   EmailDeliveryStore,
+  NotificationCategory,
+  NotificationChannel,
   NotificationRecord,
   NotificationWriteStore,
 } from "@portal/notifications";
-import { validateNotificationDraft } from "@portal/notifications";
+import {
+  getNotificationPolicy,
+  NOTIFICATION_CATEGORIES,
+  validateNotificationDraft,
+} from "@portal/notifications";
 import type { Sql } from "postgres";
 
 import type { OutboxDatabaseTransaction } from "./outbox-repository.js";
@@ -25,20 +31,39 @@ export interface NotificationDeliverySnapshot {
   readonly emailTerminalFailed: number;
 }
 
+export interface NotificationPreference {
+  readonly category: NotificationCategory;
+  readonly emailEnabled: boolean;
+}
+
+export interface SetNotificationPreferenceInput {
+  readonly category: NotificationCategory;
+  readonly emailEnabled: boolean;
+  readonly recipientUserId: string;
+}
+
 export interface NotificationRepository extends EmailDeliveryStore {
   readonly writer: NotificationWriteStore<OutboxDatabaseTransaction>;
   archive(notificationId: string, recipientUserId: string): Promise<boolean>;
+  getPreferences(
+    recipientUserId: string,
+  ): Promise<readonly NotificationPreference[]>;
   list(
     options: NotificationListOptions,
   ): Promise<readonly NotificationRecord[]>;
   markAllRead(recipientUserId: string): Promise<number>;
   markRead(notificationId: string, recipientUserId: string): Promise<boolean>;
+  setPreference(
+    input: SetNotificationPreferenceInput,
+  ): Promise<NotificationPreference>;
   snapshot(): Promise<NotificationDeliverySnapshot>;
+  unreadCount(recipientUserId: string): Promise<number>;
 }
 
 interface NotificationRow {
   readonly archivedAt: Date | null;
   readonly createdAt: Date;
+  readonly deliveryChannels: readonly NotificationChannel[];
   readonly deepLinkPath: string;
   readonly domainEventId: string;
   readonly entityId: string;
@@ -49,8 +74,18 @@ interface NotificationRow {
   readonly payload: NotificationRecord["payload"];
   readonly priority: NotificationRecord["priority"];
   readonly readAt: Date | null;
+  readonly requestedChannels: readonly NotificationChannel[];
   readonly recipientUserId: string;
   readonly type: string;
+}
+
+interface PreferenceRow {
+  readonly category: NotificationCategory;
+  readonly emailEnabled: boolean;
+}
+
+interface EnabledRow {
+  readonly enabled: boolean;
 }
 
 interface EmailDeliveryRow {
@@ -84,11 +119,6 @@ interface IdentifierRow {
   readonly id: string;
 }
 
-interface DeliveryChannelSetRow {
-  readonly emailKey: string | null;
-  readonly pushKey: string | null;
-}
-
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const eventKeyPattern = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$/u;
@@ -103,6 +133,10 @@ export function createNotificationRepository(sql: Sql): NotificationRepository {
         input: CreateNotificationInput,
       ): Promise<NotificationRecord> {
         validateCreateInput(input);
+        const deliveryChannels = await resolveDeliveryChannels(
+          transaction,
+          input,
+        );
         const [created] = await transaction<NotificationRow[]>`
           INSERT INTO notifications (
             recipient_user_id,
@@ -114,7 +148,9 @@ export function createNotificationRepository(sql: Sql): NotificationRepository {
             entity_revision,
             deep_link_path,
             priority,
-            payload
+            payload,
+            requested_channels,
+            delivery_channels
           ) VALUES (
             ${input.recipientUserId},
             ${input.type},
@@ -125,7 +161,9 @@ export function createNotificationRepository(sql: Sql): NotificationRepository {
             ${input.context.entityRevision ?? null},
             ${input.context.path},
             ${input.priority},
-            ${transaction.json(input.payload)}
+            ${transaction.json(input.payload)},
+            ${input.channels},
+            ${deliveryChannels}
           )
           ON CONFLICT (domain_event_id, recipient_user_id, type) DO NOTHING
           RETURNING
@@ -140,6 +178,8 @@ export function createNotificationRepository(sql: Sql): NotificationRepository {
             deep_link_path AS "deepLinkPath",
             priority,
             payload,
+            requested_channels AS "requestedChannels",
+            delivery_channels AS "deliveryChannels",
             created_at AS "createdAt",
             read_at AS "readAt",
             archived_at AS "archivedAt"
@@ -161,6 +201,8 @@ export function createNotificationRepository(sql: Sql): NotificationRepository {
               deep_link_path AS "deepLinkPath",
               priority,
               payload,
+              requested_channels AS "requestedChannels",
+              delivery_channels AS "deliveryChannels",
               created_at AS "createdAt",
               read_at AS "readAt",
               archived_at AS "archivedAt"
@@ -181,33 +223,12 @@ export function createNotificationRepository(sql: Sql): NotificationRepository {
           throw new Error("Notification idempotency intent collision.");
         }
         if (replay) {
-          const [existingChannels] = await transaction<DeliveryChannelSetRow[]>`
-            SELECT
-              max(delivery.idempotency_key) FILTER (
-                WHERE delivery.channel = 'EMAIL'
-              ) AS "emailKey",
-              max(delivery.idempotency_key) FILTER (
-                WHERE delivery.channel = 'PUSH'
-              ) AS "pushKey"
-            FROM notification_deliveries delivery
-            WHERE delivery.notification_id = ${notification.id}
-          `;
-          const expectedEmailKey = input.channels.includes("EMAIL")
-            ? deliveryIdempotencyKey(input, "EMAIL")
-            : null;
-          const expectedPushKey = input.channels.includes("PUSH")
-            ? deliveryIdempotencyKey(input, "PUSH")
-            : null;
-          if (
-            existingChannels === undefined ||
-            existingChannels.emailKey !== expectedEmailKey ||
-            existingChannels.pushKey !== expectedPushKey
-          ) {
+          if (!sameChannels(notification.requestedChannels, input.channels)) {
             throw new Error("Notification channel intent collision.");
           }
         }
 
-        for (const channel of input.channels) {
+        for (const channel of notification.deliveryChannels) {
           if (channel === "IN_APP") continue;
           const idempotencyKey = deliveryIdempotencyKey(input, channel);
           await transaction`
@@ -295,6 +316,35 @@ export function createNotificationRepository(sql: Sql): NotificationRepository {
       `;
       return row === undefined ? undefined : mapEmailDelivery(row);
     },
+    async getPreferences(
+      recipientUserId: string,
+    ): Promise<readonly NotificationPreference[]> {
+      if (!isUuid(recipientUserId))
+        throw new TypeError("recipientUserId must be a UUID");
+      const rows = await sql<PreferenceRow[]>`
+        SELECT candidate.category::text AS category,
+          COALESCE(preference.enabled, true) AS "emailEnabled"
+        FROM unnest(ARRAY[
+          'CHAT'::notification_category,
+          'MARKETPLACE'::notification_category,
+          'JOB_OPERATIONS'::notification_category,
+          'REVIEWS'::notification_category,
+          'ACCOUNT_SECURITY'::notification_category
+        ]) AS candidate(category)
+        LEFT JOIN notification_channel_preferences preference
+          ON preference.user_id = ${recipientUserId}
+          AND preference.category = candidate.category
+          AND preference.channel = 'EMAIL'
+        ORDER BY array_position(ARRAY[
+          'CHAT'::notification_category,
+          'MARKETPLACE'::notification_category,
+          'JOB_OPERATIONS'::notification_category,
+          'REVIEWS'::notification_category,
+          'ACCOUNT_SECURITY'::notification_category
+        ], candidate.category)
+      `;
+      return Object.freeze(rows.map((row) => Object.freeze({ ...row })));
+    },
     async list(
       options: NotificationListOptions,
     ): Promise<readonly NotificationRecord[]> {
@@ -312,8 +362,10 @@ export function createNotificationRepository(sql: Sql): NotificationRepository {
                 entity_id AS "entityId",
                 entity_revision AS "entityRevision",
                 deep_link_path AS "deepLinkPath",
-                priority,
-                payload,
+              priority,
+              payload,
+              requested_channels AS "requestedChannels",
+              delivery_channels AS "deliveryChannels",
                 created_at AS "createdAt",
                 read_at AS "readAt",
                 archived_at AS "archivedAt"
@@ -335,8 +387,10 @@ export function createNotificationRepository(sql: Sql): NotificationRepository {
                 entity_id AS "entityId",
                 entity_revision AS "entityRevision",
                 deep_link_path AS "deepLinkPath",
-                priority,
-                payload,
+              priority,
+              payload,
+              requested_channels AS "requestedChannels",
+              delivery_channels AS "deliveryChannels",
                 created_at AS "createdAt",
                 read_at AS "readAt",
                 archived_at AS "archivedAt"
@@ -450,6 +504,25 @@ export function createNotificationRepository(sql: Sql): NotificationRepository {
       `;
       return rows.length === 1;
     },
+    async setPreference(
+      input: SetNotificationPreferenceInput,
+    ): Promise<NotificationPreference> {
+      validatePreferenceInput(input);
+      const [row] = await sql<PreferenceRow[]>`
+        INSERT INTO notification_channel_preferences (
+          user_id, category, channel, enabled, updated_at
+        ) VALUES (
+          ${input.recipientUserId}, ${input.category}, 'EMAIL',
+          ${input.emailEnabled}, clock_timestamp()
+        )
+        ON CONFLICT (user_id, category, channel) DO UPDATE
+        SET enabled = EXCLUDED.enabled, updated_at = clock_timestamp()
+        RETURNING category::text AS category, enabled AS "emailEnabled"
+      `;
+      if (row === undefined)
+        throw new Error("Notification preference was not persisted.");
+      return Object.freeze({ ...row });
+    },
     async snapshot(): Promise<NotificationDeliverySnapshot> {
       const [row] = await sql<SnapshotRow[]>`
         SELECT
@@ -504,6 +577,16 @@ export function createNotificationRepository(sql: Sql): NotificationRepository {
         RETURNING id
       `;
       return rows.length === 1;
+    },
+    async unreadCount(recipientUserId: string): Promise<number> {
+      if (!isUuid(recipientUserId))
+        throw new TypeError("recipientUserId must be a UUID");
+      const [row] = await sql<CountRow[]>`
+        SELECT count(*)::integer AS count FROM notifications
+        WHERE recipient_user_id = ${recipientUserId}
+          AND read_at IS NULL AND archived_at IS NULL
+      `;
+      return row?.count ?? 0;
     },
   });
 }
@@ -561,6 +644,7 @@ function deliveryIdempotencyKey(
 
 function validateCreateInput(input: CreateNotificationInput): void {
   validateNotificationDraft(input);
+  getNotificationPolicy(input.type);
   if (!isUuid(input.domainEventId)) {
     throw new TypeError("domainEventId must be a UUID");
   }
@@ -569,6 +653,53 @@ function validateCreateInput(input: CreateNotificationInput): void {
       "eventIdempotencyKey must be an opaque safe identifier",
     );
   }
+}
+
+async function resolveDeliveryChannels(
+  transaction: OutboxDatabaseTransaction,
+  input: CreateNotificationInput,
+): Promise<readonly NotificationChannel[]> {
+  const policy = getNotificationPolicy(input.type);
+  const channels: NotificationChannel[] = ["IN_APP"];
+  for (const channel of input.channels) {
+    if (channel === "IN_APP") continue;
+    if (
+      channel === "EMAIL" &&
+      (policy.emailRequired || input.priority === "CRITICAL")
+    ) {
+      channels.push(channel);
+      continue;
+    }
+    const [preference] = await transaction<EnabledRow[]>`
+      SELECT COALESCE((
+        SELECT enabled FROM notification_channel_preferences
+        WHERE user_id = ${input.recipientUserId}
+          AND category = ${policy.category}
+          AND channel = ${channel}
+      ), true) AS enabled
+    `;
+    if (preference?.enabled ?? true) channels.push(channel);
+  }
+  return Object.freeze(channels);
+}
+
+function sameChannels(
+  left: readonly NotificationChannel[],
+  right: readonly NotificationChannel[],
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every((channel, index) => channel === right[index])
+  );
+}
+
+function validatePreferenceInput(input: SetNotificationPreferenceInput): void {
+  if (!isUuid(input.recipientUserId))
+    throw new TypeError("recipientUserId must be a UUID");
+  if (!NOTIFICATION_CATEGORIES.includes(input.category))
+    throw new TypeError("notification category is invalid");
+  if (typeof input.emailEnabled !== "boolean")
+    throw new TypeError("emailEnabled must be boolean");
 }
 
 function validateListOptions(options: NotificationListOptions): void {

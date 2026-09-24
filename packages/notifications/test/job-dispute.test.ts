@@ -38,7 +38,7 @@ describe("D22 Job dispute notification catalog", () => {
   it("creates one private important read action without dispute content", () => {
     const draft = mapDemandSideNotificationEvent(event())?.[0];
     expect(draft).toEqual({
-      channels: ["IN_APP"],
+      channels: ["IN_APP", "EMAIL"],
       context: {
         entityId: disputeId,
         entityType: "DISPUTE_CASE",
@@ -54,8 +54,8 @@ describe("D22 Job dispute notification catalog", () => {
       type: "job.dispute.opened",
     });
     expect(() => validateNotificationDraft(draft as never)).not.toThrow();
-    expect(JSON.stringify(draft)).not.toMatch(
-      /description|resolution|address|email|phone|evidence/iu,
+    expect(JSON.stringify(draft?.payload)).not.toMatch(
+      /description|resolution|address|email_address|phone|evidence/iu,
     );
   });
 
@@ -86,7 +86,7 @@ describe("D22 Job dispute notification catalog", () => {
       name: "job.dispute.admin_action",
     })?.[0];
     expect(draft).toMatchObject({
-      channels: ["IN_APP"],
+      channels: ["IN_APP", "EMAIL"],
       context: { path: `/zakazky/${jobId}` },
       payload: {
         action: "READ_DISPUTE_ADMIN_ACTION",

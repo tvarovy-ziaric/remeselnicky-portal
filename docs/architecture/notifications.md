@@ -8,11 +8,13 @@ worker then invokes `createNotificationOutboxPublisher`; the consumer claim,
 in-app record and requested channel rows commit atomically. A delivery failure
 therefore cannot roll back or rewrite business state.
 
-The package contains no feature notification catalog. Each later feature must
-register an explicit event mapper that chooses a stable notification type,
-recipient, priority, exact entity/revision path and channels. Unknown events are
-ignored without taking a consumer claim. Invalid mapped data is a permanent,
-observable outbox failure rather than a partially created notification.
+R4-024 adds the complete Web Alpha catalog. Each feature registers an explicit
+event mapper that chooses a stable notification type, recipient, priority,
+exact entity/revision path and channels. `catalog.ts` is the shared
+type-to-category, privacy-safe Slovak presentation and email-reliability policy.
+Unknown events are ignored without taking a consumer claim; an unknown
+notification type or invalid mapped data fails closed before a partial record
+can be created.
 
 ## Stored model
 
@@ -27,7 +29,10 @@ observable outbox failure rather than a partially created notification.
 Creation is guarded by a unique `(domain_event_id, recipient_user_id, type)`
 constraint in addition to the transactional outbox consumer claim. Worker
 retries therefore cannot create duplicate in-app records. Core provenance and
-content are immutable after creation. Read/archive operations are scoped by both
+content are immutable after creation. `requested_channels` preserves producer
+intent while `delivery_channels` preserves the first preference-policy
+decision, so replay cannot change delivery after a later preference edit.
+Read/archive operations are scoped by both
 notification ID and recipient ID. They only update notification UX state; they
 do not call a domain command, update outbox state, or imply approval. Deep-link
 targets must re-run normal object/action authorization when opened.
@@ -61,6 +66,22 @@ sent. Selecting and authorizing a real production email provider/account remains
 an external HUMAN GATE. Tests may inject deterministic adapters without making
 that vendor decision.
 
+## Web Alpha center and preferences
+
+The authenticated `/v1/me/notifications` surface provides `All / Unread`, a
+global unread count, mark-one/mark-all-read and archive operations. Every query
+is scoped from the active server session; no recipient selector is accepted.
+Mutations require CSRF, and responses are private/no-store/no-index. The API
+returns generated short copy and a relative path, but not outbox IDs, event
+keys or the private machine payload. Opening a path reaches the normal
+authorized entity route and never substitutes a business command.
+
+`notification_channel_preferences` stores EMAIL/PUSH preferences by category.
+IN_APP cannot be inserted into that table and remains canonical. Optional CHAT
+and review email obeys the preference (together with the conversation mute);
+notification-specific required transactional/security email overrides an
+opt-out. The immutable in-app record is still created in every case.
+
 ## Worker wiring contract
 
 Production wiring composes existing pieces without importing application code
@@ -74,6 +95,6 @@ into shared packages:
 4. `database.notifications.snapshot()` feeds queue/email backlog, age and
    terminal-failure monitoring.
 
-Feature catalogs, user preference UI, batching policy, provider webhook
-verification and mobile push-token lifecycle remain later tickets. Those layers
-must preserve the same type/idempotency taxonomy and D25 privacy boundaries.
+Provider webhook verification and mobile push-token lifecycle remain later
+tickets. Those layers must preserve the same type/idempotency taxonomy and D25
+privacy boundaries.

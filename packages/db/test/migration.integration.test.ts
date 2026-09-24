@@ -22,6 +22,7 @@ import {
   type CreateProcessingMediaAssetInput,
 } from "../src/index.js";
 import { runNotificationIntegrationAssertions } from "./notification-integration-helper.js";
+import { runAlphaNotificationIntegrationAssertions } from "./alpha-notification-integration-helper.js";
 import { runAuditIntegrationAssertions } from "./audit-integration-helper.js";
 import { runPrivacyIntegrationAssertions } from "./privacy-integration-helper.js";
 import { runTaxonomyIntegrationAssertions } from "./taxonomy-integration-helper.js";
@@ -240,6 +241,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
           "0103_dispute_withdrawal_and_mutual_settlement.sql",
           "0104_moderation_taxonomy.sql",
           "0105_moderation_action_appeal_workflow.sql",
+          "0106_alpha_notification_catalog_preferences.sql",
         ],
         alreadyApplied: 0,
       });
@@ -248,7 +250,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         testDatabaseUrl,
         migrationsDirectory,
       );
-      expect(secondRun).toEqual({ applied: [], alreadyApplied: 106 });
+      expect(secondRun).toEqual({ applied: [], alreadyApplied: 107 });
 
       const sql = postgres(testDatabaseUrl, { max: 5 });
       try {
@@ -294,7 +296,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         `;
 
         expect(postgis?.extversion).toMatch(/^3\./);
-        expect(ledger?.count).toBe(106);
+        expect(ledger?.count).toBe(107);
         expect(created).toMatchObject({ account_state: "ACTIVE" });
         expect(created?.id).toMatch(
           /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
@@ -1925,6 +1927,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
           adminId,
           privilegedSessionId: adminSessionId,
         });
+        await runAlphaNotificationIntegrationAssertions(sql);
 
         await adminAccess.revokePrivilegedSession(superSessionDigest);
         await expect(

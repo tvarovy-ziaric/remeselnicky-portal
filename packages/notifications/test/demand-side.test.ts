@@ -667,7 +667,7 @@ describe("R3 demand-side notification catalog", () => {
     ).toBe("job_invitation.received");
     expect(
       mapDemandSideNotificationEvent(
-        event({ entityType: "JOB", name: "job.confirmed" }),
+        event({ entityType: "JOB", name: "job.unrelated" }),
       ),
     ).toBeUndefined();
   });

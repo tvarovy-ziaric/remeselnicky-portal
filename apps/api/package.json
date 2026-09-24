@@ -32,6 +32,7 @@
     "@portal/db": "workspace:*",
     "@portal/domain": "workspace:*",
     "@portal/media": "workspace:*",
+    "@portal/notifications": "workspace:*",
     "@portal/observability": "workspace:*",
     "@portal/search": "workspace:*",
     "@portal/storage": "workspace:*",

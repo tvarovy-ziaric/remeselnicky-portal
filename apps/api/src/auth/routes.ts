@@ -162,6 +162,10 @@ import {
   type ModerationAppealRouteDependencies,
 } from "../moderation/routes.js";
 import {
+  registerNotificationRoutes,
+  type NotificationRouteDependencies,
+} from "../notifications/routes.js";
+import {
   registerJobDisputeRoutes,
   type JobDisputeRouteDependencies,
 } from "../job-disputes/routes.js";
@@ -325,6 +329,7 @@ export interface AuthModuleDependencies {
     ModerationAppealRouteDependencies,
     "moderation"
   >;
+  readonly notifications?: Pick<NotificationRouteDependencies, "notifications">;
   readonly jobDisputes?: Pick<
     JobDisputeRouteDependencies,
     "disputes" | "evidenceUploads"
@@ -836,6 +841,23 @@ async function configureAuthModule(
         timeWindowMs: config.rateLimitWindowMs,
       },
       ...dependencies.moderationAppeals,
+    });
+  }
+  if (dependencies.notifications !== undefined) {
+    registerNotificationRoutes(app, {
+      csrfProtection: csrfProtection(app),
+      guard,
+      rateLimit: {
+        read: {
+          max: config.rateLimitMax * 10,
+          timeWindowMs: config.rateLimitWindowMs,
+        },
+        write: {
+          max: config.rateLimitMax * 4,
+          timeWindowMs: config.rateLimitWindowMs,
+        },
+      },
+      ...dependencies.notifications,
     });
   }
   if (dependencies.jobDisputes !== undefined) {

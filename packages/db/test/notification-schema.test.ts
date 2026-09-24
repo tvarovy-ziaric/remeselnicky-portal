@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   NOTIFICATION_CHANNEL_VALUES,
+  NOTIFICATION_CATEGORY_VALUES,
   NOTIFICATION_DELIVERY_STATE_VALUES,
   NOTIFICATION_PRIORITY_VALUES,
   notificationDeliveries,
@@ -18,6 +19,13 @@ describe("notification schema", () => {
       "CRITICAL",
     ]);
     expect(NOTIFICATION_CHANNEL_VALUES).toEqual(["IN_APP", "EMAIL", "PUSH"]);
+    expect(NOTIFICATION_CATEGORY_VALUES).toEqual([
+      "CHAT",
+      "MARKETPLACE",
+      "JOB_OPERATIONS",
+      "REVIEWS",
+      "ACCOUNT_SECURITY",
+    ]);
     expect(NOTIFICATION_DELIVERY_STATE_VALUES).toEqual([
       "QUEUED",
       "PROCESSING",
@@ -26,6 +34,8 @@ describe("notification schema", () => {
       "TERMINAL_FAILED",
     ]);
     expect(notifications.domainEventId.name).toBe("domain_event_id");
+    expect(notifications.requestedChannels.name).toBe("requested_channels");
+    expect(notifications.deliveryChannels.name).toBe("delivery_channels");
     expect(notificationDeliveries.idempotencyKey.name).toBe("idempotency_key");
   });
 

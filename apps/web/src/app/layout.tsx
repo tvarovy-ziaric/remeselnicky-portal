@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { appInfo } from "../app-info";
 import { FrontendErrorTracking } from "../telemetry-client";
+import { NotificationBadge } from "../notification-badge";
 import "./styles.css";
 
 export const metadata: Metadata = {
@@ -16,7 +17,10 @@ export default function RootLayout({
   return (
     <html lang="sk">
       <body>
-        <FrontendErrorTracking>{children}</FrontendErrorTracking>
+        <FrontendErrorTracking>
+          <NotificationBadge />
+          {children}
+        </FrontendErrorTracking>
       </body>
     </html>
   );

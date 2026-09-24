@@ -73,10 +73,17 @@ export function mapJobDisputeNotificationEvent(
     : isPartyAction
       ? requiredPartyAction(event.payload["action"])
       : "OPEN";
+  const emailRequired =
+    !isAdminAction && !isPartyAction
+      ? true
+      : isAdminAction &&
+        ["REQUEST_INFORMATION", "RECORD_OUTCOME", "CLOSE"].includes(action);
 
   return Object.freeze([
     Object.freeze({
-      channels: Object.freeze(["IN_APP"] as const),
+      channels: emailRequired
+        ? Object.freeze(["IN_APP", "EMAIL"] as const)
+        : Object.freeze(["IN_APP"] as const),
       context: Object.freeze({
         entityId: disputeId,
         entityType: "DISPUTE_CASE",

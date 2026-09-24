@@ -12,6 +12,51 @@
   color: #1f2923;
 }
 
+.notification-badge {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.5rem;
+  margin: 1rem;
+}
+.notification-badge strong {
+  align-items: center;
+  background: #a5362d;
+  border-radius: 999px;
+  color: #fff;
+  display: inline-flex;
+  font-size: 0.75rem;
+  justify-content: center;
+  min-height: 1.5rem;
+  min-width: 1.5rem;
+  padding: 0 0.35rem;
+}
+.notification-filters,
+.notification-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+.notification-list {
+  display: grid;
+  gap: 1rem;
+  list-style: none;
+  padding: 0;
+}
+.notification-list article,
+.notification-preferences {
+  border: 1px solid #d8d2c4;
+  border-radius: 1rem;
+  padding: 1rem;
+}
+.notification-unread article {
+  border-left: 0.4rem solid #245a3a;
+}
+.notification-preferences label {
+  display: block;
+  margin: 0.75rem 0;
+}
+
 * {
   box-sizing: border-box;
 }

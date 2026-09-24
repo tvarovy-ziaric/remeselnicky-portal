@@ -53,8 +53,16 @@ export async function runNotificationIntegrationAssertions(
     payload: { action: "REVIEW_REQUIRED", revision: 2 },
     priority: "IMPORTANT" as const,
     recipientUserId: recipient.id,
-    type: "change_order.review_requested",
+    type: "job.change_order.proposed",
   };
+
+  await expect(
+    repository.setPreference({
+      category: "JOB_OPERATIONS",
+      emailEnabled: false,
+      recipientUserId: recipient.id,
+    }),
+  ).resolves.toEqual({ category: "JOB_OPERATIONS", emailEnabled: false });
 
   await outbox.transactions.run(async (transaction) => {
     await outbox.writer.collect(transaction, [event], {
@@ -77,6 +85,14 @@ export async function runNotificationIntegrationAssertions(
         WHERE notification.domain_event_id = ${eventId}) AS deliveries
   `;
   expect(counts).toEqual({ deliveries: 1, notifications: 1 });
+
+  await expect(repository.getPreferences(recipient.id)).resolves.toContainEqual(
+    {
+      category: "JOB_OPERATIONS",
+      emailEnabled: false,
+    },
+  );
+  await expect(repository.unreadCount(recipient.id)).resolves.toBe(1);
 
   const all = await repository.list({
     filter: "ALL",
@@ -102,6 +118,7 @@ export async function runNotificationIntegrationAssertions(
       recipientUserId: recipient.id,
     }),
   ).resolves.toEqual([]);
+  await expect(repository.unreadCount(recipient.id)).resolves.toBe(0);
 
   const [outboxAfterRead] = await sql<{ count: number }[]>`
     SELECT count(*)::integer AS count
@@ -177,4 +194,11 @@ export async function runNotificationIntegrationAssertions(
     FROM notifications
     WHERE id = ${notification.id}
   `).rejects.toThrow(/notifications_payload_is_safe/u);
+
+  await expect(repository.archive(notification.id, other.id)).resolves.toBe(
+    false,
+  );
+  await expect(repository.archive(notification.id, recipient.id)).resolves.toBe(
+    true,
+  );
 }

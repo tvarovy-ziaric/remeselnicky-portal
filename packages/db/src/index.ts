@@ -896,10 +896,13 @@ export type {
   OutboxConsumerEffectRecord,
 } from "./schema/index.js";
 export {
+  NOTIFICATION_CATEGORY_VALUES,
   NOTIFICATION_CHANNEL_VALUES,
   NOTIFICATION_DELIVERY_STATE_VALUES,
   NOTIFICATION_PRIORITY_VALUES,
   notificationChannelEnum,
+  notificationChannelPreferences,
+  notificationCategoryEnum,
   notificationDeliveries,
   notificationDeliveryStateEnum,
   notificationPriorityEnum,
@@ -908,6 +911,7 @@ export {
 export type {
   NewNotificationDeliveryRecord,
   NewNotificationRecord,
+  NotificationChannelPreferenceRecord,
   NotificationDeliveryRecord,
   NotificationRecord,
 } from "./schema/index.js";
@@ -1024,8 +1028,10 @@ export type {
 export { createNotificationRepository } from "./notification-repository.js";
 export type {
   NotificationDeliverySnapshot,
+  NotificationPreference,
   NotificationListOptions,
   NotificationRepository,
+  SetNotificationPreferenceInput,
 } from "./notification-repository.js";
 export { createProfessionTaxonomyRepository } from "./taxonomy-repository.js";
 export type { ProfessionTaxonomyPersistence } from "@portal/taxonomy";

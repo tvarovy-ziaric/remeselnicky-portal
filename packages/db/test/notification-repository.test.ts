@@ -72,6 +72,7 @@ describe("notification repository authorization envelope", () => {
           {
             archivedAt: null,
             createdAt: new Date(),
+            deliveryChannels: ["IN_APP"],
             deepLinkPath: input.context.path,
             domainEventId: input.domainEventId,
             entityId: input.context.entityId,
@@ -82,21 +83,21 @@ describe("notification repository authorization envelope", () => {
             payload: input.payload,
             priority: input.priority,
             readAt: null,
+            requestedChannels: ["IN_APP"],
             recipientUserId: input.recipientUserId,
             type: input.type,
           },
-        ])
-        .mockResolvedValueOnce([{ emailKey: null, pushKey: null }]),
+        ]),
       { json: (value: unknown) => value },
     );
     const repository = createNotificationRepository(vi.fn() as unknown as Sql);
     await expect(
       repository.writer.create(transaction as never, input),
     ).rejects.toThrow("channel intent collision");
-    expect(transaction).toHaveBeenCalledTimes(3);
+    expect(transaction).toHaveBeenCalledTimes(2);
   });
 
-  it("rejects replay with a colliding delivery idempotency key", async () => {
+  it("accepts replay under a changed preference only from the immutable first channel decision", async () => {
     const input = notificationInput();
     const transaction = Object.assign(
       vi
@@ -106,6 +107,7 @@ describe("notification repository authorization envelope", () => {
           {
             archivedAt: null,
             createdAt: new Date(),
+            deliveryChannels: ["IN_APP", "EMAIL"],
             deepLinkPath: input.context.path,
             domainEventId: input.domainEventId,
             entityId: input.context.entityId,
@@ -116,19 +118,96 @@ describe("notification repository authorization envelope", () => {
             payload: input.payload,
             priority: input.priority,
             readAt: null,
+            requestedChannels: ["IN_APP", "EMAIL"],
             recipientUserId: input.recipientUserId,
             type: input.type,
           },
         ])
-        .mockResolvedValueOnce([
-          { emailKey: "another-delivery-intent", pushKey: null },
-        ]),
+        .mockResolvedValueOnce([]),
       { json: (value: unknown) => value },
     );
     const repository = createNotificationRepository(vi.fn() as unknown as Sql);
     await expect(
       repository.writer.create(transaction as never, input),
-    ).rejects.toThrow("channel intent collision");
+    ).resolves.toMatchObject({ type: "quote.submitted" });
+  });
+
+  it("suppresses only optional email while retaining the canonical in-app record", async () => {
+    const input = {
+      ...notificationInput(),
+      type: "job.review.main.invited",
+    };
+    const row = {
+      archivedAt: null,
+      createdAt: new Date(),
+      deliveryChannels: ["IN_APP"],
+      deepLinkPath: input.context.path,
+      domainEventId: input.domainEventId,
+      entityId: input.context.entityId,
+      entityRevision: null,
+      entityType: input.context.entityType,
+      eventIdempotencyKey: input.eventIdempotencyKey,
+      id: randomUUID(),
+      payload: input.payload,
+      priority: input.priority,
+      readAt: null,
+      requestedChannels: ["IN_APP", "EMAIL"],
+      recipientUserId: input.recipientUserId,
+      type: input.type,
+    };
+    const transaction = Object.assign(
+      vi
+        .fn()
+        .mockResolvedValueOnce([{ enabled: false }])
+        .mockResolvedValueOnce([row]),
+      { json: (value: unknown) => value },
+    );
+    const repository = createNotificationRepository(vi.fn() as unknown as Sql);
+    await expect(
+      repository.writer.create(transaction as never, input),
+    ).resolves.toMatchObject({ type: input.type });
+    expect(transaction).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps requested email for a CRITICAL event even when its category is otherwise optional", async () => {
+    const input = {
+      ...notificationInput(),
+      context: {
+        entityId: randomUUID(),
+        entityType: "MODERATION_ACTION",
+        path: "/ucet/moderacia",
+      },
+      payload: { action: "APPLY_FEATURE_RESTRICTION" },
+      priority: "CRITICAL" as const,
+      type: "moderation.action.applied",
+    };
+    const row = {
+      archivedAt: null,
+      createdAt: new Date(),
+      deliveryChannels: ["IN_APP", "EMAIL"],
+      deepLinkPath: input.context.path,
+      domainEventId: input.domainEventId,
+      entityId: input.context.entityId,
+      entityRevision: null,
+      entityType: input.context.entityType,
+      eventIdempotencyKey: input.eventIdempotencyKey,
+      id: randomUUID(),
+      payload: input.payload,
+      priority: input.priority,
+      readAt: null,
+      requestedChannels: ["IN_APP", "EMAIL"],
+      recipientUserId: input.recipientUserId,
+      type: input.type,
+    };
+    const transaction = Object.assign(
+      vi.fn().mockResolvedValueOnce([row]).mockResolvedValueOnce([]),
+      { json: (value: unknown) => value },
+    );
+    const repository = createNotificationRepository(vi.fn() as unknown as Sql);
+    await expect(
+      repository.writer.create(transaction as never, input),
+    ).resolves.toMatchObject({ priority: "CRITICAL" });
+    expect(transaction).toHaveBeenCalledTimes(2);
   });
 });
 

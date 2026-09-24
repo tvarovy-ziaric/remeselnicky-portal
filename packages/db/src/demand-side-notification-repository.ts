@@ -36,6 +36,13 @@ export function createDemandSideNotificationRepository(
                 state.latest_notifiable_sequence
             WHERE runtime.singleton
               AND NOT state.muted
+              AND NOT EXISTS (
+                SELECT 1 FROM notification_channel_preferences preference
+                WHERE preference.user_id = state.recipient_user_id
+                  AND preference.category = 'CHAT'
+                  AND preference.channel = 'EMAIL'
+                  AND NOT preference.enabled
+              )
               AND state.latest_notifiable_sequence > state.last_read_sequence
               AND state.latest_notifiable_sequence >
                 state.email_considered_through_sequence
