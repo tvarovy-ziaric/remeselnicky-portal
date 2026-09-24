@@ -215,6 +215,14 @@ export function serializePublicCraftsmanProfile(
     displayText.some(
       (value) => value !== null && !isPublicDisplayTextSafe(value),
     ) ||
+    !Number.isSafeInteger(candidate.trust.reviewCount) ||
+    candidate.trust.reviewCount < 0 ||
+    (candidate.trust.reviewCount === 0
+      ? candidate.trust.customerScore !== null
+      : typeof candidate.trust.customerScore !== "number" ||
+        !Number.isFinite(candidate.trust.customerScore) ||
+        candidate.trust.customerScore < 1 ||
+        candidate.trust.customerScore > 5) ||
     !Number.isSafeInteger(candidate.trust.verifiedWorkCount) ||
     candidate.trust.verifiedWorkCount < 0 ||
     candidate.professions.some(

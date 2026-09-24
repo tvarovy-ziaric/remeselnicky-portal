@@ -79,6 +79,12 @@ describe("public craftsman profile repository", () => {
     expect(gate).toContain("publication.moderation_state = 'ALLOWED'");
     expect(gate).toContain("owner.account_state = 'ACTIVE'");
     expect(gate).toContain("completed_job_profile_evidence");
+    expect(gate).toContain("current_unlocked_job_main_reviews");
+    expect(gate).toContain("review.direction = 'CUSTOMER_TO_PROVIDER'");
+    expect(gate).toContain("review.target_kind = 'CRAFTSMAN_PROFILE'");
+    expect(gate).toContain("review.target_profile_id = profile.id");
+    expect(gate).toContain("GROUP BY review.job_id");
+    expect(gate).not.toContain("job_main_review_events");
     const professionQuery =
       sql.queries.find((query) =>
         query.includes("current_craftsman_professions profession"),
@@ -138,6 +144,27 @@ describe("public craftsman profile repository", () => {
     expect(profile?.professions[0]?.verifiedJobCount).toBe(1);
     expect(JSON.stringify(profile)).not.toMatch(
       /jobId|participantId|customerProfileId/u,
+    );
+  });
+
+  it("exposes only unlocked customer-to-provider review aggregates for the exact profile", async () => {
+    const responses = completeResponses();
+    responses[0] = [
+      {
+        ...(responses[0]?.[0] as Record<string, unknown>),
+        customerScore: "4.25",
+        reviewCount: 2,
+      },
+    ];
+    const profile = await sqlRepository(scriptedSql(responses)).findPublic(
+      profileId,
+    );
+    expect(profile?.trust).toMatchObject({
+      customerScore: 4.25,
+      reviewCount: 2,
+    });
+    expect(JSON.stringify(profile)).not.toMatch(
+      /ratings|comment|actorUserId|jobId|reviewer/iu,
     );
   });
 
@@ -217,6 +244,7 @@ function completeResponses(): unknown[][] {
         baseMunicipalityCode: "SK0101528595",
         baseMunicipalityName: "Bratislava",
         companyRegistrationVerified: false,
+        customerScore: null,
         identityVerified: true,
         nickname: "Majster Jano",
         normalRadiusMeters: 25_000,
@@ -224,6 +252,7 @@ function completeResponses(): unknown[][] {
         profileType: "INDIVIDUAL",
         realFirstName: "Ján",
         realLastName: "Remeselný",
+        reviewCount: 0,
         verifiedWorkCount: 0,
         email: "must-not-leak@example.test",
         identityVerificationReference: "internal:identity",

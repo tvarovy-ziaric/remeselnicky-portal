@@ -127,6 +127,33 @@ describe("public craftsman profile", () => {
     ).toBeNull();
   });
 
+  it("accepts only coherent bounded public customer-review aggregates", () => {
+    const candidate = validCandidate();
+    expect(
+      serializePublicCraftsmanProfile({
+        ...candidate,
+        trust: { ...candidate.trust, customerScore: 4.25, reviewCount: 2 },
+      })?.trust,
+    ).toMatchObject({ customerScore: 4.25, reviewCount: 2 });
+
+    for (const trust of [
+      { customerScore: 5, reviewCount: 0 },
+      { customerScore: null, reviewCount: 1 },
+      { customerScore: 0.99, reviewCount: 1 },
+      { customerScore: 5.01, reviewCount: 1 },
+      { customerScore: Number.NaN, reviewCount: 1 },
+      { customerScore: 4, reviewCount: -1 },
+      { customerScore: 4, reviewCount: 1.5 },
+    ] as const) {
+      expect(
+        serializePublicCraftsmanProfile({
+          ...candidate,
+          trust: { ...candidate.trust, ...trust },
+        }),
+      ).toBeNull();
+    }
+  });
+
   it("fails closed for unsafe project text and malformed public photos", () => {
     expect(
       serializePublicCraftsmanProfile({

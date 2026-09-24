@@ -12,6 +12,7 @@ interface ProfileRow {
   readonly baseMunicipalityCode: string;
   readonly baseMunicipalityName: string;
   readonly companyRegistrationVerified: boolean;
+  readonly customerScore: number | string | null;
   readonly identityVerified: boolean;
   readonly nickname: string | null;
   readonly normalRadiusMeters: number;
@@ -19,6 +20,7 @@ interface ProfileRow {
   readonly profileType: "INDIVIDUAL" | "COMPANY";
   readonly realFirstName: string | null;
   readonly realLastName: string | null;
+  readonly reviewCount: number;
   readonly verifiedWorkCount: number;
 }
 
@@ -149,6 +151,8 @@ async function findInSnapshot(
       area.base_municipality_code AS "baseMunicipalityCode",
       municipality.name_sk AS "baseMunicipalityName",
       area.normal_radius_meters AS "normalRadiusMeters",
+      reputation.customer_score AS "customerScore",
+      COALESCE(reputation.review_count, 0)::integer AS "reviewCount",
       (
         SELECT count(DISTINCT completed.job_id)::integer
         FROM completed_job_profile_evidence completed
@@ -162,6 +166,22 @@ async function findInSnapshot(
       ON area.craftsman_profile_id = profile.id
     JOIN location_municipalities municipality
       ON municipality.code = area.base_municipality_code
+    LEFT JOIN LATERAL (
+      SELECT round(avg(per_review.review_score), 2)::double precision
+          AS customer_score,
+        count(*)::integer AS review_count
+      FROM (
+        SELECT review.job_id,
+          avg((rating.value #>> '{}')::numeric) AS review_score
+        FROM current_unlocked_job_main_reviews review
+        CROSS JOIN LATERAL jsonb_each(review.ratings) rating
+        WHERE review.direction = 'CUSTOMER_TO_PROVIDER'
+          AND review.target_kind = 'CRAFTSMAN_PROFILE'
+          AND review.target_profile_id = profile.id
+          AND jsonb_typeof(rating.value) = 'number'
+        GROUP BY review.job_id
+      ) per_review
+    ) reputation ON true
     WHERE profile.id = ${profileId}
       AND publication.effectively_public
       AND publication.review_state = 'APPROVED'
@@ -396,8 +416,8 @@ async function findInSnapshot(
     trust: {
       identityVerified: profile.identityVerified,
       companyRegistrationVerified: profile.companyRegistrationVerified,
-      customerScore: null,
-      reviewCount: 0,
+      customerScore: nullableScore(profile.customerScore),
+      reviewCount: profile.reviewCount,
       verifiedWorkCount: profile.verifiedWorkCount,
     },
     portfolio: portfolioProjects.map((project) => ({
@@ -521,6 +541,15 @@ function safeInteger(value: number | string): number {
     );
   }
   return numeric;
+}
+
+function nullableScore(value: number | string | null): number | null {
+  if (value === null) return null;
+  const score = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(score)) {
+    throw new Error("Corrupt public reputation score.");
+  }
+  return score;
 }
 
 function dateOnly(value: Date | string | null): string | null {

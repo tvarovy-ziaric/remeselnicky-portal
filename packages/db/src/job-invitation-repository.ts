@@ -96,6 +96,18 @@ interface InvitationSectionRow {
   readonly sectionSchemaVersion: number;
 }
 
+interface CustomerTrustRow {
+  readonly permittedReviewComments: string[];
+  readonly rating: number | string | null;
+  readonly reviewCount: number;
+}
+
+interface InvitationCustomerTrust {
+  readonly permittedReviewComments: readonly string[];
+  readonly rating: number | null;
+  readonly reviewCount: number;
+}
+
 export function createJobInvitationRepository(
   sql: Sql,
 ): JobInvitationPersistence {
@@ -320,12 +332,21 @@ export function createJobInvitationRepository(
             AND section.content_revision <= ${displayedContentRevision}
           ORDER BY section.section_key, section.content_revision DESC
         `;
+        const customerTrust =
+          context.perspective === "CRAFTSMAN" &&
+          (context.state === "PENDING" || context.state === "ENGAGED")
+            ? await readInvitationCustomerTrust(
+                transaction,
+                context.customerProfileId,
+              )
+            : emptyInvitationCustomerTrust();
         const provisional = toDetail(
           context,
           sections,
           null,
           displayedContentRevision,
           displayedVisibleVersion,
+          customerTrust,
         );
         const [distance] = await transaction<
           Array<{ readonly approximateDistanceKm: number }>
@@ -920,6 +941,7 @@ function toDetail(
   approximateDistanceKm: number | null,
   displayedRequestContentRevision: number,
   displayedRequestVisibleVersion: number,
+  customerTrust: InvitationCustomerTrust,
 ): JobInvitationDetail {
   if (
     !Number.isSafeInteger(context.requestContentRevision) ||
@@ -983,11 +1005,7 @@ function toDetail(
   return Object.freeze({
     ...toListItem(context),
     competitionDisclosure: "CUSTOMER_MAY_CONTACT_OTHERS" as const,
-    customerTrust: Object.freeze({
-      permittedReviewComments: Object.freeze([]),
-      rating: null,
-      reviewCount: 0,
-    }),
+    customerTrust,
     request: Object.freeze({
       approximateDistanceKm,
       budget: Object.freeze({ ...budget }),
@@ -1013,6 +1031,93 @@ function toDetail(
     requestContentRevision: context.requestContentRevision,
     requestVisibleVersion: context.requestVisibleVersion,
   });
+}
+
+async function readInvitationCustomerTrust(
+  sql: TransactionSql,
+  customerProfileId: string,
+): Promise<InvitationCustomerTrust> {
+  const [row] = await sql<CustomerTrustRow[]>`
+    WITH per_review AS (
+      SELECT review.job_id, review.unlocked_at, review.comment,
+        avg((rating.value #>> '{}')::numeric) AS review_score
+      FROM current_unlocked_job_main_reviews review
+      CROSS JOIN LATERAL jsonb_each(review.ratings) rating
+      WHERE review.direction = 'PROVIDER_TO_CUSTOMER'
+        AND review.target_kind = 'CUSTOMER_PROFILE'
+        AND review.target_profile_id = ${customerProfileId}
+        AND jsonb_typeof(rating.value) = 'number'
+      GROUP BY review.job_id, review.unlocked_at, review.comment
+    ), bounded_comments AS (
+      SELECT job_id, unlocked_at, comment
+      FROM per_review
+      WHERE comment IS NOT NULL
+      ORDER BY unlocked_at DESC, job_id DESC
+      LIMIT 3
+    )
+    SELECT round(avg(per_review.review_score), 2)::double precision AS rating,
+      count(*)::integer AS "reviewCount",
+      COALESCE(
+        (SELECT array_agg(comment ORDER BY unlocked_at DESC, job_id DESC)
+          FROM bounded_comments),
+        ARRAY[]::text[]
+      ) AS "permittedReviewComments"
+    FROM per_review
+  `;
+  if (row === undefined) {
+    throw new Error("Missing invitation customer trust aggregate.");
+  }
+  const rating = nullableReviewScore(row.rating);
+  if (
+    !Number.isSafeInteger(row.reviewCount) ||
+    row.reviewCount < 0 ||
+    (row.reviewCount === 0 ? rating !== null : rating === null) ||
+    !Array.isArray(row.permittedReviewComments) ||
+    row.permittedReviewComments.length > 3 ||
+    row.permittedReviewComments.some(
+      (comment) =>
+        typeof comment !== "string" ||
+        comment.length < 1 ||
+        comment.length > 2_000 ||
+        comment.trim() !== comment ||
+        [...comment].some((character) => {
+          const codePoint = character.codePointAt(0);
+          return (
+            codePoint !== undefined && (codePoint < 32 || codePoint === 127)
+          );
+        }),
+    )
+  ) {
+    throw new Error("Corrupt invitation customer trust aggregate.");
+  }
+  const permittedReviewComments = row.permittedReviewComments.flatMap(
+    (comment) => {
+      const permitted = preConfirmationText(comment);
+      return permitted === null ? [] : [permitted];
+    },
+  );
+  return Object.freeze({
+    permittedReviewComments: Object.freeze(permittedReviewComments),
+    rating,
+    reviewCount: row.reviewCount,
+  });
+}
+
+function emptyInvitationCustomerTrust(): InvitationCustomerTrust {
+  return Object.freeze({
+    permittedReviewComments: Object.freeze([]),
+    rating: null,
+    reviewCount: 0,
+  });
+}
+
+function nullableReviewScore(value: number | string | null): number | null {
+  if (value === null) return null;
+  const score = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(score) || score < 1 || score > 5) {
+    throw new Error("Corrupt invitation customer review score.");
+  }
+  return score;
 }
 
 function assertReadListInput(input: {

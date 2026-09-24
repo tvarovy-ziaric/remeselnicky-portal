@@ -217,6 +217,16 @@ describe("job invitation repository", () => {
           sectionSchemaVersion: 1,
         },
       ],
+      [
+        {
+          permittedReviewComments: [
+            "Zákazník komunikoval vecne.",
+            "Adresa: Hlavná 12",
+          ],
+          rating: "4.25",
+          reviewCount: 2,
+        },
+      ],
       [{ approximateDistanceKm: 12 }],
     ]);
     const detail = await createJobInvitationRepository(harness.sql).readOwned({
@@ -227,6 +237,11 @@ describe("job invitation repository", () => {
     expect(detail).toMatchObject({
       counterpartDisplayName: `Zákazník ${customerProfileId.slice(0, 8).toUpperCase()}`,
       perspective: "CRAFTSMAN",
+      customerTrust: {
+        permittedReviewComments: ["Zákazník komunikoval vecne."],
+        rating: 4.25,
+        reviewCount: 2,
+      },
       request: {
         approximateDistanceKm: 12,
         description: "Výmena krytiny na prístrešku",
@@ -252,7 +267,136 @@ describe("job invitation repository", () => {
     );
     expect(harness.statements[2]).toContain("recipient_user_id");
     expect(harness.statements[2]).toContain("request_content_revision");
+    const trustQuery = harness.statements[4] ?? "";
+    expect(trustQuery).toContain("current_unlocked_job_main_reviews");
+    expect(trustQuery).toContain("review.direction = 'PROVIDER_TO_CUSTOMER'");
+    expect(trustQuery).toContain("review.target_kind = 'CUSTOMER_PROFILE'");
+    expect(trustQuery).toContain("review.target_profile_id =");
+    expect(trustQuery).toContain("GROUP BY review.job_id");
+    expect(trustQuery).toContain("LIMIT 3");
+    expect(trustQuery).not.toContain("actor_user_id");
+    expect(serialized).not.toContain("Adresa: Hlavná 12");
     expect(harness.statements.join("\n")).not.toContain("effectively_public");
+  });
+
+  it("keeps contextual customer trust absent from the customer's own invitation view", async () => {
+    const harness = transactionHarness([
+      [{}],
+      [
+        {
+          changedAt: now,
+          craftsmanDisplayName: "Majster Test",
+          customerProfileId,
+          expiresAt: new Date("2026-09-22T08:00:00Z"),
+          id: invitationId,
+          jobRequestId: requestId,
+          perspective: "CUSTOMER",
+          requestContentRevision: 4,
+          requestTitle: "Oprava strechy",
+          requestVisibleVersion: 3,
+          revision: 1,
+          state: "PENDING",
+        },
+      ],
+      [
+        {
+          payload: {
+            description: "Výmena krytiny",
+            primaryProfessionCode: "PROF:ROOFER",
+            relatedProfessionCodes: [],
+            skillCodes: [],
+            specializationCode: null,
+            title: "Oprava strechy",
+          },
+          sectionKey: "request.core",
+          sectionSchemaVersion: 1,
+        },
+        {
+          payload: {
+            exactAddress: null,
+            mapPin: null,
+            municipalityCode: "SK0101528595",
+            textClarification: null,
+          },
+          sectionKey: "request.location",
+          sectionSchemaVersion: 1,
+        },
+      ],
+      [{ approximateDistanceKm: 12 }],
+    ]);
+
+    const detail = await createJobInvitationRepository(harness.sql).readOwned({
+      actorUserId: customerActor,
+      invitationId,
+    });
+    expect(detail?.customerTrust).toEqual({
+      permittedReviewComments: [],
+      rating: null,
+      reviewCount: 0,
+    });
+    expect(harness.statements.join("\n")).not.toContain(
+      "current_unlocked_job_main_reviews",
+    );
+  });
+
+  it("fails closed on an incoherent contextual customer-trust aggregate", async () => {
+    const harness = transactionHarness([
+      [{}],
+      [
+        {
+          changedAt: now,
+          craftsmanDisplayName: "Majster Test",
+          customerProfileId,
+          expiresAt: new Date("2026-09-22T08:00:00Z"),
+          id: invitationId,
+          jobRequestId: requestId,
+          perspective: "CRAFTSMAN",
+          requestContentRevision: 4,
+          requestTitle: "Oprava strechy",
+          requestVisibleVersion: 3,
+          revision: 1,
+          state: "PENDING",
+        },
+      ],
+      [
+        {
+          payload: {
+            description: "Výmena krytiny",
+            primaryProfessionCode: "PROF:ROOFER",
+            relatedProfessionCodes: [],
+            skillCodes: [],
+            specializationCode: null,
+            title: "Oprava strechy",
+          },
+          sectionKey: "request.core",
+          sectionSchemaVersion: 1,
+        },
+        {
+          payload: {
+            exactAddress: null,
+            mapPin: null,
+            municipalityCode: "SK0101528595",
+            textClarification: null,
+          },
+          sectionKey: "request.location",
+          sectionSchemaVersion: 1,
+        },
+      ],
+      [
+        {
+          permittedReviewComments: [],
+          rating: 5.1,
+          reviewCount: 1,
+        },
+      ],
+    ]);
+
+    await expect(
+      createJobInvitationRepository(harness.sql).readOwned({
+        actorUserId: craftsmanActor,
+        invitationId,
+      }),
+    ).rejects.toThrow("Corrupt invitation customer review score");
   });
 
   it("denies a provider's unnotified pre-invitation, non-material or post-terminal revision", async () => {
