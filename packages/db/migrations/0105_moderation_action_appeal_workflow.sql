@@ -1123,9 +1123,9 @@ WITH (security_invoker = true)
 AS
 SELECT report.report_id, report.reporter_user_id,
   report.target_type, report.target_id, report.reason, report.details,
-  report.evidence_reference_type, report.evidence_reference_id,
   report.reported_at, latest.state, latest.version AS state_version,
-  latest.recorded_at AS state_recorded_at
+  latest.recorded_at AS state_recorded_at,
+  report.evidence_reference_type, report.evidence_reference_id
 FROM moderation_reports report
 JOIN LATERAL (
   SELECT event.state, event.version, event.recorded_at
