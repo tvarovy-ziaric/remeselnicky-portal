@@ -827,12 +827,13 @@ BEGIN
       OR command.actor_user_id IS DISTINCT FROM NEW.actor_user_id
       OR command.expected_state IS DISTINCT FROM latest.state
       OR NEW.version <> latest.version + 1
-      OR NEW.state::text IS DISTINCT FROM
+      OR NEW.state::text IS DISTINCT FROM (
         CASE command.decision
           WHEN 'UPHOLD' THEN 'UPHELD'
           WHEN 'REDUCE' THEN 'REDUCED'
           ELSE 'REVERSED'
         END
+      )
       OR NEW.state_event_id IS DISTINCT FROM command.command_id
       OR NEW.recorded_at IS DISTINCT FROM command.recorded_at THEN
       RAISE EXCEPTION 'appeal decision must derive from audited command';
