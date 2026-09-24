@@ -117,6 +117,72 @@ section {
   background: #dce7de;
 }
 
+.public-review-list {
+  display: grid;
+  gap: 1rem;
+  margin: 1.25rem 0;
+  padding: 0;
+  list-style: none;
+}
+
+.public-review-list > li {
+  padding: 1.25rem;
+  border-radius: 0.7rem;
+  background: #f4f8f3;
+}
+
+.public-review-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+  align-items: baseline;
+  margin-bottom: 1rem;
+}
+
+.public-review-header span {
+  color: #55705f;
+}
+
+.public-review-dimensions {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(8rem, 1fr);
+  gap: 0.45rem 1rem;
+  margin: 0;
+}
+
+.public-review-dimensions dt {
+  font-weight: 650;
+}
+
+.public-review-dimensions dd {
+  margin: 0;
+  text-align: right;
+}
+
+.public-review-list blockquote {
+  margin: 1rem 0 0;
+  padding-left: 1rem;
+  border-left: 0.2rem solid #9aab9e;
+  white-space: pre-wrap;
+}
+
+.public-review-next {
+  display: inline-block;
+  margin-top: 0.5rem;
+  font-weight: 700;
+}
+
+@media (max-width: 34rem) {
+  .public-review-dimensions {
+    grid-template-columns: 1fr;
+  }
+
+  .public-review-dimensions dd {
+    margin-bottom: 0.35rem;
+    text-align: left;
+  }
+}
+
 .public-search-page {
   display: block;
   padding: clamp(1rem, 4vw, 3rem);

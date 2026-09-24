@@ -57,8 +57,10 @@ describe("public craftsman profile repository", () => {
       ],
       professions: [
         {
+          customerScore: null,
           declaredProficiency: { level: "MASTER", source: "SELF_DECLARED" },
           evidenceSupportedProficiency: null,
+          reviewCount: 0,
           verifiedJobCount: 0,
         },
       ],
@@ -91,6 +93,16 @@ describe("public craftsman profile repository", () => {
       ) ?? "";
     expect(professionQuery).toContain("completed_job_profession_evidence");
     expect(professionQuery).toContain("count(DISTINCT completed.job_id)");
+    expect(professionQuery).toContain("current_unlocked_job_main_reviews");
+    expect(professionQuery).toContain(
+      "review.direction = 'CUSTOMER_TO_PROVIDER'",
+    );
+    expect(professionQuery).toContain(
+      "review.target_kind = 'CRAFTSMAN_PROFILE'",
+    );
+    expect(professionQuery).toContain(
+      "review.accepted_profession_code = profession.profession_code",
+    );
     const credentialQuery =
       sql.queries.find((query) => query.includes("credential_claims")) ?? "";
     expect(credentialQuery).toContain("claim.state = 'APPROVED'");
@@ -166,6 +178,35 @@ describe("public craftsman profile repository", () => {
     expect(JSON.stringify(profile)).not.toMatch(
       /ratings|comment|actorUserId|jobId|reviewer/iu,
     );
+  });
+
+  it("exposes profession-specific unlocked review quality independently from the global summary", async () => {
+    const responses = completeResponses();
+    responses[0] = [
+      {
+        ...(responses[0]?.[0] as Record<string, unknown>),
+        customerScore: "4.25",
+        reviewCount: 2,
+      },
+    ];
+    responses[2] = [
+      {
+        ...(responses[2]?.[0] as Record<string, unknown>),
+        customerScore: "4.75",
+        reviewCount: 1,
+      },
+    ];
+    const profile = await sqlRepository(scriptedSql(responses)).findPublic(
+      profileId,
+    );
+    expect(profile?.trust).toMatchObject({
+      customerScore: 4.25,
+      reviewCount: 2,
+    });
+    expect(profile?.professions[0]).toMatchObject({
+      customerScore: 4.75,
+      reviewCount: 1,
+    });
   });
 
   it("fails closed when approved legacy display text contains contact data", async () => {
@@ -262,8 +303,10 @@ function completeResponses(): unknown[][] {
     [
       {
         code: "PROF:CARPENTER",
+        customerScore: null,
         declaredLevel: "MASTER",
         evidenceSupportedLevel: null,
+        reviewCount: 0,
         verifiedJobCount: 0,
         label: "Stolár",
       },

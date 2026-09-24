@@ -154,6 +154,40 @@ describe("public craftsman profile", () => {
     }
   });
 
+  it("keeps profession review quality coherent and subordinate to the global summary", () => {
+    const candidate = validCandidate();
+    const serialized = serializePublicCraftsmanProfile({
+      ...candidate,
+      trust: { ...candidate.trust, customerScore: 4.25, reviewCount: 2 },
+      professions: [
+        {
+          ...candidate.professions[0]!,
+          customerScore: 4.5,
+          reviewCount: 1,
+        },
+      ],
+    });
+    expect(serialized?.professions[0]).toMatchObject({
+      customerScore: 4.5,
+      reviewCount: 1,
+    });
+
+    for (const professionTrust of [
+      { customerScore: 5, reviewCount: 0 },
+      { customerScore: null, reviewCount: 1 },
+      { customerScore: 5.01, reviewCount: 1 },
+      { customerScore: 4, reviewCount: 3 },
+    ] as const) {
+      expect(
+        serializePublicCraftsmanProfile({
+          ...candidate,
+          trust: { ...candidate.trust, customerScore: 4.25, reviewCount: 2 },
+          professions: [{ ...candidate.professions[0]!, ...professionTrust }],
+        }),
+      ).toBeNull();
+    }
+  });
+
   it("fails closed for unsafe project text and malformed public photos", () => {
     expect(
       serializePublicCraftsmanProfile({
@@ -202,7 +236,9 @@ function validCandidate(): PublicCraftsmanProfileCandidate {
     professions: [
       {
         code: "PROF:CARPENTER",
+        customerScore: null,
         label: "Stolár",
+        reviewCount: 0,
         verifiedJobCount: 0,
         declaredProficiency: { level: "MASTER", source: "SELF_DECLARED" },
         evidenceSupportedProficiency: null,

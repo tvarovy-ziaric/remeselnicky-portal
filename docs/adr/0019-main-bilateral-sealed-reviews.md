@@ -52,11 +52,21 @@ submit. Exceptional eligibility/reopening and post-lock changes require the
 separately audited admin/moderation workflows of R4-020/R4-022; they do not
 mutate the historical review revisions.
 
-Public provider reputation will read only unlocked customer-to-provider
-reviews, with evidence count and profession context. Provider-to-customer
-reviews will be exposed only in an authorized invitation context. No public
-endpoint or aggregate is enabled until sealed/unsealed, self-review, race,
-deadline, edit-lock, competitor and privacy tests pass.
+Public provider reputation reads only unlocked customer-to-provider reviews,
+with evidence count and profession context. A review score is the equal mean of
+its answered dimensions; the profile/profession score is then the equal mean of
+review scores, so reviews with more applicable dimensions do not silently gain
+more weight. Public reads expose only an opaque review-revision identifier,
+profession, seven dimensions, derived score, privacy-filtered comment and
+Bratislava-local month. They never expose the Job, customer/author identity or
+an exact timestamp. Provider-to-customer reviews remain available only in an
+authorized invitation context.
+
+Evidence counts are always shown. Search cards may display the unlocked score
+and count, but `review_sample_sufficient` remains false and score-based ranking
+does not activate until a governed confidence policy exists. This preserves
+D05/D10 small-sample neutrality without inventing a numeric threshold that the
+locked product specification explicitly defers.
 
 ## Consequences
 

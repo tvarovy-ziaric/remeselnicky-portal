@@ -224,6 +224,10 @@ const app = buildApi({
   },
   database,
   publicCraftsmanProfiles: { profiles: database.publicCraftsmanProfiles },
+  publicCraftsmanReviews: {
+    admission: publicDiscoveryAdmission,
+    reviews: database.publicCraftsmanReviews,
+  },
   publicPortfolioMedia: {
     delivery: createPublicPortfolioDeliveryResolver({
       repository: database.publicPortfolioDelivery,

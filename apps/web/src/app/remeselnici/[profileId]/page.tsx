@@ -4,6 +4,14 @@ import { notFound } from "next/navigation";
 import { CustomerShortlistToggle } from "../../../customer-shortlist-toggle";
 import { loadPublicCraftsmanProfile } from "../../../public-craftsman-profile-client";
 import {
+  isPublicCraftsmanReviewsCursor,
+  loadPublicCraftsmanReviews,
+} from "../../../public-craftsman-reviews-client";
+import {
+  PublicCraftsmanReviews,
+  PublicProfessionReviewEvidence,
+} from "../../../public-craftsman-reviews";
+import {
   formatEurCents,
   formatIndicativeEurRange,
   portfolioDurationUnitLabel,
@@ -19,6 +27,7 @@ export const revalidate = 0;
 
 interface PageProperties {
   readonly params: Promise<{ profileId: string }>;
+  readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export async function generateMetadata({
@@ -30,10 +39,21 @@ export async function generateMetadata({
 
 export default async function PublicCraftsmanProfilePage({
   params,
+  searchParams,
 }: PageProperties) {
   const { profileId } = await params;
-  const profile = await loadPublicCraftsmanProfile(profileId);
+  const rawCursor = (await searchParams)["reviewsCursor"];
+  const reviewsCursor = isPublicCraftsmanReviewsCursor(rawCursor)
+    ? rawCursor
+    : undefined;
+  const [profile, reviews] = await Promise.all([
+    loadPublicCraftsmanProfile(profileId),
+    loadPublicCraftsmanReviews(profileId, reviewsCursor),
+  ]);
   if (profile === null) notFound();
+  const professionLabels = Object.fromEntries(
+    profile.professions.map(({ code, label }) => [code, label]),
+  );
 
   return (
     <main className="public-profile">
@@ -62,6 +82,10 @@ export default async function PublicCraftsmanProfilePage({
                 <span>
                   Overené realizácie v profesii: {profession.verifiedJobCount}
                 </span>
+                <PublicProfessionReviewEvidence
+                  customerScore={profession.customerScore}
+                  reviewCount={profession.reviewCount}
+                />
                 <span>
                   Deklarovaná úroveň:{" "}
                   {proficiencyLabel(profession.declaredProficiency.level)}
@@ -292,6 +316,13 @@ export default async function PublicCraftsmanProfilePage({
             </ul>
           </section>
         )}
+
+        <PublicCraftsmanReviews
+          page={reviews}
+          professionLabels={professionLabels}
+          profileId={profile.profileId}
+          reviewCount={profile.trust.reviewCount}
+        />
       </article>
     </main>
   );

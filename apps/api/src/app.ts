@@ -15,6 +15,10 @@ import {
   type PublicCraftsmanProfileRouteDependencies,
 } from "./public-craftsman-profile/routes.js";
 import {
+  registerPublicCraftsmanReviewRoutes,
+  type PublicCraftsmanReviewRouteDependencies,
+} from "./public-craftsman-reviews/routes.js";
+import {
   registerPublicPortfolioMediaRoutes,
   type PublicPortfolioMediaRouteDependencies,
 } from "./public-portfolio-media/routes.js";
@@ -36,6 +40,7 @@ export interface ApiDependencies {
   readonly database: DatabaseHealthProbe;
   readonly observability?: ApiObservabilityDependencies;
   readonly publicCraftsmanProfiles?: PublicCraftsmanProfileRouteDependencies;
+  readonly publicCraftsmanReviews?: PublicCraftsmanReviewRouteDependencies;
   readonly publicPortfolioMedia?: PublicPortfolioMediaRouteDependencies;
   readonly publicSearchCards?: PublicSearchCardRouteDependencies;
   readonly taxonomyAutocomplete?: TaxonomyAutocompleteRouteDependencies;
@@ -61,6 +66,12 @@ export function buildApi(dependencies: ApiDependencies): FastifyInstance {
     registerPublicCraftsmanProfileRoutes(
       app,
       dependencies.publicCraftsmanProfiles,
+    );
+  }
+  if (dependencies.publicCraftsmanReviews !== undefined) {
+    registerPublicCraftsmanReviewRoutes(
+      app,
+      dependencies.publicCraftsmanReviews,
     );
   }
   if (dependencies.publicPortfolioMedia !== undefined) {

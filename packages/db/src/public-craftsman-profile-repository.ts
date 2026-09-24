@@ -26,9 +26,11 @@ interface ProfileRow {
 
 interface ProfessionRow {
   readonly code: string;
+  readonly customerScore: number | string | null;
   readonly declaredLevel: "BEGINNER" | "ADVANCED" | "MASTER";
   readonly evidenceSupportedLevel: "BEGINNER" | "ADVANCED" | "MASTER" | null;
   readonly label: string;
+  readonly reviewCount: number;
   readonly verifiedJobCount: number;
 }
 
@@ -207,6 +209,8 @@ async function findInSnapshot(
       taxonomy.label_sk AS label,
       profession.declared_level AS "declaredLevel",
       profession.evidence_supported_level AS "evidenceSupportedLevel",
+      reputation.customer_score AS "customerScore",
+      COALESCE(reputation.review_count, 0)::integer AS "reviewCount",
       (
         SELECT count(DISTINCT completed.job_id)::integer
         FROM completed_job_profession_evidence completed
@@ -217,6 +221,23 @@ async function findInSnapshot(
     JOIN taxonomy_professions taxonomy
       ON taxonomy.release_id = profession.taxonomy_release_id
       AND taxonomy.profession_code = profession.profession_code
+    LEFT JOIN LATERAL (
+      SELECT round(avg(per_review.review_score), 2)::double precision
+          AS customer_score,
+        count(*)::integer AS review_count
+      FROM (
+        SELECT review.job_id,
+          avg((rating.value #>> '{}')::numeric) AS review_score
+        FROM current_unlocked_job_main_reviews review
+        CROSS JOIN LATERAL jsonb_each(review.ratings) rating
+        WHERE review.direction = 'CUSTOMER_TO_PROVIDER'
+          AND review.target_kind = 'CRAFTSMAN_PROFILE'
+          AND review.target_profile_id = profession.craftsman_profile_id
+          AND review.accepted_profession_code = profession.profession_code
+          AND jsonb_typeof(rating.value) = 'number'
+        GROUP BY review.job_id
+      ) per_review
+    ) reputation ON true
     WHERE profession.craftsman_profile_id = ${profileId}
       AND profession.state = 'ACTIVE'
     ORDER BY profession.created_at, profession.id
@@ -391,7 +412,9 @@ async function findInSnapshot(
     identity: publicIdentity(profile),
     professions: professions.map((profession) => ({
       code: profession.code,
+      customerScore: nullableScore(profession.customerScore),
       label: profession.label,
+      reviewCount: profession.reviewCount,
       verifiedJobCount: profession.verifiedJobCount,
       declaredProficiency: {
         level: profession.declaredLevel,

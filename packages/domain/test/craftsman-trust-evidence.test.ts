@@ -75,10 +75,74 @@ describe("craftsman trust/evidence read model", () => {
     expect(JSON.stringify(result)).not.toMatch(/score":0|negative|penalty/iu);
   });
 
+  it("accepts provenance-backed R4 work and unlocked customer review evidence", () => {
+    const result = serializeCraftsmanTrustEvidence(
+      candidate({
+        volume: volume({
+          customerReviewCount: 2,
+          independentEvidenceSourceCount: 1,
+          verifiedJobCount: 3,
+        }),
+        quality: {
+          customerQualityAvailable: true,
+          customerScore: 4.25,
+          supervisorQualityAvailable: false,
+        },
+        professions: [
+          profession({
+            volume: volume({ customerReviewCount: 1, verifiedJobCount: 2 }),
+            quality: {
+              customerQualityAvailable: true,
+              customerScore: 4,
+              supervisorQualityAvailable: false,
+            },
+          }),
+        ],
+      }),
+    );
+    expect(result?.volume).toMatchObject({
+      customerReviewCount: 2,
+      independentEvidenceSourceCount: 1,
+      verifiedJobCount: 3,
+    });
+    expect(result?.quality).toEqual({
+      customerQualityAvailable: true,
+      customerScore: 4.25,
+      supervisorQualityAvailable: false,
+    });
+    expect(result?.professions[0]?.quality.customerScore).toBe(4);
+  });
+
   it.each([
     { volume: volume({ customerReviewCount: 1 }) },
-    { volume: volume({ verifiedJobCount: 1 }) },
-    { quality: { ...quality(), customerScore: 5 } },
+    {
+      quality: {
+        customerQualityAvailable: true,
+        customerScore: 4,
+        supervisorQualityAvailable: false,
+      },
+    },
+    {
+      quality: {
+        customerQualityAvailable: false,
+        customerScore: 5,
+        supervisorQualityAvailable: false,
+      },
+    },
+    {
+      quality: {
+        customerQualityAvailable: true,
+        customerScore: null,
+        supervisorQualityAvailable: false,
+      },
+    },
+    {
+      quality: {
+        customerQualityAvailable: true,
+        customerScore: 5.1,
+        supervisorQualityAvailable: false,
+      },
+    },
     {
       confidence: { ...confidence(), customerScore: "SUFFICIENT_SAMPLE" },
     },
@@ -90,7 +154,7 @@ describe("craftsman trust/evidence read model", () => {
       professions: [profession({ professionCode: "PLACEHOLDER" })],
     },
   ])(
-    "fails closed instead of fabricating unavailable R4 evidence: %#",
+    "fails closed for malformed or unsupported trust evidence: %#",
     (changes) => {
       expect(serializeCraftsmanTrustEvidence(candidate(changes))).toBeNull();
     },

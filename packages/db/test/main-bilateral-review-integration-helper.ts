@@ -30,6 +30,8 @@ export async function runMainBilateralReviewIntegrationAssertions(
         JOIN customer_profiles customer ON customer.id = job.customer_profile_id
         JOIN craftsman_profiles provider
           ON provider.id = job.primary_craftsman_profile_id
+        JOIN current_searchable_craftsman_profiles searchable_provider
+          ON searchable_provider.craftsman_profile_id = provider.id
         JOIN users customer_actor ON customer_actor.id = customer.owner_user_id
           AND customer_actor.account_state = 'ACTIVE'
         JOIN users provider_actor ON provider_actor.id = provider.owner_user_id
@@ -83,6 +85,7 @@ export async function runMainBilateralReviewIntegrationAssertions(
           direction: string;
           authorUserId: string;
           targetProfileId: string;
+          acceptedProfessionCode: string;
           completedAt: Date;
           submissionDeadline: Date;
           completionKind: string;
@@ -91,6 +94,7 @@ export async function runMainBilateralReviewIntegrationAssertions(
         SELECT direction::text AS direction,
           author_user_id AS "authorUserId",
           target_profile_id AS "targetProfileId",
+          accepted_profession_code AS "acceptedProfessionCode",
           completed_at AS "completedAt",
           submission_deadline AS "submissionDeadline",
           completion_kind AS "completionKind"
@@ -253,6 +257,77 @@ export async function runMainBilateralReviewIntegrationAssertions(
           targetProfileId: job.customerProfileId,
         },
       ]);
+      const customerOpportunity = opportunities[0];
+      if (customerOpportunity === undefined) {
+        throw new Error("Customer-to-provider review opportunity missing.");
+      }
+      const [reviewScore] = await tx<
+        Array<{
+          profileId: string;
+          professionCode: string;
+          reviewScore: string;
+        }>
+      >`
+        SELECT craftsman_profile_id AS "profileId",
+          profession_code AS "professionCode",
+          review_score::text AS "reviewScore"
+        FROM current_unlocked_provider_main_review_scores
+        WHERE revision_id = ${customerId}
+      `;
+      expect(reviewScore).toEqual({
+        profileId: job.providerProfileId,
+        professionCode: customerOpportunity.acceptedProfessionCode,
+        reviewScore: "5.00",
+      });
+      const [summary] = await tx<
+        Array<{
+          customerQualityAvailable: boolean;
+          customerReviewCount: number;
+          customerScore: string;
+        }>
+      >`
+        SELECT customer_review_count AS "customerReviewCount",
+          customer_score::text AS "customerScore",
+          customer_quality_available AS "customerQualityAvailable"
+        FROM current_searchable_trust_evidence_summaries
+        WHERE craftsman_profile_id = ${job.providerProfileId}
+      `;
+      expect(summary).toEqual({
+        customerQualityAvailable: true,
+        customerReviewCount: 1,
+        customerScore: "5.00",
+      });
+      const [professionSummary] = await tx<
+        Array<{ customerReviewCount: number; customerScore: string }>
+      >`
+        SELECT customer_review_count AS "customerReviewCount",
+          customer_score::text AS "customerScore"
+        FROM current_searchable_profession_trust_evidence
+        WHERE craftsman_profile_id = ${job.providerProfileId}
+          AND profession_code = ${customerOpportunity.acceptedProfessionCode}
+      `;
+      expect(professionSummary).toEqual({
+        customerReviewCount: 1,
+        customerScore: "5.00",
+      });
+      const [searchSignal] = await tx<
+        Array<{
+          customerScore: string;
+          reviewCount: number;
+          reviewSampleSufficient: boolean;
+        }>
+      >`
+        SELECT customer_score::text AS "customerScore",
+          review_count AS "reviewCount",
+          review_sample_sufficient AS "reviewSampleSufficient"
+        FROM current_searchable_craftsman_trust_signals
+        WHERE craftsman_profile_id = ${job.providerProfileId}
+      `;
+      expect(searchSignal).toEqual({
+        customerScore: "5.00",
+        reviewCount: 1,
+        reviewSampleSufficient: false,
+      });
       await expect(
         tx.savepoint(async (savepoint) => {
           await savepoint`

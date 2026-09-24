@@ -105,13 +105,43 @@ describe("craftsman trust/evidence repository", () => {
     }
   });
 
-  it("fails closed if a row fabricates unavailable review evidence", async () => {
+  it("returns unlocked customer quality without exposing raw review provenance", async () => {
     const responses = completeResponses();
     responses[0] = [
       {
         ...(responses[0]?.[0] as object),
         customerReviewCount: 1,
+        independentEvidenceSourceCount: 1,
+        verifiedJobCount: 2,
         customerScore: 5,
+        customerQualityAvailable: true,
+      },
+    ];
+    const [result] = await createCraftsmanTrustEvidenceRepository(
+      scriptedSql(responses),
+    ).listCurrent({ profileIds: [profileId] });
+    expect(result?.volume).toMatchObject({
+      customerReviewCount: 1,
+      independentEvidenceSourceCount: 1,
+      verifiedJobCount: 2,
+    });
+    expect(result?.quality).toEqual({
+      customerQualityAvailable: true,
+      customerScore: 5,
+      supervisorQualityAvailable: false,
+    });
+    expect(JSON.stringify(result)).not.toMatch(
+      /privateReviewBody|reviewer|actor|jobId|comment/iu,
+    );
+  });
+
+  it("fails closed if review availability and score are incoherent", async () => {
+    const responses = completeResponses();
+    responses[0] = [
+      {
+        ...(responses[0]?.[0] as object),
+        customerReviewCount: 1,
+        customerScore: null,
         customerQualityAvailable: true,
       },
     ];

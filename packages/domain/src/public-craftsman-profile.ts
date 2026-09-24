@@ -61,6 +61,8 @@ export interface PublicCraftsmanProfilePersistence {
 export interface PublicCraftsmanProfession {
   readonly code: string;
   readonly label: string;
+  readonly customerScore: number | null;
+  readonly reviewCount: number;
   readonly verifiedJobCount: number;
   readonly declaredProficiency: Readonly<{
     level: "BEGINNER" | "ADVANCED" | "MASTER";
@@ -215,21 +217,22 @@ export function serializePublicCraftsmanProfile(
     displayText.some(
       (value) => value !== null && !isPublicDisplayTextSafe(value),
     ) ||
-    !Number.isSafeInteger(candidate.trust.reviewCount) ||
-    candidate.trust.reviewCount < 0 ||
-    (candidate.trust.reviewCount === 0
-      ? candidate.trust.customerScore !== null
-      : typeof candidate.trust.customerScore !== "number" ||
-        !Number.isFinite(candidate.trust.customerScore) ||
-        candidate.trust.customerScore < 1 ||
-        candidate.trust.customerScore > 5) ||
+    !isCoherentCustomerReviewAggregate(
+      candidate.trust.customerScore,
+      candidate.trust.reviewCount,
+    ) ||
     !Number.isSafeInteger(candidate.trust.verifiedWorkCount) ||
     candidate.trust.verifiedWorkCount < 0 ||
     candidate.professions.some(
       (profession) =>
         !Number.isSafeInteger(profession.verifiedJobCount) ||
         profession.verifiedJobCount < 0 ||
-        profession.verifiedJobCount > candidate.trust.verifiedWorkCount,
+        profession.verifiedJobCount > candidate.trust.verifiedWorkCount ||
+        !isCoherentCustomerReviewAggregate(
+          profession.customerScore,
+          profession.reviewCount,
+        ) ||
+        profession.reviewCount > candidate.trust.reviewCount,
     )
   ) {
     return null;
@@ -246,6 +249,8 @@ export function serializePublicCraftsmanProfile(
     professions: candidate.professions.map((profession) => ({
       code: profession.code,
       label: profession.label,
+      customerScore: profession.customerScore,
+      reviewCount: profession.reviewCount,
       verifiedJobCount: profession.verifiedJobCount,
       declaredProficiency: {
         level: profession.declaredProficiency.level,
@@ -318,6 +323,22 @@ export function serializePublicCraftsmanProfile(
       verification: "ADMIN_APPROVED",
     })),
   };
+}
+
+function isCoherentCustomerReviewAggregate(
+  score: unknown,
+  count: unknown,
+): boolean {
+  return (
+    Number.isSafeInteger(count) &&
+    (count as number) >= 0 &&
+    ((count === 0 && score === null) ||
+      ((count as number) > 0 &&
+        typeof score === "number" &&
+        Number.isFinite(score) &&
+        score >= 1 &&
+        score <= 5))
+  );
 }
 
 function serializePublicPortfolio(

@@ -71,6 +71,7 @@ import type { CraftsmanAvailabilityPersistence } from "@portal/domain";
 import { createCraftsmanPublicationRepository } from "./craftsman-publication-repository.js";
 import type { CraftsmanPublicationPersistence } from "@portal/domain";
 import { createPublicCraftsmanProfileRepository } from "./public-craftsman-profile-repository.js";
+import { createPublicCraftsmanReviewRepository } from "./public-craftsman-review-repository.js";
 import { createCraftsmanSearchReadModelRepository } from "./craftsman-search-read-model-repository.js";
 import { createCraftsmanDistanceRepository } from "./craftsman-distance-repository.js";
 import { createCraftsmanServiceAreaMatchRepository } from "./craftsman-service-area-match-repository.js";
@@ -794,6 +795,19 @@ export {
 export type { CraftsmanPublicationPersistence } from "@portal/domain";
 export { createPublicCraftsmanProfileRepository } from "./public-craftsman-profile-repository.js";
 export type { PublicCraftsmanProfilePersistence } from "@portal/domain";
+export {
+  createPublicCraftsmanReviewRepository,
+  PUBLIC_CRAFTSMAN_REVIEW_DEFAULT_LIMIT,
+  PUBLIC_CRAFTSMAN_REVIEW_MAX_LIMIT,
+  PublicCraftsmanReviewProjectionError,
+  PublicCraftsmanReviewQueryValidationError,
+} from "./public-craftsman-review-repository.js";
+export type {
+  ListPublicCraftsmanReviewsInput,
+  PublicCraftsmanReviewItem,
+  PublicCraftsmanReviewPage,
+  PublicCraftsmanReviewRatings,
+} from "./public-craftsman-review-repository.js";
 export { createCraftsmanSearchReadModelRepository } from "./craftsman-search-read-model-repository.js";
 export { createCraftsmanDistanceRepository } from "./craftsman-distance-repository.js";
 export { createCraftsmanServiceAreaMatchRepository } from "./craftsman-service-area-match-repository.js";
@@ -1068,6 +1082,9 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly craftsmanAvailability: CraftsmanAvailabilityPersistence;
   readonly craftsmanPublication: CraftsmanPublicationPersistence;
   readonly publicCraftsmanProfiles: PublicCraftsmanProfilePersistence;
+  readonly publicCraftsmanReviews: ReturnType<
+    typeof createPublicCraftsmanReviewRepository
+  >;
   readonly craftsmanSearch: CraftsmanSearchReadModelPersistence;
   readonly craftsmanDistances: CraftsmanDistancePersistence;
   readonly craftsmanServiceAreaMatches: CraftsmanServiceAreaMatchPersistence;
@@ -1226,6 +1243,7 @@ export function createDatabase(
   const craftsmanAvailability = createCraftsmanAvailabilityRepository(sql);
   const craftsmanPublication = createCraftsmanPublicationRepository(sql);
   const publicCraftsmanProfiles = createPublicCraftsmanProfileRepository(sql);
+  const publicCraftsmanReviews = createPublicCraftsmanReviewRepository(sql);
   const craftsmanSearch = createCraftsmanSearchReadModelRepository(sql);
   const craftsmanDistances = createCraftsmanDistanceRepository(sql);
   const craftsmanServiceAreaMatches =
@@ -1332,6 +1350,7 @@ export function createDatabase(
     craftsmanAvailability,
     craftsmanPublication,
     publicCraftsmanProfiles,
+    publicCraftsmanReviews,
     craftsmanSearch,
     craftsmanDistances,
     craftsmanServiceAreaMatches,

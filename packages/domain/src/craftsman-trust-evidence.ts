@@ -14,11 +14,18 @@ export interface TrustEvidenceVolume {
   readonly verifiedPortfolioProjectCount: number;
 }
 
-export interface TrustEvidenceQuality {
-  readonly customerQualityAvailable: false;
-  readonly customerScore: null;
-  readonly supervisorQualityAvailable: false;
-}
+export type TrustEvidenceQuality = Readonly<
+  | {
+      readonly customerQualityAvailable: false;
+      readonly customerScore: null;
+      readonly supervisorQualityAvailable: false;
+    }
+  | {
+      readonly customerQualityAvailable: true;
+      readonly customerScore: number;
+      readonly supervisorQualityAvailable: false;
+    }
+>;
 
 export interface TrustEvidenceConfidence {
   readonly customerScore: InsufficientEvidenceConfidence;
@@ -127,6 +134,7 @@ export function serializeCraftsmanTrustEvidence(
   if (
     volume === null ||
     quality === null ||
+    !reviewEvidenceCoherent(volume, quality) ||
     confidence === null ||
     professions.length < 1 ||
     professions.some((profession) => profession === null)
@@ -165,6 +173,7 @@ function serializeProfession(
     typeof candidate.hasEvidenceSupportedSpecialization !== "boolean" ||
     volume === null ||
     quality === null ||
+    !reviewEvidenceCoherent(volume, quality) ||
     confidence === null
   ) {
     return null;
@@ -193,16 +202,6 @@ function serializeVolume(candidate: unknown): TrustEvidenceVolume | null {
   ];
   if (!values.every(isNonnegativeSafeInteger)) return null;
 
-  // R2 has no completed-job/review authority. Non-zero values would fabricate
-  // evidence before R4 installs its provenance-preserving sources.
-  if (
-    candidate.customerReviewCount !== 0 ||
-    candidate.independentEvidenceSourceCount !== 0 ||
-    candidate.supervisorEvaluationCount !== 0 ||
-    candidate.verifiedJobCount !== 0
-  ) {
-    return null;
-  }
   return Object.freeze({
     approvedCredentialTypeCount: candidate.approvedCredentialTypeCount,
     customerReviewCount: candidate.customerReviewCount,
@@ -215,15 +214,38 @@ function serializeVolume(candidate: unknown): TrustEvidenceVolume | null {
 
 function serializeQuality(candidate: unknown): TrustEvidenceQuality | null {
   if (!isRecord(candidate)) return null;
-  return candidate.customerScore === null &&
+  if (candidate.supervisorQualityAvailable !== false) return null;
+  if (
     candidate.customerQualityAvailable === false &&
-    candidate.supervisorQualityAvailable === false
-    ? Object.freeze({
-        customerQualityAvailable: false as const,
-        customerScore: null,
-        supervisorQualityAvailable: false as const,
-      })
-    : null;
+    candidate.customerScore === null
+  ) {
+    return Object.freeze({
+      customerQualityAvailable: false as const,
+      customerScore: null,
+      supervisorQualityAvailable: false as const,
+    });
+  }
+  if (
+    candidate.customerQualityAvailable === true &&
+    typeof candidate.customerScore === "number" &&
+    Number.isFinite(candidate.customerScore) &&
+    candidate.customerScore >= 1 &&
+    candidate.customerScore <= 5
+  ) {
+    return Object.freeze({
+      customerQualityAvailable: true as const,
+      customerScore: candidate.customerScore,
+      supervisorQualityAvailable: false as const,
+    });
+  }
+  return null;
+}
+
+function reviewEvidenceCoherent(
+  volume: TrustEvidenceVolume,
+  quality: TrustEvidenceQuality,
+): boolean {
+  return volume.customerReviewCount > 0 === quality.customerQualityAvailable;
 }
 
 function serializeConfidence(
