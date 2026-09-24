@@ -275,7 +275,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         `;
 
         expect(postgis?.extversion).toMatch(/^3\./);
-        expect(ledger?.count).toBe(93);
+        expect(ledger?.count).toBe(95);
         expect(created).toMatchObject({ account_state: "ACTIVE" });
         expect(created?.id).toMatch(
           /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
