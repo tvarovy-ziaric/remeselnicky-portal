@@ -13,6 +13,10 @@ import { createAdminJobCancellationRepository } from "../src/admin-job-cancellat
 const enumMigration = source("0099_admin_dispute_transition_actions.sql");
 const workflowMigration = source("0100_admin_dispute_workflow.sql");
 const cancellationMigration = source("0101_admin_job_force_cancellation.sql");
+const partyEnumMigration = source("0102_dispute_party_transition_actions.sql");
+const partyWorkflowMigration = source(
+  "0103_dispute_withdrawal_and_mutual_settlement.sql",
+);
 const actor: PrivilegedActor = {
   capabilities: new Set(["admin.disputes.manage", "admin.jobs.correct"]),
   mfaAuthenticatedAt: new Date(),
@@ -127,6 +131,61 @@ describe("R4-022 exceptional Job cancellation", () => {
     await expect(
       repository.forceCancel({ ...base, userFacingReason: "krátke" }),
     ).rejects.toThrow(TypeError);
+  });
+});
+
+describe("R4-022 retained investigation and party settlement workflow", () => {
+  it("commits party and hold actions before the dependent workflow", () => {
+    expect(partyEnumMigration).toContain("ADD VALUE 'WITHDRAW'");
+    expect(partyEnumMigration).toContain("ADD VALUE 'CONFIRM_SETTLEMENT'");
+    expect(partyEnumMigration).toContain("ADD VALUE 'SET_INVESTIGATION_HOLD'");
+    expect(partyWorkflowMigration).toContain(
+      "CREATE TABLE dispute_case_party_commands",
+    );
+  });
+
+  it("allows only the opener to withdraw and preserves a serious investigation hold", () => {
+    expect(partyWorkflowMigration).toContain(
+      "NEW.actor_user_id IS DISTINCT FROM opener_user_id OR held",
+    );
+    expect(partyWorkflowMigration).toContain(
+      "CREATE TABLE dispute_case_withdrawals",
+    );
+    expect(partyWorkflowMigration).toContain(
+      "CREATE TABLE dispute_case_investigation_hold_events",
+    );
+    expect(partyWorkflowMigration).toContain(
+      "BEFORE UPDATE OR DELETE ON dispute_case_withdrawals",
+    );
+  });
+
+  it("resolves only on exact latest bilateral summaries without rewriting commerce", () => {
+    expect(partyWorkflowMigration).toContain(
+      "other_summary IS NOT DISTINCT FROM NEW.settlement_summary",
+    );
+    expect(partyWorkflowMigration).toContain(
+      "CREATE TABLE dispute_case_party_settlement_outcomes",
+    );
+    expect(partyWorkflowMigration).toContain("'MUTUAL_PARTY_AGREEMENT'");
+    expect(partyWorkflowMigration).not.toMatch(/UPDATE\s+jobs/iu);
+    expect(partyWorkflowMigration).not.toMatch(
+      /UPDATE\s+job_agreement_snapshots/iu,
+    );
+  });
+
+  it("keeps party notifications free of settlement and withdrawal text", () => {
+    const payloadStart = partyWorkflowMigration.indexOf(
+      "jsonb_build_object(",
+      partyWorkflowMigration.indexOf("'job.dispute.party_action'"),
+    );
+    const payloadEnd = partyWorkflowMigration.indexOf(
+      "'job.dispute.party_action', NEW.command_id::text",
+      payloadStart,
+    );
+    const payload = partyWorkflowMigration.slice(payloadStart, payloadEnd);
+    expect(payload).toContain("'action', NEW.action::text");
+    expect(payload).not.toContain("settlement_summary");
+    expect(payload).not.toContain("withdrawal_reason");
   });
 });
 

@@ -203,6 +203,9 @@ export function AdminDisputeWorkspace() {
                 <small>
                   {dateTime(item.stateChangedAt)} · požiadavky:{" "}
                   {item.informationRequestCount}
+                  {item.investigationHeld
+                    ? " · závažné preverovanie aktívne"
+                    : ""}
                 </small>
               </div>
               <button
@@ -331,6 +334,36 @@ function AdminDisputeCase({
               onClick={() => submit({ action: "CLOSE" })}
             >
               Uzavrieť prípad
+            </button>
+          </Action>
+        )}
+        {!(["RESOLVED", "CLOSED"] as string[]).includes(detail.state) && (
+          <Action
+            title={
+              detail.investigationHeld
+                ? "Uvoľniť blokovanie stiahnutia"
+                : "Zachovať závažné preverovanie"
+            }
+            warning={
+              detail.investigationHeld
+                ? "Po uvoľnení môže otvárajúca strana prípad stiahnuť. Dôvod zostáva iba v audite."
+                : "Použite iba pri závažnom bezpečnostnom alebo pravidlovom signále; otvárajúca strana potom nemôže prípad stiahnuť."
+            }
+          >
+            <button
+              disabled={disabled || reason.trim().length < 8}
+              type="button"
+              onClick={() =>
+                submit({
+                  action: detail.investigationHeld
+                    ? "CLEAR_INVESTIGATION_HOLD"
+                    : "SET_INVESTIGATION_HOLD",
+                })
+              }
+            >
+              {detail.investigationHeld
+                ? "Uvoľniť blokovanie"
+                : "Zachovať preverovanie"}
             </button>
           </Action>
         )}
@@ -555,6 +588,22 @@ function CaseEvidence({ detail }: Readonly<{ detail: AdminDisputeDetail }>) {
                 <small>
                   {item.basis} · {dateTime(item.recordedAt)}
                 </small>
+              </li>
+            ))}
+          </ol>
+        )}
+      </article>
+      <article>
+        <h4>Potvrdenia dohody strán</h4>
+        {detail.settlementConfirmations.length === 0 ? (
+          <p>Bez potvrdenia.</p>
+        ) : (
+          <ol>
+            {detail.settlementConfirmations.map((item) => (
+              <li key={item.id}>
+                <strong>{role(item.confirmedByRole)}</strong>
+                <p>{item.summary}</p>
+                <small>{dateTime(item.confirmedAt)}</small>
               </li>
             ))}
           </ol>

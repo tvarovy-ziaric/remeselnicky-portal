@@ -3,7 +3,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import type { JobDisputeDetail } from "./job-dispute-data";
-import { JobDisputeDetailView, JobDisputes } from "./job-disputes";
+import {
+  JobDisputeDetailView,
+  JobDisputePartyActions,
+  JobDisputes,
+} from "./job-disputes";
 
 const jobId = "98100000-0000-4000-8000-000000000001";
 const disputeId = "98100000-0000-4000-8000-000000000002";
@@ -27,6 +31,7 @@ function detail(state: "OPEN" | "CLOSED" = "OPEN"): JobDisputeDetail {
     createdAt: "2026-09-24T10:00:00.000Z",
     stateChangedAt: "2026-09-24T10:00:00.000Z",
     canAddContent: state === "OPEN",
+    canWithdraw: false,
     statements: [
       {
         id: statementId,
@@ -70,6 +75,7 @@ function detail(state: "OPEN" | "CLOSED" = "OPEN"): JobDisputeDetail {
             recordedAt: "2026-09-24T12:00:00.000Z",
           }
         : null,
+    settlementConfirmations: [],
     caseTimeline: [
       {
         eventId: disputeId,
@@ -177,5 +183,44 @@ describe("D22 private dispute UI", () => {
     expect(html).not.toContain("Pridať nemenné vyjadrenie");
     expect(html).not.toContain("Pripojiť existujúci dôkaz zo zákazky");
     expect(html).not.toContain("Nahrať nový súkromný dôkaz");
+  });
+
+  it("explains exact bilateral settlement and opener-only withdrawal", () => {
+    const openerDetail = {
+      ...detail(),
+      viewerRole: "CUSTOMER" as const,
+      canWithdraw: true,
+    };
+    const html = renderToStaticMarkup(
+      <JobDisputePartyActions
+        detail={openerDetail}
+        onConfirmSettlement={asyncNoop}
+        onSettlementSummary={noop}
+        onWithdraw={asyncNoop}
+        onWithdrawalReason={noop}
+        pending={false}
+        settlementSummary=""
+        withdrawalReason=""
+      />,
+    );
+    expect(html).toContain("úplne rovnaké stručné zhrnutie");
+    expect(html).toContain("nemení prijatú ponuku");
+    expect(html).toContain("Stiahnuť prípad");
+    expect(html).toContain("História zostane zachovaná");
+
+    const counterparty = renderToStaticMarkup(
+      <JobDisputePartyActions
+        detail={detail()}
+        onConfirmSettlement={asyncNoop}
+        onSettlementSummary={noop}
+        onWithdraw={asyncNoop}
+        onWithdrawalReason={noop}
+        pending={false}
+        settlementSummary=""
+        withdrawalReason=""
+      />,
+    );
+    expect(counterparty).toContain("Potvrdiť vlastnú dohodu strán");
+    expect(counterparty).not.toContain("Stiahnuť prípad");
   });
 });

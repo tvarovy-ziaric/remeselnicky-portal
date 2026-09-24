@@ -235,6 +235,8 @@ describe.skipIf(testDatabaseUrl === undefined)(
           "0099_admin_dispute_transition_actions.sql",
           "0100_admin_dispute_workflow.sql",
           "0101_admin_job_force_cancellation.sql",
+          "0102_dispute_party_transition_actions.sql",
+          "0103_dispute_withdrawal_and_mutual_settlement.sql",
         ],
         alreadyApplied: 0,
       });
@@ -243,7 +245,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         testDatabaseUrl,
         migrationsDirectory,
       );
-      expect(secondRun).toEqual({ applied: [], alreadyApplied: 102 });
+      expect(secondRun).toEqual({ applied: [], alreadyApplied: 104 });
 
       const sql = postgres(testDatabaseUrl, { max: 5 });
       try {
@@ -289,7 +291,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         `;
 
         expect(postgis?.extversion).toMatch(/^3\./);
-        expect(ledger?.count).toBe(102);
+        expect(ledger?.count).toBe(104);
         expect(created).toMatchObject({ account_state: "ACTIVE" });
         expect(created?.id).toMatch(
           /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,

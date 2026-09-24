@@ -53,6 +53,20 @@ function fixture(input?: {
     recordOutcome: applied,
     close: applied,
     reopen: applied,
+    setInvestigationHold: vi.fn().mockResolvedValue({
+      status: "APPLIED",
+      commandId,
+      disputeId,
+      state: "UNDER_REVIEW",
+      recordedAt: new Date("2026-09-24T10:01:00.000Z"),
+    }),
+    clearInvestigationHold: vi.fn().mockResolvedValue({
+      status: "APPLIED",
+      commandId,
+      disputeId,
+      state: "UNDER_REVIEW",
+      recordedAt: new Date("2026-09-24T10:01:00.000Z"),
+    }),
   };
   registerAdminDisputeRoutes(app, {
     adminAccess: { authorize },
@@ -160,6 +174,45 @@ describe("administrative dispute routes", () => {
     });
     expect(invalidResponse.statusCode).toBe(400);
     expect(invalid.disputes.addInternalNote).not.toHaveBeenCalled();
+  });
+
+  it("sets and clears a serious-investigation hold through audited named commands", async () => {
+    const { app, disputes } = fixture();
+    const payload = {
+      commandId,
+      expectedState: "UNDER_REVIEW",
+      reason: "Závažný bezpečnostný signál vyžaduje ďalšie preverenie.",
+    };
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: path(ADMIN_DISPUTE_PATHS.setInvestigationHold),
+          payload,
+        })
+      ).statusCode,
+    ).toBe(201);
+    expect(disputes.setInvestigationHold).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actor,
+        disputeId,
+        commandId,
+        expectedState: "UNDER_REVIEW",
+      }),
+    );
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: path(ADMIN_DISPUTE_PATHS.clearInvestigationHold),
+          payload: {
+            ...payload,
+            reason: "Signál bol preverovaný a hold už nie je potrebný.",
+          },
+        })
+      ).statusCode,
+    ).toBe(201);
+    expect(disputes.clearInvestigationHold).toHaveBeenCalledOnce();
   });
 
   it("fails closed for anonymous, CSRF failure and stale MFA", async () => {

@@ -24,10 +24,19 @@ administrative resolution capability.
 A `dispute_cases` identity binds to exactly one accepted Job and records the
 opening party, governed category, bounded description and requested resolution.
 The current case state is derived from append-only state events. R4-021 creates
-the initial `OPEN` event only; `WAITING_FOR_PARTY`, `UNDER_REVIEW`, `RESOLVED`
-and `CLOSED` transitions and audited administrative actions remain R4-022.
-Opening a case never mutates the Job, accepted agreement, payment, review,
-reputation or moderation records.
+the initial `OPEN` event; R4-022 adds exact audited administrative transitions,
+opener withdrawal and bilateral settlement confirmation. Opening or resolving a
+case never mutates the Job, accepted agreement, payment, review, reputation or
+moderation records.
+
+The opener may issue a named withdrawal command only while the case is active
+and no private audited serious-investigation hold is current. Withdrawal closes
+the operational case but preserves its command and transition history. Either
+party may append a concise settlement confirmation; the case resolves as
+`RESOLVED_BY_PARTIES / MUTUAL_PARTY_AGREEMENT` only when the latest
+confirmation from each contractual role contains exactly the same summary.
+This outcome is documentation, not a retroactive Change order or commercial
+rewrite.
 
 Only an ACTIVE, fully verified owner of the Job's customer profile or primary
 craftsman profile may list, read, open or append to a case. Job participants,
@@ -47,15 +56,16 @@ alone never grants case-media access.
 Case detail returns immutable accepted request/quote identifiers, an authorized
 accepted-PDF link when present, approved change revisions and the Job system
 timeline. It does not copy or alter those records. The open-case outbox event
-contains only recipient, Job and case identifiers. Its notification mapper
-creates one private in-app action; description, requested resolution, evidence,
+contains only recipient, Job and case identifiers. Party-action notifications
+add only the governed action name. Their mapper creates one private in-app
+action; descriptions, settlement summaries, withdrawal reasons, evidence,
 contacts and addresses never enter the event or notification payload.
 
 ## Consequences
 
 Either contractual party can preserve and share its case record without
-changing commercial or reputational truth. Closed/resolved history can remain
-readable while content mutation is denied. R4-022 can add state transitions,
-party requests and exceptional audited Job operations through the existing
-capability- and MFA-gated admin boundary without retrofitting an unsafe ordinary
-user control or rewriting the original case history.
+changing commercial or reputational truth. Closed/resolved history remains
+readable while content mutation is denied. Administrative state transitions,
+party requests and exceptional Job operations use the capability- and MFA-gated
+admin boundary without retrofitting an unsafe ordinary user control or rewriting
+the original case history.

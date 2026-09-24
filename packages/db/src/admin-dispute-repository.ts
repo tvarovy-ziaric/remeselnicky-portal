@@ -20,6 +20,8 @@ export const ADMIN_DISPUTE_ACTIONS = Object.freeze([
   "RECORD_OUTCOME",
   "CLOSE",
   "REOPEN",
+  "SET_INVESTIGATION_HOLD",
+  "CLEAR_INVESTIGATION_HOLD",
 ] as const);
 export type AdminDisputeAction = (typeof ADMIN_DISPUTE_ACTIONS)[number];
 export type AdminDisputeState =
@@ -48,7 +50,14 @@ interface CommandBase {
 }
 
 export type AdminDisputeCommand =
-  | (CommandBase & { readonly action: "START_REVIEW" | "CLOSE" | "REOPEN" })
+  | (CommandBase & {
+      readonly action:
+        | "START_REVIEW"
+        | "CLOSE"
+        | "REOPEN"
+        | "SET_INVESTIGATION_HOLD"
+        | "CLEAR_INVESTIGATION_HOLD";
+    })
   | (CommandBase & {
       readonly action: "REQUEST_INFORMATION";
       readonly recipient: DisputeRequestRecipient;
@@ -85,6 +94,7 @@ export interface AdminDisputeQueueItem {
   readonly createdAt: Date;
   readonly stateChangedAt: Date;
   readonly informationRequestCount: number;
+  readonly investigationHeld: boolean;
 }
 
 export interface AdminDisputeCaseDetail extends AdminDisputeQueueItem {
@@ -124,6 +134,12 @@ export interface AdminDisputeCaseDetail extends AdminDisputeQueueItem {
     basis: DisputeOutcomeBasis;
     summary: string;
     recordedAt: Date;
+  }>[];
+  readonly settlementConfirmations: readonly Readonly<{
+    id: string;
+    confirmedByRole: "CUSTOMER" | "PRIMARY_PROVIDER";
+    summary: string;
+    confirmedAt: Date;
   }>[];
   readonly conversation: readonly Readonly<{
     id: string;
@@ -286,8 +302,11 @@ export function createAdminDisputeRepository(sql: RootSql) {
           dispute.created_at AS "createdAt",
           dispute.state_changed_at AS "stateChangedAt",
           (SELECT count(*)::integer FROM dispute_case_information_requests request
-            WHERE request.dispute_id = dispute.id) AS "informationRequestCount"
+            WHERE request.dispute_id = dispute.id) AS "informationRequestCount",
+          coalesce(hold.is_active, false) AS "investigationHeld"
         FROM current_dispute_cases dispute
+        LEFT JOIN current_dispute_case_investigation_holds hold
+          ON hold.dispute_id = dispute.id
         WHERE (${input.state ?? null}::text IS NULL
           OR dispute.state::text = ${input.state ?? null}::text)
         ORDER BY CASE dispute.state
@@ -331,6 +350,7 @@ export function createAdminDisputeRepository(sql: RootSql) {
             desiredResolution: string;
             jobState: string;
             conversationId: string;
+            investigationHeld: boolean;
           }
         >
       >`
@@ -341,10 +361,13 @@ export function createAdminDisputeRepository(sql: RootSql) {
           dispute.created_at AS "createdAt",
           dispute.state_changed_at AS "stateChangedAt",
           job_state.state::text AS "jobState",
-          job.winning_conversation_id AS "conversationId"
+          job.winning_conversation_id AS "conversationId",
+          coalesce(hold.is_active, false) AS "investigationHeld"
         FROM current_dispute_cases dispute
         JOIN jobs job ON job.id = dispute.job_id
         JOIN current_job_states job_state ON job_state.job_id = job.id
+        LEFT JOIN current_dispute_case_investigation_holds hold
+          ON hold.dispute_id = dispute.id
         WHERE dispute.id = ${input.disputeId}`;
       if (!row) return null;
 
@@ -370,6 +393,7 @@ export function createAdminDisputeRepository(sql: RootSql) {
         requests,
         notes,
         outcomes,
+        settlementConfirmations,
         conversation,
         attachments,
       ] = await Promise.all([
@@ -423,9 +447,28 @@ export function createAdminDisputeRepository(sql: RootSql) {
             recordedAt: Date;
           }>
         >`
-            SELECT id, category::text, basis::text, summary, recorded_at AS "recordedAt"
+            SELECT id, category::text, basis::text, summary,
+              recorded_at AS "recordedAt"
             FROM dispute_case_outcomes WHERE dispute_id = ${input.disputeId}
-            ORDER BY recorded_at, id`,
+            UNION ALL
+            SELECT id, 'RESOLVED_BY_PARTIES', 'MUTUAL_PARTY_AGREEMENT',
+              summary, recorded_at AS "recordedAt"
+            FROM dispute_case_party_settlement_outcomes
+            WHERE dispute_id = ${input.disputeId}
+            ORDER BY "recordedAt", id`,
+        tx<
+          Array<{
+            id: string;
+            confirmedByRole: "CUSTOMER" | "PRIMARY_PROVIDER";
+            summary: string;
+            confirmedAt: Date;
+          }>
+        >`
+            SELECT id, confirmed_by_role::text AS "confirmedByRole",
+              summary, confirmed_at AS "confirmedAt"
+            FROM dispute_case_settlement_confirmations
+            WHERE dispute_id = ${input.disputeId}
+            ORDER BY confirmed_at, id`,
         tx<
           Array<{
             id: string;
@@ -464,6 +507,7 @@ export function createAdminDisputeRepository(sql: RootSql) {
         informationRequests: freezeRows(requests),
         internalNotes: freezeRows(notes),
         outcomes: freezeRows(outcomes),
+        settlementConfirmations: freezeRows(settlementConfirmations),
         conversation: freezeRows(conversation),
         attachments: freezeRows(attachments),
       });
@@ -491,6 +535,10 @@ export function createAdminDisputeRepository(sql: RootSql) {
     ) => execute({ ...input, action: "RECORD_OUTCOME" }),
     close: (input: CommandBase) => execute({ ...input, action: "CLOSE" }),
     reopen: (input: CommandBase) => execute({ ...input, action: "REOPEN" }),
+    setInvestigationHold: (input: CommandBase) =>
+      execute({ ...input, action: "SET_INVESTIGATION_HOLD" }),
+    clearInvestigationHold: (input: CommandBase) =>
+      execute({ ...input, action: "CLEAR_INVESTIGATION_HOLD" }),
     listQueue,
     getCase,
   });
@@ -597,6 +645,8 @@ function auditAction(action: AdminDisputeAction): string {
     RECORD_OUTCOME: "admin.dispute.outcome_recorded",
     CLOSE: "admin.dispute.closed",
     REOPEN: "admin.dispute.reopened",
+    SET_INVESTIGATION_HOLD: "admin.dispute.investigation_hold_set",
+    CLEAR_INVESTIGATION_HOLD: "admin.dispute.investigation_hold_cleared",
   }[action];
 }
 

@@ -38,6 +38,7 @@ export interface JobDisputeSummary {
   readonly createdAt: string;
   readonly stateChangedAt: string;
   readonly canAddContent: boolean;
+  readonly canWithdraw: boolean;
 }
 
 export interface JobDisputeStatement {
@@ -84,6 +85,12 @@ export interface JobDisputeDetail extends JobDisputeSummary {
     summary: string;
     recordedAt: string;
   }> | null;
+  readonly settlementConfirmations: readonly Readonly<{
+    id: string;
+    confirmedByRole: JobDisputePartyRole;
+    summary: string;
+    confirmedAt: string;
+  }>[];
   readonly caseTimeline: readonly Readonly<{
     eventId: string;
     action: string;
@@ -133,6 +140,7 @@ export type JobDisputeCommandResult =
         | "NOT_FOUND"
         | "CASE_CLOSED"
         | "DUPLICATE_EVIDENCE"
+        | "WITHDRAWAL_BLOCKED"
         | "CONFLICT"
         | "UNAVAILABLE";
     };
@@ -199,6 +207,7 @@ function parseSummary(value: unknown, jobId: string): JobDisputeSummary | null {
       "createdAt",
       "stateChangedAt",
       "canAddContent",
+      "canWithdraw",
     ]) ||
     typeof value.id !== "string" ||
     !uuid.test(value.id) ||
@@ -214,7 +223,10 @@ function parseSummary(value: unknown, jobId: string): JobDisputeSummary | null {
     !instant(value.stateChangedAt) ||
     Date.parse(value.stateChangedAt) < Date.parse(value.createdAt) ||
     typeof value.canAddContent !== "boolean" ||
-    value.canAddContent !== !["RESOLVED", "CLOSED"].includes(value.state)
+    value.canAddContent !== !["RESOLVED", "CLOSED"].includes(value.state) ||
+    typeof value.canWithdraw !== "boolean" ||
+    (value.canWithdraw &&
+      (value.openedByRole !== value.viewerRole || !value.canAddContent))
   )
     return null;
   return value as unknown as JobDisputeSummary;
@@ -340,6 +352,22 @@ function parseOutcome(value: unknown): JobDisputeDetail["outcome"] | null {
   return value as unknown as Exclude<JobDisputeDetail["outcome"], null>;
 }
 
+function parseSettlementConfirmation(
+  value: unknown,
+): JobDisputeDetail["settlementConfirmations"][number] | null {
+  if (
+    !record(value) ||
+    !exact(value, ["id", "confirmedByRole", "summary", "confirmedAt"]) ||
+    typeof value.id !== "string" ||
+    !uuid.test(value.id) ||
+    !role(value.confirmedByRole) ||
+    !text(value.summary, 8, 2_000) ||
+    !instant(value.confirmedAt)
+  )
+    return null;
+  return value as unknown as JobDisputeDetail["settlementConfirmations"][number];
+}
+
 function parseCaseTimelineEvent(
   value: unknown,
 ): JobDisputeDetail["caseTimeline"][number] | null {
@@ -362,6 +390,8 @@ function parseCaseTimelineEvent(
       "RECORD_OUTCOME",
       "CLOSE",
       "REOPEN",
+      "WITHDRAW",
+      "CONFIRM_SETTLEMENT",
     ].includes(value.action) ||
     !(value.fromState === null || state(value.fromState)) ||
     !state(value.toState) ||
@@ -441,6 +471,7 @@ export function parseJobDisputeDetail(
           "evidence",
           "adminRequests",
           "outcome",
+          "settlementConfirmations",
           "caseTimeline",
           "commercialBaseline",
           "jobTimeline",
@@ -456,6 +487,8 @@ export function parseJobDisputeDetail(
     value.evidence.length > 5_000 ||
     !Array.isArray(value.adminRequests) ||
     value.adminRequests.length > 1_000 ||
+    !Array.isArray(value.settlementConfirmations) ||
+    value.settlementConfirmations.length > 2 ||
     !Array.isArray(value.caseTimeline) ||
     value.caseTimeline.length > 1_000 ||
     !Array.isArray(value.jobTimeline) ||
@@ -466,6 +499,9 @@ export function parseJobDisputeDetail(
   const evidence = value.evidence.map(parseEvidence);
   const adminRequests = value.adminRequests.map(parseAdminRequest);
   const outcome = value.outcome === null ? null : parseOutcome(value.outcome);
+  const settlementConfirmations = value.settlementConfirmations.map(
+    parseSettlementConfirmation,
+  );
   const caseTimeline = value.caseTimeline.map(parseCaseTimelineEvent);
   const baseline = parseBaseline(value.commercialBaseline, jobId);
   if (
@@ -473,6 +509,7 @@ export function parseJobDisputeDetail(
     evidence.some((item) => item === null) ||
     adminRequests.some((item) => item === null) ||
     (value.outcome !== null && outcome === null) ||
+    settlementConfirmations.some((item) => item === null) ||
     caseTimeline.some((item) => item === null) ||
     baseline === null
   )
@@ -497,11 +534,15 @@ export function parseJobDisputeDetail(
   );
   const requestIds = new Set(adminRequests.map((item) => item?.id));
   const caseEventIds = new Set(caseTimeline.map((item) => item?.eventId));
+  const settlementRoles = new Set(
+    settlementConfirmations.map((item) => item?.confirmedByRole),
+  );
   if (
     statementIds.size !== statements.length ||
     evidenceIds.size !== evidence.length ||
     requestIds.size !== adminRequests.length ||
-    caseEventIds.size !== caseTimeline.length
+    caseEventIds.size !== caseTimeline.length ||
+    settlementRoles.size !== settlementConfirmations.length
   )
     return null;
   return Object.freeze({
@@ -512,6 +553,9 @@ export function parseJobDisputeDetail(
       adminRequests as JobDisputeDetail["adminRequests"],
     ),
     outcome,
+    settlementConfirmations: Object.freeze(
+      settlementConfirmations as JobDisputeDetail["settlementConfirmations"],
+    ),
     caseTimeline: Object.freeze(
       caseTimeline as JobDisputeDetail["caseTimeline"],
     ),
@@ -622,6 +666,47 @@ export async function addJobDisputeEvidence(input: {
       mediaAssetId: input.mediaAssetId,
       description: input.description.trim(),
     },
+  );
+}
+
+export async function withdrawJobDispute(input: {
+  readonly fetch: typeof fetch;
+  readonly jobId: string;
+  readonly disputeId: string;
+  readonly commandId: string;
+  readonly reason: string | null;
+}): Promise<JobDisputeCommandResult> {
+  const reason = input.reason?.trim() ?? null;
+  if (
+    !uuid.test(input.disputeId) ||
+    (reason !== null && !text(reason, 1, 1_000))
+  )
+    return { status: "UNAVAILABLE" };
+  return command(
+    input.fetch,
+    input.jobId,
+    input.commandId,
+    `disputes/${input.disputeId}/withdrawal`,
+    { reason },
+  );
+}
+
+export async function confirmJobDisputeSettlement(input: {
+  readonly fetch: typeof fetch;
+  readonly jobId: string;
+  readonly disputeId: string;
+  readonly commandId: string;
+  readonly summary: string;
+}): Promise<JobDisputeCommandResult> {
+  const summary = input.summary.trim();
+  if (!uuid.test(input.disputeId) || !text(summary, 8, 2_000))
+    return { status: "UNAVAILABLE" };
+  return command(
+    input.fetch,
+    input.jobId,
+    input.commandId,
+    `disputes/${input.disputeId}/settlement-confirmations`,
+    { summary },
   );
 }
 
@@ -782,6 +867,8 @@ async function command(
       if (value.code === "CASE_CLOSED") return { status: "CASE_CLOSED" };
       if (value.code === "DUPLICATE_EVIDENCE")
         return { status: "DUPLICATE_EVIDENCE" };
+      if (value.code === "WITHDRAWAL_BLOCKED")
+        return { status: "WITHDRAWAL_BLOCKED" };
       if (value.code === "IDEMPOTENCY_CONFLICT") return { status: "CONFLICT" };
       return { status: "UNAVAILABLE" };
     }

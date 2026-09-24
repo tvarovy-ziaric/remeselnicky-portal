@@ -48,6 +48,7 @@ function build(
         createdAt: occurredAt,
         stateChangedAt: occurredAt,
         canAddContent: true,
+        canWithdraw: true,
       },
     ]),
   );
@@ -65,10 +66,12 @@ function build(
       createdAt: occurredAt,
       stateChangedAt: occurredAt,
       canAddContent: true,
+      canWithdraw: true,
       statements: [],
       evidence: [],
       adminRequests: [],
       outcome: null,
+      settlementConfirmations: [],
       caseTimeline: [
         {
           eventId: disputeId,
@@ -110,6 +113,22 @@ function build(
   const getEvidenceUploadStatus = vi.fn<Repository["getEvidenceUploadStatus"]>(
     () => Promise.resolve({ status: "READY", canBind: true }),
   );
+  const withdraw = vi.fn<Repository["withdraw"]>(() =>
+    Promise.resolve({
+      status: "APPLIED",
+      id: commandId,
+      disputeId,
+      occurredAt,
+    }),
+  );
+  const confirmSettlement = vi.fn<Repository["confirmSettlement"]>(() =>
+    Promise.resolve({
+      status: "APPLIED",
+      id: commandId,
+      disputeId,
+      occurredAt,
+    }),
+  );
   const upload = vi.fn<DisputeEvidenceUploadService["upload"]>(() =>
     Promise.resolve({
       assetId: mediaAssetId,
@@ -138,6 +157,8 @@ function build(
       getEvidenceUploadStatus,
       listCases,
       openCase,
+      withdraw,
+      confirmSettlement,
     },
     evidenceUploads: { upload },
     csrfProtection,
@@ -163,6 +184,8 @@ function build(
     addStatement,
     addEvidence,
     upload,
+    withdraw,
+    confirmSettlement,
   };
 }
 
@@ -275,6 +298,62 @@ describe("Job dispute routes", () => {
       disputeId,
       ...evidencePayload,
     });
+  });
+
+  it("uses separate exact withdrawal and bilateral settlement commands", async () => {
+    const { app, withdraw, confirmSettlement } = build();
+    const withdrawalPath = JOB_DISPUTE_PATHS.withdrawal
+      .replace(":jobId", jobId)
+      .replace(":disputeId", disputeId);
+    const withdrawal = await app.inject({
+      method: "POST",
+      url: withdrawalPath,
+      headers: { "x-csrf-token": "valid" },
+      payload: {
+        commandId,
+        reason: "Prípad už nechcem ďalej viesť.",
+      },
+    });
+    expect(withdrawal.statusCode).toBe(201);
+    expect(withdraw).toHaveBeenCalledWith({
+      actorUserId,
+      commandId,
+      jobId,
+      disputeId,
+      reason: "Prípad už nechcem ďalej viesť.",
+    });
+
+    const settlementPath = JOB_DISPUTE_PATHS.settlementConfirmations
+      .replace(":jobId", jobId)
+      .replace(":disputeId", disputeId);
+    const summary = "Obe strany zaznamenávajú dohodu o oprave do piatich dní.";
+    const settlement = await app.inject({
+      method: "POST",
+      url: settlementPath,
+      headers: { "x-csrf-token": "valid" },
+      payload: { commandId, summary },
+    });
+    expect(settlement.statusCode).toBe(201);
+    expect(confirmSettlement).toHaveBeenCalledWith({
+      actorUserId,
+      commandId,
+      jobId,
+      disputeId,
+      summary,
+    });
+
+    for (const [url, payload] of [
+      [withdrawalPath, { commandId, reason: null, state: "CLOSED" }],
+      [settlementPath, { commandId, summary, mutual: true }],
+    ] as const) {
+      const response = await app.inject({
+        method: "POST",
+        url,
+        headers: { "x-csrf-token": "valid" },
+        payload,
+      });
+      expect(response.statusCode).toBe(400);
+    }
   });
 
   it("uploads only bounded central photo/PDF evidence", async () => {

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   addJobDisputeEvidence,
+  confirmJobDisputeSettlement,
   loadJobDispute,
   loadJobDisputes,
   loadJobDisputeUploadStatus,
@@ -9,6 +10,7 @@ import {
   parseJobDisputeDetail,
   parseJobDisputeList,
   uploadJobDisputeEvidence,
+  withdrawJobDispute,
 } from "./job-dispute-data";
 
 const jobId = "98000000-0000-4000-8000-000000000001";
@@ -35,6 +37,7 @@ const summary = () => ({
   createdAt: "2026-09-24T10:00:00.000Z",
   stateChangedAt: "2026-09-24T10:00:00.000Z",
   canAddContent: true,
+  canWithdraw: false,
 });
 
 const detail = () => ({
@@ -78,6 +81,14 @@ const detail = () => ({
     summary: "Strany dostali odporúčanie na zdokumentovanú opravu.",
     recordedAt: "2026-09-24T12:00:00.000Z",
   },
+  settlementConfirmations: [
+    {
+      id: commandId,
+      confirmedByRole: "CUSTOMER",
+      summary: "Strany sa dohodli na zdokumentovanej oprave.",
+      confirmedAt: "2026-09-24T11:30:00.000Z",
+    },
+  ],
   caseTimeline: [
     {
       eventId: disputeId,
@@ -279,6 +290,73 @@ describe("D22 private dispute web contract", () => {
         description: "Už priložený dôkaz.",
       }),
     ).toEqual({ status: "DUPLICATE_EVIDENCE" });
+  });
+
+  it("sends only the exact withdrawal and settlement command bodies", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(Response.json({ csrfToken: "csrf-token" }))
+      .mockResolvedValueOnce(
+        Response.json(
+          {
+            status: "APPLIED",
+            id: commandId,
+            disputeId,
+            occurredAt: "2026-09-24T10:00:00.000Z",
+          },
+          { status: 201 },
+        ),
+      )
+      .mockResolvedValueOnce(Response.json({ csrfToken: "csrf-token" }))
+      .mockResolvedValueOnce(
+        Response.json(
+          {
+            status: "APPLIED",
+            id: commandId,
+            disputeId,
+            occurredAt: "2026-09-24T10:01:00.000Z",
+          },
+          { status: 201 },
+        ),
+      );
+    await expect(
+      withdrawJobDispute({
+        fetch: fetcher,
+        jobId,
+        disputeId,
+        commandId,
+        reason: "Prípad už nechcem ďalej viesť.",
+      }),
+    ).resolves.toMatchObject({ status: "OK", outcome: "APPLIED" });
+    const settlementSummary =
+      "Obe strany zaznamenávajú opravu do piatich pracovných dní.";
+    await expect(
+      confirmJobDisputeSettlement({
+        fetch: fetcher,
+        jobId,
+        disputeId,
+        commandId,
+        summary: settlementSummary,
+      }),
+    ).resolves.toMatchObject({ status: "OK", outcome: "APPLIED" });
+    const withdrawalCall = fetcher.mock.calls[1];
+    const settlementCall = fetcher.mock.calls[3];
+    expect(withdrawalCall && path(withdrawalCall[0])).toBe(
+      `/v1/me/jobs/${jobId}/disputes/${disputeId}/withdrawal`,
+    );
+    expect(settlementCall && path(settlementCall[0])).toBe(
+      `/v1/me/jobs/${jobId}/disputes/${disputeId}/settlement-confirmations`,
+    );
+    expect(
+      typeof withdrawalCall?.[1]?.body === "string"
+        ? JSON.parse(withdrawalCall[1].body)
+        : null,
+    ).toEqual({ commandId, reason: "Prípad už nechcem ďalej viesť." });
+    expect(
+      typeof settlementCall?.[1]?.body === "string"
+        ? JSON.parse(settlementCall[1].body)
+        : null,
+    ).toEqual({ commandId, summary: settlementSummary });
   });
 
   it("uploads only supported private binaries and validates processing status", async () => {

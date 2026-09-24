@@ -22,6 +22,9 @@ export const ADMIN_DISPUTE_PATHS = Object.freeze({
   outcomes: "/v1/admin/disputes/:disputeId/outcomes",
   close: "/v1/admin/disputes/:disputeId/close",
   reopen: "/v1/admin/disputes/:disputeId/reopen",
+  setInvestigationHold: "/v1/admin/disputes/:disputeId/investigation-hold",
+  clearInvestigationHold:
+    "/v1/admin/disputes/:disputeId/investigation-hold/clear",
 });
 
 type Repository = ReturnType<typeof createAdminDisputeRepository>;
@@ -37,6 +40,8 @@ export interface AdminDisputeRouteDependencies {
     | "recordOutcome"
     | "close"
     | "reopen"
+    | "setInvestigationHold"
+    | "clearInvestigationHold"
   >;
   readonly guard: {
     evaluate(request: FastifyRequest): Promise<SessionGuardResult>;
@@ -163,6 +168,23 @@ export function registerAdminDisputeRoutes(
     async (request, reply) =>
       handleSimpleCommand(request, reply, dependencies, "reopen"),
   );
+  app.post<{ Params: { disputeId: string } }>(
+    ADMIN_DISPUTE_PATHS.setInvestigationHold,
+    writeOptions,
+    async (request, reply) =>
+      handleSimpleCommand(request, reply, dependencies, "setInvestigationHold"),
+  );
+  app.post<{ Params: { disputeId: string } }>(
+    ADMIN_DISPUTE_PATHS.clearInvestigationHold,
+    writeOptions,
+    async (request, reply) =>
+      handleSimpleCommand(
+        request,
+        reply,
+        dependencies,
+        "clearInvestigationHold",
+      ),
+  );
 
   app.post<{ Params: { disputeId: string } }>(
     ADMIN_DISPUTE_PATHS.requestInformation,
@@ -188,9 +210,7 @@ export function registerAdminDisputeRoutes(
       )
         return reply.code(400).send({ code: "INVALID_REQUEST" });
       const replyDeadline =
-        body.replyDeadline === null
-          ? null
-          : new Date(body.replyDeadline as string);
+        body.replyDeadline === null ? null : new Date(body.replyDeadline);
       return commandReply(reply, () =>
         dependencies.disputes.requestInformation({
           actor,
@@ -298,7 +318,12 @@ async function handleSimpleCommand(
   request: FastifyRequest<{ Params: { disputeId: string } }>,
   reply: FastifyReply,
   dependencies: AdminDisputeRouteDependencies,
-  operation: "startReview" | "close" | "reopen",
+  operation:
+    | "startReview"
+    | "close"
+    | "reopen"
+    | "setInvestigationHold"
+    | "clearInvestigationHold",
 ): Promise<unknown> {
   const actor = await authorize(request, reply, dependencies);
   if (!actor) return;

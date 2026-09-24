@@ -27,6 +27,9 @@ export const JOB_DISPUTE_PATHS = Object.freeze({
   detail: "/v1/me/jobs/:jobId/disputes/:disputeId",
   statements: "/v1/me/jobs/:jobId/disputes/:disputeId/statements",
   evidence: "/v1/me/jobs/:jobId/disputes/:disputeId/evidence",
+  withdrawal: "/v1/me/jobs/:jobId/disputes/:disputeId/withdrawal",
+  settlementConfirmations:
+    "/v1/me/jobs/:jobId/disputes/:disputeId/settlement-confirmations",
   evidenceUpload:
     "/v1/me/jobs/:jobId/disputes/:disputeId/evidence/uploads/:mediaKind",
   evidenceUploadStatus:
@@ -47,6 +50,8 @@ export interface JobDisputeRouteDependencies {
     | "getEvidenceUploadStatus"
     | "listCases"
     | "openCase"
+    | "withdraw"
+    | "confirmSettlement"
   >;
   readonly evidenceUploads?: DisputeEvidenceUploadService;
   readonly guard: {
@@ -80,6 +85,14 @@ interface EvidenceBody {
   readonly source: "NEW_UPLOAD" | "EXISTING_JOB_EVIDENCE";
   readonly mediaAssetId: string;
   readonly description: string;
+}
+interface WithdrawalBody {
+  readonly commandId: string;
+  readonly reason: string | null;
+}
+interface SettlementBody {
+  readonly commandId: string;
+  readonly summary: string;
 }
 
 export function registerJobDisputeRoutes(
@@ -191,6 +204,64 @@ export function registerJobDisputeRoutes(
         return sendCommand(
           reply,
           await dependencies.disputes.addStatement({
+            actorUserId,
+            jobId: request.params.jobId,
+            disputeId: request.params.disputeId,
+            ...request.body,
+          }),
+        );
+      } catch (error) {
+        return sendError(reply, error);
+      }
+    },
+  );
+
+  app.post<{
+    Params: { jobId: string; disputeId: string };
+    Body: WithdrawalBody;
+  }>(
+    JOB_DISPUTE_PATHS.withdrawal,
+    {
+      ...write,
+      preValidation: exactWithdrawalBody,
+      schema: { params: caseParams, body: withdrawalBodySchema },
+    },
+    async (request, reply) => {
+      const actorUserId = await activeActor(request, reply, dependencies);
+      if (actorUserId === null) return;
+      try {
+        return sendCommand(
+          reply,
+          await dependencies.disputes.withdraw({
+            actorUserId,
+            jobId: request.params.jobId,
+            disputeId: request.params.disputeId,
+            ...request.body,
+          }),
+        );
+      } catch (error) {
+        return sendError(reply, error);
+      }
+    },
+  );
+
+  app.post<{
+    Params: { jobId: string; disputeId: string };
+    Body: SettlementBody;
+  }>(
+    JOB_DISPUTE_PATHS.settlementConfirmations,
+    {
+      ...write,
+      preValidation: exactSettlementBody,
+      schema: { params: caseParams, body: settlementBodySchema },
+    },
+    async (request, reply) => {
+      const actorUserId = await activeActor(request, reply, dependencies);
+      if (actorUserId === null) return;
+      try {
+        return sendCommand(
+          reply,
+          await dependencies.disputes.confirmSettlement({
             actorUserId,
             jobId: request.params.jobId,
             disputeId: request.params.disputeId,
@@ -349,6 +420,12 @@ function serializeDetail(item: DisputeCaseDetail) {
             ...item.outcome,
             recordedAt: item.outcome.recordedAt.toISOString(),
           },
+    settlementConfirmations: item.settlementConfirmations.map(
+      (confirmation) => ({
+        ...confirmation,
+        confirmedAt: confirmation.confirmedAt.toISOString(),
+      }),
+    ),
     caseTimeline: item.caseTimeline.map((event) => ({
       ...event,
       occurredAt: event.occurredAt.toISOString(),
@@ -437,6 +514,28 @@ function exactEvidenceBody(
   done: () => void,
 ) {
   if (!validExactBody(request.body, evidenceKeys)) {
+    void reply.code(400).send({ code: "INVALID_REQUEST" });
+    return;
+  }
+  done();
+}
+function exactWithdrawalBody(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  done: () => void,
+) {
+  if (!validExactBody(request.body, withdrawalKeys)) {
+    void reply.code(400).send({ code: "INVALID_REQUEST" });
+    return;
+  }
+  done();
+}
+function exactSettlementBody(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  done: () => void,
+) {
+  if (!validExactBody(request.body, settlementKeys)) {
     void reply.code(400).send({ code: "INVALID_REQUEST" });
     return;
   }
@@ -535,6 +634,8 @@ const evidenceKeys = [
   "mediaAssetId",
   "source",
 ] as const;
+const withdrawalKeys = ["commandId", "reason"] as const;
+const settlementKeys = ["commandId", "summary"] as const;
 const openBodySchema = {
   type: "object",
   additionalProperties: false,
@@ -565,5 +666,28 @@ const evidenceBodySchema = {
     source: { enum: ["NEW_UPLOAD", "EXISTING_JOB_EVIDENCE"] },
     mediaAssetId: uuid,
     description: { type: "string", minLength: 1, maxLength: 1000 },
+  },
+} as const;
+const withdrawalBodySchema = {
+  type: "object",
+  additionalProperties: false,
+  required: withdrawalKeys,
+  properties: {
+    commandId: uuid,
+    reason: {
+      anyOf: [
+        { type: "null" },
+        { type: "string", minLength: 1, maxLength: 1000 },
+      ],
+    },
+  },
+} as const;
+const settlementBodySchema = {
+  type: "object",
+  additionalProperties: false,
+  required: settlementKeys,
+  properties: {
+    commandId: uuid,
+    summary: { type: "string", minLength: 8, maxLength: 2000 },
   },
 } as const;

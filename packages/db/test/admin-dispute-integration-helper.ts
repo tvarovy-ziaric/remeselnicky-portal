@@ -25,11 +25,13 @@ export async function runAdminDisputeIntegrationAssertions(
       jobId: string;
       customerUserId: string;
       providerUserId: string;
+      openedByRole: "CUSTOMER" | "PRIMARY_PROVIDER";
     }>
   >`
     SELECT dispute.id AS "disputeId", dispute.job_id AS "jobId",
       customer.owner_user_id AS "customerUserId",
-      provider.owner_user_id AS "providerUserId"
+      provider.owner_user_id AS "providerUserId",
+      dispute.opened_by_role::text AS "openedByRole"
     FROM current_dispute_cases dispute
     JOIN jobs job ON job.id = dispute.job_id
     JOIN customer_profiles customer ON customer.id = job.customer_profile_id
@@ -124,22 +126,18 @@ export async function runAdminDisputeIntegrationAssertions(
     accessId: randomUUID(),
     reason: "Preverenie súkromnej komunikácie k otvorenému prípadu.",
   });
-  expect(adminDetail).toMatchObject({
-    state: "UNDER_REVIEW",
-    informationRequests: [expect.objectContaining({ id: requestId })],
-    internalNotes: [expect.objectContaining({ id: noteId })],
-    outcomes: [expect.objectContaining({ id: outcomeId })],
-  });
+  expect(adminDetail?.state).toBe("UNDER_REVIEW");
+  expect(adminDetail?.informationRequests[0]?.id).toBe(requestId);
+  expect(adminDetail?.internalNotes[0]?.id).toBe(noteId);
+  expect(adminDetail?.outcomes[0]?.id).toBe(outcomeId);
   expect(adminDetail?.conversation.length).toBeGreaterThan(0);
   const partyDetail = await createJobDisputeRepository(sql).getCase({
     actorUserId: fixture.providerUserId,
     jobId: fixture.jobId,
     disputeId: fixture.disputeId,
   });
-  expect(partyDetail).toMatchObject({
-    adminRequests: [expect.objectContaining({ id: requestId })],
-    outcome: expect.objectContaining({ id: outcomeId }),
-  });
+  expect(partyDetail?.adminRequests[0]?.id).toBe(requestId);
+  expect(partyDetail?.outcome?.id).toBe(outcomeId);
   expect(JSON.stringify(partyDetail)).not.toContain(
     "Súkromná poznámka pre oprávnený administratívny tím.",
   );
@@ -160,6 +158,152 @@ export async function runAdminDisputeIntegrationAssertions(
         )`;
     }),
   ).rejects.toThrow(/audit event required/iu);
+
+  const partyRepository = createJobDisputeRepository(sql);
+  const openerUserId =
+    fixture.openedByRole === "CUSTOMER"
+      ? fixture.customerUserId
+      : fixture.providerUserId;
+  const otherPartyUserId =
+    fixture.openedByRole === "CUSTOMER"
+      ? fixture.providerUserId
+      : fixture.customerUserId;
+  const holdId = randomUUID();
+  await expect(
+    repository.setInvestigationHold({
+      ...base,
+      commandId: holdId,
+      expectedState: "UNDER_REVIEW",
+      reason: "Závažný bezpečnostný signál vyžaduje pokračovanie preverenia.",
+    }),
+  ).resolves.toMatchObject({ status: "APPLIED", state: "UNDER_REVIEW" });
+  await expect(
+    partyRepository.withdraw({
+      actorUserId: openerUserId,
+      commandId: randomUUID(),
+      jobId: fixture.jobId,
+      disputeId: fixture.disputeId,
+      reason: "Strany pokračujú v riešení mimo prípadu.",
+    }),
+  ).resolves.toEqual({ status: "WITHDRAWAL_BLOCKED" });
+  await expect(
+    partyRepository.withdraw({
+      actorUserId: otherPartyUserId,
+      commandId: randomUUID(),
+      jobId: fixture.jobId,
+      disputeId: fixture.disputeId,
+      reason: null,
+    }),
+  ).resolves.toEqual({ status: "WITHDRAWAL_BLOCKED" });
+  const heldDetail = await partyRepository.getCase({
+    actorUserId: openerUserId,
+    jobId: fixture.jobId,
+    disputeId: fixture.disputeId,
+  });
+  expect(heldDetail?.canWithdraw).toBe(false);
+
+  const clearHoldId = randomUUID();
+  await expect(
+    repository.clearInvestigationHold({
+      ...base,
+      commandId: clearHoldId,
+      expectedState: "UNDER_REVIEW",
+      reason: "Závažný signál bol preverovaný a hold už nie je potrebný.",
+    }),
+  ).resolves.toMatchObject({ status: "APPLIED", state: "UNDER_REVIEW" });
+  const withdrawalId = randomUUID();
+  await expect(
+    partyRepository.withdraw({
+      actorUserId: openerUserId,
+      commandId: withdrawalId,
+      jobId: fixture.jobId,
+      disputeId: fixture.disputeId,
+      reason: "Otvárajúca strana už nežiada pokračovanie prípadu.",
+    }),
+  ).resolves.toMatchObject({ status: "APPLIED" });
+  await expect(
+    sql<{ state: string }[]>`
+      SELECT state::text FROM current_dispute_cases
+      WHERE id = ${fixture.disputeId}`,
+  ).resolves.toEqual([{ state: "CLOSED" }]);
+
+  const settlementDisputeId = randomUUID();
+  await expect(
+    partyRepository.openCase({
+      actorUserId: fixture.customerUserId,
+      commandId: settlementDisputeId,
+      jobId: fixture.jobId,
+      category: "OTHER",
+      description: "Strany potrebujú zaznamenať vlastnú dohodu o vyriešení.",
+      desiredResolution: "Zaznamenať presný spoločný výsledok.",
+    }),
+  ).resolves.toMatchObject({ status: "APPLIED" });
+  const firstSummary = "Poskytovateľ vykoná kontrolu do piatich dní.";
+  const exactSummary =
+    "Poskytovateľ vykoná kontrolu a opravu do piatich pracovných dní.";
+  await expect(
+    partyRepository.confirmSettlement({
+      actorUserId: fixture.customerUserId,
+      commandId: randomUUID(),
+      jobId: fixture.jobId,
+      disputeId: settlementDisputeId,
+      summary: firstSummary,
+    }),
+  ).resolves.toMatchObject({ status: "APPLIED" });
+  await expect(
+    partyRepository.confirmSettlement({
+      actorUserId: fixture.providerUserId,
+      commandId: randomUUID(),
+      jobId: fixture.jobId,
+      disputeId: settlementDisputeId,
+      summary: exactSummary,
+    }),
+  ).resolves.toMatchObject({ status: "APPLIED" });
+  await expect(
+    sql<{ state: string }[]>`
+      SELECT state::text FROM current_dispute_cases
+      WHERE id = ${settlementDisputeId}`,
+  ).resolves.toEqual([{ state: "OPEN" }]);
+  const matchingConfirmationId = randomUUID();
+  await expect(
+    partyRepository.confirmSettlement({
+      actorUserId: fixture.customerUserId,
+      commandId: matchingConfirmationId,
+      jobId: fixture.jobId,
+      disputeId: settlementDisputeId,
+      summary: exactSummary,
+    }),
+  ).resolves.toMatchObject({ status: "APPLIED" });
+  const settlementDetail = await partyRepository.getCase({
+    actorUserId: fixture.providerUserId,
+    jobId: fixture.jobId,
+    disputeId: settlementDisputeId,
+  });
+  expect(settlementDetail?.state).toBe("RESOLVED");
+  expect(settlementDetail?.outcome).toMatchObject({
+    id: matchingConfirmationId,
+    category: "RESOLVED_BY_PARTIES",
+    basis: "MUTUAL_PARTY_AGREEMENT",
+    summary: exactSummary,
+  });
+  expect(settlementDetail?.settlementConfirmations).toHaveLength(2);
+  expect(JSON.stringify(settlementDetail)).not.toContain(firstSummary);
+  const [partyNotification] = await sql<
+    Array<{ payload: Record<string, unknown> }>
+  >`
+    SELECT payload FROM outbox_events
+    WHERE event_name = 'job.dispute.party_action'
+      AND aggregate_id = ${settlementDisputeId}::text
+    ORDER BY occurred_at DESC LIMIT 1`;
+  expect(partyNotification?.payload).toEqual({
+    action: "CONFIRM_SETTLEMENT",
+    dispute_id: settlementDisputeId,
+    job_id: fixture.jobId,
+    recipient_user_id: fixture.providerUserId,
+  });
+  expect(JSON.stringify(partyNotification)).not.toMatch(
+    /summary|reason|description/iu,
+  );
 
   const [job] = await sql<Array<{ jobId: string; state: string }>>`
     SELECT job.id AS "jobId", state.state::text
@@ -200,8 +344,8 @@ export async function runAdminDisputeIntegrationAssertions(
   const [auditCount] = await sql<Array<{ count: number }>>`
     SELECT count(*)::integer AS count FROM audit_events
     WHERE correlation_id IN (${reviewId}, ${requestId}, ${noteId}, ${outcomeId},
-      ${closeId}, ${reopenId}, ${cancellationId})`;
-  expect(auditCount?.count).toBe(7);
+      ${closeId}, ${reopenId}, ${holdId}, ${clearHoldId}, ${cancellationId})`;
+  expect(auditCount?.count).toBe(9);
 }
 
 function digest(value: string): string {

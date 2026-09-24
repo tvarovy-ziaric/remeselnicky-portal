@@ -50,6 +50,7 @@ export interface DisputeCaseSummary {
   readonly createdAt: Date;
   readonly stateChangedAt: Date;
   readonly canAddContent: boolean;
+  readonly canWithdraw: boolean;
 }
 
 export interface DisputeStatement {
@@ -90,6 +91,12 @@ export interface DisputeCaseDetail extends DisputeCaseSummary {
     summary: string;
     recordedAt: Date;
   }> | null;
+  readonly settlementConfirmations: readonly Readonly<{
+    id: string;
+    confirmedByRole: DisputePartyRole;
+    summary: string;
+    confirmedAt: Date;
+  }>[];
   readonly caseTimeline: readonly Readonly<{
     eventId: string;
     action: string;
@@ -129,7 +136,11 @@ export type DisputeCommandResult =
       occurredAt: Date;
     }>
   | Readonly<{
-      status: "NOT_FOUND" | "CASE_CLOSED" | "DUPLICATE_EVIDENCE";
+      status:
+        | "NOT_FOUND"
+        | "CASE_CLOSED"
+        | "DUPLICATE_EVIDENCE"
+        | "WITHDRAWAL_BLOCKED";
     }>;
 
 export class DisputeIdempotencyError extends Error {
@@ -141,7 +152,8 @@ interface Party {
 }
 interface ExistingCommand {
   readonly id: string;
-  readonly kind: "CASE" | "STATEMENT" | "EVIDENCE";
+  readonly kind:
+    "CASE" | "STATEMENT" | "EVIDENCE" | "WITHDRAW" | "CONFIRM_SETTLEMENT";
   readonly actorUserId: string;
   readonly disputeId: string;
   readonly jobId: string;
@@ -159,6 +171,7 @@ interface SummaryRow {
   readonly stateRevision: number;
   readonly createdAt: Date;
   readonly stateChangedAt: Date;
+  readonly investigationHeld: boolean;
 }
 
 export function createJobDisputeRepository(sql: RootSql) {
@@ -331,6 +344,127 @@ export function createJobDisputeRepository(sql: RootSql) {
     });
   }
 
+  async function withdraw(input: {
+    actorUserId: string;
+    commandId: string;
+    jobId: string;
+    disputeId: string;
+    reason: string | null;
+  }): Promise<DisputeCommandResult> {
+    ids(input.actorUserId, input.commandId, input.jobId, input.disputeId);
+    const reason =
+      input.reason === null ? null : bounded(input.reason, 1, 1000);
+    const intent = fingerprint({
+      kind: "WITHDRAW",
+      actorUserId: input.actorUserId,
+      jobId: input.jobId,
+      disputeId: input.disputeId,
+      reason,
+    });
+    return transaction(sql, async (tx) => {
+      await lockCommand(tx, input.commandId);
+      const prior = await existingCommand(tx, input.commandId);
+      if (prior !== null)
+        return replay(
+          prior,
+          "WITHDRAW",
+          intent,
+          input.actorUserId,
+          input.jobId,
+          input.disputeId,
+        );
+      const party = await authorizeCase(
+        tx,
+        input.actorUserId,
+        input.jobId,
+        input.disputeId,
+        true,
+      );
+      if (party === null) return { status: "NOT_FOUND" };
+      if (!party.acceptsContent) return { status: "CASE_CLOSED" };
+      const [eligibility] = await tx<
+        Array<{ allowed: boolean; state: string }>
+      >`
+        SELECT identity.opened_by_user_id = ${input.actorUserId}::uuid
+            AND NOT coalesce(hold.is_active, false) AS allowed,
+          current.state::text AS state
+        FROM dispute_cases identity
+        JOIN current_dispute_cases current ON current.id = identity.id
+        LEFT JOIN current_dispute_case_investigation_holds hold
+          ON hold.dispute_id = identity.id
+        WHERE identity.id = ${input.disputeId}`;
+      if (!eligibility?.allowed) return { status: "WITHDRAWAL_BLOCKED" };
+      const [row] = await tx<Array<{ recordedAt: Date }>>`
+        INSERT INTO dispute_case_party_commands (
+          command_id, dispute_id, action, actor_user_id, actor_role,
+          expected_state, settlement_summary, withdrawal_reason,
+          command_intent_sha256
+        ) VALUES (
+          ${input.commandId}, ${input.disputeId}, 'WITHDRAW',
+          ${input.actorUserId}, ${party.role}, ${eligibility.state},
+          NULL, ${reason}, ${intent}
+        ) RETURNING recorded_at AS "recordedAt"`;
+      if (!row) throw new Error("Dispute withdrawal insert missing.");
+      return applied(input.commandId, input.disputeId, row.recordedAt);
+    });
+  }
+
+  async function confirmSettlement(input: {
+    actorUserId: string;
+    commandId: string;
+    jobId: string;
+    disputeId: string;
+    summary: string;
+  }): Promise<DisputeCommandResult> {
+    ids(input.actorUserId, input.commandId, input.jobId, input.disputeId);
+    const summary = bounded(input.summary, 8, 2000);
+    const intent = fingerprint({
+      kind: "CONFIRM_SETTLEMENT",
+      actorUserId: input.actorUserId,
+      jobId: input.jobId,
+      disputeId: input.disputeId,
+      summary,
+    });
+    return transaction(sql, async (tx) => {
+      await lockCommand(tx, input.commandId);
+      const prior = await existingCommand(tx, input.commandId);
+      if (prior !== null)
+        return replay(
+          prior,
+          "CONFIRM_SETTLEMENT",
+          intent,
+          input.actorUserId,
+          input.jobId,
+          input.disputeId,
+        );
+      const party = await authorizeCase(
+        tx,
+        input.actorUserId,
+        input.jobId,
+        input.disputeId,
+        true,
+      );
+      if (party === null) return { status: "NOT_FOUND" };
+      if (!party.acceptsContent) return { status: "CASE_CLOSED" };
+      const [state] = await tx<Array<{ state: string }>>`
+        SELECT state::text AS state FROM current_dispute_cases
+        WHERE id = ${input.disputeId}`;
+      if (!state) return { status: "NOT_FOUND" };
+      const [row] = await tx<Array<{ recordedAt: Date }>>`
+        INSERT INTO dispute_case_party_commands (
+          command_id, dispute_id, action, actor_user_id, actor_role,
+          expected_state, settlement_summary, withdrawal_reason,
+          command_intent_sha256
+        ) VALUES (
+          ${input.commandId}, ${input.disputeId}, 'CONFIRM_SETTLEMENT',
+          ${input.actorUserId}, ${party.role}, ${state.state}, ${summary},
+          NULL, ${intent}
+        ) RETURNING recorded_at AS "recordedAt"`;
+      if (!row) throw new Error("Settlement confirmation insert missing.");
+      return applied(input.commandId, input.disputeId, row.recordedAt);
+    });
+  }
+
   async function listCases(input: {
     actorUserId: string;
     jobId: string;
@@ -351,8 +485,11 @@ export function createJobDisputeRepository(sql: RootSql) {
           dispute.desired_resolution AS "desiredResolution",
           dispute.state::text, dispute.state_revision AS "stateRevision",
           dispute.created_at AS "createdAt",
-          dispute.state_changed_at AS "stateChangedAt"
+          dispute.state_changed_at AS "stateChangedAt",
+          coalesce(hold.is_active, false) AS "investigationHeld"
         FROM current_dispute_cases dispute
+        LEFT JOIN current_dispute_case_investigation_holds hold
+          ON hold.dispute_id = dispute.id
         WHERE dispute.job_id = ${input.jobId}
         ORDER BY dispute.created_at DESC, dispute.id DESC`;
       return Object.freeze(rows.map((row) => mapSummary(row, party.role)));
@@ -381,8 +518,11 @@ export function createJobDisputeRepository(sql: RootSql) {
           dispute.desired_resolution AS "desiredResolution",
           dispute.state::text, dispute.state_revision AS "stateRevision",
           dispute.created_at AS "createdAt",
-          dispute.state_changed_at AS "stateChangedAt"
+          dispute.state_changed_at AS "stateChangedAt",
+          coalesce(hold.is_active, false) AS "investigationHeld"
         FROM current_dispute_cases dispute
+        LEFT JOIN current_dispute_case_investigation_holds hold
+          ON hold.dispute_id = dispute.id
         WHERE dispute.id = ${input.disputeId}
           AND dispute.job_id = ${input.jobId}`;
       if (!row) return null;
@@ -473,6 +613,19 @@ export function createJobDisputeRepository(sql: RootSql) {
         FROM dispute_case_state_events
         WHERE dispute_id = ${input.disputeId}
         ORDER BY event_sequence`;
+      const settlementConfirmations = await tx<
+        Array<{
+          id: string;
+          confirmedByRole: DisputePartyRole;
+          summary: string;
+          confirmedAt: Date;
+        }>
+      >`
+        SELECT id, confirmed_by_role::text AS "confirmedByRole",
+          summary, confirmed_at AS "confirmedAt"
+        FROM current_dispute_settlement_confirmations
+        WHERE dispute_id = ${input.disputeId}
+        ORDER BY confirmed_at, id`;
       const [baseline] = await tx<
         Array<{
           requestRevision: number;
@@ -527,6 +680,7 @@ export function createJobDisputeRepository(sql: RootSql) {
         ORDER BY occurred_at, event_order, event_id`;
       validateDetailRows(statements, evidence, baseline, changes, timeline);
       validateAdminContextRows(adminRequests, outcome ?? null, caseTimeline);
+      validateSettlementConfirmations(settlementConfirmations);
       return Object.freeze({
         ...mapSummary(row, party.role),
         statements: Object.freeze(
@@ -558,6 +712,11 @@ export function createJobDisputeRepository(sql: RootSql) {
           adminRequests.map((request) => Object.freeze(request)),
         ),
         outcome: outcome === undefined ? null : Object.freeze(outcome),
+        settlementConfirmations: Object.freeze(
+          settlementConfirmations.map((confirmation) =>
+            Object.freeze(confirmation),
+          ),
+        ),
         caseTimeline: Object.freeze(
           caseTimeline.map((event) => Object.freeze(event)),
         ),
@@ -683,6 +842,8 @@ export function createJobDisputeRepository(sql: RootSql) {
     openCase,
     addStatement,
     addEvidence,
+    withdraw,
+    confirmSettlement,
     listCases,
     getCase,
     prepareEvidenceUpload,
@@ -798,7 +959,16 @@ async function existingCommand(
       evidence.created_at AS "occurredAt"
     FROM dispute_case_evidence evidence
     JOIN dispute_cases dispute ON dispute.id = evidence.dispute_id
-    WHERE evidence.id = ${commandId}`;
+    WHERE evidence.id = ${commandId}
+    UNION ALL
+    SELECT party.command_id, party.action::text AS kind,
+      party.actor_user_id AS "actorUserId",
+      party.dispute_id AS "disputeId", dispute.job_id AS "jobId",
+      party.command_intent_sha256 AS intent,
+      party.recorded_at AS "occurredAt"
+    FROM dispute_case_party_commands party
+    JOIN dispute_cases dispute ON dispute.id = party.dispute_id
+    WHERE party.command_id = ${commandId}`;
   if (rows.length > 1) throw conflict("Dispute command ID collision.");
   return rows[0] ?? null;
 }
@@ -856,7 +1026,8 @@ function mapSummary(
     !Number.isSafeInteger(row.stateRevision) ||
     row.stateRevision < 1 ||
     !(row.createdAt instanceof Date) ||
-    !(row.stateChangedAt instanceof Date)
+    !(row.stateChangedAt instanceof Date) ||
+    typeof row.investigationHeld !== "boolean"
   )
     throw new Error("Invalid dispute case projection.");
   return Object.freeze({
@@ -868,7 +1039,38 @@ function mapSummary(
     canAddContent: ["OPEN", "WAITING_FOR_PARTY", "UNDER_REVIEW"].includes(
       row.state,
     ),
+    canWithdraw:
+      ["OPEN", "WAITING_FOR_PARTY", "UNDER_REVIEW"].includes(row.state) &&
+      row.openedByRole === viewerRole &&
+      !row.investigationHeld,
   });
+}
+
+function validateSettlementConfirmations(
+  confirmations: readonly {
+    id: string;
+    confirmedByRole: DisputePartyRole;
+    summary: string;
+    confirmedAt: Date;
+  }[],
+): void {
+  if (
+    confirmations.length > 2 ||
+    confirmations.some(
+      (confirmation) =>
+        !uuid.test(confirmation.id) ||
+        !["CUSTOMER", "PRIMARY_PROVIDER"].includes(
+          confirmation.confirmedByRole,
+        ) ||
+        confirmation.summary.length < 8 ||
+        confirmation.summary.length > 2000 ||
+        control.test(confirmation.summary) ||
+        !(confirmation.confirmedAt instanceof Date),
+    ) ||
+    new Set(confirmations.map(({ confirmedByRole }) => confirmedByRole))
+      .size !== confirmations.length
+  )
+    throw new Error("Invalid dispute settlement confirmation projection.");
 }
 
 function validateDetailRows(
@@ -1025,6 +1227,8 @@ function validateAdminContextRows(
           "RECORD_OUTCOME",
           "CLOSE",
           "REOPEN",
+          "WITHDRAW",
+          "CONFIRM_SETTLEMENT",
         ].includes(event.action) ||
         (event.fromState !== null && !states.includes(event.fromState)) ||
         !states.includes(event.toState) ||

@@ -107,6 +107,33 @@ describe("D22 Job dispute notification catalog", () => {
     ).toThrow(/action/iu);
   });
 
+  it("maps a party action without settlement or withdrawal content", () => {
+    const draft = mapJobDisputeNotificationEvent({
+      ...event({ action: "CONFIRM_SETTLEMENT" }),
+      name: "job.dispute.party_action",
+    })?.[0];
+    expect(draft).toMatchObject({
+      channels: ["IN_APP"],
+      context: { path: `/zakazky/${jobId}` },
+      payload: {
+        action: "READ_DISPUTE_PARTY_ACTION",
+        case_action: "CONFIRM_SETTLEMENT",
+        dispute_id: disputeId,
+        job_id: jobId,
+      },
+      priority: "IMPORTANT",
+    });
+    expect(JSON.stringify(draft)).not.toMatch(
+      /settlement_summary|withdrawal_reason|description|evidence/iu,
+    );
+    expect(() =>
+      mapJobDisputeNotificationEvent({
+        ...event({ action: "REWRITE_AGREEMENT" }),
+        name: "job.dispute.party_action",
+      }),
+    ).toThrow(/party action/iu);
+  });
+
   it("ignores events outside its bounded catalog", () => {
     expect(
       mapJobDisputeNotificationEvent({

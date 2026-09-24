@@ -20,10 +20,13 @@ complete and testable before that gate is opened.
 
 Implement only named commands: start review, request information, add a private
 internal note, record an operational outcome, close and reopen a dispute, plus
-separate force-complete and force-cancel Job commands. There is no generic
-`set status` operation. Each command carries an idempotency identity, exact
-expected state, recent MFA-backed privileged session, safe internal reason and
-a matching immutable audit event in the same transaction.
+set or clear a private serious-investigation hold, and separate force-complete
+and force-cancel Job commands. There is no generic `set status` operation. Each
+command carries an idempotency identity, exact expected state, recent MFA-backed
+privileged session, safe internal reason and a matching immutable audit event in
+the same transaction. The hold does not create a Job state or public signal; it
+only preserves the D22 investigation boundary by disabling opener withdrawal
+until an authorized administrator clears it.
 
 User-facing request and outcome text is stored separately from the audit
 reason and private internal note. Outcome categories avoid fault or liability

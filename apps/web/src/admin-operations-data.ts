@@ -17,6 +17,7 @@ export interface AdminDisputeQueueItem {
   readonly createdAt: string;
   readonly stateChangedAt: string;
   readonly informationRequestCount: number;
+  readonly investigationHeld: boolean;
 }
 
 export interface AdminDisputeDetail extends AdminDisputeQueueItem {
@@ -56,6 +57,12 @@ export interface AdminDisputeDetail extends AdminDisputeQueueItem {
     basis: "MUTUAL_PARTY_AGREEMENT" | "ADMINISTRATIVE_CLOSURE";
     summary: string;
     recordedAt: string;
+  }>[];
+  readonly settlementConfirmations: readonly Readonly<{
+    id: string;
+    confirmedByRole: "CUSTOMER" | "PRIMARY_PROVIDER";
+    summary: string;
+    confirmedAt: string;
   }>[];
   readonly conversation: readonly Readonly<{
     id: string;
@@ -111,6 +118,7 @@ const queueKeys = [
   "createdAt",
   "stateChangedAt",
   "informationRequestCount",
+  "investigationHeld",
 ] as const;
 
 export function createAdminCommandId(): string {
@@ -146,6 +154,7 @@ export function parseAdminDisputeDetail(
       "createdAt",
       "stateChangedAt",
       "informationRequestCount",
+      "investigationHeld",
       "description",
       "desiredResolution",
       "jobState",
@@ -155,6 +164,7 @@ export function parseAdminDisputeDetail(
       "informationRequests",
       "internalNotes",
       "outcomes",
+      "settlementConfirmations",
       "conversation",
       "attachments",
     ]) ||
@@ -178,6 +188,11 @@ export function parseAdminDisputeDetail(
     2_000,
   );
   const outcomes = parseArray(detail.outcomes, parseOutcome, 1_000);
+  const settlementConfirmations = parseArray(
+    detail.settlementConfirmations,
+    parseSettlementConfirmation,
+    2,
+  );
   const conversation = parseArray(
     detail.conversation,
     parseConversationEntry,
@@ -190,6 +205,7 @@ export function parseAdminDisputeDetail(
     informationRequests === null ||
     internalNotes === null ||
     outcomes === null ||
+    settlementConfirmations === null ||
     conversation === null ||
     attachments === null ||
     informationRequests.length !== detail.informationRequestCount
@@ -206,6 +222,7 @@ export function parseAdminDisputeDetail(
     informationRequests,
     internalNotes,
     outcomes,
+    settlementConfirmations,
     conversation,
     attachments,
   }) as unknown as AdminDisputeDetail;
@@ -249,7 +266,14 @@ export async function accessAdminDispute(
 }
 
 export type AdminDisputeCommand =
-  | Readonly<{ action: "START_REVIEW" | "CLOSE" | "REOPEN" }>
+  | Readonly<{
+      action:
+        | "START_REVIEW"
+        | "CLOSE"
+        | "REOPEN"
+        | "SET_INVESTIGATION_HOLD"
+        | "CLEAR_INVESTIGATION_HOLD";
+    }>
   | Readonly<{
       action: "REQUEST_INFORMATION";
       recipient: "CUSTOMER" | "PRIMARY_PROVIDER" | "BOTH";
@@ -294,8 +318,12 @@ export async function sendAdminDisputeCommand(
     RECORD_OUTCOME: "outcomes",
     CLOSE: "close",
     REOPEN: "reopen",
+    SET_INVESTIGATION_HOLD: "investigation-hold",
+    CLEAR_INVESTIGATION_HOLD: "investigation-hold/clear",
   }[input.command.action];
-  const { action: _action, ...specific } = input.command;
+  const specific = Object.fromEntries(
+    Object.entries(input.command).filter(([key]) => key !== "action"),
+  );
   const result = await post(
     fetcher,
     `/v1/admin/disputes/${input.disputeId}/${path}`,
@@ -338,7 +366,9 @@ export async function sendAdminJobCorrection(
     return { status: "UNAVAILABLE" };
   if (input.kind === "CANCEL" && !bounded(input.userFacingReason, 8, 1_000))
     return { status: "UNAVAILABLE" };
-  const { kind: _kind, ...body } = input;
+  const body = Object.fromEntries(
+    Object.entries(input).filter(([key]) => key !== "kind"),
+  );
   const suffix = input.kind === "COMPLETE" ? "force-complete" : "force-cancel";
   const result = await post(
     fetcher,
@@ -502,7 +532,8 @@ function parseQueueItem(
       value.openedByRole !== "PRIMARY_PROVIDER") ||
     !instant(value.createdAt) ||
     !instant(value.stateChangedAt) ||
-    !integer(value.informationRequestCount, 0, 100_000)
+    !integer(value.informationRequestCount, 0, 100_000) ||
+    typeof value.investigationHeld !== "boolean"
   )
     return null;
   return value as unknown as AdminDisputeQueueItem;
@@ -569,6 +600,17 @@ function parseOutcome(value: unknown) {
     ) &&
     bounded(value.summary, 1, 4_000) &&
     instant(value.recordedAt)
+    ? value
+    : null;
+}
+function parseSettlementConfirmation(value: unknown) {
+  return row(value, ["id", "confirmedByRole", "summary", "confirmedAt"]) &&
+    id(value.id) &&
+    ["CUSTOMER", "PRIMARY_PROVIDER"].includes(
+      value.confirmedByRole as string,
+    ) &&
+    bounded(value.summary, 8, 2_000) &&
+    instant(value.confirmedAt)
     ? value
     : null;
 }

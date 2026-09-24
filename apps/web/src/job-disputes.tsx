@@ -7,6 +7,7 @@ import { loadJobDocumentPage, type JobDocumentItem } from "./job-documentation";
 import {
   addJobDisputeEvidence,
   addJobDisputeStatement,
+  confirmJobDisputeSettlement,
   createJobDisputeCommandId,
   jobDisputeCategories,
   loadJobDispute,
@@ -14,6 +15,7 @@ import {
   loadJobDisputeUploadStatus,
   openJobDispute,
   uploadJobDisputeEvidence,
+  withdrawJobDispute,
   type JobDisputeCategory,
   type JobDisputeCommandResult,
   type JobDisputeDetail,
@@ -53,6 +55,8 @@ const caseActionLabels: Readonly<Record<string, string>> = Object.freeze({
   RECORD_OUTCOME: "Zaznamenaný výsledok",
   CLOSE: "Prípad uzavretý",
   REOPEN: "Prípad znovu otvorený",
+  WITHDRAW: "Prípad stiahnutý otvárajúcou stranou",
+  CONFIRM_SETTLEMENT: "Dohodu potvrdili obe strany",
 });
 
 function retryId(ref: { current: Retry }, fingerprint: string) {
@@ -83,12 +87,16 @@ export function JobDisputes({ jobId }: { readonly jobId: string }) {
     null,
   );
   const [pending, setPending] = useState(false);
+  const [settlementSummary, setSettlementSummary] = useState("");
+  const [withdrawalReason, setWithdrawalReason] = useState("");
   const [notice, setNotice] = useState("");
   const [failed, setFailed] = useState(false);
   const openRetry = useRef<Retry>(null);
   const statementRetry = useRef<Retry>(null);
   const existingEvidenceRetry = useRef<Retry>(null);
   const uploadEvidenceRetry = useRef<Retry>(null);
+  const settlementRetry = useRef<Retry>(null);
+  const withdrawalRetry = useRef<Retry>(null);
 
   const refreshCases = async (preferredId?: string) => {
     const result = await loadJobDisputes({ fetch: globalThis.fetch, jobId });
@@ -331,6 +339,52 @@ export function JobDisputes({ jobId }: { readonly jobId: string }) {
     setPending(false);
   };
 
+  const confirmSettlement = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!detail || pending || settlementSummary.trim().length < 8) return;
+    setPending(true);
+    setNotice("");
+    const summary = settlementSummary.trim();
+    const result = await confirmJobDisputeSettlement({
+      fetch: globalThis.fetch,
+      jobId,
+      disputeId: detail.id,
+      commandId: retryId(settlementRetry, JSON.stringify([detail.id, summary])),
+      summary,
+    });
+    if (result.status === "OK") {
+      settlementRetry.current = null;
+      setNotice(
+        "Vaše presné zhrnutie bolo potvrdené. Prípad sa vyrieši až po rovnakom potvrdení druhej strany.",
+      );
+      await refreshCases(detail.id);
+      await refreshDetail(detail.id);
+    } else setNotice(commandNotice(result.status));
+    setPending(false);
+  };
+
+  const withdrawCase = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!detail || pending || !detail.canWithdraw) return;
+    setPending(true);
+    setNotice("");
+    const reason = withdrawalReason.trim() || null;
+    const result = await withdrawJobDispute({
+      fetch: globalThis.fetch,
+      jobId,
+      disputeId: detail.id,
+      commandId: retryId(withdrawalRetry, JSON.stringify([detail.id, reason])),
+      reason,
+    });
+    if (result.status === "OK") {
+      withdrawalRetry.current = null;
+      setNotice("Prípad bol stiahnutý a historický záznam zostal zachovaný.");
+      await refreshCases(detail.id);
+      await refreshDetail(detail.id);
+    } else setNotice(commandNotice(result.status));
+    setPending(false);
+  };
+
   return (
     <section aria-labelledby="job-disputes">
       <h2 id="job-disputes">Súkromné sporné prípady</h2>
@@ -417,28 +471,40 @@ export function JobDisputes({ jobId }: { readonly jobId: string }) {
         <p role="status">Načítava sa detail prípadu…</p>
       )}
       {detail && (
-        <JobDisputeDetailView
-          detail={detail}
-          documents={documents}
-          existingDescription={existingDescription}
-          existingMediaAssetId={existingMediaAssetId}
-          file={file}
-          onAddStatement={addStatement}
-          onBindExisting={bindExistingEvidence}
-          onCheckUpload={checkUpload}
-          onExistingDescription={setExistingDescription}
-          onExistingMediaAssetId={setExistingMediaAssetId}
-          onFile={setFile}
-          onStatement={setStatement}
-          onStatementKind={setStatementKind}
-          onUpload={uploadEvidence}
-          onUploadDescription={setUploadDescription}
-          pending={pending}
-          pendingUpload={pendingUpload}
-          statement={statement}
-          statementKind={statementKind}
-          uploadDescription={uploadDescription}
-        />
+        <>
+          <JobDisputeDetailView
+            detail={detail}
+            documents={documents}
+            existingDescription={existingDescription}
+            existingMediaAssetId={existingMediaAssetId}
+            file={file}
+            onAddStatement={addStatement}
+            onBindExisting={bindExistingEvidence}
+            onCheckUpload={checkUpload}
+            onExistingDescription={setExistingDescription}
+            onExistingMediaAssetId={setExistingMediaAssetId}
+            onFile={setFile}
+            onStatement={setStatement}
+            onStatementKind={setStatementKind}
+            onUpload={uploadEvidence}
+            onUploadDescription={setUploadDescription}
+            pending={pending}
+            pendingUpload={pendingUpload}
+            statement={statement}
+            statementKind={statementKind}
+            uploadDescription={uploadDescription}
+          />
+          <JobDisputePartyActions
+            detail={detail}
+            onConfirmSettlement={confirmSettlement}
+            onSettlementSummary={setSettlementSummary}
+            onWithdraw={withdrawCase}
+            onWithdrawalReason={setWithdrawalReason}
+            pending={pending}
+            settlementSummary={settlementSummary}
+            withdrawalReason={withdrawalReason}
+          />
+        </>
       )}
     </section>
   );
@@ -563,6 +629,23 @@ export function JobDisputeDetailView({
             prijatej dohody.
           </p>
         </div>
+      )}
+
+      <h4>Potvrdenia dohody strán</h4>
+      {detail.settlementConfirmations.length === 0 ? (
+        <p>Žiadna strana zatiaľ nepotvrdila spoločné zhrnutie.</p>
+      ) : (
+        <ol>
+          {detail.settlementConfirmations.map((confirmation) => (
+            <li key={confirmation.id}>
+              <strong>{roleLabel(confirmation.confirmedByRole)}</strong>
+              <p>{confirmation.summary}</p>
+              <time dateTime={confirmation.confirmedAt}>
+                {new Date(confirmation.confirmedAt).toLocaleString("sk-SK")}
+              </time>
+            </li>
+          ))}
+        </ol>
       )}
 
       <h4>Nemeniteľný obchodný základ</h4>
@@ -771,6 +854,75 @@ export function JobDisputeDetailView({
   );
 }
 
+export function JobDisputePartyActions({
+  detail,
+  onConfirmSettlement,
+  onSettlementSummary,
+  onWithdraw,
+  onWithdrawalReason,
+  pending,
+  settlementSummary,
+  withdrawalReason,
+}: Readonly<{
+  detail: JobDisputeDetail;
+  onConfirmSettlement: (event: React.FormEvent) => Promise<void>;
+  onSettlementSummary: (value: string) => void;
+  onWithdraw: (event: React.FormEvent) => Promise<void>;
+  onWithdrawalReason: (value: string) => void;
+  pending: boolean;
+  settlementSummary: string;
+  withdrawalReason: string;
+}>) {
+  if (!detail.canAddContent) return null;
+  return (
+    <div className="dispute-party-actions">
+      <form onSubmit={(event) => void onConfirmSettlement(event)}>
+        <fieldset disabled={pending}>
+          <legend>Potvrdiť vlastnú dohodu strán</legend>
+          <p>
+            Obe strany musia nezávisle potvrdiť úplne rovnaké stručné zhrnutie.
+            Záznam nemení prijatú ponuku ani schválené zmeny.
+          </p>
+          <label htmlFor={`settlement-${detail.id}`}>Spoločné zhrnutie</label>
+          <textarea
+            id={`settlement-${detail.id}`}
+            maxLength={2_000}
+            minLength={8}
+            onChange={(event) => onSettlementSummary(event.currentTarget.value)}
+            required
+            value={settlementSummary}
+          />
+          <button type="submit">Potvrdiť presné zhrnutie</button>
+        </fieldset>
+      </form>
+      {detail.canWithdraw && (
+        <form onSubmit={(event) => void onWithdraw(event)}>
+          <fieldset disabled={pending}>
+            <legend>Stiahnuť prípad</legend>
+            <p>
+              Stiahnutie je dostupné iba otvárajúcej strane, ak nie je nutné
+              pokračovať v závažnom bezpečnostnom alebo pravidlovom preverovaní.
+              História zostane zachovaná.
+            </p>
+            <label htmlFor={`withdrawal-${detail.id}`}>
+              Poznámka k stiahnutiu (voliteľná)
+            </label>
+            <textarea
+              id={`withdrawal-${detail.id}`}
+              maxLength={1_000}
+              onChange={(event) =>
+                onWithdrawalReason(event.currentTarget.value)
+              }
+              value={withdrawalReason}
+            />
+            <button type="submit">Stiahnuť prípad</button>
+          </fieldset>
+        </form>
+      )}
+    </div>
+  );
+}
+
 function commandNotice(
   status: Exclude<JobDisputeCommandResult["status"], "OK">,
 ) {
@@ -781,6 +933,8 @@ function commandNotice(
       return "Prípad už neprijíma ďalší obsah.";
     case "DUPLICATE_EVIDENCE":
       return "Tento súbor už je k prípadu pripojený.";
+    case "WITHDRAWAL_BLOCKED":
+      return "Prípad teraz nemožno stiahnuť, pretože musí pokračovať závažné preverovanie.";
     case "CONFLICT":
       return "Príkaz koliduje s predchádzajúcim pokusom. Obnovte prípad.";
     case "NOT_FOUND":

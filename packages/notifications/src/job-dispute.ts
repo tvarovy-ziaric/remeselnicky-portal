@@ -5,6 +5,7 @@ import type { NotificationDraft } from "./model.js";
 export const JOB_DISPUTE_NOTIFICATION_EVENT_NAMES = Object.freeze({
   adminAction: "job.dispute.admin_action",
   opened: "job.dispute.opened",
+  partyAction: "job.dispute.party_action",
 } as const);
 
 export interface JobDisputeNotificationCopy {
@@ -21,6 +22,10 @@ const COPY = Object.freeze({
     body: "Druhá zmluvná strana otvorila súkromný prípad k zákazke. Pozrite si opis a požadované riešenie v detaile zákazky.",
     title: "Nový sporný prípad k zákazke",
   }),
+  [JOB_DISPUTE_NOTIFICATION_EVENT_NAMES.partyAction]: Object.freeze({
+    body: "Druhá zmluvná strana zaznamenala krok v súkromnom prípade. Podrobnosti nájdete v detaile zákazky.",
+    title: "Krok strany v spornom prípade",
+  }),
 } as const);
 
 export function getJobDisputeNotificationCopy(
@@ -35,7 +40,8 @@ export function mapJobDisputeNotificationEvent(
 ): readonly NotificationDraft[] | undefined {
   if (
     event.name !== JOB_DISPUTE_NOTIFICATION_EVENT_NAMES.opened &&
-    event.name !== JOB_DISPUTE_NOTIFICATION_EVENT_NAMES.adminAction
+    event.name !== JOB_DISPUTE_NOTIFICATION_EVENT_NAMES.adminAction &&
+    event.name !== JOB_DISPUTE_NOTIFICATION_EVENT_NAMES.partyAction
   )
     return undefined;
   if (
@@ -46,9 +52,11 @@ export function mapJobDisputeNotificationEvent(
     throw new TypeError("Invalid Job dispute notification envelope.");
   const isAdminAction =
     event.name === JOB_DISPUTE_NOTIFICATION_EVENT_NAMES.adminAction;
+  const isPartyAction =
+    event.name === JOB_DISPUTE_NOTIFICATION_EVENT_NAMES.partyAction;
   assertExactKeys(
     event.payload,
-    isAdminAction
+    isAdminAction || isPartyAction
       ? ["action", "dispute_id", "job_id", "recipient_user_id"]
       : ["dispute_id", "job_id", "recipient_user_id"],
   );
@@ -62,7 +70,9 @@ export function mapJobDisputeNotificationEvent(
     throw new TypeError("Job dispute notification identity is incoherent.");
   const action = isAdminAction
     ? requiredAdminAction(event.payload["action"])
-    : "OPEN";
+    : isPartyAction
+      ? requiredPartyAction(event.payload["action"])
+      : "OPEN";
 
   return Object.freeze([
     Object.freeze({
@@ -75,8 +85,10 @@ export function mapJobDisputeNotificationEvent(
       payload: Object.freeze({
         action: isAdminAction
           ? "READ_DISPUTE_ADMIN_ACTION"
-          : "READ_DISPUTE_CASE",
-        ...(isAdminAction ? { case_action: action } : {}),
+          : isPartyAction
+            ? "READ_DISPUTE_PARTY_ACTION"
+            : "READ_DISPUTE_CASE",
+        ...(isAdminAction || isPartyAction ? { case_action: action } : {}),
         dispute_id: disputeId,
         job_id: jobId,
       }),
@@ -96,9 +108,20 @@ function requiredAdminAction(value: unknown): string {
       "RECORD_OUTCOME",
       "CLOSE",
       "REOPEN",
+      "SET_INVESTIGATION_HOLD",
+      "CLEAR_INVESTIGATION_HOLD",
     ].includes(value)
   )
     throw new TypeError("Job dispute admin action is invalid.");
+  return value;
+}
+
+function requiredPartyAction(value: unknown): string {
+  if (
+    typeof value !== "string" ||
+    !["WITHDRAW", "CONFIRM_SETTLEMENT"].includes(value)
+  )
+    throw new TypeError("Job dispute party action is invalid.");
   return value;
 }
 

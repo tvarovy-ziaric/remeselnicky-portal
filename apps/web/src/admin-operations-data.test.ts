@@ -22,6 +22,7 @@ const item = {
   createdAt: "2026-09-24T10:00:00.000Z",
   stateChangedAt: "2026-09-24T10:10:00.000Z",
   informationRequestCount: 1,
+  investigationHeld: false,
 } as const;
 const detail = {
   ...item,
@@ -50,9 +51,15 @@ const detail = {
   ],
   internalNotes: [],
   outcomes: [],
+  settlementConfirmations: [],
   conversation: [],
   attachments: [],
 };
+
+function requestBody(value: BodyInit | null | undefined): string {
+  if (typeof value !== "string") throw new TypeError("Expected JSON body.");
+  return value;
+}
 
 describe("admin operations response boundary", () => {
   it("accepts only the exact bounded queue projection", () => {
@@ -121,7 +128,7 @@ describe("admin operations transport", () => {
     expect(new Headers(options?.headers).get("x-csrf-token")).toBe(
       "csrf-token-123456",
     );
-    expect(JSON.parse(String(options?.body))).toEqual({
+    expect(JSON.parse(requestBody(options?.body))).toEqual({
       accessId: commandId,
       reason: "Preverenie komunikácie k otvorenému sporu.",
     });
@@ -156,7 +163,7 @@ describe("admin operations transport", () => {
     ).resolves.toMatchObject({ status: "OK", state: "WAITING_FOR_PARTY" });
     const [path, options] = fetcher.mock.calls[1] ?? [];
     expect(path).toBe(`/v1/admin/disputes/${disputeId}/request-information`);
-    expect(JSON.parse(String(options?.body))).toEqual({
+    expect(JSON.parse(requestBody(options?.body))).toEqual({
       commandId,
       expectedState: "UNDER_REVIEW",
       reason: "Chýbajú podklady od hlavného remeselníka.",
@@ -164,6 +171,40 @@ describe("admin operations transport", () => {
       requestText: "Doplňte fotografiu opraveného detailu.",
       replyDeadline: null,
     });
+  });
+
+  it("uses distinct named endpoints for setting and clearing an investigation hold", async () => {
+    for (const [action, suffix] of [
+      ["SET_INVESTIGATION_HOLD", "investigation-hold"],
+      ["CLEAR_INVESTIGATION_HOLD", "investigation-hold/clear"],
+    ] as const) {
+      const fetcher = vi
+        .fn<typeof fetch>()
+        .mockResolvedValueOnce(
+          Response.json({ csrfToken: "csrf-token-123456" }),
+        )
+        .mockResolvedValueOnce(
+          Response.json({
+            status: "APPLIED",
+            commandId,
+            disputeId,
+            state: "UNDER_REVIEW",
+            recordedAt: "2026-09-24T10:20:00.000Z",
+          }),
+        );
+      await expect(
+        sendAdminDisputeCommand(fetcher, {
+          disputeId,
+          commandId,
+          expectedState: "UNDER_REVIEW",
+          reason: "Závažný signál bol preskúmaný oprávneným tímom.",
+          command: { action },
+        }),
+      ).resolves.toMatchObject({ status: "OK" });
+      expect(fetcher.mock.calls[1]?.[0]).toBe(
+        `/v1/admin/disputes/${disputeId}/${suffix}`,
+      );
+    }
   });
 
   it("keeps force-complete and force-cancel as distinct commands", async () => {
@@ -211,7 +252,9 @@ describe("admin operations transport", () => {
     expect(cancel.mock.calls[1]?.[0]).toBe(
       `/v1/admin/jobs/${jobId}/force-cancel`,
     );
-    expect(JSON.parse(String(cancel.mock.calls[1]?.[1]?.body))).toMatchObject({
+    expect(
+      JSON.parse(requestBody(cancel.mock.calls[1]?.[1]?.body)),
+    ).toMatchObject({
       userFacingReason: "Platforma zákazku z bezpečnostných dôvodov zrušila.",
     });
   });
