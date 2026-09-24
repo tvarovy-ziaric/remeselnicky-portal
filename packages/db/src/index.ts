@@ -110,6 +110,8 @@ import { createJobRequestLifecycleRepository } from "./job-request-lifecycle-rep
 import { createJobInvitationRepository } from "./job-invitation-repository.js";
 import { createJobInvitationReminderRepository } from "./job-invitation-notification-repository.js";
 import { createDemandSideNotificationRepository } from "./demand-side-notification-repository.js";
+import { createJobMainReviewNotificationRepository } from "./job-main-review-notification-repository.js";
+export { createJobMainReviewNotificationRepository } from "./job-main-review-notification-repository.js";
 import {
   createR3AnalyticsLeaseStore,
   createR3AnalyticsObservationRepository,
@@ -387,6 +389,7 @@ import {
 import type {
   DemandSideNotificationMaintenanceStore,
   JobInvitationReminderStore,
+  JobMainReviewNotificationMaintenanceStore,
 } from "@portal/notifications";
 import {
   createJobRequestMediaAccessResolver,
@@ -1084,6 +1087,7 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly jobInvitations: JobInvitationPersistence;
   readonly jobInvitationReminders: JobInvitationReminderStore;
   readonly demandSideNotifications: DemandSideNotificationMaintenanceStore;
+  readonly jobMainReviewNotifications: JobMainReviewNotificationMaintenanceStore;
   readonly r3Analytics: R3AnalyticsLeaseStore;
   readonly r3AnalyticsObservations: R3AnalyticsObservationPersistence;
   readonly r3PdfDeliveryObservations: R3PdfDeliveryObservationPersistence;
@@ -1244,6 +1248,8 @@ export function createDatabase(
   const jobInvitations = createJobInvitationRepository(sql);
   const jobInvitationReminders = createJobInvitationReminderRepository(sql);
   const demandSideNotifications = createDemandSideNotificationRepository(sql);
+  const jobMainReviewNotifications =
+    createJobMainReviewNotificationRepository(sql);
   const r3Analytics = createR3AnalyticsLeaseStore(sql);
   const r3AnalyticsObservations = createR3AnalyticsObservationRepository(sql);
   const r3PdfDeliveryObservations =
@@ -1345,6 +1351,7 @@ export function createDatabase(
     jobInvitations,
     jobInvitationReminders,
     demandSideNotifications,
+    jobMainReviewNotifications,
     r3Analytics,
     r3AnalyticsObservations,
     r3PdfDeliveryObservations,

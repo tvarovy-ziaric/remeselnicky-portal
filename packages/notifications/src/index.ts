@@ -36,6 +36,15 @@ export {
   mapJobInvitationNotificationEvent,
 } from "./job-invitation.js";
 export type { JobInvitationReminderStore } from "./job-invitation.js";
+export {
+  getJobMainReviewNotificationCopy,
+  JOB_MAIN_REVIEW_NOTIFICATION_EVENT_NAMES,
+  mapJobMainReviewNotificationEvent,
+} from "./main-review.js";
+export type {
+  JobMainReviewNotificationCopy,
+  JobMainReviewNotificationMaintenanceStore,
+} from "./main-review.js";
 export type {
   ClaimEmailDeliveryOptions,
   EmailDelivery,

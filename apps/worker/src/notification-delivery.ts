@@ -6,6 +6,7 @@ import type { R3AnalyticsProcessResult } from "@portal/analytics";
 import type {
   DemandSideNotificationMaintenanceStore,
   JobInvitationReminderStore,
+  JobMainReviewNotificationMaintenanceStore,
 } from "@portal/notifications";
 import type { OutboxWorker } from "@portal/outbox";
 import type { QueueWorker } from "@portal/queue";
@@ -25,6 +26,7 @@ export function createInvitationNotificationProcessor(input: {
   }>;
   readonly demandSideNotifications: DemandSideNotificationMaintenanceStore;
   readonly invitations: Pick<JobInvitationPersistence, "expirePending">;
+  readonly mainReviewNotifications: JobMainReviewNotificationMaintenanceStore;
   readonly maintenanceIntervalMs?: number;
   readonly mediaProcessing?: QueueWorker;
   readonly now?: () => number;
@@ -50,6 +52,7 @@ export function createInvitationNotificationProcessor(input: {
       if (currentTime >= nextMaintenanceAt) {
         await input.reminders.enqueueDueReminders();
         await input.demandSideNotifications.enqueueDueUnreadChatEmails();
+        await input.mainReviewNotifications.enqueueDueDeadlineUnlocks();
         await input.invitations.expirePending();
         await input.quotes.expireDueSubmitted();
         nextMaintenanceAt = currentTime + interval;

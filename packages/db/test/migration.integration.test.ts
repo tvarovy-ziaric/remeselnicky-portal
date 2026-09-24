@@ -219,6 +219,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
           "0090_completed_job_work_volume.sql",
           "0091_job_participant_role_decisions.sql",
           "0092_main_bilateral_review_foundation.sql",
+          "0093_main_review_notifications.sql",
         ],
         alreadyApplied: 0,
       });
@@ -227,7 +228,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         testDatabaseUrl,
         migrationsDirectory,
       );
-      expect(secondRun).toEqual({ applied: [], alreadyApplied: 93 });
+      expect(secondRun).toEqual({ applied: [], alreadyApplied: 94 });
 
       const sql = postgres(testDatabaseUrl, { max: 5 });
       try {

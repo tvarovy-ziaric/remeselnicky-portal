@@ -7,6 +7,7 @@ describe("invitation notification processor", () => {
   it("schedules reminders before expiry and drains the durable outbox", async () => {
     const enqueueDueReminders = vi.fn(() => Promise.resolve([]));
     const enqueueDueUnreadChatEmails = vi.fn(() => Promise.resolve(0));
+    const enqueueDueDeadlineUnlocks = vi.fn(() => Promise.resolve(0));
     const expirePending = vi.fn(() => Promise.resolve([]));
     const expireDueSubmitted = vi.fn(() => Promise.resolve([]));
     const results: Awaited<ReturnType<OutboxWorker["processNext"]>>[] = [
@@ -39,6 +40,7 @@ describe("invitation notification processor", () => {
       analytics: { processNext: processAnalytics },
       demandSideNotifications: { enqueueDueUnreadChatEmails },
       invitations: { expirePending },
+      mainReviewNotifications: { enqueueDueDeadlineUnlocks },
       maintenanceIntervalMs: 60_000,
       mediaProcessing: { processNext: processMedia },
       now: () => currentTime,
@@ -54,6 +56,7 @@ describe("invitation notification processor", () => {
     await expect(processor.processNext()).resolves.toEqual({ status: "idle" });
     expect(enqueueDueReminders).toHaveBeenCalledTimes(1);
     expect(enqueueDueUnreadChatEmails).toHaveBeenCalledTimes(1);
+    expect(enqueueDueDeadlineUnlocks).toHaveBeenCalledTimes(1);
     expect(expirePending).toHaveBeenCalledTimes(1);
     expect(expireDueSubmitted).toHaveBeenCalledTimes(1);
     expect(processNext).toHaveBeenCalledTimes(2);
@@ -68,6 +71,7 @@ describe("invitation notification processor", () => {
       .mockRejectedValueOnce(new Error("DATABASE_UNAVAILABLE"));
     const expirePending = vi.fn(() => Promise.resolve([]));
     const enqueueDueUnreadChatEmails = vi.fn(() => Promise.resolve(0));
+    const enqueueDueDeadlineUnlocks = vi.fn(() => Promise.resolve(0));
     const expireDueSubmitted = vi.fn(() => Promise.resolve([]));
     const processNext = vi.fn<OutboxWorker["processNext"]>(() =>
       Promise.resolve({ status: "IDLE" }),
@@ -76,6 +80,7 @@ describe("invitation notification processor", () => {
     const processor = createInvitationNotificationProcessor({
       demandSideNotifications: { enqueueDueUnreadChatEmails },
       invitations: { expirePending },
+      mainReviewNotifications: { enqueueDueDeadlineUnlocks },
       maintenanceIntervalMs: 10,
       now: () => currentTime,
       outbox: { processNext },
@@ -102,6 +107,9 @@ describe("invitation notification processor", () => {
         enqueueDueUnreadChatEmails: vi.fn().mockResolvedValue(0),
       },
       invitations: { expirePending: vi.fn().mockResolvedValue([]) },
+      mainReviewNotifications: {
+        enqueueDueDeadlineUnlocks: vi.fn().mockResolvedValue(0),
+      },
       now: () => 1,
       onAnalyticsError,
       outbox: { processNext: processOutbox },

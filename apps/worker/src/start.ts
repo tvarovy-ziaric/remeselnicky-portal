@@ -110,6 +110,7 @@ const processor = createInvitationNotificationProcessor({
   analytics: analyticsProcessor,
   demandSideNotifications: database.demandSideNotifications,
   invitations: database.jobInvitations,
+  mainReviewNotifications: database.jobMainReviewNotifications,
   ...(mediaProcessing === undefined ? {} : { mediaProcessing }),
   outbox: outboxWorker,
   onAnalyticsError(error) {
