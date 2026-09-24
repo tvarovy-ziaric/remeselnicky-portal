@@ -3,6 +3,7 @@ import type { PersistedDomainEvent } from "@portal/outbox";
 import type { NotificationDraft } from "./model.js";
 
 export const JOB_DISPUTE_NOTIFICATION_EVENT_NAMES = Object.freeze({
+  adminAction: "job.dispute.admin_action",
   opened: "job.dispute.opened",
 } as const);
 
@@ -12,6 +13,10 @@ export interface JobDisputeNotificationCopy {
 }
 
 const COPY = Object.freeze({
+  [JOB_DISPUTE_NOTIFICATION_EVENT_NAMES.adminAction]: Object.freeze({
+    body: "V súkromnom prípade pribudla administratívna požiadavka alebo zmena stavu. Podrobnosti nájdete v detaile zákazky.",
+    title: "Aktualizácia sporného prípadu",
+  }),
   [JOB_DISPUTE_NOTIFICATION_EVENT_NAMES.opened]: Object.freeze({
     body: "Druhá zmluvná strana otvorila súkromný prípad k zákazke. Pozrite si opis a požadované riešenie v detaile zákazky.",
     title: "Nový sporný prípad k zákazke",
@@ -24,11 +29,14 @@ export function getJobDisputeNotificationCopy(
   return COPY[type];
 }
 
-/** Maps only the privacy-minimal case-open event; no case text enters outbox. */
+/** Maps only privacy-minimal case events; no case text enters outbox. */
 export function mapJobDisputeNotificationEvent(
   event: PersistedDomainEvent,
 ): readonly NotificationDraft[] | undefined {
-  if (event.name !== JOB_DISPUTE_NOTIFICATION_EVENT_NAMES.opened)
+  if (
+    event.name !== JOB_DISPUTE_NOTIFICATION_EVENT_NAMES.opened &&
+    event.name !== JOB_DISPUTE_NOTIFICATION_EVENT_NAMES.adminAction
+  )
     return undefined;
   if (
     event.schemaVersion !== 1 ||
@@ -36,7 +44,14 @@ export function mapJobDisputeNotificationEvent(
     !isUuid(event.entity.id)
   )
     throw new TypeError("Invalid Job dispute notification envelope.");
-  assertExactKeys(event.payload, ["dispute_id", "job_id", "recipient_user_id"]);
+  const isAdminAction =
+    event.name === JOB_DISPUTE_NOTIFICATION_EVENT_NAMES.adminAction;
+  assertExactKeys(
+    event.payload,
+    isAdminAction
+      ? ["action", "dispute_id", "job_id", "recipient_user_id"]
+      : ["dispute_id", "job_id", "recipient_user_id"],
+  );
   const disputeId = requiredUuid(event.payload["dispute_id"], "dispute");
   const jobId = requiredUuid(event.payload["job_id"], "Job");
   const recipientUserId = requiredUuid(
@@ -45,6 +60,9 @@ export function mapJobDisputeNotificationEvent(
   );
   if (event.entity.id !== disputeId)
     throw new TypeError("Job dispute notification identity is incoherent.");
+  const action = isAdminAction
+    ? requiredAdminAction(event.payload["action"])
+    : "OPEN";
 
   return Object.freeze([
     Object.freeze({
@@ -55,7 +73,10 @@ export function mapJobDisputeNotificationEvent(
         path: `/zakazky/${jobId}`,
       }),
       payload: Object.freeze({
-        action: "READ_DISPUTE_CASE",
+        action: isAdminAction
+          ? "READ_DISPUTE_ADMIN_ACTION"
+          : "READ_DISPUTE_CASE",
+        ...(isAdminAction ? { case_action: action } : {}),
         dispute_id: disputeId,
         job_id: jobId,
       }),
@@ -64,6 +85,21 @@ export function mapJobDisputeNotificationEvent(
       type: event.name,
     }),
   ]);
+}
+
+function requiredAdminAction(value: unknown): string {
+  if (
+    typeof value !== "string" ||
+    ![
+      "START_REVIEW",
+      "REQUEST_INFORMATION",
+      "RECORD_OUTCOME",
+      "CLOSE",
+      "REOPEN",
+    ].includes(value)
+  )
+    throw new TypeError("Job dispute admin action is invalid.");
+  return value;
 }
 
 function assertExactKeys(

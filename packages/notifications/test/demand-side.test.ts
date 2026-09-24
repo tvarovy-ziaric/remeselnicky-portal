@@ -74,6 +74,25 @@ describe("R3 demand-side notification catalog", () => {
       ),
     ).toThrow();
   });
+  it("maps explicit administrative cancellation without exposing either reason", () => {
+    const jobId = randomUUID();
+    const commandId = randomUUID();
+    const draft = mapDemandSideNotificationEvent(
+      event({
+        entityId: jobId,
+        entityType: "JOB",
+        name: "job.cancelled.admin_forced",
+        payload: { command_id: commandId, job_id: jobId },
+      }),
+    )?.[0];
+    expect(draft).toMatchObject({
+      channels: ["IN_APP", "EMAIL"],
+      context: { path: `/zakazky/${jobId}` },
+      payload: { action: "ADMIN_CANCELLATION", command_id: commandId },
+      priority: "IMPORTANT",
+    });
+    expect(JSON.stringify(draft)).not.toMatch(/reason|address|body/iu);
+  });
   it.each([
     ["job.completion.proposed", "REVIEW_COMPLETION_PROPOSAL"],
     ["job.completion.proposal_agreed", "COMPLETION_PROPOSAL_AGREED"],

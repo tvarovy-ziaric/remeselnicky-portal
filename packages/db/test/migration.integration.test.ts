@@ -106,6 +106,7 @@ import { runJobSupervisorEvaluationCommittedRaceAssertions } from "./job-supervi
 import { runJobSupervisorEvaluationIntegrationAssertions } from "./job-supervisor-evaluation-integration-helper.js";
 import { runReviewResponseReportIntegrationAssertions } from "./review-response-report-integration-helper.js";
 import { runJobDisputeIntegrationAssertions } from "./job-dispute-integration-helper.js";
+import { runAdminDisputeIntegrationAssertions } from "./admin-dispute-integration-helper.js";
 import { runVerifiedCompletionEvidenceIntegrationAssertions } from "./verified-completion-evidence-integration-helper.js";
 
 const testDatabaseUrl = process.env["TEST_DATABASE_URL"];
@@ -231,6 +232,9 @@ describe.skipIf(testDatabaseUrl === undefined)(
           "0096_job_supervisor_evaluations.sql",
           "0097_review_responses_and_reports.sql",
           "0098_job_dispute_cases.sql",
+          "0099_admin_dispute_transition_actions.sql",
+          "0100_admin_dispute_workflow.sql",
+          "0101_admin_job_force_cancellation.sql",
         ],
         alreadyApplied: 0,
       });
@@ -1398,7 +1402,8 @@ describe.skipIf(testDatabaseUrl === undefined)(
           throw new Error("Expected integration MFA factors.");
         }
         const superSessionDigest = digest(`super-session-${randomUUID()}`);
-        const adminSessionDigest = digest(`admin-session-${randomUUID()}`);
+        const adminSessionId = `admin-session-${randomUUID()}`;
+        const adminSessionDigest = digest(adminSessionId);
         const privilegedExpiresAt = new Date(Date.now() + 30 * 60_000);
         await sql`
           INSERT INTO auth_sessions (
@@ -1905,6 +1910,10 @@ describe.skipIf(testDatabaseUrl === undefined)(
         await runJobSupervisorEvaluationCommittedRaceAssertions(sql);
         await runReviewResponseReportIntegrationAssertions(sql);
         await runJobDisputeIntegrationAssertions(sql);
+        await runAdminDisputeIntegrationAssertions(sql, {
+          adminId,
+          privilegedSessionId: adminSessionId,
+        });
 
         await adminAccess.revokePrivilegedSession(superSessionDigest);
         await expect(

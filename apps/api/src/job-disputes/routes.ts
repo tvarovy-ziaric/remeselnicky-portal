@@ -337,6 +337,22 @@ function serializeDetail(item: DisputeCaseDetail) {
       ...evidence,
       createdAt: evidence.createdAt.toISOString(),
     })),
+    adminRequests: item.adminRequests.map((request) => ({
+      ...request,
+      replyDeadline: request.replyDeadline?.toISOString() ?? null,
+      requestedAt: request.requestedAt.toISOString(),
+    })),
+    outcome:
+      item.outcome === null
+        ? null
+        : {
+            ...item.outcome,
+            recordedAt: item.outcome.recordedAt.toISOString(),
+          },
+    caseTimeline: item.caseTimeline.map((event) => ({
+      ...event,
+      occurredAt: event.occurredAt.toISOString(),
+    })),
     commercialBaseline: {
       ...item.commercialBaseline,
       approvedChanges: item.commercialBaseline.approvedChanges.map(

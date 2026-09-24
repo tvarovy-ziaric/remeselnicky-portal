@@ -17,13 +17,15 @@ export interface AdminConsoleModule {
   readonly label: string;
 }
 
+export type AdminModuleState = "OPERATIONAL" | "PLACEHOLDER";
+
 export function parseAdminModule(
   value: unknown,
   expectedId: string,
 ): AdminConsoleModule | undefined {
   if (
     !isRecord(value) ||
-    value.state !== "PLACEHOLDER" ||
+    (value.state !== "PLACEHOLDER" && value.state !== "OPERATIONAL") ||
     typeof value.id !== "string" ||
     value.id !== expectedId ||
     !isAdminModuleId(value.id) ||
@@ -32,6 +34,11 @@ export function parseAdminModule(
   ) {
     return undefined;
   }
+  if (
+    (value.id === "disputes" || value.id === "jobs") !==
+    (value.state === "OPERATIONAL")
+  )
+    return undefined;
   return {
     description: value.description,
     id: value.id,

@@ -109,6 +109,21 @@ describe("admin console routes", () => {
     expect(response.json()).toEqual({ code: "PRIVILEGED_ACCESS_DENIED" });
   });
 
+  it("marks implemented dispute and Job modules as operational", async () => {
+    const fixture = createFixture("ACTIVE", adminActor());
+    for (const moduleId of ["disputes", "jobs"] as const) {
+      const response = await fixture.app.inject({
+        method: "GET",
+        url: `${ADMIN_CONSOLE_BASE_PATH}/modules/${moduleId}`,
+      });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({
+        id: moduleId,
+        state: "OPERATIONAL",
+      });
+    }
+  });
+
   it("fails closed if a service returns an actor for a different identity", async () => {
     const actor = adminActor();
     const fixture = createFixture("ACTIVE", {

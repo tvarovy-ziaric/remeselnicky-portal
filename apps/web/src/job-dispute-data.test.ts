@@ -62,6 +62,31 @@ const detail = () => ({
       createdAt: "2026-09-24T10:02:00.000Z",
     },
   ],
+  adminRequests: [
+    {
+      id: commandId,
+      recipient: "PRIMARY_PROVIDER",
+      requestText: "Doplňte fotografiu opraveného detailu.",
+      replyDeadline: "2026-09-30T10:00:00.000Z",
+      requestedAt: "2026-09-24T11:00:00.000Z",
+    },
+  ],
+  outcome: {
+    id: revisionId,
+    category: "OPERATIONAL_ADMIN_RESOLUTION",
+    basis: "ADMINISTRATIVE_CLOSURE",
+    summary: "Strany dostali odporúčanie na zdokumentovanú opravu.",
+    recordedAt: "2026-09-24T12:00:00.000Z",
+  },
+  caseTimeline: [
+    {
+      eventId: disputeId,
+      action: "OPEN",
+      fromState: null,
+      toState: "OPEN",
+      occurredAt: "2026-09-24T10:00:00.000Z",
+    },
+  ],
   commercialBaseline: {
     acceptedRequestContentRevision: 2,
     acceptedRequestVisibleVersion: 3,
@@ -109,6 +134,8 @@ describe("D22 private dispute web contract", () => {
     expect(parsed?.evidence[0]?.downloadPath).toBe(
       `/v1/media/${mediaAssetId}/download`,
     );
+    expect(parsed?.adminRequests[0]?.recipient).toBe("PRIMARY_PROVIDER");
+    expect(parsed?.outcome?.category).toBe("OPERATIONAL_ADMIN_RESOLUTION");
   });
 
   it("fails closed on cross-Job identity, state/content mismatch and unsafe evidence", () => {

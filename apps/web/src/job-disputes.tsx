@@ -38,6 +38,22 @@ const stateLabels: Readonly<Record<JobDisputeState, string>> = Object.freeze({
 });
 const roleLabel = (role: "CUSTOMER" | "PRIMARY_PROVIDER") =>
   role === "CUSTOMER" ? "Zákazník" : "Hlavný poskytovateľ";
+const outcomeLabels = Object.freeze({
+  RESOLVED_BY_PARTIES: "Dohoda strán",
+  OPERATIONAL_ADMIN_RESOLUTION: "Prevádzkové administratívne riešenie",
+  NO_ACTION: "Bez ďalšieho opatrenia",
+  REFERRED_OUTSIDE_PLATFORM: "Odkázané mimo platformy",
+  ACCOUNT_POLICY_ACTION: "Samostatné opatrenie podľa pravidiel platformy",
+  OTHER: "Iný prevádzkový výsledok",
+});
+const caseActionLabels: Readonly<Record<string, string>> = Object.freeze({
+  OPEN: "Prípad otvorený",
+  START_REVIEW: "Začalo sa preverovanie",
+  REQUEST_INFORMATION: "Vyžiadané doplnenie",
+  RECORD_OUTCOME: "Zaznamenaný výsledok",
+  CLOSE: "Prípad uzavretý",
+  REOPEN: "Prípad znovu otvorený",
+});
 
 function retryId(ref: { current: Retry }, fingerprint: string) {
   if (ref.current?.fingerprint === fingerprint) return ref.current.commandId;
@@ -484,6 +500,70 @@ export function JobDisputeDetailView({
       <p>
         <strong>Požadované riešenie:</strong> {detail.desiredResolution}
       </p>
+
+      <h4>Postup prípadu</h4>
+      <ol>
+        {detail.caseTimeline.map((item) => (
+          <li key={item.eventId}>
+            {caseActionLabels[item.action] ?? item.action} ·{" "}
+            {stateLabels[item.toState]} ·{" "}
+            <time dateTime={item.occurredAt}>
+              {new Date(item.occurredAt).toLocaleString("sk-SK")}
+            </time>
+          </li>
+        ))}
+      </ol>
+
+      <h4>Požiadavky administrátora</h4>
+      {detail.adminRequests.length === 0 ? (
+        <p>Administrátor zatiaľ nepožiadal o doplnenie.</p>
+      ) : (
+        <ol>
+          {detail.adminRequests.map((request) => (
+            <li key={request.id}>
+              <p>{request.requestText}</p>
+              <p>
+                Určené:{" "}
+                {request.recipient === "BOTH"
+                  ? "obe strany"
+                  : roleLabel(request.recipient)}
+                {request.replyDeadline && (
+                  <>
+                    {" "}
+                    · prevádzkový termín{" "}
+                    <time dateTime={request.replyDeadline}>
+                      {new Date(request.replyDeadline).toLocaleString("sk-SK")}
+                    </time>
+                  </>
+                )}
+              </p>
+              <p>
+                Zmeškanie prevádzkového termínu samo osebe nerozhoduje spor ani
+                právny nárok.
+              </p>
+            </li>
+          ))}
+        </ol>
+      )}
+
+      <h4>Výsledok prípadu</h4>
+      {detail.outcome === null ? (
+        <p>Výsledok ešte nebol zaznamenaný.</p>
+      ) : (
+        <div>
+          <p>
+            <strong>{outcomeLabels[detail.outcome.category]}</strong> ·{" "}
+            {detail.outcome.basis === "MUTUAL_PARTY_AGREEMENT"
+              ? "vzájomná dohoda strán"
+              : "administratívne uzavretie prípadu"}
+          </p>
+          <p>{detail.outcome.summary}</p>
+          <p>
+            Toto je prevádzkový záznam platformy, nie právny rozsudok ani zmena
+            prijatej dohody.
+          </p>
+        </div>
+      )}
 
       <h4>Nemeniteľný obchodný základ</h4>
       <p>

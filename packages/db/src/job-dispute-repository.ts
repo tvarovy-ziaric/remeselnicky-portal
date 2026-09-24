@@ -29,6 +29,13 @@ export type DisputeCategory = (typeof DISPUTE_CATEGORIES)[number];
 export type DisputePartyRole = "CUSTOMER" | "PRIMARY_PROVIDER";
 export type DisputeCaseState =
   "OPEN" | "WAITING_FOR_PARTY" | "UNDER_REVIEW" | "RESOLVED" | "CLOSED";
+export type DisputeCaseOutcomeCategory =
+  | "RESOLVED_BY_PARTIES"
+  | "OPERATIONAL_ADMIN_RESOLUTION"
+  | "NO_ACTION"
+  | "REFERRED_OUTSIDE_PLATFORM"
+  | "ACCOUNT_POLICY_ACTION"
+  | "OTHER";
 
 export interface DisputeCaseSummary {
   readonly id: string;
@@ -69,6 +76,27 @@ export interface DisputeEvidence {
 export interface DisputeCaseDetail extends DisputeCaseSummary {
   readonly statements: readonly DisputeStatement[];
   readonly evidence: readonly DisputeEvidence[];
+  readonly adminRequests: readonly Readonly<{
+    id: string;
+    recipient: DisputePartyRole | "BOTH";
+    requestText: string;
+    replyDeadline: Date | null;
+    requestedAt: Date;
+  }>[];
+  readonly outcome: Readonly<{
+    id: string;
+    category: DisputeCaseOutcomeCategory;
+    basis: "MUTUAL_PARTY_AGREEMENT" | "ADMINISTRATIVE_CLOSURE";
+    summary: string;
+    recordedAt: Date;
+  }> | null;
+  readonly caseTimeline: readonly Readonly<{
+    eventId: string;
+    action: string;
+    fromState: DisputeCaseState | null;
+    toState: DisputeCaseState;
+    occurredAt: Date;
+  }>[];
   readonly commercialBaseline: Readonly<{
     acceptedRequestContentRevision: number;
     acceptedRequestVisibleVersion: number;
@@ -402,6 +430,49 @@ export function createJobDisputeRepository(sql: RootSql) {
           AND canonical.revoked_at IS NULL
         WHERE evidence.dispute_id = ${input.disputeId}
         ORDER BY evidence.created_at, evidence.id`;
+      const adminRequests = await tx<
+        Array<{
+          id: string;
+          recipient: DisputePartyRole | "BOTH";
+          requestText: string;
+          replyDeadline: Date | null;
+          requestedAt: Date;
+        }>
+      >`
+        SELECT id, recipient::text, request_text AS "requestText",
+          reply_deadline AS "replyDeadline", requested_at AS "requestedAt"
+        FROM dispute_case_information_requests
+        WHERE dispute_id = ${input.disputeId}
+          AND recipient::text IN ('BOTH', ${party.role})
+        ORDER BY requested_at, id`;
+      const [outcome] = await tx<
+        Array<{
+          id: string;
+          category: DisputeCaseOutcomeCategory;
+          basis: "MUTUAL_PARTY_AGREEMENT" | "ADMINISTRATIVE_CLOSURE";
+          summary: string;
+          recordedAt: Date;
+        }>
+      >`
+        SELECT id, category::text, basis::text, summary,
+          recorded_at AS "recordedAt"
+        FROM current_dispute_case_outcomes
+        WHERE dispute_id = ${input.disputeId}`;
+      const caseTimeline = await tx<
+        Array<{
+          eventId: string;
+          action: string;
+          fromState: DisputeCaseState | null;
+          toState: DisputeCaseState;
+          occurredAt: Date;
+        }>
+      >`
+        SELECT event_id AS "eventId", action::text,
+          from_state::text AS "fromState", to_state::text AS "toState",
+          occurred_at AS "occurredAt"
+        FROM dispute_case_state_events
+        WHERE dispute_id = ${input.disputeId}
+        ORDER BY event_sequence`;
       const [baseline] = await tx<
         Array<{
           requestRevision: number;
@@ -455,6 +526,7 @@ export function createJobDisputeRepository(sql: RootSql) {
         WHERE job_id = ${input.jobId}
         ORDER BY occurred_at, event_order, event_id`;
       validateDetailRows(statements, evidence, baseline, changes, timeline);
+      validateAdminContextRows(adminRequests, outcome ?? null, caseTimeline);
       return Object.freeze({
         ...mapSummary(row, party.role),
         statements: Object.freeze(
@@ -481,6 +553,13 @@ export function createJobDisputeRepository(sql: RootSql) {
               createdAt: item.createdAt,
             }),
           ),
+        ),
+        adminRequests: Object.freeze(
+          adminRequests.map((request) => Object.freeze(request)),
+        ),
+        outcome: outcome === undefined ? null : Object.freeze(outcome),
+        caseTimeline: Object.freeze(
+          caseTimeline.map((event) => Object.freeze(event)),
         ),
         commercialBaseline: Object.freeze({
           acceptedRequestContentRevision: baseline.requestRevision,
@@ -877,6 +956,82 @@ function validateDetailRows(
     )
   )
     throw new Error("Invalid dispute case detail projection.");
+}
+
+function validateAdminContextRows(
+  requests: readonly {
+    id: string;
+    recipient: DisputePartyRole | "BOTH";
+    requestText: string;
+    replyDeadline: Date | null;
+    requestedAt: Date;
+  }[],
+  outcome: {
+    id: string;
+    category: DisputeCaseOutcomeCategory;
+    basis: "MUTUAL_PARTY_AGREEMENT" | "ADMINISTRATIVE_CLOSURE";
+    summary: string;
+    recordedAt: Date;
+  } | null,
+  timeline: readonly {
+    eventId: string;
+    action: string;
+    fromState: DisputeCaseState | null;
+    toState: DisputeCaseState;
+    occurredAt: Date;
+  }[],
+): void {
+  const states = [
+    "OPEN",
+    "WAITING_FOR_PARTY",
+    "UNDER_REVIEW",
+    "RESOLVED",
+    "CLOSED",
+  ];
+  if (
+    requests.some(
+      (request) =>
+        !uuid.test(request.id) ||
+        !["CUSTOMER", "PRIMARY_PROVIDER", "BOTH"].includes(request.recipient) ||
+        request.requestText.length < 1 ||
+        control.test(request.requestText) ||
+        (request.replyDeadline !== null &&
+          !(request.replyDeadline instanceof Date)) ||
+        !(request.requestedAt instanceof Date),
+    ) ||
+    (outcome !== null &&
+      (!uuid.test(outcome.id) ||
+        ![
+          "RESOLVED_BY_PARTIES",
+          "OPERATIONAL_ADMIN_RESOLUTION",
+          "NO_ACTION",
+          "REFERRED_OUTSIDE_PLATFORM",
+          "ACCOUNT_POLICY_ACTION",
+          "OTHER",
+        ].includes(outcome.category) ||
+        !["MUTUAL_PARTY_AGREEMENT", "ADMINISTRATIVE_CLOSURE"].includes(
+          outcome.basis,
+        ) ||
+        outcome.summary.length < 1 ||
+        control.test(outcome.summary) ||
+        !(outcome.recordedAt instanceof Date))) ||
+    timeline.some(
+      (event) =>
+        !uuid.test(event.eventId) ||
+        ![
+          "OPEN",
+          "START_REVIEW",
+          "REQUEST_INFORMATION",
+          "RECORD_OUTCOME",
+          "CLOSE",
+          "REOPEN",
+        ].includes(event.action) ||
+        (event.fromState !== null && !states.includes(event.fromState)) ||
+        !states.includes(event.toState) ||
+        !(event.occurredAt instanceof Date),
+    )
+  )
+    throw new Error("Invalid dispute administrative context projection.");
 }
 
 function fingerprint(value: unknown): string {

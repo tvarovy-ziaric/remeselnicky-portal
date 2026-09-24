@@ -50,6 +50,46 @@ function detail(state: "OPEN" | "CLOSED" = "OPEN"): JobDisputeDetail {
         createdAt: "2026-09-24T10:02:00.000Z",
       },
     ],
+    adminRequests: [
+      {
+        id: quoteId,
+        recipient: "PRIMARY_PROVIDER",
+        requestText: "Doplňte fotografiu opraveného detailu.",
+        replyDeadline: "2026-09-30T10:00:00.000Z",
+        requestedAt: "2026-09-24T11:00:00.000Z",
+      },
+    ],
+    outcome:
+      state === "CLOSED"
+        ? {
+            id: mediaAssetId,
+            category: "OPERATIONAL_ADMIN_RESOLUTION",
+            basis: "ADMINISTRATIVE_CLOSURE",
+            summary:
+              "Prípad bol prevádzkovo uzavretý bez právneho rozhodnutia.",
+            recordedAt: "2026-09-24T12:00:00.000Z",
+          }
+        : null,
+    caseTimeline: [
+      {
+        eventId: disputeId,
+        action: "OPEN",
+        fromState: null,
+        toState: "OPEN",
+        occurredAt: "2026-09-24T10:00:00.000Z",
+      },
+      ...(state === "CLOSED"
+        ? [
+            {
+              eventId: quoteId,
+              action: "CLOSE",
+              fromState: "RESOLVED" as const,
+              toState: "CLOSED" as const,
+              occurredAt: "2026-09-24T12:01:00.000Z",
+            },
+          ]
+        : []),
+    ],
     commercialBaseline: {
       acceptedRequestContentRevision: 2,
       acceptedRequestVisibleVersion: 3,
@@ -121,6 +161,8 @@ describe("D22 private dispute UI", () => {
     expect(html).toContain("Vada je viditeľná na priloženej fotografii.");
     expect(html).toContain("Pridať nemenné vyjadrenie");
     expect(html).toContain("Nahrať nový súkromný dôkaz");
+    expect(html).toContain("Doplňte fotografiu opraveného detailu.");
+    expect(html).toContain("Zmeškanie prevádzkového termínu");
     expect(html).toContain("JOB_CONFIRMED");
     expect(html).not.toContain("Rozhodnúť spor");
     expect(html).not.toContain("Vrátiť peniaze");
@@ -130,6 +172,8 @@ describe("D22 private dispute UI", () => {
     const html = renderDetail(detail("CLOSED"));
     expect(html).toContain("Uzavretý");
     expect(html).toContain("Miesto zatekania po daždi.");
+    expect(html).toContain("prevádzkovo uzavretý bez právneho rozhodnutia");
+    expect(html).toContain("nie právny rozsudok ani zmena prijatej dohody");
     expect(html).not.toContain("Pridať nemenné vyjadrenie");
     expect(html).not.toContain("Pripojiť existujúci dôkaz zo zákazky");
     expect(html).not.toContain("Nahrať nový súkromný dôkaz");

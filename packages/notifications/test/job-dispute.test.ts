@@ -80,6 +80,33 @@ describe("D22 Job dispute notification catalog", () => {
     );
   });
 
+  it("maps an admin action without request, outcome, note or audit text", () => {
+    const draft = mapJobDisputeNotificationEvent({
+      ...event({ action: "REQUEST_INFORMATION" }),
+      name: "job.dispute.admin_action",
+    })?.[0];
+    expect(draft).toMatchObject({
+      channels: ["IN_APP"],
+      context: { path: `/zakazky/${jobId}` },
+      payload: {
+        action: "READ_DISPUTE_ADMIN_ACTION",
+        case_action: "REQUEST_INFORMATION",
+        dispute_id: disputeId,
+        job_id: jobId,
+      },
+      priority: "IMPORTANT",
+    });
+    expect(JSON.stringify(draft)).not.toMatch(
+      /request_text|summary|internal_note|reason/iu,
+    );
+    expect(() =>
+      mapJobDisputeNotificationEvent({
+        ...event({ action: "LEGAL_VERDICT" }),
+        name: "job.dispute.admin_action",
+      }),
+    ).toThrow(/action/iu);
+  });
+
   it("ignores events outside its bounded catalog", () => {
     expect(
       mapJobDisputeNotificationEvent({

@@ -73,5 +73,19 @@ describe("admin shell response boundary", () => {
     expect(
       parseAdminModule({ ...response, state: "READY" }, "audit"),
     ).toBeUndefined();
+    expect(
+      parseAdminModule(
+        {
+          description: "Otvorené prípady a spory.",
+          id: "disputes",
+          label: "Spory",
+          state: "OPERATIONAL",
+        },
+        "disputes",
+      )?.id,
+    ).toBe("disputes");
+    expect(
+      parseAdminModule({ ...response, id: "disputes" }, "disputes"),
+    ).toBeUndefined();
   });
 });

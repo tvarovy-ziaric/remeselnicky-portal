@@ -64,6 +64,33 @@ export interface JobDisputeEvidence {
 export interface JobDisputeDetail extends JobDisputeSummary {
   readonly statements: readonly JobDisputeStatement[];
   readonly evidence: readonly JobDisputeEvidence[];
+  readonly adminRequests: readonly Readonly<{
+    id: string;
+    recipient: JobDisputePartyRole | "BOTH";
+    requestText: string;
+    replyDeadline: string | null;
+    requestedAt: string;
+  }>[];
+  readonly outcome: Readonly<{
+    id: string;
+    category:
+      | "RESOLVED_BY_PARTIES"
+      | "OPERATIONAL_ADMIN_RESOLUTION"
+      | "NO_ACTION"
+      | "REFERRED_OUTSIDE_PLATFORM"
+      | "ACCOUNT_POLICY_ACTION"
+      | "OTHER";
+    basis: "MUTUAL_PARTY_AGREEMENT" | "ADMINISTRATIVE_CLOSURE";
+    summary: string;
+    recordedAt: string;
+  }> | null;
+  readonly caseTimeline: readonly Readonly<{
+    eventId: string;
+    action: string;
+    fromState: JobDisputeState | null;
+    toState: JobDisputeState;
+    occurredAt: string;
+  }>[];
   readonly commercialBaseline: Readonly<{
     acceptedRequestContentRevision: number;
     acceptedRequestVisibleVersion: number;
@@ -264,6 +291,86 @@ function parseEvidence(value: unknown): JobDisputeEvidence | null {
   return value as unknown as JobDisputeEvidence;
 }
 
+function parseAdminRequest(
+  value: unknown,
+): JobDisputeDetail["adminRequests"][number] | null {
+  if (
+    !record(value) ||
+    !exact(value, [
+      "id",
+      "recipient",
+      "requestText",
+      "replyDeadline",
+      "requestedAt",
+    ]) ||
+    typeof value.id !== "string" ||
+    !uuid.test(value.id) ||
+    !["CUSTOMER", "PRIMARY_PROVIDER", "BOTH"].includes(
+      String(value.recipient),
+    ) ||
+    !text(value.requestText, 1, 2_000) ||
+    !(value.replyDeadline === null || instant(value.replyDeadline)) ||
+    !instant(value.requestedAt)
+  )
+    return null;
+  return value as unknown as JobDisputeDetail["adminRequests"][number];
+}
+
+function parseOutcome(value: unknown): JobDisputeDetail["outcome"] | null {
+  if (
+    !record(value) ||
+    !exact(value, ["id", "category", "basis", "summary", "recordedAt"]) ||
+    typeof value.id !== "string" ||
+    !uuid.test(value.id) ||
+    ![
+      "RESOLVED_BY_PARTIES",
+      "OPERATIONAL_ADMIN_RESOLUTION",
+      "NO_ACTION",
+      "REFERRED_OUTSIDE_PLATFORM",
+      "ACCOUNT_POLICY_ACTION",
+      "OTHER",
+    ].includes(String(value.category)) ||
+    !["MUTUAL_PARTY_AGREEMENT", "ADMINISTRATIVE_CLOSURE"].includes(
+      String(value.basis),
+    ) ||
+    !text(value.summary, 1, 4_000) ||
+    !instant(value.recordedAt)
+  )
+    return null;
+  return value as unknown as Exclude<JobDisputeDetail["outcome"], null>;
+}
+
+function parseCaseTimelineEvent(
+  value: unknown,
+): JobDisputeDetail["caseTimeline"][number] | null {
+  if (
+    !record(value) ||
+    !exact(value, [
+      "eventId",
+      "action",
+      "fromState",
+      "toState",
+      "occurredAt",
+    ]) ||
+    typeof value.eventId !== "string" ||
+    !uuid.test(value.eventId) ||
+    typeof value.action !== "string" ||
+    ![
+      "OPEN",
+      "START_REVIEW",
+      "REQUEST_INFORMATION",
+      "RECORD_OUTCOME",
+      "CLOSE",
+      "REOPEN",
+    ].includes(value.action) ||
+    !(value.fromState === null || state(value.fromState)) ||
+    !state(value.toState) ||
+    !instant(value.occurredAt)
+  )
+    return null;
+  return value as unknown as JobDisputeDetail["caseTimeline"][number];
+}
+
 function parseBaseline(value: unknown, jobId: string) {
   if (
     !record(value) ||
@@ -332,6 +439,9 @@ export function parseJobDisputeDetail(
         ![
           "statements",
           "evidence",
+          "adminRequests",
+          "outcome",
+          "caseTimeline",
           "commercialBaseline",
           "jobTimeline",
         ].includes(key),
@@ -344,16 +454,26 @@ export function parseJobDisputeDetail(
     value.statements.length > 5_000 ||
     !Array.isArray(value.evidence) ||
     value.evidence.length > 5_000 ||
+    !Array.isArray(value.adminRequests) ||
+    value.adminRequests.length > 1_000 ||
+    !Array.isArray(value.caseTimeline) ||
+    value.caseTimeline.length > 1_000 ||
     !Array.isArray(value.jobTimeline) ||
     value.jobTimeline.length > 10_000
   )
     return null;
   const statements = value.statements.map(parseStatement);
   const evidence = value.evidence.map(parseEvidence);
+  const adminRequests = value.adminRequests.map(parseAdminRequest);
+  const outcome = value.outcome === null ? null : parseOutcome(value.outcome);
+  const caseTimeline = value.caseTimeline.map(parseCaseTimelineEvent);
   const baseline = parseBaseline(value.commercialBaseline, jobId);
   if (
     statements.some((item) => item === null) ||
     evidence.some((item) => item === null) ||
+    adminRequests.some((item) => item === null) ||
+    (value.outcome !== null && outcome === null) ||
+    caseTimeline.some((item) => item === null) ||
     baseline === null
   )
     return null;
@@ -375,15 +495,26 @@ export function parseJobDisputeDetail(
   const evidenceIds = new Set(
     (evidence as JobDisputeEvidence[]).map((item) => item.id),
   );
+  const requestIds = new Set(adminRequests.map((item) => item?.id));
+  const caseEventIds = new Set(caseTimeline.map((item) => item?.eventId));
   if (
     statementIds.size !== statements.length ||
-    evidenceIds.size !== evidence.length
+    evidenceIds.size !== evidence.length ||
+    requestIds.size !== adminRequests.length ||
+    caseEventIds.size !== caseTimeline.length
   )
     return null;
   return Object.freeze({
     ...summary,
     statements: Object.freeze(statements as JobDisputeStatement[]),
     evidence: Object.freeze(evidence as JobDisputeEvidence[]),
+    adminRequests: Object.freeze(
+      adminRequests as JobDisputeDetail["adminRequests"],
+    ),
+    outcome,
+    caseTimeline: Object.freeze(
+      caseTimeline as JobDisputeDetail["caseTimeline"],
+    ),
     commercialBaseline: baseline,
     jobTimeline: Object.freeze(
       value.jobTimeline as JobDisputeDetail["jobTimeline"],

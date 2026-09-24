@@ -163,6 +163,8 @@ import { createJobLifecycleRepository } from "./job-lifecycle-repository.js";
 import { createJobCompletionRepository } from "./job-completion-repository.js";
 import { createCustomerCompletionProposalRepository } from "./customer-completion-proposal-repository.js";
 import { createAdminJobCompletionRepository } from "./admin-job-completion-repository.js";
+import { createAdminJobCancellationRepository } from "./admin-job-cancellation-repository.js";
+import { createAdminDisputeRepository } from "./admin-dispute-repository.js";
 export {
   createAdminJobCompletionRepository,
   AdminJobCompletionIdempotencyError,
@@ -171,6 +173,31 @@ export type {
   ForceCompleteJobInput,
   ForceCompleteJobResult,
 } from "./admin-job-completion-repository.js";
+export {
+  createAdminJobCancellationRepository,
+  AdminJobCancellationIdempotencyError,
+} from "./admin-job-cancellation-repository.js";
+export type {
+  ForceCancelJobInput,
+  ForceCancelJobResult,
+} from "./admin-job-cancellation-repository.js";
+export {
+  createAdminDisputeRepository,
+  AdminDisputeIdempotencyError,
+  ADMIN_DISPUTE_ACTIONS,
+  DISPUTE_OUTCOME_CATEGORIES,
+} from "./admin-dispute-repository.js";
+export type {
+  AdminDisputeAction,
+  AdminDisputeCaseDetail,
+  AdminDisputeCommand,
+  AdminDisputeCommandResult,
+  AdminDisputeQueueItem,
+  AdminDisputeState,
+  DisputeOutcomeBasis,
+  DisputeOutcomeCategory,
+  DisputeRequestRecipient,
+} from "./admin-dispute-repository.js";
 export {
   createCustomerCompletionProposalRepository,
   CompletionProposalIdempotencyError,
@@ -297,6 +324,7 @@ export {
 } from "./job-dispute-repository.js";
 export type {
   DisputeCaseDetail,
+  DisputeCaseOutcomeCategory,
   DisputeCaseState,
   DisputeCaseSummary,
   DisputeCategory,
@@ -1203,6 +1231,10 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly adminJobCompletion: ReturnType<
     typeof createAdminJobCompletionRepository
   >;
+  readonly adminJobCancellation: ReturnType<
+    typeof createAdminJobCancellationRepository
+  >;
+  readonly adminDisputes: ReturnType<typeof createAdminDisputeRepository>;
   readonly customerCompletionProposals: ReturnType<
     typeof createCustomerCompletionProposalRepository
   >;
@@ -1375,6 +1407,8 @@ export function createDatabase(
   const jobLifecycle = createJobLifecycleRepository(sql);
   const jobCompletion = createJobCompletionRepository(sql);
   const adminJobCompletion = createAdminJobCompletionRepository(sql);
+  const adminJobCancellation = createAdminJobCancellationRepository(sql);
+  const adminDisputes = createAdminDisputeRepository(sql);
   const customerCompletionProposals =
     createCustomerCompletionProposalRepository(sql);
   const jobDocumentation = createJobDocumentationRepository(sql);
@@ -1483,6 +1517,8 @@ export function createDatabase(
     jobLifecycle,
     jobCompletion,
     adminJobCompletion,
+    adminJobCancellation,
+    adminDisputes,
     customerCompletionProposals,
     jobDocumentation,
     jobRoster,

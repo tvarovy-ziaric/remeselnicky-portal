@@ -10,6 +10,7 @@ import {
   parseAdminModules,
   parseAdminSession,
 } from "./admin-shell-model";
+import { AdminDisputeWorkspace, AdminJobOperations } from "./admin-operations";
 
 export type AdminShellState =
   | { readonly status: "LOADING" }
@@ -89,6 +90,10 @@ export function AdminShellClient({
                 Späť na prehľad
               </a>
             </section>
+          ) : selected.id === "disputes" ? (
+            <AdminDisputeWorkspace />
+          ) : selected.id === "jobs" ? (
+            <AdminJobOperations />
           ) : (
             <AdminModulePlaceholder module={selected} />
           )}

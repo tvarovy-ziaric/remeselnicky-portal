@@ -79,6 +79,16 @@ export {
 } from "./job-completion/admin-routes.js";
 export type { AdminJobCompletionRouteDependencies } from "./job-completion/admin-routes.js";
 export {
+  ADMIN_JOB_CANCELLATION_PATH,
+  registerAdminJobCancellationRoutes,
+} from "./job-lifecycle/admin-cancel-routes.js";
+export type { AdminJobCancellationRouteDependencies } from "./job-lifecycle/admin-cancel-routes.js";
+export {
+  ADMIN_DISPUTE_PATHS,
+  registerAdminDisputeRoutes,
+} from "./admin-disputes/routes.js";
+export type { AdminDisputeRouteDependencies } from "./admin-disputes/routes.js";
+export {
   JOB_DOCUMENTATION_PATH,
   registerJobDocumentationRoutes,
 } from "./job-documentation/routes.js";

@@ -72,7 +72,10 @@ export function registerAdminConsoleRoutes(
         description: module.description,
         id: moduleId,
         label: module.label,
-        state: "PLACEHOLDER",
+        state:
+          moduleId === "disputes" || moduleId === "jobs"
+            ? "OPERATIONAL"
+            : "PLACEHOLDER",
       });
     },
   );

@@ -708,6 +708,220 @@ p {
   font-weight: 800;
 }
 
+.admin-operations {
+  width: min(100%, 76rem);
+}
+
+.admin-toolbar,
+.admin-action-grid,
+.admin-evidence-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.admin-toolbar {
+  grid-template-columns: minmax(11rem, 0.7fr) minmax(16rem, 2fr);
+  margin: 1.5rem 0;
+}
+
+.admin-toolbar label,
+.admin-action label,
+.admin-reason {
+  display: grid;
+  gap: 0.4rem;
+  color: #33453a;
+  font-size: 0.9rem;
+  font-weight: 750;
+}
+
+.admin-toolbar input,
+.admin-toolbar select,
+.admin-action input,
+.admin-action select,
+.admin-action textarea,
+.admin-reason textarea {
+  width: 100%;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid #a8b2aa;
+  border-radius: 0.55rem;
+  background: #fff;
+  color: #1f2923;
+}
+
+.admin-action textarea,
+.admin-reason textarea {
+  min-height: 5.5rem;
+  resize: vertical;
+}
+
+.admin-case-list {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-case-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid #d8d4c8;
+  border-radius: 0.7rem;
+  background: #fff;
+}
+
+.admin-case-list li[aria-current="true"] {
+  border-color: #355b43;
+  box-shadow: 0 0 0 2px rgb(53 91 67 / 14%);
+}
+
+.admin-case-list li > div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.admin-case-list span,
+.admin-case-list small,
+.admin-action > p,
+.admin-status {
+  color: #55705f;
+}
+
+.admin-case-list button,
+.admin-action button,
+.admin-empty-state button {
+  padding: 0.7rem 1rem;
+  border: 0;
+  border-radius: 0.55rem;
+  background: #234d31;
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.admin-case-list button:disabled,
+.admin-action button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.admin-case-detail {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid #d8d4c8;
+}
+
+.admin-case-detail > header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.admin-case-detail h3,
+.admin-action h3,
+.admin-action h4 {
+  margin: 0.25rem 0 0.5rem;
+}
+
+.admin-state-badge {
+  padding: 0.45rem 0.65rem;
+  border-radius: 999px;
+  background: #dce7de;
+  color: #294f37;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.admin-facts {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1.25rem 0;
+}
+
+.admin-facts div {
+  padding: 0.9rem;
+  border-radius: 0.6rem;
+  background: #f4f8f3;
+}
+
+.admin-facts dt {
+  margin-bottom: 0.25rem;
+  color: #55705f;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.admin-facts dd {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.admin-action-grid,
+.admin-evidence-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 1.25rem;
+}
+
+.admin-action,
+.admin-evidence-grid article {
+  display: grid;
+  align-content: start;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid #d8d4c8;
+  border-radius: 0.7rem;
+  background: #faf9f4;
+}
+
+.admin-action > p {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.admin-confirm {
+  grid-template-columns: auto 1fr !important;
+  align-items: start;
+}
+
+.admin-confirm input {
+  width: auto;
+  margin-top: 0.2rem;
+}
+
+.admin-evidence-grid {
+  margin-top: 2rem;
+}
+
+.admin-evidence-grid .admin-wide {
+  grid-column: 1 / -1;
+}
+
+.admin-evidence-grid h4 {
+  margin: 0;
+}
+
+.admin-evidence-grid ol {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.admin-evidence-grid li p {
+  margin: 0.25rem 0;
+  white-space: pre-wrap;
+}
+
+.admin-evidence-grid small {
+  color: #55705f;
+}
+
 .admin-locked {
   display: grid;
   min-height: 100vh;
@@ -733,6 +947,22 @@ p {
 
   .admin-nav a {
     flex: 0 0 auto;
+  }
+
+  .admin-toolbar,
+  .admin-action-grid,
+  .admin-evidence-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-evidence-grid .admin-wide {
+    grid-column: auto;
+  }
+
+  .admin-case-list li,
+  .admin-case-detail > header {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 

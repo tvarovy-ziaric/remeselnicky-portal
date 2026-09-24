@@ -67,6 +67,17 @@ function build(
       canAddContent: true,
       statements: [],
       evidence: [],
+      adminRequests: [],
+      outcome: null,
+      caseTimeline: [
+        {
+          eventId: disputeId,
+          action: "OPEN",
+          fromState: null,
+          toState: "OPEN",
+          occurredAt,
+        },
+      ],
       commercialBaseline: {
         acceptedRequestContentRevision: 1,
         acceptedRequestVisibleVersion: 1,

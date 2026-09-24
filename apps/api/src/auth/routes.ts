@@ -86,6 +86,14 @@ import {
   type AdminJobCompletionRouteDependencies,
 } from "../job-completion/admin-routes.js";
 import {
+  registerAdminJobCancellationRoutes,
+  type AdminJobCancellationRouteDependencies,
+} from "../job-lifecycle/admin-cancel-routes.js";
+import {
+  registerAdminDisputeRoutes,
+  type AdminDisputeRouteDependencies,
+} from "../admin-disputes/routes.js";
+import {
   registerJobDocumentationRoutes,
   type JobDocumentationRouteDependencies,
 } from "../job-documentation/routes.js";
@@ -251,6 +259,11 @@ export interface AuthModuleDependencies {
     AdminJobCompletionRouteDependencies,
     "completion"
   >;
+  readonly adminJobCancellation?: Pick<
+    AdminJobCancellationRouteDependencies,
+    "cancellation"
+  >;
+  readonly adminDisputes?: Pick<AdminDisputeRouteDependencies, "disputes">;
   readonly jobDocumentation?: Pick<
     JobDocumentationRouteDependencies,
     "documentation"
@@ -854,6 +867,30 @@ async function configureAuthModule(
       registerAdminJobCompletionRoutes(app, {
         adminAccess: dependencies.adminAccess.service,
         completion: dependencies.adminJobCompletion.completion,
+        guard,
+        csrfProtection: csrfProtection(app),
+        rateLimit: {
+          max: config.rateLimitMax,
+          timeWindowMs: config.rateLimitWindowMs,
+        },
+      });
+    }
+    if (dependencies.adminJobCancellation !== undefined) {
+      registerAdminJobCancellationRoutes(app, {
+        adminAccess: dependencies.adminAccess.service,
+        cancellation: dependencies.adminJobCancellation.cancellation,
+        guard,
+        csrfProtection: csrfProtection(app),
+        rateLimit: {
+          max: config.rateLimitMax,
+          timeWindowMs: config.rateLimitWindowMs,
+        },
+      });
+    }
+    if (dependencies.adminDisputes !== undefined) {
+      registerAdminDisputeRoutes(app, {
+        adminAccess: dependencies.adminAccess.service,
+        disputes: dependencies.adminDisputes.disputes,
         guard,
         csrfProtection: csrfProtection(app),
         rateLimit: {
