@@ -291,7 +291,7 @@ export async function runAdminDisputeIntegrationAssertions(
   const [partyNotification] = await sql<
     Array<{ payload: Record<string, unknown> }>
   >`
-    SELECT payload FROM outbox_events
+    SELECT payload FROM domain_outbox_events
     WHERE event_name = 'job.dispute.party_action'
       AND aggregate_id = ${settlementDisputeId}::text
     ORDER BY occurred_at DESC LIMIT 1`;
