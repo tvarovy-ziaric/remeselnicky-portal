@@ -1887,6 +1887,11 @@ describe.skipIf(testDatabaseUrl === undefined)(
         );
         await runJobContextReviewIntegrationAssertions(sql);
         await runJobContextReviewCommittedRaceAssertions(sql);
+        await runQuoteAcceptanceCommittedRaceIntegrationAssertions(
+          sql,
+          acceptanceSource,
+          "CREATE_CONFIRMED_FIXTURE",
+        );
         await runJobSupervisorEvaluationIntegrationAssertions(sql);
         await runJobSupervisorEvaluationCommittedRaceAssertions(sql);
 
