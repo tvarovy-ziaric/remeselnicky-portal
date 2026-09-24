@@ -115,6 +115,14 @@ function serializePage(page: PublicCraftsmanReviewPage) {
       score: review.score,
       comment: review.comment,
       reviewedMonth: review.reviewedMonth,
+      response:
+        review.response === null
+          ? null
+          : {
+              responseId: review.response.responseId,
+              body: review.response.body,
+              respondedMonth: review.response.respondedMonth,
+            },
     })),
     nextCursor: page.nextCursor,
   };

@@ -118,6 +118,7 @@ describe("supervisor evaluation private UX", () => {
     expect(html).toContain("Stavbyvedúci zákazky");
     expect(html).toContain("Samostatná a spoľahlivá práca.");
     expect(html).toContain("Verejný profil nesmie zobraziť");
+    expect(html).toContain("Nahlásiť odborné hodnotenie");
     expect(
       renderToStaticMarkup(
         <ReceivedSupervisorEvaluationView

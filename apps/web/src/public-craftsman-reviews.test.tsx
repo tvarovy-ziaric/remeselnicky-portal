@@ -38,6 +38,10 @@ describe("public craftsman reviews", () => {
     expect(html).toContain("Znovu by si zákazník vybral tohto poskytovateľa");
     expect(html).toContain("Neviem posúdiť / netýka sa");
     expect(html).toContain("Poctivá práca a dobrá komunikácia.");
+    expect(html).toContain("Odpoveď remeselníka");
+    expect(html).toContain("Ďakujem za spätnú väzbu.");
+    expect(html).toContain("Nahlásiť hodnotenie");
+    expect(html).toContain("Nahlásiť odpoveď");
     expect(html).not.toContain(reviewId);
     expect(html).not.toMatch(/job|customerName|submittedAt|email|adresa/iu);
   });
@@ -89,7 +93,8 @@ describe("public craftsman reviews", () => {
     expect(html).toContain(
       `/remeselnici/${profileId}?reviewsCursor=v1.${page().nextCursor?.slice(3)}`,
     );
-    expect(html).not.toMatch(/form|button|POST/iu);
+    expect(html).not.toContain("<form");
+    expect(html).not.toMatch(/method=["']post/iu);
   });
 
   it("formats only month and year", () => {
@@ -128,6 +133,11 @@ function page(): PublicCraftsmanReviewsPage {
         score: 4.67,
         comment: "Poctivá práca a dobrá komunikácia.",
         reviewedMonth: "2026-09",
+        response: {
+          responseId: "84000000-0000-4000-8000-000000000004",
+          body: "Ďakujem za spätnú väzbu.",
+          respondedMonth: "2026-09",
+        },
       },
     ],
     nextCursor: "v1.84000000-0000-4000-8000-000000000003",

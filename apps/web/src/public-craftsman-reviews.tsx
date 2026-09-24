@@ -4,6 +4,7 @@ import {
   publicCraftsmanReviewDimensions,
   type PublicCraftsmanReviewsPage,
 } from "./public-craftsman-reviews-client";
+import { ReviewReportButton } from "./review-moderation-actions";
 
 export function PublicCraftsmanReviews({
   page,
@@ -55,6 +56,27 @@ export function PublicCraftsmanReviews({
               </dl>
               {review.comment === null ? null : (
                 <blockquote>{review.comment}</blockquote>
+              )}
+              <ReviewReportButton
+                label="Nahlásiť hodnotenie"
+                targetId={review.reviewId}
+                targetType="MAIN_REVIEW"
+              />
+              {review.response === null ? null : (
+                <aside className="public-review-response">
+                  <header>
+                    <strong>Odpoveď remeselníka</strong>
+                    <span>
+                      {formatReviewedMonth(review.response.respondedMonth)}
+                    </span>
+                  </header>
+                  <p>{review.response.body}</p>
+                  <ReviewReportButton
+                    label="Nahlásiť odpoveď"
+                    targetId={review.response.responseId}
+                    targetType="REVIEW_RESPONSE"
+                  />
+                </aside>
               )}
             </li>
           ))}

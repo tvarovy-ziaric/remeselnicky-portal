@@ -51,6 +51,22 @@ describe("public craftsman reviews parser", () => {
     }
   });
 
+  it("rejects malformed or privacy-unsafe public response projections", () => {
+    for (const response of [
+      { ...review().response, extra: true },
+      { ...review().response, responseId: "private" },
+      { ...review().response, body: "Kontakt +421 900 123 456" },
+      { ...review().response, respondedMonth: "2026-09-24" },
+    ]) {
+      expect(
+        parsePublicCraftsmanReviewsPage({
+          ...page(),
+          reviews: [{ ...review(), response }],
+        }),
+      ).toBeNull();
+    }
+  });
+
   it("rejects malformed ratings, score, month, duplicates, and cursors", () => {
     const invalidReviews = [
       { ...review(), ratings: { ...review().ratings, extra: 5 } },
@@ -180,5 +196,10 @@ function review() {
     score: 4.67,
     comment: "Poctivá práca a dobrá komunikácia.",
     reviewedMonth: "2026-09",
+    response: {
+      responseId: nextId,
+      body: "Ďakujem za spätnú väzbu.",
+      respondedMonth: "2026-09",
+    },
   };
 }

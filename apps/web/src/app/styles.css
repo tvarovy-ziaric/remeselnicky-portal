@@ -166,6 +166,41 @@ section {
   white-space: pre-wrap;
 }
 
+.public-review-response {
+  margin-top: 1rem;
+  border-left: 3px solid var(--color-accent, #315b43);
+  padding: 0.75rem 1rem;
+  background: rgba(49, 91, 67, 0.06);
+}
+
+.public-review-response header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.public-review-response p {
+  margin: 0.5rem 0 0;
+}
+
+.review-moderation-action {
+  margin-top: 0.75rem;
+}
+
+.review-moderation-action form,
+.review-response-editor {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  max-width: 42rem;
+}
+
+.review-moderation-action label,
+.review-response-editor label {
+  display: grid;
+  gap: 0.35rem;
+}
+
 .public-review-next {
   display: inline-block;
   margin-top: 0.5rem;

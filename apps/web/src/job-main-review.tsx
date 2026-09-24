@@ -15,6 +15,10 @@ import {
   submitJobMainReview,
   validJobMainReviewDraft,
 } from "./job-main-review-data";
+import {
+  ReviewReportButton,
+  ReviewResponseEditor,
+} from "./review-moderation-actions";
 
 const dimensions = (direction: JobMainReviewDirection) =>
   direction === "CUSTOMER_TO_PROVIDER"
@@ -256,6 +260,18 @@ export function JobMainReviewView({
             comment={page.counterpartyReview.comment}
           />
           <p>Odomknuté {dateTime(page.counterpartyReview.unlockedAt)}</p>
+          {page.counterpartyReview.direction === "CUSTOMER_TO_PROVIDER" && (
+            <>
+              <ReviewReportButton
+                label="Nahlásiť hodnotenie"
+                targetId={page.counterpartyReview.revisionId}
+                targetType="MAIN_REVIEW"
+              />
+              <ReviewResponseEditor
+                reviewId={page.counterpartyReview.revisionId}
+              />
+            </>
+          )}
         </div>
       )}
     </section>

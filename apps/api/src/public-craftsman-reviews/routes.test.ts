@@ -270,5 +270,6 @@ function review() {
     score: 4.67,
     comment: "Precízna práca.",
     reviewedMonth: "2026-09",
+    response: null,
   };
 }

@@ -195,6 +195,9 @@ const app = buildApi({
     jobSupervisorEvaluations: {
       evaluations: database.jobSupervisorEvaluations,
     },
+    reviewResponsesAndReports: {
+      persistence: database.reviewResponsesAndReports,
+    },
     quoteLifecycle: { lifecycle: database.quoteLifecycle },
     quoteAuthoring: {
       core: quoteAuthoring,

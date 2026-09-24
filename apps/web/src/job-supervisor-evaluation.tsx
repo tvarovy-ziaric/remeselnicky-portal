@@ -20,6 +20,7 @@ import {
   type SupervisorVerifiedRole,
   validSupervisorEvaluationDraft,
 } from "./job-supervisor-evaluation-data";
+import { ReviewReportButton } from "./review-moderation-actions";
 
 const emptyRatings = () =>
   Object.fromEntries(
@@ -335,6 +336,11 @@ function ReceivedEvaluationCard({
         .
       </p>
       <p>Odoslané {dateTime(evaluation.submittedAt)}.</p>
+      <ReviewReportButton
+        label="Nahlásiť odborné hodnotenie"
+        targetId={evaluation.evaluationId}
+        targetType="SUPERVISOR_EVALUATION"
+      />
     </article>
   );
 }

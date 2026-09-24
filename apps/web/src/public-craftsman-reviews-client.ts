@@ -34,6 +34,11 @@ export interface PublicCraftsmanReview {
   readonly score: number;
   readonly comment: string | null;
   readonly reviewedMonth: string;
+  readonly response: Readonly<{
+    responseId: string;
+    body: string;
+    respondedMonth: string;
+  }> | null;
 }
 
 export interface PublicCraftsmanReviewsPage {
@@ -135,6 +140,7 @@ function parseReview(value: unknown): PublicCraftsmanReview | null {
       "score",
       "comment",
       "reviewedMonth",
+      "response",
     ]) ||
     typeof value.reviewId !== "string" ||
     !uuid.test(value.reviewId) ||
@@ -155,6 +161,8 @@ function parseReview(value: unknown): PublicCraftsmanReview | null {
   }
   const ratings = parseRatings(value.ratings);
   if (ratings === null) return null;
+  const response = parseResponse(value.response);
+  if (response === undefined) return null;
   const answered = Object.values(ratings).filter(
     (rating): rating is Exclude<PublicCraftsmanReviewRating, null> =>
       rating !== null,
@@ -173,6 +181,31 @@ function parseReview(value: unknown): PublicCraftsmanReview | null {
     score: value.score,
     comment: value.comment,
     reviewedMonth: value.reviewedMonth,
+    response,
+  };
+}
+
+function parseResponse(
+  value: unknown,
+): PublicCraftsmanReview["response"] | undefined {
+  if (value === null) return null;
+  if (
+    !record(value) ||
+    !exact(value, ["responseId", "body", "respondedMonth"]) ||
+    typeof value.responseId !== "string" ||
+    !uuid.test(value.responseId) ||
+    typeof value.body !== "string" ||
+    value.body.length > 2_000 ||
+    !isPublicReviewCommentSafe(value.body) ||
+    typeof value.respondedMonth !== "string" ||
+    !reviewedMonth.test(value.respondedMonth)
+  ) {
+    return undefined;
+  }
+  return {
+    responseId: value.responseId,
+    body: value.body,
+    respondedMonth: value.respondedMonth,
   };
 }
 

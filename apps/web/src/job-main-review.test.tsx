@@ -142,4 +142,33 @@ describe("completed Job main review section", () => {
     expect(expiredHtml).not.toContain("Odoslať hodnotenie");
     expect(expiredHtml).not.toContain("od druhej strany");
   });
+
+  it("offers the rated provider one response and report path only for the public customer review", () => {
+    const providerPage: JobMainReviewPage = {
+      ...openPage("PROVIDER_TO_CUSTOMER"),
+      state: "UNLOCKED",
+      ownReview: {
+        revisionId: ownRevisionId,
+        version: 1,
+        submittedAt,
+        revisedAt: submittedAt,
+        ratings: ratings(providerToCustomerReviewDimensions),
+        comment: null,
+      },
+      counterpartyReview: {
+        direction: "CUSTOMER_TO_PROVIDER",
+        revisionId: otherRevisionId,
+        submittedAt,
+        revisedAt: submittedAt,
+        unlockedAt: submittedAt,
+        ratings: ratings(customerToProviderReviewDimensions),
+        comment: "Vecná zákaznícka recenzia.",
+      },
+    };
+    const html = renderToStaticMarkup(
+      <JobMainReviewView page={providerPage} now={now} />,
+    );
+    expect(html).toContain("Nahlásiť hodnotenie");
+    expect(html).toContain("Načítavam vašu verejnú odpoveď");
+  });
 });

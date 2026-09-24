@@ -24,6 +24,14 @@ export type PublicCraftsmanReviewRatings = Readonly<
   Record<PublicCraftsmanReviewDimension, 1 | 2 | 3 | 4 | 5 | null>
 >;
 
+export interface PublicCraftsmanReviewResponse {
+  /** Opaque stable identity used only for reporting this public response. */
+  readonly responseId: string;
+  readonly body: string;
+  /** Bratislava-local publication month, deliberately without exact time. */
+  readonly respondedMonth: string;
+}
+
 export interface PublicCraftsmanReviewItem {
   /** Opaque public revision identity; never a Job or reviewer identity. */
   readonly reviewId: string;
@@ -34,6 +42,7 @@ export interface PublicCraftsmanReviewItem {
   readonly comment: string | null;
   /** Bratislava-local publication month, deliberately without exact time. */
   readonly reviewedMonth: string;
+  readonly response: PublicCraftsmanReviewResponse | null;
 }
 
 export interface PublicCraftsmanReviewPage {
@@ -70,6 +79,9 @@ interface PublicReviewRow {
   readonly ratings: unknown;
   readonly comment: string | null;
   readonly reviewedMonth: string;
+  readonly responseId: string | null;
+  readonly responseBody: string | null;
+  readonly respondedMonth: string | null;
 }
 
 interface NormalizedListInput {
@@ -154,11 +166,19 @@ async function selectFirstPage(
       review.accepted_profession_code AS "professionCode",
       review.ratings,
       review.comment,
+      response.response_id AS "responseId",
+      response.body AS "responseBody",
       to_char(
         review.unlocked_at AT TIME ZONE 'Europe/Bratislava',
         'YYYY-MM'
-      ) AS "reviewedMonth"
+      ) AS "reviewedMonth",
+      to_char(
+        response.responded_at AT TIME ZONE 'Europe/Bratislava',
+        'YYYY-MM'
+      ) AS "respondedMonth"
     FROM current_unlocked_job_main_reviews review
+    LEFT JOIN current_job_main_review_responses response
+      ON response.review_revision_id = review.revision_id
     WHERE review.target_profile_id = ${input.craftsmanProfileId}
       AND review.direction = 'CUSTOMER_TO_PROVIDER'
       AND review.target_kind = 'CRAFTSMAN_PROFILE'
@@ -177,11 +197,19 @@ async function selectAfterCursor(
       review.accepted_profession_code AS "professionCode",
       review.ratings,
       review.comment,
+      response.response_id AS "responseId",
+      response.body AS "responseBody",
       to_char(
         review.unlocked_at AT TIME ZONE 'Europe/Bratislava',
         'YYYY-MM'
-      ) AS "reviewedMonth"
+      ) AS "reviewedMonth",
+      to_char(
+        response.responded_at AT TIME ZONE 'Europe/Bratislava',
+        'YYYY-MM'
+      ) AS "respondedMonth"
     FROM current_unlocked_job_main_reviews review
+    LEFT JOIN current_job_main_review_responses response
+      ON response.review_revision_id = review.revision_id
     WHERE review.target_profile_id = ${input.craftsmanProfileId}
       AND review.direction = 'CUSTOMER_TO_PROVIDER'
       AND review.target_kind = 'CRAFTSMAN_PROFILE'
@@ -266,6 +294,32 @@ function projectRow(row: PublicReviewRow): PublicCraftsmanReviewItem {
     score,
     comment: publicComment(row.comment),
     reviewedMonth: row.reviewedMonth,
+    response: publicResponse(row),
+  });
+}
+
+function publicResponse(
+  row: PublicReviewRow,
+): PublicCraftsmanReviewResponse | null {
+  const absent =
+    row.responseId === null &&
+    row.responseBody === null &&
+    row.respondedMonth === null;
+  if (absent) return null;
+  if (
+    !isUuid(row.responseId) ||
+    typeof row.responseBody !== "string" ||
+    row.responseBody.length > 2_000 ||
+    !isPublicDisplayTextSafe(row.responseBody) ||
+    typeof row.respondedMonth !== "string" ||
+    !/^\d{4}-(?:0[1-9]|1[0-2])$/u.test(row.respondedMonth)
+  ) {
+    return null;
+  }
+  return Object.freeze({
+    responseId: row.responseId,
+    body: row.responseBody,
+    respondedMonth: row.respondedMonth,
   });
 }
 

@@ -68,6 +68,7 @@ describe("public craftsman review repository", () => {
           score: 4.5,
           comment: "Precízna a spoľahlivá práca.",
           reviewedMonth: "2026-09",
+          response: null,
         },
         {
           reviewId: review2,
@@ -76,6 +77,7 @@ describe("public craftsman review repository", () => {
           score: 4.5,
           comment: "Precízna a spoľahlivá práca.",
           reviewedMonth: "2026-09",
+          response: null,
         },
       ],
       nextCursor: `v1.${review2}`,
@@ -150,6 +152,31 @@ describe("public craftsman review repository", () => {
     });
   });
 
+  it("projects one privacy-minimized rated-party response without author identity", async () => {
+    const responseId = "94000000-0000-4000-8000-000000000014";
+    const sql = scriptedSql([
+      [{ profileId }],
+      [
+        publicRow(review1, {
+          responseId,
+          responseBody: "Ďakujeme za vecnú spätnú väzbu.",
+          respondedMonth: "2026-09",
+        }),
+      ],
+    ]);
+    const page = await repository(sql).list({ craftsmanProfileId: profileId });
+    expect(page?.items[0]?.response).toEqual({
+      responseId,
+      body: "Ďakujeme za vecnú spätnú väzbu.",
+      respondedMonth: "2026-09",
+    });
+    const query = sql.queries[1] ?? "";
+    expect(query).toContain("current_job_main_review_responses");
+    expect(JSON.stringify(page)).not.toMatch(
+      /authorUserId|revisedAt|lockedAt/iu,
+    );
+  });
+
   it("fails closed for malformed ratings, identities, profession or month", async () => {
     for (const row of [
       publicRow("not-a-review"),
@@ -213,6 +240,9 @@ function publicRow(
     ratings: ratings(),
     comment: "Precízna a spoľahlivá práca.",
     reviewedMonth: "2026-09",
+    responseId: null,
+    responseBody: null,
+    respondedMonth: null,
     jobId: "must-not-leak",
     actorUserId: "must-not-leak",
     customerProfileId: "must-not-leak",
