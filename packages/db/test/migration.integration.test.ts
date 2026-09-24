@@ -100,6 +100,8 @@ import { runChangeOrderPdfIntegrationAssertions } from "./change-order-pdf-integ
 import { runJobCompletionIntegrationAssertions } from "./job-completion-integration-helper.js";
 import { runMainBilateralReviewIntegrationAssertions } from "./main-bilateral-review-integration-helper.js";
 import { runMainBilateralReviewCommittedRaceAssertions } from "./main-bilateral-review-committed-race-integration-helper.js";
+import { runJobContextReviewCommittedRaceAssertions } from "./job-context-review-committed-race-integration-helper.js";
+import { runJobContextReviewIntegrationAssertions } from "./job-context-review-integration-helper.js";
 import { runVerifiedCompletionEvidenceIntegrationAssertions } from "./verified-completion-evidence-integration-helper.js";
 
 const testDatabaseUrl = process.env["TEST_DATABASE_URL"];
@@ -221,6 +223,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
           "0092_main_bilateral_review_foundation.sql",
           "0093_main_review_notifications.sql",
           "0094_unlocked_provider_review_reputation.sql",
+          "0095_job_participant_work_group_reviews.sql",
         ],
         alreadyApplied: 0,
       });
@@ -229,7 +232,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         testDatabaseUrl,
         migrationsDirectory,
       );
-      expect(secondRun).toEqual({ applied: [], alreadyApplied: 95 });
+      expect(secondRun).toEqual({ applied: [], alreadyApplied: 96 });
 
       const sql = postgres(testDatabaseUrl, { max: 5 });
       try {
@@ -1874,6 +1877,8 @@ describe.skipIf(testDatabaseUrl === undefined)(
         await runJobRosterCancelledReadIntegrationAssertions(sql);
         await runJobDocumentationIntegrationAssertions(sql);
         await runMainBilateralReviewCommittedRaceAssertions(sql);
+        await runJobContextReviewIntegrationAssertions(sql);
+        await runJobContextReviewCommittedRaceAssertions(sql);
 
         await adminAccess.revokePrivilegedSession(superSessionDigest);
         await expect(

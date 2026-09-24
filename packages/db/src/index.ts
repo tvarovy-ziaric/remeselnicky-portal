@@ -266,6 +266,27 @@ export type {
   SubmitJobMainReviewResult,
   UnlockedCounterpartyJobMainReview,
 } from "./job-main-review-repository.js";
+import { createJobContextReviewRepository } from "./job-context-review-repository.js";
+export {
+  createJobContextReviewRepository,
+  JobContextReviewIdempotencyError,
+  participantReviewDimensions,
+  workGroupReviewDimensions,
+} from "./job-context-review-repository.js";
+export type {
+  JobContextReviewContent,
+  JobContextReviewPage,
+  JobContextReviewRating,
+  JobContextReviewRatings,
+  JobContextReviewRepository,
+  JobContextReviewTargetKind,
+  JobParticipantReviewTarget,
+  JobWorkGroupReviewMember,
+  JobWorkGroupReviewTarget,
+  SubmitJobContextReviewInput,
+  SubmitJobContextReviewResult,
+  VerifiedJobParticipantRole,
+} from "./job-context-review-repository.js";
 import { createJobParticipationDetailRepository } from "./job-participation-detail-repository.js";
 export { createJobParticipationDetailRepository } from "./job-participation-detail-repository.js";
 export type { JobParticipationDetail } from "./job-participation-detail-repository.js";
@@ -1147,6 +1168,9 @@ export interface DatabaseClient extends DatabaseHealthProbe {
     typeof createJobParticipantRoleDecisionRepository
   >;
   readonly jobMainReviews: ReturnType<typeof createJobMainReviewRepository>;
+  readonly jobContextReviews: ReturnType<
+    typeof createJobContextReviewRepository
+  >;
   readonly jobOperations: ReturnType<typeof createJobOperationalRepository>;
   readonly jobMilestones: ReturnType<typeof createJobMilestoneRepository>;
   readonly changeOrders: ReturnType<typeof createChangeOrderRepository>;
@@ -1297,6 +1321,7 @@ export function createDatabase(
   const jobParticipantRoleDecisions =
     createJobParticipantRoleDecisionRepository(sql);
   const jobMainReviews = createJobMainReviewRepository(sql);
+  const jobContextReviews = createJobContextReviewRepository(sql);
   const jobOperations = createJobOperationalRepository(sql);
   const jobMilestones = createJobMilestoneRepository(sql);
   const changeOrders = createChangeOrderRepository(sql);
@@ -1396,6 +1421,7 @@ export function createDatabase(
     jobParticipantCapabilities,
     jobParticipantRoleDecisions,
     jobMainReviews,
+    jobContextReviews,
     jobOperations,
     jobMilestones,
     changeOrders,
