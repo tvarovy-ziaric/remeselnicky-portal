@@ -308,6 +308,9 @@ describe("D17-A Job dashboard", () => {
       expect(stateHtml).toContain(label);
       expect(stateHtml).not.toContain("Zrušiť zákazku");
       expect(stateHtml).not.toContain("Pozvať remeselníka na zákazku");
+      expect(stateHtml.includes("Načítava sa možnosť hodnotenia")).toBe(
+        state === "COMPLETED",
+      );
     }
   });
 
