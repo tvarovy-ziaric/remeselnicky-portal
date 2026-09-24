@@ -359,6 +359,47 @@ describe("authentication HTTP boundary", () => {
     expect(rejectedLogin.json()).toEqual({ code: "INVALID_CREDENTIALS" });
   });
 
+  it("preserves safe reads but revokes mutations immediately for an active ACCOUNT restriction", async () => {
+    const fixture = createFixture({ draftHandoff: true, eligible: true });
+    const registered = await register(fixture);
+    fixture.persistence.setModerationScopes(USER_ID, ["ACCOUNT"]);
+
+    const response = await fixture.app.inject({
+      headers: { cookie: registered.cookie },
+      method: "GET",
+      url: AUTH_API_PATHS.session,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      user: { accountState: "ACTIVE", id: USER_ID },
+    });
+    const mutation = await fixture.app.inject({
+      headers: {
+        cookie: registered.cookie,
+        "x-csrf-token": registered.response.json<{ csrfToken: string }>()
+          .csrfToken,
+      },
+      method: "POST",
+      payload: {
+        section: {
+          key: "request.core",
+          payload: { description: "Oprava strechy" },
+          schemaVersion: 1,
+        },
+      },
+      url: AUTH_API_PATHS.draftHandoffConsume,
+    });
+    expect(mutation.statusCode).toBe(403);
+    expect(mutation.json()).toEqual({ code: "ACCOUNT_NOT_ACTIVE" });
+    const loginStillAvailableForAppeal = await login(
+      fixture,
+      "person@example.com",
+      PASSWORD,
+    );
+    expect(loginStillAvailableForAppeal.statusCode).toBe(200);
+  });
+
   it("rejects expired and payload-tampered sessions", async () => {
     const expiredFixture = createFixture({ eligible: true });
     const expiredRegistration = await register(expiredFixture);
@@ -1356,6 +1397,7 @@ class MemoryAuthPersistence implements AuthPersistence {
       return Promise.resolve({ status: "DUPLICATE" });
     }
     const credential: AuthCredential = {
+      activeModerationScopes: [],
       accountState: "ACTIVE",
       adultAttestedAt: NOW,
       emailVerifiedAt: null,
@@ -1384,6 +1426,20 @@ class MemoryAuthPersistence implements AuthPersistence {
     for (const [email, credential] of this.credentials) {
       if (credential.id === userId) {
         this.credentials.set(email, { ...credential, accountState: state });
+      }
+    }
+  }
+
+  public setModerationScopes(
+    userId: UserId,
+    activeModerationScopes: AuthUser["activeModerationScopes"],
+  ): void {
+    for (const [email, credential] of this.credentials) {
+      if (credential.id === userId) {
+        this.credentials.set(email, {
+          ...credential,
+          activeModerationScopes,
+        });
       }
     }
   }

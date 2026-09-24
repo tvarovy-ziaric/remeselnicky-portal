@@ -1,6 +1,8 @@
 import type { UserAccountState, UserId } from "@portal/domain";
+import type { ModerationEnforcementScope } from "@portal/db";
 
 export interface AuthUser {
+  readonly activeModerationScopes: readonly ModerationEnforcementScope[];
   readonly accountState: UserAccountState;
   readonly adultAttestedAt: Date;
   readonly emailVerifiedAt: Date | null;

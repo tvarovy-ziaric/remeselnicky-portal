@@ -11,6 +11,7 @@ import type {
   FastifyRequest,
   onRequestHookHandler,
 } from "fastify";
+import type { SessionAuthorizationScope } from "../auth/guard.js";
 
 export const QUOTE_ACCEPTANCE_PATH =
   "/v1/me/job-requests/:jobRequestId/quotes/:quoteId/accept";
@@ -18,6 +19,7 @@ export const QUOTE_ACCEPTANCE_PATH =
 interface Guard {
   evaluate(
     request: FastifyRequest,
+    scope?: SessionAuthorizationScope,
   ): Promise<
     | { readonly status: "ACTIVE"; readonly user: { readonly id: UserId } }
     | { readonly status: "ACCOUNT_NOT_ACTIVE" | "AUTHENTICATION_REQUIRED" }
@@ -62,7 +64,7 @@ export function registerQuoteAcceptanceRoutes(
     async (request, reply) => {
       reply.header("cache-control", "private, no-store");
       reply.header("x-robots-tag", "noindex, nofollow");
-      const actor = await dependencies.guard.evaluate(request);
+      const actor = await dependencies.guard.evaluate(request, "QUOTING");
       if (actor.status !== "ACTIVE")
         return reply
           .code(actor.status === "AUTHENTICATION_REQUIRED" ? 401 : 403)

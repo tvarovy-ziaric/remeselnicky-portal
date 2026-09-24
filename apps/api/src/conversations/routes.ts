@@ -32,6 +32,7 @@ import type {
   ConversationWriteAction,
   ConversationWriteAdmission,
 } from "./write-admission.js";
+import type { SessionAuthorizationScope } from "../auth/guard.js";
 
 export const CONVERSATION_PATHS = Object.freeze({
   byId: "/v1/me/conversations/:conversationId",
@@ -48,6 +49,7 @@ export const CONVERSATION_PATHS = Object.freeze({
 interface Guard {
   evaluate(
     request: FastifyRequest,
+    scope?: SessionAuthorizationScope,
   ): Promise<
     | { readonly status: "ACTIVE"; readonly user: { readonly id: UserId } }
     | { readonly status: "ACCOUNT_NOT_ACTIVE" }
@@ -212,7 +214,12 @@ function registerConversationChatRoutes(
       schema: { body: messageBodySchema, params: conversationParamsSchema },
     },
     async (request, reply) => {
-      const actorUserId = await requireActor(request, reply, guard);
+      const actorUserId = await requireActor(
+        request,
+        reply,
+        guard,
+        "MESSAGING",
+      );
       if (actorUserId === undefined) return;
       if (
         !(await admitWrite(
@@ -374,7 +381,12 @@ function registerConversationChatRoutes(
       schema: { params: attachmentParamsSchema },
     },
     async (request, reply) => {
-      const actorUserId = await requireActor(request, reply, guard);
+      const actorUserId = await requireActor(
+        request,
+        reply,
+        guard,
+        "MESSAGING",
+      );
       if (actorUserId === undefined) return;
       if (
         !(await admitWrite(
@@ -549,8 +561,9 @@ async function requireActor(
   request: FastifyRequest,
   reply: FastifyReply,
   guard: Guard,
+  scope?: SessionAuthorizationScope,
 ): Promise<UserId | undefined> {
-  const result = await guard.evaluate(request);
+  const result = await guard.evaluate(request, scope);
   if (result.status === "AUTHENTICATION_REQUIRED") {
     await reply.code(401).send({ code: result.status });
     return undefined;

@@ -370,6 +370,7 @@ class TestAuthPersistence implements AuthPersistence {
 
   public addUser(id: UserId, accountState: UserAccountState): void {
     this.users.set(id, {
+      activeModerationScopes: [],
       accountState,
       adultAttestedAt: now,
       emailVerifiedAt: now,

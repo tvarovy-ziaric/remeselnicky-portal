@@ -17,6 +17,7 @@ import {
   type UserId,
 } from "@portal/domain";
 import { createAuthenticatedAuthorizationActor } from "@portal/authorization";
+import type { SessionAuthorizationScope } from "../auth/guard.js";
 import {
   QuoteSupportingDocumentIdempotencyError,
   type createQuoteSupportingDocumentRepository,
@@ -55,6 +56,7 @@ export const QUOTE_AUTHORING_PATHS = Object.freeze({
 interface Guard {
   evaluate(
     request: FastifyRequest,
+    scope?: SessionAuthorizationScope,
   ): Promise<
     | { readonly status: "ACTIVE"; readonly user: { readonly id: UserId } }
     | { readonly status: "ACCOUNT_NOT_ACTIVE" | "AUTHENTICATION_REQUIRED" }
@@ -162,6 +164,7 @@ export function registerQuoteAuthoringRoutes(
         request,
         reply,
         dependencies.guard,
+        "QUOTING",
       );
       if (actorUserId === undefined) return;
       try {
@@ -200,6 +203,7 @@ export function registerQuoteAuthoringRoutes(
         request,
         reply,
         dependencies.guard,
+        "QUOTING",
       );
       if (actorUserId === undefined) return;
       try {
@@ -238,6 +242,7 @@ export function registerQuoteAuthoringRoutes(
         request,
         reply,
         dependencies.guard,
+        "QUOTING",
       );
       if (actorUserId === undefined) return;
       try {
@@ -275,6 +280,7 @@ export function registerQuoteAuthoringRoutes(
         request,
         reply,
         dependencies.guard,
+        "QUOTING",
       );
       if (actorUserId === undefined) return;
       try {
@@ -347,6 +353,7 @@ function registerStructuredRoutes(
         request,
         reply,
         dependencies.guard,
+        "QUOTING",
       );
       if (actorUserId === undefined) return;
       try {
@@ -398,6 +405,7 @@ function registerExternalPdfRoutes(
         request,
         reply,
         dependencies.guard,
+        "QUOTING",
       );
       if (actorUserId === undefined) return;
       if (dependencies.documentUploads === undefined) {
@@ -484,6 +492,7 @@ function registerExternalPdfRoutes(
         request,
         reply,
         dependencies.guard,
+        "QUOTING",
       );
       if (actorUserId === undefined) return;
       try {
@@ -570,6 +579,7 @@ function registerSupportingDocumentRoutes(
         request,
         reply,
         dependencies.guard,
+        "QUOTING",
       );
       if (actorUserId === undefined) return;
       try {
@@ -623,6 +633,7 @@ function registerSupportingDocumentRoutes(
         request,
         reply,
         dependencies.guard,
+        "QUOTING",
       );
       if (actorUserId === undefined) return;
       if (dependencies.supportingDocumentUploads === undefined)
@@ -689,6 +700,7 @@ function registerSupportingDocumentRoutes(
         request,
         reply,
         dependencies.guard,
+        "QUOTING",
       );
       if (actorUserId === undefined) return;
       try {
@@ -792,8 +804,9 @@ async function requireActor(
   request: FastifyRequest,
   reply: FastifyReply,
   guard: Guard,
+  scope?: SessionAuthorizationScope,
 ): Promise<UserId | undefined> {
-  const result = await guard.evaluate(request);
+  const result = await guard.evaluate(request, scope);
   if (result.status === "ACTIVE") return result.user.id;
   await reply
     .code(result.status === "AUTHENTICATION_REQUIRED" ? 401 : 403)

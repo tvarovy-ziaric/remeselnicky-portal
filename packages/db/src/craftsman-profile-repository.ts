@@ -34,10 +34,12 @@ interface CraftsmanProfileRow {
 
 interface LockedCraftsmanProfileRow extends CraftsmanProfileRow {
   readonly ownerAccountState: "ACTIVE" | "SUSPENDED" | "DEACTIVATED";
+  readonly publishingAllowed: boolean;
 }
 
 interface OwnerStateRow {
   readonly accountState: "ACTIVE" | "SUSPENDED" | "DEACTIVATED";
+  readonly publishingAllowed: boolean;
 }
 
 /**
@@ -54,12 +56,16 @@ export function createCraftsmanProfileRepository(
     ): Promise<CreateCraftsmanProfileDraftResult> {
       return sql.begin(async (transaction) => {
         const [owner] = await transaction<OwnerStateRow[]>`
-          SELECT account_state AS "accountState"
+          SELECT account_state AS "accountState",
+            moderation_user_scope_allows(id, 'PUBLISHING') AS "publishingAllowed"
           FROM users
           WHERE id = ${input.actorUserId}
           FOR UPDATE
         `;
-        if (owner?.accountState !== "ACTIVE") {
+        if (
+          owner?.accountState !== "ACTIVE" ||
+          owner.publishingAllowed !== true
+        ) {
           return Object.freeze({ status: "OWNER_NOT_ACTIVE" });
         }
 
@@ -185,7 +191,9 @@ export function createCraftsmanProfileRepository(
             craftsman_profiles.revision,
             craftsman_profiles.created_at AS "createdAt",
             craftsman_profiles.updated_at AS "updatedAt",
-            users.account_state AS "ownerAccountState"
+            users.account_state AS "ownerAccountState",
+            moderation_user_scope_allows(users.id, 'PUBLISHING')
+              AS "publishingAllowed"
           FROM craftsman_profiles
           JOIN users ON users.id = craftsman_profiles.owner_user_id
           WHERE craftsman_profiles.id = ${input.profileId}
@@ -195,7 +203,10 @@ export function createCraftsmanProfileRepository(
         if (locked === undefined) {
           return Object.freeze({ status: "NOT_FOUND" });
         }
-        if (locked.ownerAccountState !== "ACTIVE") {
+        if (
+          locked.ownerAccountState !== "ACTIVE" ||
+          locked.publishingAllowed !== true
+        ) {
           return Object.freeze({ status: "OWNER_NOT_ACTIVE" });
         }
         if (locked.profileType !== input.profileType) {

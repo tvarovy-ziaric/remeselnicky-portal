@@ -48,6 +48,7 @@ describe("conversation routes", () => {
       actorUserId,
       conversationId,
     });
+    expect(fixture.evaluate).toHaveBeenCalledWith(expect.anything(), undefined);
     await app.close();
   });
 
@@ -180,6 +181,10 @@ describe("conversation routes", () => {
         mediaKind: "IMAGE",
         messageId,
       }),
+    );
+    expect(fixture.evaluate).toHaveBeenCalledWith(
+      expect.anything(),
+      "MESSAGING",
     );
     expect(response.body).not.toMatch(/storage|url|filename/iu);
 
@@ -427,6 +432,13 @@ function createFixture(
     csrfCallCount += 1;
     done();
   };
+  const evaluate = vi
+    .fn()
+    .mockResolvedValue(
+      guardStatus === "ACTIVE"
+        ? { status: "ACTIVE", user: { id: actorUserId } }
+        : { status: guardStatus },
+    );
   return {
     dependencies: {
       chat: {
@@ -439,18 +451,11 @@ function createFixture(
         service: { report, sendMessage, updateParticipantState },
       },
       conversations: { readOwned, readOwnedByInvitation },
-      guard: {
-        evaluate: vi
-          .fn()
-          .mockResolvedValue(
-            guardStatus === "ACTIVE"
-              ? { status: "ACTIVE", user: { id: actorUserId } }
-              : { status: guardStatus },
-          ),
-      },
+      guard: { evaluate },
     },
     csrfCalls: () => csrfCallCount,
     admit,
+    evaluate,
     readOwned,
     readOwnedByInvitation,
     readTimeline,

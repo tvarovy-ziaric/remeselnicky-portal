@@ -37,7 +37,11 @@ export {
   type PhoneVerificationPersistence,
   type PhoneVerificationService,
 } from "./phone-verification.js";
-export { createSessionGuard, type SessionGuardResult } from "./guard.js";
+export {
+  createSessionGuard,
+  type SessionAuthorizationScope,
+  type SessionGuardResult,
+} from "./guard.js";
 export type {
   AuthCredential,
   AuthPersistence,

@@ -13,6 +13,7 @@ import type {
   FastifyRequest,
   onRequestHookHandler,
 } from "fastify";
+import type { SessionAuthorizationScope } from "../auth/guard.js";
 
 export const QUOTE_LIFECYCLE_PATHS = Object.freeze({
   context: "/v1/me/quotes/:quoteId/lifecycle",
@@ -23,6 +24,7 @@ export const QUOTE_LIFECYCLE_PATHS = Object.freeze({
 interface Guard {
   evaluate(
     request: FastifyRequest,
+    scope?: SessionAuthorizationScope,
   ): Promise<
     | { readonly status: "ACTIVE"; readonly user: { readonly id: UserId } }
     | { readonly status: "ACCOUNT_NOT_ACTIVE" | "AUTHENTICATION_REQUIRED" }
@@ -105,6 +107,7 @@ export function registerQuoteLifecycleRoutes(
         request,
         reply,
         dependencies.guard,
+        "QUOTING",
       );
       if (actorUserId === undefined) return;
       try {
@@ -146,6 +149,7 @@ export function registerQuoteLifecycleRoutes(
         request,
         reply,
         dependencies.guard,
+        "QUOTING",
       );
       if (actorUserId === undefined) return;
       try {
@@ -177,8 +181,9 @@ async function requireActor(
   request: FastifyRequest,
   reply: FastifyReply,
   guard: Guard,
+  scope?: SessionAuthorizationScope,
 ): Promise<UserId | undefined> {
-  const result = await guard.evaluate(request);
+  const result = await guard.evaluate(request, scope);
   if (result.status === "ACTIVE") return result.user.id;
   await reply
     .code(result.status === "AUTHENTICATION_REQUIRED" ? 401 : 403)

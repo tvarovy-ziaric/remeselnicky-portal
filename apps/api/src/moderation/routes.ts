@@ -14,7 +14,10 @@ import type {
   onRequestHookHandler,
 } from "fastify";
 
-import type { SessionGuardResult } from "../auth/guard.js";
+import type {
+  SessionAuthorizationScope,
+  SessionGuardResult,
+} from "../auth/guard.js";
 
 type Repository = ReturnType<typeof createModerationRepository>;
 type JsonObject = Record<string, unknown>;
@@ -48,7 +51,10 @@ export const ADMIN_MODERATION_PATHS = Object.freeze({
 
 interface CommonDependencies {
   readonly guard: {
-    evaluate(request: FastifyRequest): Promise<SessionGuardResult>;
+    evaluate(
+      request: FastifyRequest,
+      scope?: SessionAuthorizationScope,
+    ): Promise<SessionGuardResult>;
   };
   readonly csrfProtection: onRequestHookHandler;
   readonly rateLimit: { readonly max: number; readonly timeWindowMs: number };
@@ -437,7 +443,10 @@ async function appealActor(
   reply: FastifyReply,
   dependencies: CommonDependencies,
 ): Promise<UserId | undefined> {
-  const result = await dependencies.guard.evaluate(request);
+  const result = await dependencies.guard.evaluate(
+    request,
+    "RESTRICTED_ACCOUNT_APPEAL",
+  );
   if (result.status === "AUTHENTICATION_REQUIRED") {
     await reply.code(401).send({ code: "AUTHENTICATION_REQUIRED" });
     return undefined;

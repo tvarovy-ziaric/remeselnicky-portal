@@ -395,6 +395,71 @@ export async function runModerationIntegrationAssertions(
   `;
   expect(searchableAfterReversal[0]?.count).toBe(1);
 
+  const restrictionReportId = randomUUID();
+  await expect(
+    createReviewResponseReportRepository(sql).createReport({
+      actorUserId: input.subjectUserId,
+      commandId: restrictionReportId,
+      targetType: "CRAFTSMAN_PROFILE",
+      targetId: input.targetProfileId,
+      reason: "MISLEADING_CLAIM",
+      details: "Publikačné údaje profilu vyžadujú dočasné manuálne preverenie.",
+    }),
+  ).resolves.toMatchObject({ status: "APPLIED", state: "OPEN" });
+  await expect(
+    repository.startReview({
+      actor,
+      privilegedSessionId: input.privilegedSessionId,
+      commandId: randomUUID(),
+      reportId: restrictionReportId,
+      expectedState: "OPEN",
+      reason: "Začatie preverenia publikovaných údajov profilu.",
+    }),
+  ).resolves.toMatchObject({ status: "APPLIED", state: "UNDER_REVIEW" });
+  const restrictionId = randomUUID();
+  await expect(
+    repository.restrictFeature({
+      actor,
+      privilegedSessionId: input.privilegedSessionId,
+      commandId: restrictionId,
+      reportId: restrictionReportId,
+      expectedState: "UNDER_REVIEW",
+      reason: "Dočasné obmedzenie publikovania počas manuálneho preverenia.",
+      policyCategory: "IMPERSONATION_MISREPRESENTATION",
+      policyReasonCode: "PROFILE_PUBLISHING_REVIEW",
+      policyVersion: "D24-ALPHA-1",
+      subjectUserId: input.reporterUserId,
+      enforcementScope: "PUBLISHING",
+      userFacingReason:
+        "Publikovanie profilu je dočasne obmedzené počas preverenia.",
+      priorState: { publishing: "ALLOWED" },
+    }),
+  ).resolves.toMatchObject({ status: "APPLIED", state: "ACTIONED" });
+
+  const [scopeAdmission] = await sql<
+    Array<{ readonly publishing: boolean; readonly quoting: boolean }>
+  >`
+    SELECT
+      moderation_user_scope_allows(
+        ${input.reporterUserId}, 'PUBLISHING'
+      ) AS publishing,
+      moderation_user_scope_allows(
+        ${input.reporterUserId}, 'QUOTING'
+      ) AS quoting
+  `;
+  expect(scopeAdmission).toEqual({ publishing: false, quoting: true });
+  await expect(
+    sql.begin(async (tx) => {
+      await tx`
+        INSERT INTO craftsman_availability_commands (
+          command_id, craftsman_profile_id, actor_user_id
+        ) VALUES (
+          ${randomUUID()}, ${input.targetProfileId}, ${input.reporterUserId}
+        )
+      `;
+    }),
+  ).rejects.toThrow("active moderation restriction prohibits command");
+
   await expect(
     sql.begin(async (tx) => {
       await tx`UPDATE moderation_actions

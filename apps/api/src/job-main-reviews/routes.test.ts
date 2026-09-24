@@ -93,22 +93,22 @@ function build(input?: {
       done();
     },
   );
+  const evaluate = vi.fn(() =>
+    Promise.resolve(
+      input?.status === "AUTHENTICATION_REQUIRED" ||
+        input?.status === "ACCOUNT_NOT_ACTIVE"
+        ? { status: input.status }
+        : { status: "ACTIVE" as const, user: { id: actorUserId } },
+    ),
+  );
   registerJobMainReviewRoutes(app, {
     reviews,
     csrfProtection,
-    guard: {
-      evaluate: () =>
-        Promise.resolve(
-          input?.status === "AUTHENTICATION_REQUIRED" ||
-            input?.status === "ACCOUNT_NOT_ACTIVE"
-            ? { status: input.status }
-            : { status: "ACTIVE", user: { id: actorUserId } },
-        ),
-    },
+    guard: { evaluate },
     rateLimit: { max: 7, timeWindowMs: 60_000 },
   });
   apps.push(app);
-  return { app, csrfProtection, get, submit };
+  return { app, csrfProtection, evaluate, get, submit };
 }
 
 const path = JOB_MAIN_REVIEW_PATH.replace(":jobId", jobId);
@@ -138,7 +138,7 @@ describe("private main bilateral review routes", () => {
       ratings: providerRatings,
       comment: null,
     };
-    const { app, get } = build({
+    const { app, evaluate, get } = build({
       page: opportunity({
         state: "UNLOCKED",
         ownReview: own,
@@ -150,6 +150,7 @@ describe("private main bilateral review routes", () => {
     expect(response.headers["cache-control"]).toBe("private, no-store");
     expect(response.headers["x-robots-tag"]).toBe("noindex, nofollow");
     expect(get).toHaveBeenCalledWith({ actorUserId, jobId });
+    expect(evaluate).toHaveBeenCalledWith(expect.anything(), undefined);
     expect(response.json()).toEqual({
       jobId,
       direction: "CUSTOMER_TO_PROVIDER",
@@ -211,7 +212,7 @@ describe("private main bilateral review routes", () => {
   });
 
   it("requires CSRF and submits only server-derived direction through the session actor", async () => {
-    const { app, submit, csrfProtection } = build();
+    const { app, csrfProtection, evaluate, submit } = build();
     expect(
       (await app.inject({ method: "POST", url: path, payload: validBody }))
         .statusCode,
@@ -238,6 +239,7 @@ describe("private main bilateral review routes", () => {
       jobId,
       ...validBody,
     });
+    expect(evaluate).toHaveBeenCalledWith(expect.anything(), "REVIEWS");
     expect(csrfProtection).toHaveBeenCalled();
   });
 

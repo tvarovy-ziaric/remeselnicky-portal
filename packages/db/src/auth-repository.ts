@@ -1,7 +1,10 @@
 import type { Sql } from "postgres";
 
+import type { ModerationEnforcementScope } from "./moderation-repository.js";
 import type { AuthSessionPayload } from "./schema/auth.js";
 import type { UserRecord } from "./schema/user.js";
+
+export type { ModerationEnforcementScope } from "./moderation-repository.js";
 
 export interface RegisterAuthUserInput {
   readonly adultAttested: true;
@@ -10,6 +13,7 @@ export interface RegisterAuthUserInput {
 }
 
 export interface AuthUser {
+  readonly activeModerationScopes: readonly ModerationEnforcementScope[];
   readonly id: string;
   readonly accountState: UserRecord["accountState"];
   readonly adultAttestedAt: Date;
@@ -96,6 +100,7 @@ export interface AuthRepository {
 }
 
 interface AuthUserRow {
+  readonly activeModerationScopes: readonly ModerationEnforcementScope[];
   readonly id: string;
   readonly accountState: UserRecord["accountState"];
   readonly adultAttestedAt: Date;
@@ -176,6 +181,7 @@ export function createAuthRepository(sql: Sql): AuthRepository {
                 phone_verified_at
             )
             SELECT
+              ARRAY[]::text[] AS "activeModerationScopes",
               inserted_user.id,
               inserted_user.account_state AS "accountState",
               inserted_credential.adult_attested_at AS "adultAttestedAt",
@@ -209,6 +215,12 @@ export function createAuthRepository(sql: Sql): AuthRepository {
     ): Promise<AuthCredential | null> {
       const [credential] = await sql<AuthCredentialRow[]>`
         SELECT
+          ARRAY(
+            SELECT DISTINCT restriction.enforcement_scope::text
+            FROM current_moderation_user_restrictions restriction
+            WHERE restriction.subject_user_id = users.id
+            ORDER BY restriction.enforcement_scope::text
+          ) AS "activeModerationScopes",
           users.id,
           users.account_state AS "accountState",
           auth_credentials.normalized_email AS "normalizedEmail",
@@ -227,6 +239,12 @@ export function createAuthRepository(sql: Sql): AuthRepository {
     async findAuthUserById(userId: string): Promise<AuthUser | null> {
       const [user] = await sql<AuthUserRow[]>`
         SELECT
+          ARRAY(
+            SELECT DISTINCT restriction.enforcement_scope::text
+            FROM current_moderation_user_restrictions restriction
+            WHERE restriction.subject_user_id = users.id
+            ORDER BY restriction.enforcement_scope::text
+          ) AS "activeModerationScopes",
           users.id,
           users.account_state AS "accountState",
           auth_credentials.adult_attested_at AS "adultAttestedAt",

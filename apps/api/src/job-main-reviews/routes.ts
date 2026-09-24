@@ -11,6 +11,7 @@ import type {
   FastifyRequest,
   onRequestHookHandler,
 } from "fastify";
+import type { SessionAuthorizationScope } from "../auth/guard.js";
 
 export const JOB_MAIN_REVIEW_PATH = "/v1/me/jobs/:jobId/reviews/main";
 
@@ -39,6 +40,7 @@ export interface JobMainReviewRouteDependencies {
   readonly guard: {
     evaluate(
       request: FastifyRequest,
+      scope?: SessionAuthorizationScope,
     ): Promise<
       | { readonly status: "ACTIVE"; readonly user: { readonly id: UserId } }
       | { readonly status: "ACCOUNT_NOT_ACTIVE" | "AUTHENTICATION_REQUIRED" }
@@ -120,7 +122,12 @@ export function registerJobMainReviewRoutes(
       schema: { params: jobParams, body: submitBody },
     },
     async (request, reply) => {
-      const actorUserId = await activeActor(request, reply, dependencies);
+      const actorUserId = await activeActor(
+        request,
+        reply,
+        dependencies,
+        "REVIEWS",
+      );
       if (actorUserId === null) return;
       try {
         return sendSubmitResult(
@@ -204,8 +211,9 @@ async function activeActor(
   request: FastifyRequest,
   reply: FastifyReply,
   dependencies: JobMainReviewRouteDependencies,
+  scope?: SessionAuthorizationScope,
 ): Promise<string | null> {
-  const actor = await dependencies.guard.evaluate(request);
+  const actor = await dependencies.guard.evaluate(request, scope);
   if (actor.status === "ACTIVE") return actor.user.id;
   void reply
     .code(actor.status === "AUTHENTICATION_REQUIRED" ? 401 : 403)

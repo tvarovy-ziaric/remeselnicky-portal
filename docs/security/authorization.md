@@ -51,6 +51,14 @@ role-string grant and no concrete permission matrix. R0-012 and feature tickets
 define their own closed capability/action vocabularies under their locked
 rules.
 
+R4-025 finalizes the cross-release composition in
+[`../testing/r4-final-permission-matrix.md`](../testing/r4-final-permission-matrix.md).
+The session boundary reloads current D24 restriction scopes for every request,
+and migration `0107_final_permission_matrix.sql` independently guards explicit
+R1-R4 mutation ingress tables. Feature restrictions do not erase authorized
+historical reads, and appeal/privacy/privileged correction planes keep their own
+separate policies.
+
 An evaluator registers policies by object identity. A missing definition,
 another definition with the same textual key, anonymous actor, untrusted actor
 or context, unresolved target, explicit policy denial, invalid result, thrown

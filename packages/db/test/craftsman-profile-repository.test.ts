@@ -31,7 +31,7 @@ const individualRow = {
 describe("CraftsmanProfile repository", () => {
   it("locks an ACTIVE owner and creates one incomplete private draft", async () => {
     const harness = transactionHarness([
-      [{ accountState: "ACTIVE" }],
+      [{ accountState: "ACTIVE", publishingAllowed: true }],
       [],
       [individualRow],
     ]);
@@ -80,9 +80,24 @@ describe("CraftsmanProfile repository", () => {
     },
   );
 
+  it("refuses profile creation under a current PUBLISHING restriction", async () => {
+    const harness = transactionHarness([
+      [{ accountState: "ACTIVE", publishingAllowed: false }],
+    ]);
+    const repository = createCraftsmanProfileRepository(harness.sql);
+
+    await expect(
+      repository.createPrivateDraft({
+        actorUserId: ownerUserId,
+        profileType: "INDIVIDUAL",
+      }),
+    ).resolves.toEqual({ status: "OWNER_NOT_ACTIVE" });
+    expect(harness.statements).toHaveLength(1);
+  });
+
   it("is idempotent for the same owner and rejects a conflicting second type", async () => {
     const same = transactionHarness([
-      [{ accountState: "ACTIVE" }],
+      [{ accountState: "ACTIVE", publishingAllowed: true }],
       [individualRow],
     ]);
     await expect(
@@ -93,7 +108,7 @@ describe("CraftsmanProfile repository", () => {
     ).resolves.toMatchObject({ status: "UNCHANGED" });
 
     const conflict = transactionHarness([
-      [{ accountState: "ACTIVE" }],
+      [{ accountState: "ACTIVE", publishingAllowed: true }],
       [individualRow],
     ]);
     await expect(
@@ -116,7 +131,13 @@ describe("CraftsmanProfile repository", () => {
       updatedAt,
     };
     const harness = transactionHarness([
-      [{ ...individualRow, ownerAccountState: "ACTIVE" }],
+      [
+        {
+          ...individualRow,
+          ownerAccountState: "ACTIVE",
+          publishingAllowed: true,
+        },
+      ],
       [updated],
     ]);
     const repository = createCraftsmanProfileRepository(harness.sql);
@@ -156,6 +177,7 @@ describe("CraftsmanProfile repository", () => {
       ...individualRow,
       about: "Uložené",
       ownerAccountState: "ACTIVE" as const,
+      publishingAllowed: true,
       revision: 2,
     };
     const harness = transactionHarness([[committed]]);
@@ -187,7 +209,14 @@ describe("CraftsmanProfile repository", () => {
     ).resolves.toEqual({ status: "OWNER_NOT_ACTIVE" });
 
     const stale = transactionHarness([
-      [{ ...individualRow, ownerAccountState: "ACTIVE", revision: 2 }],
+      [
+        {
+          ...individualRow,
+          ownerAccountState: "ACTIVE",
+          publishingAllowed: true,
+          revision: 2,
+        },
+      ],
     ]);
     await expect(
       createCraftsmanProfileRepository(stale.sql).replacePrivateDraft(
@@ -196,7 +225,13 @@ describe("CraftsmanProfile repository", () => {
     ).resolves.toEqual({ status: "STALE_REVISION" });
 
     const mismatch = transactionHarness([
-      [{ ...individualRow, ownerAccountState: "ACTIVE" }],
+      [
+        {
+          ...individualRow,
+          ownerAccountState: "ACTIVE",
+          publishingAllowed: true,
+        },
+      ],
     ]);
     await expect(
       createCraftsmanProfileRepository(mismatch.sql).replacePrivateDraft({

@@ -98,6 +98,8 @@ describe("Quote authoring routes", () => {
       ],
     });
     expect(listed.headers["cache-control"]).toBe("private, no-store");
+    expect(fixture.evaluate).toHaveBeenCalledWith(expect.anything(), undefined);
+    expect(fixture.evaluate).toHaveBeenCalledWith(expect.anything(), "QUOTING");
     fixture.supportingDocuments.remove.mockResolvedValue({
       status: "REMOVED",
     });
@@ -436,20 +438,17 @@ function build(
         ReturnType<typeof createQuoteSupportingDocumentRepository>["remove"]
       >(),
   };
+  const evaluate = vi.fn(() =>
+    Promise.resolve(
+      status === "ACTIVE" ? { status, user: { id: actorUserId } } : { status },
+    ),
+  );
   registerQuoteAuthoringRoutes(app, {
     core,
     csrfProtection: csrf,
     documentUploads,
     externalPdf,
-    guard: {
-      evaluate: vi.fn(() =>
-        Promise.resolve(
-          status === "ACTIVE"
-            ? { status, user: { id: actorUserId } }
-            : { status },
-        ),
-      ),
-    },
+    guard: { evaluate },
     rateLimit: { max: 50, timeWindowMs: 60_000 },
     structured,
     supportingDocumentUploads,
@@ -460,6 +459,7 @@ function build(
     core,
     csrf,
     documentUploads,
+    evaluate,
     externalPdf,
     structured,
     supportingDocumentUploads,

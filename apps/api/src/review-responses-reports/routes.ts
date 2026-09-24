@@ -12,6 +12,7 @@ import type {
   FastifyRequest,
   onRequestHookHandler,
 } from "fastify";
+import type { SessionAuthorizationScope } from "../auth/guard.js";
 
 export const REVIEW_RESPONSE_REPORT_PATHS = Object.freeze({
   response: "/v1/me/reviews/:reviewId/response",
@@ -31,6 +32,7 @@ export interface ReviewResponseReportRouteDependencies {
   readonly guard: {
     evaluate(
       request: FastifyRequest,
+      scope?: SessionAuthorizationScope,
     ): Promise<
       | { readonly status: "ACTIVE"; readonly user: { readonly id: UserId } }
       | { readonly status: "ACCOUNT_NOT_ACTIVE" | "AUTHENTICATION_REQUIRED" }
@@ -150,7 +152,12 @@ export function registerReviewResponseReportRoutes(
       schema: { params: reviewParams, body: responseBody },
     },
     async (request, reply) => {
-      const actorUserId = await activeActor(request, reply, dependencies);
+      const actorUserId = await activeActor(
+        request,
+        reply,
+        dependencies,
+        "REVIEWS",
+      );
       if (actorUserId === null) return;
       try {
         return sendResponseResult(
@@ -250,8 +257,9 @@ async function activeActor(
   request: FastifyRequest,
   reply: FastifyReply,
   dependencies: ReviewResponseReportRouteDependencies,
+  scope?: SessionAuthorizationScope,
 ): Promise<string | null> {
-  const actor = await dependencies.guard.evaluate(request);
+  const actor = await dependencies.guard.evaluate(request, scope);
   if (actor.status === "ACTIVE") return actor.user.id;
   void reply
     .code(actor.status === "AUTHENTICATION_REQUIRED" ? 401 : 403)

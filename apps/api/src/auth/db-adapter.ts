@@ -111,6 +111,7 @@ export function createAuthPersistence(
 
 function authUser(user: DatabaseAuthUser): AuthUser {
   return {
+    activeModerationScopes: user.activeModerationScopes,
     accountState: user.accountState,
     adultAttestedAt: user.adultAttestedAt,
     emailVerifiedAt: user.emailVerifiedAt,

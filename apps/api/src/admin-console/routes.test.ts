@@ -9,6 +9,7 @@ import { registerAdminConsoleRoutes } from "./routes.js";
 
 const USER_ID = "11111111-1111-4111-8111-111111111111" as UserId;
 const activeUser: AuthUser = {
+  activeModerationScopes: [],
   accountState: "ACTIVE",
   adultAttestedAt: new Date("2026-01-01T00:00:00.000Z"),
   emailVerifiedAt: new Date("2026-01-01T00:00:00.000Z"),
