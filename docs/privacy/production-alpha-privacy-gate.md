@@ -1,10 +1,16 @@
 # Production Alpha privacy HUMAN GATE
 
-Status: `BLOCKED PENDING HUMAN AUTHORIZATION AND LEGAL REVIEW`
+Status: `SHORTLIST PREPARED — BLOCKED PENDING REVIEWER/PROVIDER SELECTION`
 
 This gate applies before the first real-user production Alpha. It does not
 block synthetic development or CI, and it does not authorize a vendor, account,
 credential, data transfer, legal conclusion or spend.
+
+The human authorized option 1 on 2026-09-25: prepare a named legal/privacy
+review and independent-ledger shortlist only. The resulting no-spend research,
+prices, account requirements, credential boundaries and comparison are recorded
+in [Legal and recovery-ledger shortlist](./legal-and-recovery-ledger-shortlist.md).
+No firm was contacted and no provider account or resource was created.
 
 ## Technical baseline already implemented
 
@@ -102,20 +108,21 @@ belong in Git, CI logs, application logs or the ordinary application database.
 
 Current incremental cost is **EUR 0**: local code and CI use synthetic data and
 no new service has been provisioned. Production cost is intentionally
-`NOT AUTHORIZED / NOT ESTIMATED` until the human chooses the provider shortlist,
-region, durability/immutability tier, retention, traffic and support level.
-Any quote or free-tier claim must be revalidated against the provider's current
-official pricing before approval.
+`NOT AUTHORIZED`. The research shortlist records public usage-based pricing and
+where a quote/calculator export is still required, but no binding estimate is
+possible until the human chooses the reviewer candidates, provider, region,
+durability/immutability tier, retention, traffic and support level. Any quote
+or free-tier claim must be revalidated against current official pricing before
+approval.
 
 ## Exact human decision requested
 
-Authorize either:
-
-1. preparation of a named legal/privacy review and vendor shortlist only, with
-   no account creation or spend; or
-2. a concrete reviewed matrix/provider package, including named owner, approved
-   vendor/account, region, credential custodians and spend ceiling, so
-   implementation and provisioning can continue.
+Choose which shortlisted legal firms may be contacted for fixed-scope quotes,
+which ledger options may receive a non-binding calculator/design comparison,
+the proposed internal privacy/incident owner, and legal/monthly-ledger budget
+ceilings. This authorizes requests and planning only. Engagement, provider
+selection, contract acceptance, account creation, credentials, provisioning and
+real-user rollout each remain separately gated.
 
 Until then, keep production disposition jobs, production-class restore and
 real-user rollout disabled. Do not weaken the fail-closed policy to advance the
