@@ -52,4 +52,3 @@ FOR EACH ROW EXECUTE FUNCTION prevent_privacy_operational_history_mutation();
 
 COMMENT ON TABLE privacy_category_execution_receipts IS
   'Append-only idempotency proof for a completed category transformation. It contains counts and a deterministic digest, never deleted personal content.';
-
