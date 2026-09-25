@@ -400,10 +400,11 @@ export async function runModerationIntegrationAssertions(
     createReviewResponseReportRepository(sql).createReport({
       actorUserId: input.subjectUserId,
       commandId: restrictionReportId,
-      targetType: "CRAFTSMAN_PROFILE",
-      targetId: input.targetProfileId,
+      targetType: "USER_BEHAVIOR",
+      targetId: input.reporterUserId,
       reason: "MISLEADING_CLAIM",
-      details: "Publikačné údaje profilu vyžadujú dočasné manuálne preverenie.",
+      details:
+        "Publikačné správanie účtu vyžaduje dočasné manuálne preverenie.",
     }),
   ).resolves.toMatchObject({ status: "APPLIED", state: "OPEN" });
   await expect(
