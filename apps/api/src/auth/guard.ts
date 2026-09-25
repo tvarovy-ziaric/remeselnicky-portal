@@ -10,6 +10,7 @@ export type SessionGuardResult =
 
 export type SessionAuthorizationScope =
   | Exclude<ModerationEnforcementScope, "CONTENT" | "ACCOUNT">
+  | "PRIVACY_REQUEST"
   | "RESTRICTED_ACCOUNT_APPEAL";
 
 export function createSessionGuard(persistence: AuthPersistence) {
@@ -30,7 +31,10 @@ export function createSessionGuard(persistence: AuthPersistence) {
       if (user.accountState !== "ACTIVE") {
         return { status: "ACCOUNT_NOT_ACTIVE", user };
       }
-      if (scope === "RESTRICTED_ACCOUNT_APPEAL") {
+      if (
+        scope === "RESTRICTED_ACCOUNT_APPEAL" ||
+        scope === "PRIVACY_REQUEST"
+      ) {
         return { status: "ACTIVE", user };
       }
       // D24 preserves Job and business history while restricting new actions.

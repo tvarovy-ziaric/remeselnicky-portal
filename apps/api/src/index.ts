@@ -100,6 +100,21 @@ export type {
   ModerationAppealRouteDependencies,
 } from "./moderation/routes.js";
 export {
+  PRIVACY_REQUEST_PATHS,
+  registerPrivacyRequestRoutes,
+} from "./privacy/routes.js";
+export type { PrivacyRequestRouteDependencies } from "./privacy/routes.js";
+export {
+  JOB_PROPERTY_PHOTO_CONSENT_PATHS,
+  registerJobPropertyPhotoConsentRoutes,
+} from "./privacy/photo-consent-routes.js";
+export type { JobPropertyPhotoConsentRouteDependencies } from "./privacy/photo-consent-routes.js";
+export {
+  ADMIN_PRIVACY_PATHS,
+  registerAdminPrivacyRoutes,
+} from "./privacy/admin-routes.js";
+export type { AdminPrivacyRouteDependencies } from "./privacy/admin-routes.js";
+export {
   JOB_DOCUMENTATION_PATH,
   registerJobDocumentationRoutes,
 } from "./job-documentation/routes.js";

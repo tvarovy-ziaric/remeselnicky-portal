@@ -34,6 +34,7 @@
     "@portal/media": "workspace:*",
     "@portal/notifications": "workspace:*",
     "@portal/observability": "workspace:*",
+    "@portal/privacy": "workspace:*",
     "@portal/search": "workspace:*",
     "@portal/storage": "workspace:*",
     "argon2": "0.45.1",

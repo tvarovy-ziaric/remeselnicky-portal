@@ -1,13 +1,23 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
+import type { PrivilegedActor } from "@portal/admin-auth";
 import type { UserId } from "@portal/domain";
 import type { Sql } from "postgres";
 import { expect } from "vitest";
 
-import { createPrivacyRepository } from "../src/index.js";
+import {
+  createPrivacyOperationsRepository,
+  createPrivacyRepository,
+} from "../src/index.js";
 
 /** Runs inside the single clean-migration integration test to avoid migration races. */
-export async function runPrivacyIntegrationAssertions(sql: Sql): Promise<void> {
+export async function runPrivacyIntegrationAssertions(
+  sql: Sql,
+  admin: {
+    readonly adminId: UserId;
+    readonly privilegedSessionId: string;
+  },
+): Promise<void> {
   const [subject] = await sql<{ id: UserId }[]>`
     INSERT INTO users DEFAULT VALUES RETURNING id
   `;
@@ -236,13 +246,140 @@ export async function runPrivacyIntegrationAssertions(sql: Sql): Promise<void> {
     )
   `).rejects.toThrow(/privacy request revisions must be contiguous/u);
 
+  const operations = createPrivacyOperationsRepository(sql);
+  const adminActor: PrivilegedActor = {
+    capabilities: new Set(["admin.privacy.manage"]),
+    mfaAuthenticatedAt: new Date(),
+    roles: ["ADMIN"],
+    userId: admin.adminId,
+  };
+  await expect(
+    operations.transitionRequest({
+      actionCode: "REQUEST_REVIEW_STARTED",
+      actor: adminActor,
+      caseId,
+      commandId: randomUUID(),
+      deadlineAt: null,
+      expectedRevision: 2,
+      expectedState: "VERIFIED",
+      privilegedSessionId: admin.privilegedSessionId,
+      reason: "Verified account closure request entered review.",
+      resultingState: "IN_REVIEW",
+    }),
+  ).resolves.toMatchObject({
+    revision: 3,
+    state: "IN_REVIEW",
+    status: "APPLIED",
+  });
+
+  await expect(sql`
+    INSERT INTO privacy_account_closure_commands (
+      command_id, case_id, subject_user_id, actor_user_id,
+      actor_privileged_session_hash, expected_request_revision,
+      expected_request_state, resulting_request_revision,
+      reason_code, reason, payload_fingerprint
+    ) VALUES (
+      ${randomUUID()}, ${caseId}, ${subject.id}, ${admin.adminId},
+      ${"0".repeat(64)}, 3, 'IN_REVIEW', 4,
+      'INVALID_MFA_ATTEMPT', 'Invalid session must fail closed.',
+      ${"f".repeat(64)}
+    )
+  `).rejects.toThrow(/recent MFA required/u);
+
+  const subjectSessionDigest = createHash("sha256")
+    .update(`privacy-subject-session-${randomUUID()}`, "utf8")
+    .digest("hex");
   await sql`
-    UPDATE users
-    SET account_state = 'DEACTIVATED',
-        account_state_changed_at = CURRENT_TIMESTAMP,
-        updated_at = CURRENT_TIMESTAMP
-    WHERE id = ${subject.id}
+    INSERT INTO auth_sessions (
+      session_id_hash, user_id, payload, expires_at
+    ) VALUES (
+      ${subjectSessionDigest}, ${subject.id}, ${sql.json({})},
+      CURRENT_TIMESTAMP + INTERVAL '30 minutes'
+    )
   `;
+  const closureCommandId = randomUUID();
+  const closure = await operations.executeAccountClosure({
+    actor: adminActor,
+    caseId,
+    commandId: closureCommandId,
+    expectedRequestRevision: 3,
+    expectedRequestState: "IN_REVIEW",
+    privilegedSessionId: admin.privilegedSessionId,
+    reason: "Verified request has no open marketplace obligations.",
+    reasonCode: "VERIFIED_ACCOUNT_CLOSURE",
+    subjectUserId: subject.id,
+  });
+  expect(closure).toMatchObject({
+    requestRevision: 4,
+    requestState: "ACTION_REQUIRED",
+    status: "APPLIED",
+  });
+  if (closure.status !== "APPLIED")
+    throw new Error("Expected applied account closure command.");
+  expect(closure.dispositions).toHaveLength(17);
+  expect(
+    closure.dispositions.every(
+      ({ disposition, policyVersionId, state }) =>
+        disposition === "REVIEW_REQUIRED" &&
+        policyVersionId === null &&
+        state === "BLOCKED",
+    ),
+  ).toBe(true);
+
+  const [closed] = await sql<
+    Array<{
+      readonly accountState: string;
+      readonly cases: number;
+      readonly requestRevision: number;
+      readonly requestState: string;
+      readonly revokedSessions: number;
+    }>
+  >`
+    SELECT users.account_state::text AS "accountState",
+      count(DISTINCT request.case_id)::integer AS cases,
+      current_request.revision AS "requestRevision",
+      current_request.state::text AS "requestState",
+      count(DISTINCT session.session_id_hash)
+        FILTER (WHERE session.revoked_at IS NOT NULL)::integer
+        AS "revokedSessions"
+    FROM users
+    LEFT JOIN privacy_request_cases request
+      ON request.subject_user_id = users.id
+    LEFT JOIN current_privacy_request_cases current_request
+      ON current_request.case_id = request.case_id
+    LEFT JOIN auth_sessions session ON session.user_id = users.id
+    WHERE users.id = ${subject.id}
+    GROUP BY users.id, current_request.revision, current_request.state
+  `;
+  expect(closed).toEqual({
+    accountState: "DEACTIVATED",
+    cases: 1,
+    requestRevision: 4,
+    requestState: "ACTION_REQUIRED",
+    revokedSessions: 1,
+  });
+
+  await expect(
+    operations.transitionRequest({
+      actionCode: "REQUEST_COMPLETED",
+      actor: adminActor,
+      caseId,
+      commandId: randomUUID(),
+      deadlineAt: null,
+      expectedRevision: 4,
+      expectedState: "ACTION_REQUIRED",
+      privilegedSessionId: admin.privilegedSessionId,
+      reason: "Completion must wait for every category disposition.",
+      resultingState: "COMPLETED",
+    }),
+  ).rejects.toThrow(/all privacy category dispositions must complete/u);
+
+  await expect(sql`
+    UPDATE privacy_account_closure_commands
+    SET reason = 'History rewrite attempt.'
+    WHERE command_id = ${closureCommandId}
+  `).rejects.toThrow(/privacy operational history is append-only/u);
+
   const [retained] = await sql<{ accountState: string; cases: number }[]>`
     SELECT
       users.account_state AS "accountState",

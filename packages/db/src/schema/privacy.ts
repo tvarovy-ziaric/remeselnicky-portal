@@ -16,6 +16,8 @@ import {
 import {
   CONSENT_ACTION_VALUES,
   OPTIONAL_CONSENT_PURPOSE_VALUES,
+  PRIVACY_DATA_DISPOSITION_VALUES,
+  PRIVACY_DISPOSITION_STATE_VALUES,
   PRIVACY_POLICY_KIND_VALUES,
   PRIVACY_REQUEST_STATE_VALUES,
   PRIVACY_REQUEST_TYPE_VALUES,
@@ -57,6 +59,14 @@ export const privacyRequestTypeEnum = pgEnum(
 export const privacyRequestStateEnum = pgEnum(
   "privacy_request_state",
   PRIVACY_REQUEST_STATE_VALUES,
+);
+export const privacyDataDispositionEnum = pgEnum(
+  "privacy_data_disposition",
+  PRIVACY_DATA_DISPOSITION_VALUES,
+);
+export const privacyDispositionStateEnum = pgEnum(
+  "privacy_disposition_state",
+  PRIVACY_DISPOSITION_STATE_VALUES,
 );
 
 export const privacyPolicyVersions = pgTable(
@@ -220,6 +230,125 @@ export const privacyRequestEvents = pgTable(
   ],
 );
 
+export const privacyAccountClosureCommands = pgTable(
+  "privacy_account_closure_commands",
+  {
+    commandId: uuid("command_id").primaryKey(),
+    caseId: uuid("case_id")
+      .notNull()
+      .unique()
+      .references(() => privacyRequestCases.caseId, { onDelete: "restrict" }),
+    subjectUserId: uuid("subject_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    actorUserId: uuid("actor_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    actorPrivilegedSessionHash: char("actor_privileged_session_hash", {
+      length: 64,
+    }).notNull(),
+    expectedRequestRevision: integer("expected_request_revision").notNull(),
+    expectedRequestState: privacyRequestStateEnum(
+      "expected_request_state",
+    ).notNull(),
+    resultingRequestRevision: integer("resulting_request_revision").notNull(),
+    reasonCode: text("reason_code").notNull(),
+    reason: text("reason").notNull(),
+    payloadFingerprint: char("payload_fingerprint", { length: 64 }).notNull(),
+    occurredAt: timestamp("occurred_at", {
+      mode: "date",
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    check(
+      "privacy_account_closure_revision_step",
+      sql`${table.resultingRequestRevision} = ${table.expectedRequestRevision} + 1`,
+    ),
+  ],
+);
+
+export const privacyRequestAdminCommands = pgTable(
+  "privacy_request_admin_commands",
+  {
+    commandId: uuid("command_id").primaryKey(),
+    caseId: uuid("case_id")
+      .notNull()
+      .references(() => privacyRequestCases.caseId, { onDelete: "restrict" }),
+    actorUserId: uuid("actor_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    actorPrivilegedSessionHash: char("actor_privileged_session_hash", {
+      length: 64,
+    }).notNull(),
+    expectedRevision: integer("expected_revision").notNull(),
+    expectedState: privacyRequestStateEnum("expected_state").notNull(),
+    resultingRevision: integer("resulting_revision").notNull(),
+    resultingState: privacyRequestStateEnum("resulting_state").notNull(),
+    actionCode: text("action_code").notNull(),
+    deadlineAt: timestamp("deadline_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
+    reason: text("reason").notNull(),
+    payloadFingerprint: char("payload_fingerprint", { length: 64 }).notNull(),
+    occurredAt: timestamp("occurred_at", {
+      mode: "date",
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    check(
+      "privacy_request_admin_revision_step",
+      sql`${table.resultingRevision} = ${table.expectedRevision} + 1`,
+    ),
+  ],
+);
+
+export const privacyDataDispositionEvents = pgTable(
+  "privacy_data_disposition_events",
+  {
+    eventId: uuid("event_id").primaryKey().defaultRandom(),
+    caseId: uuid("case_id")
+      .notNull()
+      .references(() => privacyRequestCases.caseId, { onDelete: "restrict" }),
+    category: privacyRetentionCategoryEnum("category").notNull(),
+    revision: integer("revision").notNull(),
+    disposition: privacyDataDispositionEnum("disposition").notNull(),
+    state: privacyDispositionStateEnum("state").notNull(),
+    policyVersionId: uuid("policy_version_id").references(
+      () => privacyRetentionPolicyVersions.policyVersionId,
+      { onDelete: "restrict" },
+    ),
+    actorUserId: uuid("actor_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    actionCode: text("action_code").notNull(),
+    occurredAt: timestamp("occurred_at", {
+      mode: "date",
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    unique("privacy_data_disposition_case_category_revision_unique").on(
+      table.caseId,
+      table.category,
+      table.revision,
+    ),
+    index("privacy_data_disposition_case_idx").on(
+      table.caseId,
+      table.category,
+      table.revision,
+    ),
+  ],
+);
+
 export type PrivacyPolicyVersionRecord =
   typeof privacyPolicyVersions.$inferSelect;
 export type PrivacyConsentPurposeRecord =
@@ -231,3 +360,9 @@ export type PrivacyRetentionPolicyVersionRecord =
 export type PrivacyRequestCaseRecord = typeof privacyRequestCases.$inferSelect;
 export type PrivacyRequestEventRecord =
   typeof privacyRequestEvents.$inferSelect;
+export type PrivacyAccountClosureCommandRecord =
+  typeof privacyAccountClosureCommands.$inferSelect;
+export type PrivacyRequestAdminCommandRecord =
+  typeof privacyRequestAdminCommands.$inferSelect;
+export type PrivacyDataDispositionEventRecord =
+  typeof privacyDataDispositionEvents.$inferSelect;

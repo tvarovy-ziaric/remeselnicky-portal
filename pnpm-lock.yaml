@@ -104,6 +104,9 @@ importers:
       '@portal/observability':
         specifier: workspace:*
         version: link:../../packages/observability
+      '@portal/privacy':
+        specifier: workspace:*
+        version: link:../../packages/privacy
       '@portal/search':
         specifier: workspace:*
         version: link:../../packages/search

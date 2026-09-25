@@ -28,6 +28,7 @@ describe("admin privileged access", () => {
 
     expect(admin.has("admin.access")).toBe(true);
     expect(admin.has("admin.profiles.moderate")).toBe(true);
+    expect(admin.has("admin.privacy.manage")).toBe(true);
     expect(admin.has("admin.roles.manage")).toBe(false);
     expect(admin.has("admin.sensitive.read")).toBe(false);
     expect(superAdmin.has("admin.roles.manage")).toBe(true);

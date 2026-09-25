@@ -201,6 +201,13 @@ const app = buildApi({
     },
     moderationAppeals: { moderation: database.moderation },
     notifications: { notifications: database.notifications },
+    privacyRequests: {
+      operations: database.privacyOperations,
+      privacy: database.privacy,
+    },
+    propertyPhotoConsent: {
+      consent: database.jobPropertyPhotoConsent,
+    },
     jobDisputes: {
       disputes: database.jobDisputes,
       ...(mediaRuntime === undefined

@@ -12,6 +12,7 @@ export default function HomePage() {
           <a href="/remeselnici">Nájsť remeselníka</a>
           <a href="/zakazky">Moje zákazky</a>
           <a href="/ucasti/pozvanky">Pozvánky na účasť</a>
+          <a href="/ucet/sukromie">Súkromie a moje údaje</a>
         </nav>
         <p className="contract">Zdieľaný kontrakt API: {appInfo.apiVersion}</p>
       </section>

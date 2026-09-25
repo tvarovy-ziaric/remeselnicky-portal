@@ -38,6 +38,9 @@ describe("session moderation restriction composition", () => {
     await expect(
       guard.evaluate(request("POST"), "RESTRICTED_ACCOUNT_APPEAL"),
     ).resolves.toMatchObject({ status: "ACTIVE" });
+    await expect(
+      guard.evaluate(request("POST"), "PRIVACY_REQUEST"),
+    ).resolves.toMatchObject({ status: "ACTIVE" });
   });
 
   it("does not turn the appeal exception into ordinary suspended access", async () => {

@@ -87,6 +87,34 @@ export const PRIVACY_REQUEST_STATE_VALUES = Object.freeze([
 ] as const);
 export type PrivacyRequestState = (typeof PRIVACY_REQUEST_STATE_VALUES)[number];
 
+export const PRIVACY_DATA_DISPOSITION_VALUES = Object.freeze([
+  "REVIEW_REQUIRED",
+  "DELETE",
+  "ANONYMIZE",
+  "RETAIN",
+  "NO_DATA",
+] as const);
+export type PrivacyDataDispositionKind =
+  (typeof PRIVACY_DATA_DISPOSITION_VALUES)[number];
+
+export const PRIVACY_DISPOSITION_STATE_VALUES = Object.freeze([
+  "BLOCKED",
+  "READY",
+  "PROCESSING",
+  "COMPLETED",
+  "FAILED",
+] as const);
+export type PrivacyDispositionState =
+  (typeof PRIVACY_DISPOSITION_STATE_VALUES)[number];
+
+export const JOB_PROPERTY_PHOTO_CONSENT_ACTION_VALUES = Object.freeze([
+  "GRANTED",
+  "DECLINED",
+  "WITHDRAWN",
+] as const);
+export type JobPropertyPhotoConsentAction =
+  (typeof JOB_PROPERTY_PHOTO_CONSENT_ACTION_VALUES)[number];
+
 export interface PrivacyPolicyVersionDraft {
   readonly contentSha256: string;
   readonly effectiveAt: Date | null;

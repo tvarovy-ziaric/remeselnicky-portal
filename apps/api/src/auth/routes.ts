@@ -166,6 +166,18 @@ import {
   type NotificationRouteDependencies,
 } from "../notifications/routes.js";
 import {
+  registerPrivacyRequestRoutes,
+  type PrivacyRequestRouteDependencies,
+} from "../privacy/routes.js";
+import {
+  registerJobPropertyPhotoConsentRoutes,
+  type JobPropertyPhotoConsentRouteDependencies,
+} from "../privacy/photo-consent-routes.js";
+import {
+  registerAdminPrivacyRoutes,
+  type AdminPrivacyRouteDependencies,
+} from "../privacy/admin-routes.js";
+import {
   registerJobDisputeRoutes,
   type JobDisputeRouteDependencies,
 } from "../job-disputes/routes.js";
@@ -280,6 +292,7 @@ export interface AuthModuleDependencies {
     AdminModerationRouteDependencies,
     "moderation"
   >;
+  readonly adminPrivacy?: Pick<AdminPrivacyRouteDependencies, "operations">;
   readonly jobDocumentation?: Pick<
     JobDocumentationRouteDependencies,
     "documentation"
@@ -330,6 +343,14 @@ export interface AuthModuleDependencies {
     "moderation"
   >;
   readonly notifications?: Pick<NotificationRouteDependencies, "notifications">;
+  readonly privacyRequests?: Pick<
+    PrivacyRequestRouteDependencies,
+    "operations" | "privacy"
+  >;
+  readonly propertyPhotoConsent?: Pick<
+    JobPropertyPhotoConsentRouteDependencies,
+    "consent"
+  >;
   readonly jobDisputes?: Pick<
     JobDisputeRouteDependencies,
     "disputes" | "evidenceUploads"
@@ -860,6 +881,28 @@ async function configureAuthModule(
       ...dependencies.notifications,
     });
   }
+  if (dependencies.privacyRequests !== undefined) {
+    registerPrivacyRequestRoutes(app, {
+      csrfProtection: csrfProtection(app),
+      guard,
+      rateLimit: {
+        max: config.rateLimitMax,
+        timeWindowMs: config.rateLimitWindowMs,
+      },
+      ...dependencies.privacyRequests,
+    });
+  }
+  if (dependencies.propertyPhotoConsent !== undefined) {
+    registerJobPropertyPhotoConsentRoutes(app, {
+      consent: dependencies.propertyPhotoConsent.consent,
+      csrfProtection: csrfProtection(app),
+      guard,
+      rateLimit: {
+        max: config.rateLimitMax,
+        timeWindowMs: config.rateLimitWindowMs,
+      },
+    });
+  }
   if (dependencies.jobDisputes !== undefined) {
     registerJobDisputeRoutes(app, {
       csrfProtection: csrfProtection(app),
@@ -954,6 +997,18 @@ async function configureAuthModule(
         moderation: dependencies.adminModeration.moderation,
         guard,
         csrfProtection: csrfProtection(app),
+        rateLimit: {
+          max: config.rateLimitMax,
+          timeWindowMs: config.rateLimitWindowMs,
+        },
+      });
+    }
+    if (dependencies.adminPrivacy !== undefined) {
+      registerAdminPrivacyRoutes(app, {
+        adminAccess: dependencies.adminAccess.service,
+        csrfProtection: csrfProtection(app),
+        guard,
+        operations: dependencies.adminPrivacy.operations,
         rateLimit: {
           max: config.rateLimitMax,
           timeWindowMs: config.rateLimitWindowMs,

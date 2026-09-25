@@ -101,6 +101,8 @@ import {
   type CredentialClaimRepository,
 } from "./credential-claim-repository.js";
 import { createPrivacyRepository } from "./privacy-repository.js";
+import { createPrivacyOperationsRepository } from "./privacy-operations-repository.js";
+import { createJobPropertyPhotoConsentRepository } from "./job-property-photo-consent-repository.js";
 import type { PrivacyRepository } from "@portal/privacy";
 import { createCustomerProfileRepository } from "./customer-profile-repository.js";
 import { createCustomerShortlistRepository } from "./customer-shortlist-repository.js";
@@ -568,10 +570,15 @@ export {
   privacyConsentActionEnum,
   privacyConsentEvents,
   privacyConsentPurposes,
+  privacyAccountClosureCommands,
+  privacyDataDispositionEnum,
+  privacyDataDispositionEvents,
+  privacyDispositionStateEnum,
   privacyOptionalConsentPurposeEnum,
   privacyPolicyKindEnum,
   privacyPolicyVersions,
   privacyRequestCases,
+  privacyRequestAdminCommands,
   privacyRequestEvents,
   privacyRequestStateEnum,
   privacyRequestTypeEnum,
@@ -581,10 +588,13 @@ export {
   privacyReviewStateEnum,
 } from "./schema/index.js";
 export type {
+  PrivacyAccountClosureCommandRecord,
   PrivacyConsentEventRecord,
   PrivacyConsentPurposeRecord,
   PrivacyPolicyVersionRecord,
+  PrivacyDataDispositionEventRecord,
   PrivacyRequestCaseRecord,
+  PrivacyRequestAdminCommandRecord,
   PrivacyRequestEventRecord,
   PrivacyRetentionPolicyVersionRecord,
 } from "./schema/index.js";
@@ -975,6 +985,29 @@ export {
   SEARCHABLE_CRAFTSMAN_PROFILE_COLUMNS,
 } from "./schema/index.js";
 export { createPrivacyRepository } from "./privacy-repository.js";
+export {
+  createPrivacyOperationsRepository,
+  PrivacyAccountClosureIdempotencyError,
+} from "./privacy-operations-repository.js";
+export {
+  createJobPropertyPhotoConsentRepository,
+  JobPropertyPhotoConsentIdempotencyError,
+} from "./job-property-photo-consent-repository.js";
+export type {
+  AppendJobPropertyPhotoConsentInput,
+  AppendJobPropertyPhotoConsentResult,
+  JobPropertyPhotoConsentEvent,
+  JobPropertyPhotoConsentItem,
+  PropertyPhotoConsentPolicy,
+} from "./job-property-photo-consent-repository.js";
+export type {
+  ExecuteAccountClosureInput,
+  ExecuteAccountClosureResult,
+  PrivacyDataDisposition,
+  PrivacyRequestSummary,
+  TransitionPrivacyRequestInput,
+  TransitionPrivacyRequestResult,
+} from "./privacy-operations-repository.js";
 export type { PrivacyRepository } from "@portal/privacy";
 export type {
   AuthCredential,
@@ -1332,6 +1365,12 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly professionTaxonomy: ProfessionTaxonomyPersistence;
   readonly skillCatalog: SkillCatalogRepository;
   readonly privacy: PrivacyRepository;
+  readonly privacyOperations: ReturnType<
+    typeof createPrivacyOperationsRepository
+  >;
+  readonly jobPropertyPhotoConsent: ReturnType<
+    typeof createJobPropertyPhotoConsentRepository
+  >;
   close(): Promise<void>;
 }
 
@@ -1488,6 +1527,8 @@ export function createDatabase(
   const professionTaxonomy = createProfessionTaxonomyRepository(sql);
   const skillCatalog = createSkillCatalogRepository(sql);
   const privacy = createPrivacyRepository(sql);
+  const privacyOperations = createPrivacyOperationsRepository(sql);
+  const jobPropertyPhotoConsent = createJobPropertyPhotoConsentRepository(sql);
   const health = createDatabaseHealthProbe(async () => {
     await sql`select 1 as health`;
   });
@@ -1590,6 +1631,8 @@ export function createDatabase(
     professionTaxonomy,
     skillCatalog,
     privacy,
+    privacyOperations,
+    jobPropertyPhotoConsent,
     query,
     ping(): Promise<void> {
       return health.ping();

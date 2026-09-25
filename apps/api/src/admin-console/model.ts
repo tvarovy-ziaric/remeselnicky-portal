@@ -33,6 +33,11 @@ export const ADMIN_CONSOLE_MODULES = Object.freeze({
     description: "Profily čakajúce na prvé schválenie.",
     label: "Profily",
   }),
+  privacy: Object.freeze({
+    capability: "admin.privacy.manage" as const,
+    description: "Žiadosti dotknutých osôb a uzavretie účtov.",
+    label: "Súkromie",
+  }),
   reports: Object.freeze({
     capability: "admin.reviews.moderate" as const,
     description: "Nahlásený obsah pripravený na posúdenie.",
