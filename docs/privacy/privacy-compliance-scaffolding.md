@@ -83,3 +83,26 @@ ID deduplicates the privacy append and retries the audit projection. Audit
 adapters must therefore be idempotent by event ID; a durable outbox adapter may
 be introduced without changing this contract. Operators must never repair an
 audit outage by rewriting or deleting privacy history.
+
+## R4-026 disposition orchestration
+
+Migration `0111_privacy_disposition_jobs.sql` advances the scaffold without
+inventing legal policy. A reviewed `DELETE` or `ANONYMIZE` category decision
+atomically creates an immutable recovery tombstone and a lease-based job with
+the exact same identity. Existing current `READY` heads are backfilled during
+upgrade; an obsolete historical decision is never reactivated.
+
+The queue remains fail-closed until a provider-neutral independent recovery
+ledger returns a receipt for the tombstone. Only the receipt digest and bounded
+ledger code are stored locally. Claims, retryable failures, terminal failures
+and completion append category disposition events atomically. Leases are
+bounded, stale acknowledgements fail, and an expired last attempt becomes an
+explicit `LEASE_EXPIRED` terminal result instead of an indefinitely ambiguous
+processing state.
+
+This orchestration does not itself delete or anonymize category data. Every
+category still needs a reviewed policy and an idempotent dedicated executor;
+unsupported categories remain non-executable. The independent ledger adapter,
+credentials and production recovery reapplicator remain external provisioning
+HUMAN GATES. See
+[ADR 0026](../adr/0026-privacy-disposition-jobs-and-recovery-tombstones.md).
