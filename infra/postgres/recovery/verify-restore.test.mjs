@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -7,6 +8,7 @@ import test from "node:test";
 import {
   RecoveryValidationError,
   parseConfiguration,
+  parseTombstoneAttestation,
   runRestoreVerification,
 } from "./verify-restore.mjs";
 
@@ -36,6 +38,37 @@ function expectCode(environment, code) {
     () => parseConfiguration(environment),
     (error) => error instanceof RecoveryValidationError && error.code === code,
   );
+}
+
+function productionFixture(overrides = {}) {
+  const environment = fixture({
+    RECOVERY_EXPECTED_ENVIRONMENT: "recovery",
+    RECOVERY_DATA_CLASS: "production",
+  });
+  const directory = join(
+    environment.RECOVERY_EVIDENCE_DIRECTORY,
+    "production-inputs",
+  );
+  mkdirSync(directory, { recursive: true });
+  const ledger = join(directory, "normalized-ledger.jsonl");
+  const ledgerContent = `${JSON.stringify({
+    ledgerCode: "synthetic.ledger",
+    recordCount: 0,
+    recordType: "PORTAL_PRIVACY_RECOVERY_LEDGER",
+    schemaVersion: 1,
+  })}\n`;
+  writeFileSync(ledger, ledgerContent);
+  const reapplicator = join(directory, "reapply-hook");
+  writeFileSync(reapplicator, "#!/usr/bin/env node\n", { mode: 0o700 });
+  return {
+    ...environment,
+    RECOVERY_TOMBSTONE_LEDGER: ledger,
+    RECOVERY_TOMBSTONE_LEDGER_SHA256: createHash("sha256")
+      .update(ledgerContent)
+      .digest("hex"),
+    RECOVERY_TOMBSTONE_REAPPLICATOR: reapplicator,
+    ...overrides,
+  };
 }
 
 test("accepts an isolated synthetic staging restore", () => {
@@ -115,6 +148,45 @@ test("production-class recovery fails closed without a tombstone reapplicator", 
   );
 });
 
+test("rejects an invalid normalized-ledger digest", () => {
+  expectCode(
+    productionFixture({ RECOVERY_TOMBSTONE_LEDGER_SHA256: "not-a-digest" }),
+    "INVALID_TOMBSTONE_LEDGER_DIGEST",
+  );
+});
+
+test("validates exact content-free tombstone attestations", () => {
+  const value = {
+    database: "portal_restore_verify_20260914_a",
+    ledgerSha256: "a".repeat(64),
+    recordsAlreadyApplied: 1,
+    recordsApplied: 2,
+    recordsRead: 3,
+    runId: "restore-20260914-a",
+    schemaVersion: 1,
+    state: "COMPLETED",
+  };
+  assert.deepEqual(
+    parseTombstoneAttestation(JSON.stringify(value), {
+      ledgerSha256: "a".repeat(64),
+      runId: "restore-20260914-a",
+      targetDatabase: "portal_restore_verify_20260914_a",
+    }),
+    value,
+  );
+  assert.throws(
+    () =>
+      parseTombstoneAttestation(JSON.stringify({ ...value, recordsRead: 4 }), {
+        ledgerSha256: "a".repeat(64),
+        runId: "restore-20260914-a",
+        targetDatabase: "portal_restore_verify_20260914_a",
+      }),
+    (error) =>
+      error instanceof RecoveryValidationError &&
+      error.code === "TOMBSTONE_ATTESTATION_MISMATCH",
+  );
+});
+
 test("rejects duplicate TLS parameters", () => {
   expectCode(
     fixture({
@@ -176,6 +248,78 @@ test("executes a guarded restore and writes privacy-safe pass evidence", async (
   assert.equal(evidence.status, "passed");
   assert.equal(evidence.containsCredentialsOrPersonalData, false);
   assert.equal(JSON.stringify(evidence).includes("secret"), false);
+});
+
+test("production-class restore requires matching hook and database replay attestations", async () => {
+  const environment = productionFixture();
+  const attestation = {
+    database: environment.RECOVERY_TARGET_DATABASE,
+    ledgerSha256: environment.RECOVERY_TOMBSTONE_LEDGER_SHA256,
+    recordsAlreadyApplied: 0,
+    recordsApplied: 0,
+    recordsRead: 0,
+    runId: environment.RECOVERY_RUN_ID,
+    schemaVersion: 1,
+    state: "COMPLETED",
+  };
+  let queryNumber = 0;
+  await runRestoreVerification(environment, {
+    output: () => undefined,
+    run(binary) {
+      if (binary === environment.RECOVERY_TOMBSTONE_REAPPLICATOR)
+        return JSON.stringify(attestation);
+      if (binary !== "psql") return "";
+      queryNumber += 1;
+      if (queryNumber === 1 || queryNumber === 3) return "recovery";
+      if (queryNumber === 2) return "0";
+      if (queryNumber === 4) return JSON.stringify(attestation);
+      return JSON.stringify({
+        database: environment.RECOVERY_TARGET_DATABASE,
+        environment: "recovery",
+        latestMigration: 2,
+        migrationLedger: true,
+        postgis: true,
+        usersTable: true,
+      });
+    },
+  });
+  const evidence = JSON.parse(
+    readFileSync(
+      join(environment.RECOVERY_EVIDENCE_DIRECTORY, "restore-20260914-a.json"),
+      "utf8",
+    ),
+  );
+  assert.deepEqual(evidence.tombstoneState, {
+    ledgerSha256: environment.RECOVERY_TOMBSTONE_LEDGER_SHA256,
+    recordsAlreadyApplied: 0,
+    recordsApplied: 0,
+    recordsRead: 0,
+    status: "reapplied-and-database-attested",
+  });
+  assert.equal(evidence.containsCredentialsOrPersonalData, false);
+});
+
+test("production recovery rejects a successful no-op hook without attestation", async () => {
+  const environment = productionFixture({
+    RECOVERY_RUN_ID: "restore-noop-01",
+  });
+  let queryNumber = 0;
+  await assert.rejects(
+    runRestoreVerification(environment, {
+      output: () => undefined,
+      run(binary) {
+        if (binary === environment.RECOVERY_TOMBSTONE_REAPPLICATOR) return "";
+        if (binary !== "psql") return "";
+        queryNumber += 1;
+        if (queryNumber === 1 || queryNumber === 3) return "recovery";
+        if (queryNumber === 2) return "0";
+        return "";
+      },
+    }),
+    (error) =>
+      error instanceof RecoveryValidationError &&
+      error.code === "TOMBSTONE_ATTESTATION_INVALID",
+  );
 });
 
 test("refuses to overwrite an existing evidence record before running commands", async () => {

@@ -19,7 +19,7 @@
     "test": "turbo run test && pnpm test:boundaries && pnpm test:recovery && pnpm test:release && pnpm test:alpha",
     "test:alpha": "node --test scripts/validate-alpha-staging.test.mjs",
     "test:boundaries": "node --test scripts/verify-import-boundaries.test.mjs",
-    "test:recovery": "node --test infra/postgres/recovery/verify-restore.test.mjs",
+    "test:recovery": "node --test infra/postgres/recovery/*.test.mjs",
     "test:release": "node deploy/scripts/validate.mjs && node --test deploy/scripts/*.test.mjs",
     "typecheck": "turbo run typecheck"
   },

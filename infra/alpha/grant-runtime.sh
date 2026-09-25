@@ -31,6 +31,20 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
   GRANT USAGE, SELECT ON SEQUENCES TO :"app_user";
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
   GRANT EXECUTE ON FUNCTIONS TO :"app_user";
+REVOKE ALL ON TABLE privacy_restore_reapplication_runs FROM :"app_user";
+REVOKE ALL ON TABLE privacy_restore_applied_tombstones FROM :"app_user";
+REVOKE ALL ON TABLE privacy_restore_reapplication_items FROM :"app_user";
+REVOKE EXECUTE ON FUNCTION assert_privacy_restore_database_owner()
+  FROM :"app_user";
+REVOKE EXECUTE ON FUNCTION begin_privacy_restore_reapplication(
+  varchar, varchar, char, integer
+) FROM :"app_user";
+REVOKE EXECUTE ON FUNCTION apply_privacy_restore_tombstone(
+  varchar, uuid, uuid, uuid, privacy_retention_category,
+  privacy_data_disposition, uuid, char, timestamptz
+) FROM :"app_user";
+REVOKE EXECUTE ON FUNCTION complete_privacy_restore_reapplication(varchar)
+  FROM :"app_user";
 REVOKE CREATE ON SCHEMA public FROM :"app_user";
 SQL
 

@@ -136,10 +136,12 @@ export function parseConfiguration(environment = process.env) {
 
   let tombstoneReapplicator;
   let tombstoneLedger;
+  let tombstoneLedgerSha256;
   if (dataClass === "production") {
     if (
       !environment.RECOVERY_TOMBSTONE_REAPPLICATOR?.trim() ||
-      !environment.RECOVERY_TOMBSTONE_LEDGER?.trim()
+      !environment.RECOVERY_TOMBSTONE_LEDGER?.trim() ||
+      !environment.RECOVERY_TOMBSTONE_LEDGER_SHA256?.trim()
     ) {
       throw new RecoveryValidationError(
         "TOMBSTONE_REAPPLICATION_REQUIRED",
@@ -152,6 +154,16 @@ export function parseConfiguration(environment = process.env) {
     tombstoneLedger = resolve(
       requireValue(environment, "RECOVERY_TOMBSTONE_LEDGER"),
     );
+    tombstoneLedgerSha256 = requireValue(
+      environment,
+      "RECOVERY_TOMBSTONE_LEDGER_SHA256",
+    );
+    if (!/^[0-9a-f]{64}$/.test(tombstoneLedgerSha256)) {
+      throw new RecoveryValidationError(
+        "INVALID_TOMBSTONE_LEDGER_DIGEST",
+        "The normalized tombstone ledger SHA-256 is invalid.",
+      );
+    }
     assertExecutableFile(tombstoneReapplicator);
     assertRegularFile(tombstoneLedger, "TOMBSTONE_LEDGER_NOT_FOUND");
   }
@@ -177,7 +189,77 @@ export function parseConfiguration(environment = process.env) {
     target,
     tombstoneReapplicator,
     tombstoneLedger,
+    tombstoneLedgerSha256,
   });
+}
+
+function exactKeys(value, keys) {
+  if (typeof value !== "object" || value === null || Array.isArray(value))
+    return false;
+  const actual = Object.keys(value).sort();
+  const expected = [...keys].sort();
+  return (
+    actual.length === expected.length &&
+    actual.every((key, index) => key === expected[index])
+  );
+}
+
+export function parseTombstoneAttestation(
+  text,
+  { runId, targetDatabase, ledgerSha256 },
+) {
+  let value;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    throw new RecoveryValidationError(
+      "TOMBSTONE_ATTESTATION_INVALID",
+      "The tombstone reapplicator did not return valid attestation JSON.",
+    );
+  }
+  if (
+    !exactKeys(value, [
+      "database",
+      "ledgerSha256",
+      "recordsAlreadyApplied",
+      "recordsApplied",
+      "recordsRead",
+      "runId",
+      "schemaVersion",
+      "state",
+    ]) ||
+    value.schemaVersion !== 1 ||
+    value.runId !== runId ||
+    value.database !== targetDatabase ||
+    value.ledgerSha256 !== ledgerSha256 ||
+    value.state !== "COMPLETED" ||
+    !Number.isSafeInteger(value.recordsRead) ||
+    !Number.isSafeInteger(value.recordsApplied) ||
+    !Number.isSafeInteger(value.recordsAlreadyApplied) ||
+    value.recordsRead < 0 ||
+    value.recordsApplied < 0 ||
+    value.recordsAlreadyApplied < 0 ||
+    value.recordsApplied + value.recordsAlreadyApplied !== value.recordsRead
+  ) {
+    throw new RecoveryValidationError(
+      "TOMBSTONE_ATTESTATION_MISMATCH",
+      "The tombstone reapplication attestation does not match this recovery run.",
+    );
+  }
+  return Object.freeze(value);
+}
+
+function sameTombstoneAttestation(left, right) {
+  return [
+    "schemaVersion",
+    "runId",
+    "database",
+    "ledgerSha256",
+    "recordsRead",
+    "recordsApplied",
+    "recordsAlreadyApplied",
+    "state",
+  ].every((field) => left[field] === right[field]);
 }
 
 function parsePostgresUrl(value) {
@@ -418,15 +500,67 @@ export async function runRestoreVerification(
 
     let tombstoneState = "not-required-for-non-production-data";
     if (configuration.dataClass === "production") {
-      execute(configuration.tombstoneReapplicator, [], {
+      const actualLedgerSha256 = await sha256(configuration.tombstoneLedger);
+      if (actualLedgerSha256 !== configuration.tombstoneLedgerSha256) {
+        throw new RecoveryValidationError(
+          "TOMBSTONE_LEDGER_DIGEST_MISMATCH",
+          "The normalized tombstone ledger does not match its approved digest.",
+        );
+      }
+      const attestationText = execute(configuration.tombstoneReapplicator, [], {
         ...postgresEnvironment(
           configuration.target,
           configuration.targetDatabase,
         ),
         PORTAL_RECOVERY_RUN_ID: configuration.runId,
         PORTAL_TOMBSTONE_LEDGER: configuration.tombstoneLedger,
+        PORTAL_TOMBSTONE_LEDGER_SHA256: actualLedgerSha256,
       });
-      tombstoneState = "reapplied-by-required-hook";
+      const attestation = parseTombstoneAttestation(attestationText, {
+        runId: configuration.runId,
+        targetDatabase: configuration.targetDatabase,
+        ledgerSha256: actualLedgerSha256,
+      });
+      const databaseAttestationText = query(
+        configuration.target,
+        configuration.targetDatabase,
+        `SELECT json_build_object(
+          'schemaVersion', 1,
+          'runId', run_id,
+          'database', current_database(),
+          'ledgerSha256', ledger_sha256,
+          'recordsRead', records_expected,
+          'recordsApplied', records_applied,
+          'recordsAlreadyApplied', records_already_applied,
+          'state', state::text
+        )::text
+        FROM privacy_restore_reapplication_runs
+        WHERE run_id = '${configuration.runId}'
+          AND ledger_sha256 = '${actualLedgerSha256}'
+          AND state = 'COMPLETED';`,
+        execute,
+      );
+      const databaseAttestation = parseTombstoneAttestation(
+        databaseAttestationText,
+        {
+          runId: configuration.runId,
+          targetDatabase: configuration.targetDatabase,
+          ledgerSha256: actualLedgerSha256,
+        },
+      );
+      if (!sameTombstoneAttestation(databaseAttestation, attestation)) {
+        throw new RecoveryValidationError(
+          "TOMBSTONE_DATABASE_ATTESTATION_MISMATCH",
+          "The hook and database tombstone attestations differ.",
+        );
+      }
+      tombstoneState = Object.freeze({
+        status: "reapplied-and-database-attested",
+        ledgerSha256: actualLedgerSha256,
+        recordsRead: attestation.recordsRead,
+        recordsApplied: attestation.recordsApplied,
+        recordsAlreadyApplied: attestation.recordsAlreadyApplied,
+      });
     }
 
     const verificationText = query(

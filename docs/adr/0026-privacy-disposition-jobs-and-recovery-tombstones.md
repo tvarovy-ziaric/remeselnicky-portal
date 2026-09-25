@@ -3,7 +3,9 @@
 - Status: Accepted
 - Date: 2026-09-25
 - Locked references: D27.82–96, D27.106–136, D27.184–202
-- Implementation: migration `0111_privacy_disposition_jobs.sql`
+- Implementation: migrations `0111_privacy_disposition_jobs.sql`,
+  `0112_privacy_notification_delivery_disposition.sql` and
+  `0113_privacy_restore_reapplication.sql`
 
 ## Context
 
@@ -44,10 +46,18 @@ row exists.
    idempotent for the exact job ID. Migration 0111 supplies orchestration and
    recovery safety, not category transformations. A category remains
    non-executable until its reviewed policy and dedicated executor exist.
-6. Production-class restore remains isolated until the independent ledger is
-   supplied and an idempotent reapplicator has replayed deletion/anonymization
-   state. Traffic must not reach the restored database before that verification
-   passes.
+6. Production-class restore remains isolated until an independently sourced,
+   digest-approved normalized ledger is supplied. The canonical reapplicator
+   validates an exact bounded JSONL schema, applies every tombstone in one
+   database transaction and accepts only category transformations implemented
+   in the restored schema. Unsupported categories roll back rather than being
+   silently skipped.
+7. Reapplication uses a global immutable tombstone receipt plus per-run
+   `APPLIED / ALREADY_APPLIED` outcomes. Completion requires exactly one outcome
+   for every ledger record. The restore verifier accepts success only when the
+   hook attestation and a second database query agree exactly. Runtime database
+   roles are denied access; only the owner of the newly isolated restore
+   database can mutate this evidence.
 
 ## Consequences
 
@@ -60,6 +70,9 @@ row exists.
 - Selecting and provisioning the independent ledger/provider, its credentials
   and production retention is a HUMAN GATE. No vendor, account or billing
   commitment is made by this ADR.
+- The first restore effect is intentionally narrow: subject-owned notification
+  delivery metadata can be deleted without deleting the canonical in-app
+  notification. The architecture does not claim broader erasure coverage.
 - Exact retention values, legal holds, third-party propagation and the concrete
   transformation for each category still require reviewed implementation. The
   queue foundation must not be described as completed erasure by itself.

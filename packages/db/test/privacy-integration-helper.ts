@@ -800,4 +800,179 @@ export async function runPrivacyIntegrationAssertions(
       subjectUserId: subject.id,
     }),
   ).resolves.toEqual({ status: "NOT_FOUND" });
+
+  const restoreNotificationEventId = randomUUID();
+  const restoreNotificationId = randomUUID();
+  const restoreDeliveryId = randomUUID();
+  await sql`
+    INSERT INTO domain_outbox_events (
+      event_id, idempotency_key, event_name, schema_version, occurred_at,
+      entity_type, entity_id, payload, command_name, correlation_id
+    ) VALUES (
+      ${restoreNotificationEventId},
+      ${`privacy-restore-test:${restoreNotificationEventId}`},
+      'privacy.restore.test.notification', 1, CURRENT_TIMESTAMP,
+      'PRIVACY_REQUEST', ${exportCaseId}, '{}'::jsonb,
+      'privacy.restore.test.notification', ${exportCaseId}
+    )`;
+  await sql`
+    INSERT INTO notifications (
+      id, recipient_user_id, type, domain_event_id,
+      event_idempotency_key, entity_type, entity_id, deep_link_path,
+      priority, payload, requested_channels, delivery_channels
+    ) VALUES (
+      ${restoreNotificationId}, ${exportSubject.id}, 'privacy.restore.test',
+      ${restoreNotificationEventId},
+      ${`privacy-restore-test:${restoreNotificationId}`},
+      'PRIVACY_REQUEST', ${exportCaseId}, '/ucet/sukromie', 'INFO',
+      '{}'::jsonb, ARRAY['IN_APP', 'EMAIL']::notification_channel[],
+      ARRAY['IN_APP', 'EMAIL']::notification_channel[]
+    )`;
+  await sql`
+    INSERT INTO notification_deliveries (
+      id, notification_id, channel, idempotency_key
+    ) VALUES (
+      ${restoreDeliveryId}, ${restoreNotificationId}, 'EMAIL',
+      ${`privacy-restore-test:${restoreDeliveryId}`}
+    )`;
+
+  const restoreTombstoneId = randomUUID();
+  const restorePolicyVersionId = randomUUID();
+  const restoreSourceCreatedAt = "2026-09-25T10:00:00.000Z";
+  const restoreReceiptDigest = "d".repeat(64);
+  const firstRestoreRunId = `restore-live-${randomUUID()}`;
+  const firstReplay = await sql.begin(async (transaction) => {
+    await transaction`
+      SELECT run_id FROM begin_privacy_restore_reapplication(
+        ${firstRestoreRunId}, 'integration.privacy-ledger', ${"e".repeat(64)}, 1
+      )`;
+    const [item] = await transaction<
+      Array<{ readonly affectedCount: number; readonly outcome: string }>
+    >`
+      SELECT
+        outcome::text AS outcome,
+        affected_record_count::integer AS "affectedCount"
+      FROM apply_privacy_restore_tombstone(
+        ${firstRestoreRunId}, ${restoreTombstoneId}::uuid,
+        ${restoreTombstoneId}::uuid, ${exportSubject.id}::uuid,
+        'NOTIFICATION_DELIVERY'::privacy_retention_category,
+        'DELETE'::privacy_data_disposition, ${restorePolicyVersionId}::uuid,
+        ${restoreReceiptDigest}::char(64),
+        ${restoreSourceCreatedAt}::timestamptz
+      )`;
+    const [completed] = await transaction<
+      Array<{
+        readonly alreadyApplied: number;
+        readonly applied: number;
+        readonly state: string;
+      }>
+    >`
+      SELECT
+        state::text AS state,
+        records_applied::integer AS applied,
+        records_already_applied::integer AS "alreadyApplied"
+      FROM complete_privacy_restore_reapplication(${firstRestoreRunId})`;
+    return { completed, item };
+  });
+  expect(firstReplay).toEqual({
+    completed: { alreadyApplied: 0, applied: 1, state: "COMPLETED" },
+    item: { affectedCount: 1, outcome: "APPLIED" },
+  });
+  const [restoreEffect] = await sql<
+    Array<{ readonly deliveries: number; readonly notifications: number }>
+  >`
+    SELECT
+      count(DISTINCT notification.id)::integer AS notifications,
+      count(DISTINCT delivery.id)::integer AS deliveries
+    FROM notifications notification
+    LEFT JOIN notification_deliveries delivery
+      ON delivery.notification_id = notification.id
+    WHERE notification.id = ${restoreNotificationId}`;
+  expect(restoreEffect).toEqual({ deliveries: 0, notifications: 1 });
+
+  const secondRestoreRunId = `restore-live-${randomUUID()}`;
+  const secondReplay = await sql.begin(async (transaction) => {
+    await transaction`
+      SELECT run_id FROM begin_privacy_restore_reapplication(
+        ${secondRestoreRunId}, 'integration.privacy-ledger', ${"f".repeat(64)}, 1
+      )`;
+    const [item] = await transaction<
+      Array<{ readonly affectedCount: number; readonly outcome: string }>
+    >`
+      SELECT
+        outcome::text AS outcome,
+        affected_record_count::integer AS "affectedCount"
+      FROM apply_privacy_restore_tombstone(
+        ${secondRestoreRunId}, ${restoreTombstoneId}::uuid,
+        ${restoreTombstoneId}::uuid, ${exportSubject.id}::uuid,
+        'NOTIFICATION_DELIVERY'::privacy_retention_category,
+        'DELETE'::privacy_data_disposition, ${restorePolicyVersionId}::uuid,
+        ${restoreReceiptDigest}::char(64),
+        ${restoreSourceCreatedAt}::timestamptz
+      )`;
+    const [completed] = await transaction<
+      Array<{
+        readonly alreadyApplied: number;
+        readonly applied: number;
+        readonly state: string;
+      }>
+    >`
+      SELECT
+        state::text AS state,
+        records_applied::integer AS applied,
+        records_already_applied::integer AS "alreadyApplied"
+      FROM complete_privacy_restore_reapplication(${secondRestoreRunId})`;
+    return { completed, item };
+  });
+  expect(secondReplay).toEqual({
+    completed: { alreadyApplied: 1, applied: 0, state: "COMPLETED" },
+    item: { affectedCount: 0, outcome: "ALREADY_APPLIED" },
+  });
+
+  await expect(
+    sql.begin(async (transaction) => {
+      const incompleteRunId = `restore-live-${randomUUID()}`;
+      await transaction`
+        SELECT run_id FROM begin_privacy_restore_reapplication(
+          ${incompleteRunId}, 'integration.privacy-ledger',
+          ${"1".repeat(64)}, 1
+        )`;
+      await transaction`
+        SELECT run_id FROM complete_privacy_restore_reapplication(
+          ${incompleteRunId}
+        )`;
+    }),
+  ).rejects.toThrow(/privacy restore run item count mismatch/u);
+
+  await expect(
+    sql.begin(async (transaction) => {
+      const unsupportedRunId = `restore-live-${randomUUID()}`;
+      const unsupportedTombstoneId = randomUUID();
+      await transaction`
+        SELECT run_id FROM begin_privacy_restore_reapplication(
+          ${unsupportedRunId}, 'integration.privacy-ledger',
+          ${"2".repeat(64)}, 1
+        )`;
+      await transaction`
+        SELECT outcome FROM apply_privacy_restore_tombstone(
+          ${unsupportedRunId}, ${unsupportedTombstoneId}::uuid,
+          ${unsupportedTombstoneId}::uuid, ${exportSubject.id}::uuid,
+          'ACCOUNT_CORE'::privacy_retention_category,
+          'DELETE'::privacy_data_disposition, ${randomUUID()}::uuid,
+          ${"3".repeat(64)}::char(64),
+          ${restoreSourceCreatedAt}::timestamptz
+        )`;
+    }),
+  ).rejects.toThrow(/unsupported privacy restore tombstone category/u);
+
+  await expect(sql`
+    UPDATE privacy_restore_reapplication_runs
+    SET records_applied = 0
+    WHERE run_id = ${firstRestoreRunId}
+  `).rejects.toThrow(/invalid privacy restore run transition/u);
+  await expect(sql`
+    UPDATE privacy_restore_applied_tombstones
+    SET affected_record_count = 0
+    WHERE tombstone_id = ${restoreTombstoneId}
+  `).rejects.toThrow(/privacy restore history is immutable/u);
 }

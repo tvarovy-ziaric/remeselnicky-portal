@@ -18,8 +18,9 @@ drops a database and never promotes a restored database into service.
    provider's audited recovery path. Do not paste credentials into the shell
    history or evidence.
 4. Use synthetic/anonymized data in staging. Production-class data is permitted
-   only in a separately marked `recovery` environment and only after R4-026
-   supplies the tombstone ledger and idempotent reapplicator.
+   only in a separately marked `recovery` environment. The canonical
+   reapplicator is implemented, but the normalized ledger must come from the
+   separately authorized independent ledger and must be approved by digest.
 5. Determine the expected latest migration version from the backup manifest,
    not by guessing from the current checkout.
 
@@ -50,11 +51,31 @@ migration ledger, exact migration version and core schema. It creates a
 credential-free JSON evidence record with restrictive file permissions where
 supported. Evidence files are append-only by run ID.
 
-For production-class input, additionally supply
-`RECOVERY_TOMBSTONE_REAPPLICATOR` and `RECOVERY_TOMBSTONE_LEDGER`. The verifier
-runs the reapplicator after restore and before schema evidence is marked passed.
-The reapplicator receives the target libpq settings, ledger path and run ID via
-environment, never command-line secrets.
+For production-class input, additionally supply the canonical reapplicator,
+the normalized independent ledger and its approved SHA-256 digest:
+
+```powershell
+$env:RECOVERY_TOMBSTONE_REAPPLICATOR = "infra/postgres/recovery/reapply-privacy-tombstones.mjs"
+$env:RECOVERY_TOMBSTONE_LEDGER = "C:\secure-recovery\normalized-privacy-ledger.jsonl"
+$env:RECOVERY_TOMBSTONE_LEDGER_SHA256 = "<64 lowercase hex characters>"
+```
+
+The UTF-8 JSONL ledger has exactly one header followed by its declared number
+of records. The header schema is
+`PORTAL_PRIVACY_RECOVERY_LEDGER` version 1. Each exact tombstone contains only
+its IDs, subject ID, category, disposition, policy-version ID, independent
+receipt digest and source timestamp. Duplicate IDs, extra fields, malformed
+records, an incorrect digest, unsupported category transformations or an
+incomplete record count fail the entire database transaction.
+
+The verifier runs the reapplicator after restore and before schema evidence is
+marked passed. It requires matching content-free attestations from the hook and
+the restored database. The reapplicator receives target libpq settings, ledger
+path, digest and run ID through the environment, never command-line secrets.
+At this checkpoint only reviewed `NOTIFICATION_DELIVERY + DELETE` tombstones
+are executable; they delete subject-owned provider-delivery metadata while
+preserving canonical notifications. Any other category intentionally blocks
+the restore until a dedicated reviewed transformation exists.
 
 ## Review and cleanup
 
@@ -63,9 +84,10 @@ environment, never command-line secrets.
    monitoring references without copying secrets or personal data.
 2. In a restricted session, perform read-only consistency checks and the media
    inventory comparison. Do not auto-repair immutable commercial history.
-3. For a production-class recovery, independently confirm deletion,
-   anonymization, profile deindexing and withdrawn public-media state before any
-   traffic can reach the database.
+3. For a production-class recovery, verify that the attested read/applied/
+   already-applied counts exactly match the approved ledger, then independently
+   confirm deletion, anonymization, profile deindexing and withdrawn
+   public-media state before any traffic can reach the database.
 4. Record the rehearsal outcome and follow-ups. Restore failure is a serious
    operational problem.
 5. Cleanup is intentionally not automated. After evidence review, an authorized

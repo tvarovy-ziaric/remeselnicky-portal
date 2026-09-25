@@ -111,9 +111,25 @@ executing it twice.
 
 Every other category still needs a reviewed policy and an idempotent dedicated
 executor; unsupported categories terminate explicitly as non-executable. The
-independent ledger adapter, credentials and production recovery reapplicator
-remain external provisioning HUMAN GATES. See
+independent ledger adapter, credentials and production retention remain
+external provisioning HUMAN GATES. See
 [ADR 0026](../adr/0026-privacy-disposition-jobs-and-recovery-tombstones.md).
+
+Migration `0113_privacy_restore_reapplication.sql` and the canonical recovery
+hook close the local restore-replay gap for that first supported category. A
+production-class restore now requires a digest-approved, exact-schema JSONL
+ledger from outside the restored database. All records replay in one
+transaction; unsupported effects, identity conflicts, duplicate records or
+count mismatches roll back. Global immutable tombstone receipts make repeat
+recovery idempotent, while per-run `APPLIED / ALREADY_APPLIED` evidence must
+cover every input record before completion. The verifier independently reads
+the completed database record and requires it to match the hook's content-free
+attestation. Application runtime roles cannot access the recovery tables or
+commands; the owner of the newly isolated restore database is required.
+
+This is provider-neutral infrastructure, not an independent ledger itself. It
+does not authorize a vendor, credentials, production data or traffic promotion,
+and it intentionally fails for every category without a reviewed transformation.
 
 ## Access and portability base bundle
 
