@@ -49,9 +49,15 @@ describe("D27 resumable disposition jobs and recovery tombstones", () => {
     expect(repository).toContain('appendWorkerEvent(tx, row, "PROCESSING")');
     expect(repository).toContain('appendWorkerEvent(tx, row, "FAILED")');
     expect(repository).toContain('appendWorkerEvent(tx, row, "COMPLETED")');
-    expect(repository).toContain("attempt_count >= max_attempts");
+    expect(repository).toContain("job.attempt_count >= job.max_attempts");
     expect(repository).toContain("last_error_code = 'LEASE_EXPIRED'");
     expect(repository).toContain("job.attempt_count < job.max_attempts");
+    expect(repository).toContain(
+      "JOIN privacy_category_execution_receipts receipt",
+    );
+    expect(repository).toContain(
+      'appendWorkerEvent(tx, completed, "COMPLETED")',
+    );
   });
 
   it("preserves exact category, policy, subject and immutable provenance", () => {

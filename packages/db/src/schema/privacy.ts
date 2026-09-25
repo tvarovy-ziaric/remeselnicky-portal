@@ -545,6 +545,32 @@ export const privacyDataDispositionJobs = pgTable(
   ],
 );
 
+export const privacyCategoryExecutionReceipts = pgTable(
+  "privacy_category_execution_receipts",
+  {
+    jobId: uuid("job_id")
+      .primaryKey()
+      .references(() => privacyDataDispositionJobs.jobId, {
+        onDelete: "restrict",
+      }),
+    category: privacyRetentionCategoryEnum("category").notNull(),
+    disposition: privacyDataDispositionEnum("disposition").notNull(),
+    subjectUserId: uuid("subject_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    executorCode: text("executor_code").notNull(),
+    executionAttempt: integer("execution_attempt").notNull(),
+    affectedRecordCount: integer("affected_record_count").notNull(),
+    resultDigest: char("result_digest", { length: 64 }).notNull(),
+    completedAt: timestamp("completed_at", {
+      mode: "date",
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+);
+
 export type PrivacyPolicyVersionRecord =
   typeof privacyPolicyVersions.$inferSelect;
 export type PrivacyConsentPurposeRecord =
@@ -570,3 +596,5 @@ export type PrivacyRecoveryTombstoneReceiptRecord =
   typeof privacyRecoveryTombstoneReceipts.$inferSelect;
 export type PrivacyDataDispositionJobRecord =
   typeof privacyDataDispositionJobs.$inferSelect;
+export type PrivacyCategoryExecutionReceiptRecord =
+  typeof privacyCategoryExecutionReceipts.$inferSelect;

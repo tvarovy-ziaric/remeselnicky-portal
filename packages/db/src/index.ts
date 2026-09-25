@@ -107,6 +107,10 @@ import {
   createPrivacyRecoveryTombstoneStore,
   type PrivacyRecoveryTombstoneStore,
 } from "./privacy-disposition-queue.js";
+import {
+  createPrivacyNotificationDeliveryDispositionExecutor,
+  type PrivacyNotificationDeliveryDispositionExecutor,
+} from "./privacy-category-disposition-executor.js";
 import { createJobPropertyPhotoConsentRepository } from "./job-property-photo-consent-repository.js";
 import type { PrivacyRepository } from "@portal/privacy";
 import { createCustomerProfileRepository } from "./customer-profile-repository.js";
@@ -1053,6 +1057,14 @@ export {
   PRIVACY_DISPOSITION_JOB_NAME,
   PRIVACY_DISPOSITION_MAX_ATTEMPTS,
 } from "./privacy-disposition-queue.js";
+export {
+  createPrivacyNotificationDeliveryDispositionExecutor,
+  PRIVACY_NOTIFICATION_DELIVERY_EXECUTOR_CODE,
+} from "./privacy-category-disposition-executor.js";
+export type {
+  PrivacyCategoryExecutionReceipt,
+  PrivacyNotificationDeliveryDispositionExecutor,
+} from "./privacy-category-disposition-executor.js";
 export type {
   PendingPrivacyRecoveryTombstone,
   PrivacyDispositionJob,
@@ -1379,6 +1391,7 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly privacyDispositionQueue: ReturnType<
     typeof createPrivacyDispositionQueue
   >;
+  readonly privacyNotificationDeliveryDisposition: PrivacyNotificationDeliveryDispositionExecutor;
   readonly privacyRecoveryTombstones: PrivacyRecoveryTombstoneStore;
   readonly privateMediaDelivery: PrivateMediaDeliveryRepository;
   readonly notifications: NotificationRepository;
@@ -1551,6 +1564,8 @@ export function createDatabase(
   const privacy = createPrivacyRepository(sql);
   const privacyOperations = createPrivacyOperationsRepository(sql);
   const privacyDispositionQueue = createPrivacyDispositionQueue(sql);
+  const privacyNotificationDeliveryDisposition =
+    createPrivacyNotificationDeliveryDispositionExecutor(sql);
   const privacyRecoveryTombstones = createPrivacyRecoveryTombstoneStore(sql);
   const jobPropertyPhotoConsent = createJobPropertyPhotoConsentRepository(sql);
   const health = createDatabaseHealthProbe(async () => {
@@ -1656,6 +1671,7 @@ export function createDatabase(
     skillCatalog,
     privacy,
     privacyDispositionQueue,
+    privacyNotificationDeliveryDisposition,
     privacyOperations,
     privacyRecoveryTombstones,
     jobPropertyPhotoConsent,

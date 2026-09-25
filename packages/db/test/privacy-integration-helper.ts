@@ -7,6 +7,7 @@ import { expect } from "vitest";
 
 import {
   createPrivacyDispositionQueue,
+  createPrivacyNotificationDeliveryDispositionExecutor,
   createPrivacyOperationsRepository,
   createPrivacyRecoveryTombstoneStore,
   createPrivacyRepository,
@@ -522,6 +523,147 @@ export async function runPrivacyIntegrationAssertions(
       reason: "retries_exhausted",
     }),
   ]);
+
+  const notificationEventId = randomUUID();
+  const notificationId = randomUUID();
+  const notificationDeliveryId = randomUUID();
+  await sql`
+    INSERT INTO domain_outbox_events (
+      event_id, idempotency_key, event_name, schema_version, occurred_at,
+      entity_type, entity_id, payload, command_name, correlation_id
+    ) VALUES (
+      ${notificationEventId}, ${`privacy-test:${notificationEventId}`},
+      'privacy.test.notification', 1, clock_timestamp(),
+      'PRIVACY_REQUEST', ${caseId}, '{}'::jsonb,
+      'privacy.test.notification', ${caseId}
+    )`;
+  await sql`
+    INSERT INTO notifications (
+      id, recipient_user_id, type, domain_event_id,
+      event_idempotency_key, entity_type, entity_id, deep_link_path,
+      priority, payload, requested_channels, delivery_channels
+    ) VALUES (
+      ${notificationId}, ${subject.id}, 'privacy.test',
+      ${notificationEventId}, ${`privacy-test:${notificationId}`},
+      'PRIVACY_REQUEST', ${caseId}, '/ucet/sukromie', 'INFO', '{}'::jsonb,
+      ARRAY['IN_APP', 'EMAIL']::notification_channel[],
+      ARRAY['IN_APP', 'EMAIL']::notification_channel[]
+    )`;
+  await sql`
+    INSERT INTO notification_deliveries (
+      id, notification_id, channel, idempotency_key
+    ) VALUES (
+      ${notificationDeliveryId}, ${notificationId}, 'EMAIL',
+      ${`privacy-test:${notificationDeliveryId}`}
+    )`;
+
+  const notificationPolicyId = randomUUID();
+  await expect(
+    repository.appendRetentionPolicyVersion({
+      category: "NOTIFICATION_DELIVERY",
+      durationDays: 1,
+      launchState: "READY",
+      legalReviewState: "APPROVED",
+      policyVersionId: notificationPolicyId,
+      rationaleCode: "SYNTHETIC_TEST_POLICY",
+      supersedesPolicyVersionId: "12000000-0000-4000-8000-000000000014",
+      version: 2,
+    }),
+  ).resolves.toMatchObject({ status: "APPENDED" });
+  const notificationDispositionCommandId = randomUUID();
+  await expect(
+    operations.decideDataDisposition({
+      actionCode: "NOTIFICATION_DELIVERY_DELETE_QUEUED",
+      actor: adminActor,
+      caseId,
+      category: "NOTIFICATION_DELIVERY",
+      commandId: notificationDispositionCommandId,
+      disposition: "DELETE",
+      expectedDisposition: "REVIEW_REQUIRED",
+      expectedRevision: 1,
+      expectedState: "BLOCKED",
+      policyVersionId: notificationPolicyId,
+      privilegedSessionId: admin.privilegedSessionId,
+      reason: "Synthetic reviewed notification delivery cleanup decision.",
+    }),
+  ).resolves.toMatchObject({
+    disposition: { state: "READY" },
+    status: "APPLIED",
+  });
+  await expect(
+    recoveryTombstones.acknowledge({
+      ledgerCode: "synthetic.integration",
+      receipt: `synthetic-independent-ledger:${randomUUID()}`,
+      tombstoneId: notificationDispositionCommandId,
+    }),
+  ).resolves.toBe("ACKNOWLEDGED");
+  const notificationQueue = createPrivacyDispositionQueue(sql, {
+    leaseDurationMs: 1_000,
+  });
+  const notificationDelivery = await notificationQueue.take(Date.now());
+  expect(notificationDelivery).toMatchObject({
+    attempt: 1,
+    jobId: notificationDispositionCommandId,
+    payload: { category: "NOTIFICATION_DELIVERY", disposition: "DELETE" },
+  });
+  if (notificationDelivery === undefined)
+    throw new Error("Expected notification delivery disposition job.");
+  const categoryExecutor =
+    createPrivacyNotificationDeliveryDispositionExecutor(sql);
+  const executionContext = {
+    attempt: notificationDelivery.attempt,
+    correlationId: notificationDelivery.correlationId,
+    eventId: notificationDelivery.eventId,
+    jobId: notificationDelivery.jobId,
+    runId: "privacy-integration-run",
+  };
+  await expect(
+    categoryExecutor.execute(notificationDelivery.payload, executionContext),
+  ).resolves.toBeUndefined();
+  await expect(
+    categoryExecutor.execute(notificationDelivery.payload, executionContext),
+  ).resolves.toBeUndefined();
+  await sql`SELECT pg_sleep(1.1)`;
+  await expect(notificationQueue.take(Date.now())).resolves.toBeUndefined();
+  await expect(
+    categoryExecutor.receipt(notificationDispositionCommandId),
+  ).resolves.toMatchObject({
+    affectedRecordCount: 1,
+    category: "NOTIFICATION_DELIVERY",
+    disposition: "DELETE",
+    executionAttempt: 1,
+  });
+  const [notificationRetention] = await sql<
+    Array<{ readonly deliveries: number; readonly notifications: number }>
+  >`
+    SELECT
+      count(DISTINCT notification.id)::integer AS notifications,
+      count(DISTINCT delivery.id)::integer AS deliveries
+    FROM notifications notification
+    LEFT JOIN notification_deliveries delivery
+      ON delivery.notification_id = notification.id
+    WHERE notification.id = ${notificationId}`;
+  expect(notificationRetention).toEqual({ deliveries: 0, notifications: 1 });
+  await expect(
+    operations.listDispositions({
+      actor: adminActor,
+      caseId,
+      privilegedSessionId: admin.privilegedSessionId,
+    }),
+  ).resolves.toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        category: "NOTIFICATION_DELIVERY",
+        disposition: "DELETE",
+        state: "COMPLETED",
+      }),
+    ]),
+  );
+  await expect(sql`
+    UPDATE privacy_category_execution_receipts
+    SET affected_record_count = 0
+    WHERE job_id = ${notificationDispositionCommandId}
+  `).rejects.toThrow(/privacy operational history is append-only/u);
 
   const [closed] = await sql<
     Array<{

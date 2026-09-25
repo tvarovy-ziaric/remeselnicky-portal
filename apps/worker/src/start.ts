@@ -31,7 +31,12 @@ import {
 
 import { createMediaProcessingWorker } from "./media-processing.js";
 import { createInvitationNotificationProcessor } from "./notification-delivery.js";
-import { createWorkerReadiness, runWorkerLoop } from "./service.js";
+import { createPrivacyDispositionWorker } from "./privacy-disposition.js";
+import {
+  createWorkerQueueTelemetrySink,
+  createWorkerReadiness,
+  runWorkerLoop,
+} from "./service.js";
 import { runWorker } from "./worker.js";
 
 const config = loadServerConfig();
@@ -106,6 +111,11 @@ const analyticsProcessor = createR3AnalyticsProcessor({
   store: database.r3Analytics,
 });
 const mediaProcessing = createMediaRuntime();
+const privacyDispositions = createPrivacyDispositionWorker({
+  executor: database.privacyNotificationDeliveryDisposition,
+  queue: database.privacyDispositionQueue,
+  telemetry: createWorkerQueueTelemetrySink(logger, metrics),
+});
 const processor = createInvitationNotificationProcessor({
   analytics: analyticsProcessor,
   demandSideNotifications: database.demandSideNotifications,
@@ -118,6 +128,7 @@ const processor = createInvitationNotificationProcessor({
   },
   quotes: database.quoteLifecycle,
   reminders: database.jobInvitationReminders,
+  privacyDispositions,
 });
 
 function createMediaRuntime() {

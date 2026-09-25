@@ -345,15 +345,48 @@ export function createPrivacyDispositionQueue(
     async take(now: number) {
       assertFiniteTimestamp(now, "now");
       return transaction(sql, async (tx) => {
+        const completedRows = await tx<MutationRow[]>`
+          WITH completed AS (
+            SELECT job.job_id
+            FROM privacy_data_disposition_jobs job
+            JOIN privacy_category_execution_receipts receipt
+              ON receipt.job_id = job.job_id
+            WHERE job.state = 'PROCESSING'
+              AND job.lease_expires_at <= clock_timestamp()
+            ORDER BY job.lease_expires_at, job.job_id
+            FOR UPDATE OF job SKIP LOCKED
+            LIMIT 1
+          )
+          UPDATE privacy_data_disposition_jobs job
+          SET state = 'SUCCEEDED', lease_token = NULL,
+            lease_expires_at = NULL, last_error_code = NULL
+          FROM completed
+          WHERE job.job_id = completed.job_id
+          RETURNING job.job_id AS "jobId",
+            job.source_disposition_event_id AS "sourceDispositionEventId",
+            job.tombstone_id AS "tombstoneId", job.case_id AS "caseId",
+            job.subject_user_id AS "subjectUserId", job.category::text,
+            job.disposition::text, job.policy_version_id AS "policyVersionId"`;
+        if (completedRows[0] !== undefined) {
+          const completed = requireSingleMutation(
+            completedRows,
+            "completed receipt recovery",
+          );
+          await appendWorkerEvent(tx, completed, "COMPLETED");
+        }
+
         const expiredRows = await tx<MutationRow[]>`
           WITH expired AS (
-            SELECT job_id
-            FROM privacy_data_disposition_jobs
-            WHERE state = 'PROCESSING'
-              AND lease_expires_at <= clock_timestamp()
-              AND attempt_count >= max_attempts
-            ORDER BY lease_expires_at, job_id
-            FOR UPDATE SKIP LOCKED
+            SELECT job.job_id
+            FROM privacy_data_disposition_jobs job
+            LEFT JOIN privacy_category_execution_receipts receipt
+              ON receipt.job_id = job.job_id
+            WHERE job.state = 'PROCESSING'
+              AND job.lease_expires_at <= clock_timestamp()
+              AND job.attempt_count >= job.max_attempts
+              AND receipt.job_id IS NULL
+            ORDER BY job.lease_expires_at, job.job_id
+            FOR UPDATE OF job SKIP LOCKED
             LIMIT 1
           )
           UPDATE privacy_data_disposition_jobs job

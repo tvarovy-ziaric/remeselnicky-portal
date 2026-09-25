@@ -139,6 +139,7 @@ export {
   privacyConsentEvents,
   privacyConsentPurposes,
   privacyAccountClosureCommands,
+  privacyCategoryExecutionReceipts,
   privacyDataDispositionAdminCommands,
   privacyDataDispositionEnum,
   privacyDataDispositionEvents,
@@ -388,6 +389,7 @@ export type {
 } from "./credential-claim.js";
 export type {
   PrivacyAccountClosureCommandRecord,
+  PrivacyCategoryExecutionReceiptRecord,
   PrivacyConsentEventRecord,
   PrivacyConsentPurposeRecord,
   PrivacyDataDispositionAdminCommandRecord,
