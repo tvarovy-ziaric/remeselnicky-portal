@@ -149,3 +149,7 @@ automatic completion. Password hashes, reset/session/MFA material, internal
 admin/security/risk data, other people's message content and storage/provider
 identifiers are never serialized. A section above the bounded online limit is
 not truncated; it fails to an assisted-export result instead.
+
+The remaining production decisions, accounts, credentials, legal evidence and
+provisioning sequence are explicit in the
+[Production Alpha privacy HUMAN GATE](./production-alpha-privacy-gate.md).
