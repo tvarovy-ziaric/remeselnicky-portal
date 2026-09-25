@@ -59,7 +59,7 @@ export type AppendJobPropertyPhotoConsentResult =
       readonly status: "UNCHANGED";
     }>;
 
-interface ConsentRow extends JobPropertyPhotoConsentEvent {}
+type ConsentRow = JobPropertyPhotoConsentEvent;
 
 export class JobPropertyPhotoConsentIdempotencyError extends Error {}
 

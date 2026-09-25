@@ -17,12 +17,10 @@ const now = new Date("2026-09-25T09:00:00.000Z");
 
 function fakeSql(responses: unknown[]) {
   const calls: TemplateStringsArray[] = [];
-  const transaction = vi.fn(
-    (strings: TemplateStringsArray, ..._values: unknown[]) => {
-      calls.push(strings);
-      return Promise.resolve(responses.shift() ?? []);
-    },
-  );
+  const transaction = vi.fn((strings: TemplateStringsArray) => {
+    calls.push(strings);
+    return Promise.resolve(responses.shift() ?? []);
+  });
   const root = Object.assign(vi.fn(), {
     begin: vi.fn((operation: (sql: unknown) => unknown) =>
       operation(transaction),

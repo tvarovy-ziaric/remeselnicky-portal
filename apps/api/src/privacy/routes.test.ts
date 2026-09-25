@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import type { UserId } from "@portal/domain";
+import type { PrivacyRequestCaseDraft } from "@portal/privacy";
 import Fastify, {
   type FastifyInstance,
   type FastifyReply,
@@ -38,16 +39,18 @@ function build(input?: {
     },
   ]);
   const hasOpenObligations = vi.fn().mockResolvedValue(true);
-  const createPrivacyRequestCase = vi.fn().mockImplementation((request) =>
-    Promise.resolve({
-      caseId: request.caseId,
-      event: { revision: 1, state: "RECEIVED" },
-      receivedAt: now,
-      requestType: request.requestType,
-      status: "CREATED",
-      subjectUserId: userId,
-    }),
-  );
+  const createPrivacyRequestCase = vi
+    .fn()
+    .mockImplementation((request: PrivacyRequestCaseDraft) =>
+      Promise.resolve({
+        caseId: request.caseId,
+        event: { revision: 1, state: "RECEIVED" },
+        receivedAt: now,
+        requestType: request.requestType,
+        status: "CREATED",
+        subjectUserId: userId,
+      }),
+    );
   const csrfProtection = vi.fn(
     (
       request: FastifyRequest,
