@@ -493,7 +493,6 @@ function validateTransition(input: TransitionPrivacyRequestInput): void {
   if (
     !Number.isSafeInteger(input.expectedRevision) ||
     input.expectedRevision < 1 ||
-    input.resultingState === "RECEIVED" ||
     !reasonCode.test(input.actionCode) ||
     (input.deadlineAt !== null &&
       (!(input.deadlineAt instanceof Date) ||
