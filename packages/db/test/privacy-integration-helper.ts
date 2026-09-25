@@ -284,7 +284,7 @@ export async function runPrivacyIntegrationAssertions(
       'INVALID_MFA_ATTEMPT', 'Invalid session must fail closed.',
       ${"f".repeat(64)}
     )
-  `).rejects.toThrow(/recent MFA required/u);
+  `).rejects.toThrow(/recent MFA(?:-backed privacy capability)? required/u);
 
   const subjectSessionDigest = createHash("sha256")
     .update(`privacy-subject-session-${randomUUID()}`, "utf8")
