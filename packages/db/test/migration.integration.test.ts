@@ -248,6 +248,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
           "0110_privacy_disposition_decisions.sql",
           "0111_privacy_disposition_jobs.sql",
           "0112_privacy_notification_delivery_disposition.sql",
+          "0113_privacy_restore_reapplication.sql",
         ],
         alreadyApplied: 0,
       });
@@ -256,7 +257,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         testDatabaseUrl,
         migrationsDirectory,
       );
-      expect(secondRun).toEqual({ applied: [], alreadyApplied: 113 });
+      expect(secondRun).toEqual({ applied: [], alreadyApplied: 114 });
 
       const sql = postgres(testDatabaseUrl, { max: 5 });
       try {
