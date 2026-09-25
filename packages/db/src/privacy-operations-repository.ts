@@ -78,7 +78,8 @@ export type TransitionPrivacyRequestResult =
       readonly state: Exclude<PrivacyRequestState, "RECEIVED">;
       readonly status: "APPLIED" | "DEDUPLICATED";
     }>
-  | Readonly<{ readonly status: "NOT_FOUND" | "STALE_STATE" }>;
+  | Readonly<{ readonly status: "NOT_FOUND" }>
+  | Readonly<{ readonly status: "STALE_STATE" }>;
 
 export type ExecuteAccountClosureResult =
   | Readonly<{
@@ -89,14 +90,11 @@ export type ExecuteAccountClosureResult =
       readonly requestState: "ACTION_REQUIRED";
       readonly status: "APPLIED" | "DEDUPLICATED";
     }>
-  | Readonly<{
-      readonly status:
-        | "ACCOUNT_NOT_ACTIVE"
-        | "ALREADY_DEACTIVATED"
-        | "NOT_FOUND"
-        | "OPEN_OBLIGATIONS"
-        | "STALE_STATE";
-    }>;
+  | Readonly<{ readonly status: "ACCOUNT_NOT_ACTIVE" }>
+  | Readonly<{ readonly status: "ALREADY_DEACTIVATED" }>
+  | Readonly<{ readonly status: "NOT_FOUND" }>
+  | Readonly<{ readonly status: "OPEN_OBLIGATIONS" }>
+  | Readonly<{ readonly status: "STALE_STATE" }>;
 
 interface ClosureCommandRow {
   readonly actorUserId: UserId;

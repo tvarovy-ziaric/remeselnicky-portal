@@ -6,6 +6,38 @@ CREATE TYPE privacy_disposition_state AS ENUM (
   'BLOCKED', 'READY', 'PROCESSING', 'COMPLETED', 'FAILED'
 );
 
+-- The unified immutable audit ledger was created before the dedicated privacy
+-- capability existed. Keep its authenticated-actor allowlist synchronized so
+-- privacy commands cannot bypass the shared audited-command path.
+ALTER TABLE audit_events DROP CONSTRAINT audit_events_actor_valid;
+ALTER TABLE audit_events ADD CONSTRAINT audit_events_actor_valid CHECK (
+  (
+    actor_kind = 'AUTHENTICATED_USER'
+    AND actor_user_id IS NOT NULL
+    AND actor_system_reference IS NULL
+    AND actor_capability IS NOT NULL
+    AND actor_capability IN (
+      'admin.access',
+      'admin.credentials.review',
+      'admin.disputes.manage',
+      'admin.jobs.correct',
+      'admin.profiles.review',
+      'admin.profiles.moderate',
+      'admin.privacy.manage',
+      'admin.reviews.moderate',
+      'admin.sensitive.read',
+      'admin.users.manage',
+      'admin.roles.manage'
+    )
+  ) OR (
+    actor_kind = 'SYSTEM'
+    AND actor_user_id IS NULL
+    AND actor_system_reference IS NOT NULL
+    AND actor_system_reference ~ '^[a-z][a-z0-9.-]{1,31}:[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'
+    AND actor_capability IS NULL
+  )
+);
+
 CREATE VIEW current_privacy_request_cases
 WITH (security_invoker = true)
 AS

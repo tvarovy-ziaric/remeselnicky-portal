@@ -185,7 +185,7 @@ function writeOptions(dependencies: AdminPrivacyRouteDependencies) {
     },
     onRequest: [rejectQuery, dependencies.csrfProtection],
     onSend: privateHeaders,
-  } as const;
+  };
 }
 
 async function authorize(

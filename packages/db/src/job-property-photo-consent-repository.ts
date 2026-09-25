@@ -51,10 +51,12 @@ export type AppendJobPropertyPhotoConsentResult =
       readonly event: JobPropertyPhotoConsentEvent;
       readonly status: "APPENDED" | "DEDUPLICATED";
     }>
+  | Readonly<{ readonly status: "NOT_FOUND" }>
+  | Readonly<{ readonly status: "POLICY_NOT_APPROVED" }>
+  | Readonly<{ readonly currentRevision: number; readonly status: "STALE" }>
   | Readonly<{
-      readonly currentRevision?: number;
-      readonly status:
-        "NOT_FOUND" | "POLICY_NOT_APPROVED" | "STALE" | "UNCHANGED";
+      readonly currentRevision: number;
+      readonly status: "UNCHANGED";
     }>;
 
 interface ConsentRow extends JobPropertyPhotoConsentEvent {}

@@ -28,6 +28,8 @@ describe("D27 account-closure migration", () => {
   });
 
   it("requires recent MFA and blocks unresolved Job or dispute obligations", () => {
+    expect(migration).toContain("'admin.privacy.manage'");
+    expect(migration).toContain("audit_events_actor_valid");
     expect(migration).toContain("privacy_admin_session_is_recent");
     expect(migration).toContain("privacy_account_has_open_obligations");
     expect(migration).toContain("current_job_states");
