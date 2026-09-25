@@ -114,3 +114,22 @@ executor; unsupported categories terminate explicitly as non-executable. The
 independent ledger adapter, credentials and production recovery reapplicator
 remain external provisioning HUMAN GATES. See
 [ADR 0026](../adr/0026-privacy-disposition-jobs-and-recovery-tombstones.md).
+
+## Access and portability base bundle
+
+An authenticated subject may download a structured JSON base bundle only for
+their own `ACCESS` or `PORTABILITY` case after an administrator has recorded
+proportionate identity verification. The read runs in a repeatable-read,
+read-only transaction and includes account/contact facts, customer and
+craftsman profile fields, optional-consent history, privacy-request history,
+owned Job-request draft history, only messages authored by the subject, and a
+media manifest without storage keys, hashes or provider references.
+
+The document labels itself `BASE_BUNDLE_REQUIRES_CASE_REVIEW`. It explicitly
+lists shared Job/commercial records, other-party shared content, binary media
+and external-processor data as required case-review supplements. Therefore it
+is not evidence that an access/portability case is complete and does not permit
+automatic completion. Password hashes, reset/session/MFA material, internal
+admin/security/risk data, other people's message content and storage/provider
+identifiers are never serialized. A section above the bounded online limit is
+not truncated; it fails to an assisted-export result instead.

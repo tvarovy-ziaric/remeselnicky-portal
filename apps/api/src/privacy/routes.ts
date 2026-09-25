@@ -1,6 +1,7 @@
 import type {
   PrivacyRepository,
   createPrivacyOperationsRepository,
+  createPrivacySubjectExportRepository,
 } from "@portal/db";
 import type { UserId } from "@portal/domain";
 import {
@@ -20,9 +21,11 @@ import type {
 } from "../auth/guard.js";
 
 type Operations = ReturnType<typeof createPrivacyOperationsRepository>;
+type SubjectExports = ReturnType<typeof createPrivacySubjectExportRepository>;
 
 export const PRIVACY_REQUEST_PATHS = Object.freeze({
   accountClosureReadiness: "/v1/me/privacy/account-closure/readiness",
+  export: "/v1/me/privacy/requests/:caseId/export",
   requests: "/v1/me/privacy/requests",
 } as const);
 
@@ -39,6 +42,7 @@ export interface PrivacyRequestRouteDependencies {
     "hasOpenObligations" | "listForSubject"
   >;
   readonly privacy: Pick<PrivacyRepository, "createPrivacyRequestCase">;
+  readonly subjectExports: Pick<SubjectExports, "createForSubject">;
   readonly rateLimit: { readonly max: number; readonly timeWindowMs: number };
 }
 
@@ -96,6 +100,51 @@ export function registerPrivacyRequestRoutes(
         });
       } catch {
         return reply.code(503).send({ code: "TEMPORARILY_UNAVAILABLE" });
+      }
+    },
+  );
+
+  app.get<{ Params: { caseId: string } }>(
+    PRIVACY_REQUEST_PATHS.export,
+    {
+      config: {
+        rateLimit: {
+          max: Math.min(10, dependencies.rateLimit.max),
+          timeWindow: dependencies.rateLimit.timeWindowMs,
+        },
+      },
+      onRequest: rejectQuery,
+      onSend: privateHeaders,
+    },
+    async (request, reply) => {
+      const subjectUserId = await privacyActor(request, reply, dependencies);
+      if (subjectUserId === undefined) return;
+      if (!validId(request.params.caseId))
+        return reply.code(400).send({ code: "INVALID_REQUEST" });
+      try {
+        const result = await dependencies.subjectExports.createForSubject({
+          caseId: request.params.caseId,
+          subjectUserId,
+        });
+        if (result.status !== "READY") {
+          if (result.status === "NOT_FOUND")
+            return reply.code(404).send({ code: "NOT_FOUND" });
+          return reply.code(409).send({
+            code:
+              result.status === "NOT_AVAILABLE"
+                ? "EXPORT_NOT_AVAILABLE"
+                : result.status,
+          });
+        }
+        void reply.header(
+          "content-disposition",
+          `attachment; filename="privacy-${request.params.caseId}.json"`,
+        );
+        return reply.send(result.document);
+      } catch (error) {
+        return error instanceof TypeError
+          ? reply.code(400).send({ code: "INVALID_REQUEST" })
+          : reply.code(503).send({ code: "TEMPORARILY_UNAVAILABLE" });
       }
     },
   );

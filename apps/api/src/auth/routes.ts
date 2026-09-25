@@ -345,7 +345,7 @@ export interface AuthModuleDependencies {
   readonly notifications?: Pick<NotificationRouteDependencies, "notifications">;
   readonly privacyRequests?: Pick<
     PrivacyRequestRouteDependencies,
-    "operations" | "privacy"
+    "operations" | "privacy" | "subjectExports"
   >;
   readonly propertyPhotoConsent?: Pick<
     JobPropertyPhotoConsentRouteDependencies,

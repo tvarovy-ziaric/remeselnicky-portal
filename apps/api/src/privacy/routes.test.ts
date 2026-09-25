@@ -22,6 +22,12 @@ const apps: FastifyInstance[] = [];
 function build(input?: {
   readonly accountState?: "ACTIVE" | "DEACTIVATED" | "SUSPENDED";
   readonly authenticated?: boolean;
+  readonly exportStatus?:
+    | "ASSISTED_EXPORT_REQUIRED"
+    | "IDENTITY_VERIFICATION_REQUIRED"
+    | "NOT_AVAILABLE"
+    | "NOT_FOUND"
+    | "READY";
 }) {
   const accountState = input?.accountState ?? "ACTIVE";
   const listForSubject = vi.fn().mockResolvedValue([
@@ -39,6 +45,56 @@ function build(input?: {
     },
   ]);
   const hasOpenObligations = vi.fn().mockResolvedValue(true);
+  const createForSubject = vi
+    .fn()
+    .mockImplementation(
+      (request: { readonly caseId: string; readonly subjectUserId: UserId }) =>
+        Promise.resolve(
+          input?.exportStatus !== undefined && input.exportStatus !== "READY"
+            ? { status: input.exportStatus }
+            : {
+                document: {
+                  account: {
+                    accountState: "ACTIVE",
+                    accountStateChangedAt: now.toISOString(),
+                    adultAttestedAt: now.toISOString(),
+                    createdAt: now.toISOString(),
+                    email: "subject@example.test",
+                    emailVerifiedAt: now.toISOString(),
+                    phone: null,
+                    phoneVerifiedAt: null,
+                    userId,
+                  },
+                  consentHistory: [],
+                  craftsmanProfile: null,
+                  customerProfile: null,
+                  exportCase: {
+                    caseId: request.caseId,
+                    requestRevision: 3,
+                    requestState: "IN_REVIEW",
+                    requestType: "ACCESS",
+                  },
+                  generatedAt: now.toISOString(),
+                  jobRequestDraftHistory: [],
+                  mediaManifest: [],
+                  privacyRequestHistory: [],
+                  schemaVersion: "1.0",
+                  scope: {
+                    coverage: "BASE_BUNDLE_REQUIRES_CASE_REVIEW",
+                    excludedSecurityMaterial: [
+                      "AUTHENTICATION_SECRET_HASHES_AND_TOKENS",
+                    ],
+                    includedSections: ["ACCOUNT_AND_VERIFIED_CONTACT"],
+                    requiredCaseReviewSupplements: [
+                      "SHARED_JOB_AND_COMMERCIAL_RECORDS",
+                    ],
+                  },
+                  subjectAuthoredConversationMessages: [],
+                },
+                status: "READY",
+              },
+        ),
+    );
   const createPrivacyRequestCase = vi
     .fn()
     .mockImplementation((request: PrivacyRequestCaseDraft) =>
@@ -83,12 +139,14 @@ function build(input?: {
     guard: { evaluate },
     operations: { hasOpenObligations, listForSubject },
     privacy: { createPrivacyRequestCase },
+    subjectExports: { createForSubject },
     rateLimit: { max: 20, timeWindowMs: 60_000 },
   });
   apps.push(app);
   return {
     app,
     createPrivacyRequestCase,
+    createForSubject,
     evaluate,
     hasOpenObligations,
     listForSubject,
@@ -185,6 +243,68 @@ describe("privacy-request routes", () => {
       executionBlockedByOpenObligations: true,
     });
     expect(fixture.hasOpenObligations).toHaveBeenCalledWith(userId);
+  });
+
+  it("downloads only the verified subject's explicit structured base bundle", async () => {
+    const fixture = build();
+    const caseId = randomUUID();
+    const response = await fixture.app.inject({
+      method: "GET",
+      url: `/v1/me/privacy/requests/${caseId}/export`,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("private, no-store");
+    expect(response.headers["x-robots-tag"]).toBe("noindex, nofollow");
+    expect(response.headers["content-disposition"]).toBe(
+      `attachment; filename="privacy-${caseId}.json"`,
+    );
+    expect(response.json()).toMatchObject({
+      account: { email: "subject@example.test", userId },
+      exportCase: { caseId, requestType: "ACCESS" },
+      scope: { coverage: "BASE_BUNDLE_REQUIRES_CASE_REVIEW" },
+    });
+    expect(response.body).not.toMatch(
+      /password|sessionId|mfaFactor|actorUserId|storageKey/iu,
+    );
+    expect(fixture.createForSubject).toHaveBeenCalledWith({
+      caseId,
+      subjectUserId: userId,
+    });
+  });
+
+  it("fails closed before identity verification and for oversized assisted exports", async () => {
+    const caseId = randomUUID();
+    const unverified = build({
+      exportStatus: "IDENTITY_VERIFICATION_REQUIRED",
+    });
+    expect(
+      (
+        await unverified.app.inject({
+          method: "GET",
+          url: `/v1/me/privacy/requests/${caseId}/export`,
+        })
+      ).json(),
+    ).toEqual({ code: "IDENTITY_VERIFICATION_REQUIRED" });
+
+    const assisted = build({ exportStatus: "ASSISTED_EXPORT_REQUIRED" });
+    const assistedResponse = await assisted.app.inject({
+      method: "GET",
+      url: `/v1/me/privacy/requests/${caseId}/export`,
+    });
+    expect(assistedResponse.statusCode).toBe(409);
+    expect(assistedResponse.json()).toEqual({
+      code: "ASSISTED_EXPORT_REQUIRED",
+    });
+  });
+
+  it("uses a uniform not-found response for foreign or non-export cases", async () => {
+    const fixture = build({ exportStatus: "NOT_FOUND" });
+    const response = await fixture.app.inject({
+      method: "GET",
+      url: `/v1/me/privacy/requests/${randomUUID()}/export`,
+    });
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toEqual({ code: "NOT_FOUND" });
   });
 
   it("keeps rights available to suspended users but not deactivated sessions", async () => {

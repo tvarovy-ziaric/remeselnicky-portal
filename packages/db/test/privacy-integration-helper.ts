@@ -11,6 +11,7 @@ import {
   createPrivacyOperationsRepository,
   createPrivacyRecoveryTombstoneStore,
   createPrivacyRepository,
+  createPrivacySubjectExportRepository,
 } from "../src/index.js";
 
 /** Runs inside the single clean-migration integration test to avoid migration races. */
@@ -733,4 +734,70 @@ export async function runPrivacyIntegrationAssertions(
   await expect(
     sql`DELETE FROM users WHERE id = ${subject.id}`,
   ).rejects.toThrow();
+
+  const [exportSubject] = await sql<{ readonly id: UserId }[]>`
+    INSERT INTO users DEFAULT VALUES RETURNING id`;
+  if (exportSubject === undefined)
+    throw new Error("Expected privacy export subject.");
+  await sql`
+    INSERT INTO auth_credentials (
+      user_id, normalized_email, password_hash, adult_attested_at,
+      email_verified_at
+    ) VALUES (
+      ${exportSubject.id}, ${`privacy-export-${exportSubject.id}@example.test`},
+      ${"synthetic-password-hash"}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+    )`;
+  const exportCaseId = randomUUID();
+  await expect(
+    repository.createPrivacyRequestCase({
+      caseId: exportCaseId,
+      correlationId: randomUUID(),
+      eventId: randomUUID(),
+      requestType: "ACCESS",
+      subjectUserId: exportSubject.id,
+    }),
+  ).resolves.toMatchObject({ status: "CREATED" });
+  await expect(
+    operations.transitionRequest({
+      actionCode: "IDENTITY_VERIFIED",
+      actor: adminActor,
+      caseId: exportCaseId,
+      commandId: randomUUID(),
+      deadlineAt: null,
+      expectedRevision: 1,
+      expectedState: "RECEIVED",
+      privilegedSessionId: admin.privilegedSessionId,
+      reason: "Synthetic export identity was proportionately verified.",
+      resultingState: "VERIFIED",
+    }),
+  ).resolves.toMatchObject({ status: "APPLIED" });
+  const subjectExports = createPrivacySubjectExportRepository(sql);
+  const exportResult = await subjectExports.createForSubject({
+    caseId: exportCaseId,
+    subjectUserId: exportSubject.id,
+  });
+  expect(exportResult).toMatchObject({
+    document: {
+      account: {
+        email: `privacy-export-${exportSubject.id}@example.test`,
+        userId: exportSubject.id,
+      },
+      exportCase: {
+        caseId: exportCaseId,
+        requestState: "VERIFIED",
+        requestType: "ACCESS",
+      },
+      scope: { coverage: "BASE_BUNDLE_REQUIRES_CASE_REVIEW" },
+    },
+    status: "READY",
+  });
+  expect(JSON.stringify(exportResult)).not.toMatch(
+    /synthetic-password-hash|session_id_hash|actorUserId|storageKey/iu,
+  );
+  await expect(
+    subjectExports.createForSubject({
+      caseId: exportCaseId,
+      subjectUserId: subject.id,
+    }),
+  ).resolves.toEqual({ status: "NOT_FOUND" });
 }

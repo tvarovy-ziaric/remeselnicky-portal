@@ -202,6 +202,18 @@ export function PrivacyCenter() {
                       {new Date(item.deadlineAt).toLocaleDateString("sk-SK")}
                     </small>
                   )}
+                  {privacyExportHref(item) === null ? null : (
+                    <>
+                      <a download href={privacyExportHref(item) ?? undefined}>
+                        Stiahnuť základný JSON export
+                      </a>
+                      <small>
+                        Základný export obsahuje údaje viazané iba na vás.
+                        Zdieľané obchodné záznamy a súbory doplní správca po
+                        kontrole práv ostatných osôb.
+                      </small>
+                    </>
+                  )}
                 </li>
               ))}
             </ol>
@@ -262,6 +274,17 @@ export function parseClosureReadiness(value: unknown): ClosureReadiness | null {
     canRequestClosure: value.canRequestClosure,
     executionBlockedByOpenObligations: value.executionBlockedByOpenObligations,
   };
+}
+
+export function privacyExportHref(item: PrivacyRequestItem): string | null {
+  if (
+    !["ACCESS", "PORTABILITY"].includes(item.requestType) ||
+    !["VERIFIED", "IN_REVIEW", "ACTION_REQUIRED", "COMPLETED"].includes(
+      item.state,
+    )
+  )
+    return null;
+  return `/v1/me/privacy/requests/${item.caseId}/export`;
 }
 
 async function csrf(): Promise<string> {

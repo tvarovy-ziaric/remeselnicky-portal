@@ -204,6 +204,7 @@ const app = buildApi({
     privacyRequests: {
       operations: database.privacyOperations,
       privacy: database.privacy,
+      subjectExports: database.privacySubjectExports,
     },
     propertyPhotoConsent: {
       consent: database.jobPropertyPhotoConsent,

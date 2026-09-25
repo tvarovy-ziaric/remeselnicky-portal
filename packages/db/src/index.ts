@@ -103,6 +103,10 @@ import {
 import { createPrivacyRepository } from "./privacy-repository.js";
 import { createPrivacyOperationsRepository } from "./privacy-operations-repository.js";
 import {
+  createPrivacySubjectExportRepository,
+  type PrivacySubjectExportRepository,
+} from "./privacy-subject-export-repository.js";
+import {
   createPrivacyDispositionQueue,
   createPrivacyRecoveryTombstoneStore,
   type PrivacyRecoveryTombstoneStore,
@@ -1070,6 +1074,16 @@ export type {
   PrivacyDispositionJob,
   PrivacyRecoveryTombstoneStore,
 } from "./privacy-disposition-queue.js";
+export {
+  createPrivacySubjectExportRepository,
+  PRIVACY_SUBJECT_EXPORT_MAX_ROWS_PER_SECTION,
+  PRIVACY_SUBJECT_EXPORT_SCHEMA_VERSION,
+} from "./privacy-subject-export-repository.js";
+export type {
+  CreatePrivacySubjectExportResult,
+  PrivacySubjectExportDocument,
+  PrivacySubjectExportRepository,
+} from "./privacy-subject-export-repository.js";
 export { createPrivateMediaDeliveryRepository } from "./media-delivery-repository.js";
 export {
   createConversationAttachmentMediaAccessResolver,
@@ -1403,6 +1417,7 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly privacyOperations: ReturnType<
     typeof createPrivacyOperationsRepository
   >;
+  readonly privacySubjectExports: PrivacySubjectExportRepository;
   readonly jobPropertyPhotoConsent: ReturnType<
     typeof createJobPropertyPhotoConsentRepository
   >;
@@ -1563,6 +1578,7 @@ export function createDatabase(
   const skillCatalog = createSkillCatalogRepository(sql);
   const privacy = createPrivacyRepository(sql);
   const privacyOperations = createPrivacyOperationsRepository(sql);
+  const privacySubjectExports = createPrivacySubjectExportRepository(sql);
   const privacyDispositionQueue = createPrivacyDispositionQueue(sql);
   const privacyNotificationDeliveryDisposition =
     createPrivacyNotificationDeliveryDispositionExecutor(sql);
@@ -1673,6 +1689,7 @@ export function createDatabase(
     privacyDispositionQueue,
     privacyNotificationDeliveryDisposition,
     privacyOperations,
+    privacySubjectExports,
     privacyRecoveryTombstones,
     jobPropertyPhotoConsent,
     query,
