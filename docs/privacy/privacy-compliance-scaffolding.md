@@ -100,9 +100,17 @@ bounded, stale acknowledgements fail, and an expired last attempt becomes an
 explicit `LEASE_EXPIRED` terminal result instead of an indefinitely ambiguous
 processing state.
 
-This orchestration does not itself delete or anonymize category data. Every
-category still needs a reviewed policy and an idempotent dedicated executor;
-unsupported categories remain non-executable. The independent ledger adapter,
-credentials and production recovery reapplicator remain external provisioning
-HUMAN GATES. See
+Migration `0112_privacy_notification_delivery_disposition.sql` adds the first
+dedicated executor. For an exact receipt-gated `NOTIFICATION_DELIVERY` job it
+deletes only provider-delivery metadata owned by the subject, preserves the
+canonical in-app notification, and records an immutable execution receipt with
+counts and a deterministic digest but no message content, recipient address or
+provider reference. A committed receipt makes retry after a crash before queue
+acknowledgement idempotent; the lease reaper completes the exact job instead of
+executing it twice.
+
+Every other category still needs a reviewed policy and an idempotent dedicated
+executor; unsupported categories terminate explicitly as non-executable. The
+independent ledger adapter, credentials and production recovery reapplicator
+remain external provisioning HUMAN GATES. See
 [ADR 0026](../adr/0026-privacy-disposition-jobs-and-recovery-tombstones.md).
