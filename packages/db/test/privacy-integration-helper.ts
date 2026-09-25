@@ -533,7 +533,7 @@ export async function runPrivacyIntegrationAssertions(
       entity_type, entity_id, payload, command_name, correlation_id
     ) VALUES (
       ${notificationEventId}, ${`privacy-test:${notificationEventId}`},
-      'privacy.test.notification', 1, clock_timestamp(),
+      'privacy.test.notification', 1, CURRENT_TIMESTAMP,
       'PRIVACY_REQUEST', ${caseId}, '{}'::jsonb,
       'privacy.test.notification', ${caseId}
     )`;
