@@ -37,7 +37,8 @@ export interface PrivacyRequestSummary {
 
 export interface PrivacyDataDisposition {
   readonly actionCode: string;
-  readonly actorUserId: UserId;
+  readonly actorSystemReference: string | null;
+  readonly actorUserId: UserId | null;
   readonly category: RetentionCategory;
   readonly disposition: PrivacyDataDispositionKind;
   readonly occurredAt: Date;
@@ -253,7 +254,9 @@ export function createPrivacyOperationsRepository(sql: RootSql) {
       const rows = await tx<PrivacyDataDisposition[]>`
         SELECT category::text, revision, disposition::text, state::text,
           policy_version_id AS "policyVersionId",
-          actor_user_id AS "actorUserId", action_code AS "actionCode",
+          actor_user_id AS "actorUserId",
+          actor_system_reference AS "actorSystemReference",
+          action_code AS "actionCode",
           occurred_at AS "occurredAt"
         FROM current_privacy_data_dispositions
         WHERE case_id = ${input.caseId}
@@ -320,7 +323,9 @@ export function createPrivacyOperationsRepository(sql: RootSql) {
       const [current] = await tx<PrivacyDataDisposition[]>`
         SELECT category::text, revision, disposition::text, state::text,
           policy_version_id AS "policyVersionId",
-          actor_user_id AS "actorUserId", action_code AS "actionCode",
+          actor_user_id AS "actorUserId",
+          actor_system_reference AS "actorSystemReference",
+          action_code AS "actionCode",
           occurred_at AS "occurredAt"
         FROM current_privacy_data_dispositions
         WHERE case_id = ${input.caseId} AND category = ${input.category}`;
@@ -621,6 +626,7 @@ function dispositionDecisionResult(
     commandId: command.commandId,
     disposition: Object.freeze({
       actionCode: command.actionCode,
+      actorSystemReference: null,
       actorUserId: command.actorUserId,
       category: command.category,
       disposition: command.disposition,
@@ -641,7 +647,9 @@ async function closureResult(
   const rows = await tx<PrivacyDataDisposition[]>`
     SELECT category::text, revision, disposition::text, state::text,
       policy_version_id AS "policyVersionId",
-      actor_user_id AS "actorUserId", action_code AS "actionCode",
+      actor_user_id AS "actorUserId",
+      actor_system_reference AS "actorSystemReference",
+      action_code AS "actionCode",
       occurred_at AS "occurredAt"
     FROM current_privacy_data_dispositions
     WHERE case_id = ${command.caseId}

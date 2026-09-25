@@ -29,6 +29,7 @@
     "@portal/notifications": "workspace:*",
     "@portal/observability": "workspace:*",
     "@portal/outbox": "workspace:*",
+    "@portal/privacy": "workspace:*",
     "@portal/queue": "workspace:*",
     "@portal/storage": "workspace:*"
   },

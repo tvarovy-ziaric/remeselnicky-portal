@@ -102,6 +102,11 @@ import {
 } from "./credential-claim-repository.js";
 import { createPrivacyRepository } from "./privacy-repository.js";
 import { createPrivacyOperationsRepository } from "./privacy-operations-repository.js";
+import {
+  createPrivacyDispositionQueue,
+  createPrivacyRecoveryTombstoneStore,
+  type PrivacyRecoveryTombstoneStore,
+} from "./privacy-disposition-queue.js";
 import { createJobPropertyPhotoConsentRepository } from "./job-property-photo-consent-repository.js";
 import type { PrivacyRepository } from "@portal/privacy";
 import { createCustomerProfileRepository } from "./customer-profile-repository.js";
@@ -1042,6 +1047,17 @@ export type {
 } from "./phone-verification-repository.js";
 export { createMediaRepository } from "./media-repository.js";
 export { createMediaProcessingQueue } from "./media-processing-queue.js";
+export {
+  createPrivacyDispositionQueue,
+  createPrivacyRecoveryTombstoneStore,
+  PRIVACY_DISPOSITION_JOB_NAME,
+  PRIVACY_DISPOSITION_MAX_ATTEMPTS,
+} from "./privacy-disposition-queue.js";
+export type {
+  PendingPrivacyRecoveryTombstone,
+  PrivacyDispositionJob,
+  PrivacyRecoveryTombstoneStore,
+} from "./privacy-disposition-queue.js";
 export { createPrivateMediaDeliveryRepository } from "./media-delivery-repository.js";
 export {
   createConversationAttachmentMediaAccessResolver,
@@ -1360,6 +1376,10 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly emailVerification: EmailVerificationRepository;
   readonly media: MediaRepository;
   readonly mediaProcessingQueue: ReturnType<typeof createMediaProcessingQueue>;
+  readonly privacyDispositionQueue: ReturnType<
+    typeof createPrivacyDispositionQueue
+  >;
+  readonly privacyRecoveryTombstones: PrivacyRecoveryTombstoneStore;
   readonly privateMediaDelivery: PrivateMediaDeliveryRepository;
   readonly notifications: NotificationRepository;
   readonly outbox: OutboxRepository;
@@ -1530,6 +1550,8 @@ export function createDatabase(
   const skillCatalog = createSkillCatalogRepository(sql);
   const privacy = createPrivacyRepository(sql);
   const privacyOperations = createPrivacyOperationsRepository(sql);
+  const privacyDispositionQueue = createPrivacyDispositionQueue(sql);
+  const privacyRecoveryTombstones = createPrivacyRecoveryTombstoneStore(sql);
   const jobPropertyPhotoConsent = createJobPropertyPhotoConsentRepository(sql);
   const health = createDatabaseHealthProbe(async () => {
     await sql`select 1 as health`;
@@ -1633,7 +1655,9 @@ export function createDatabase(
     professionTaxonomy,
     skillCatalog,
     privacy,
+    privacyDispositionQueue,
     privacyOperations,
+    privacyRecoveryTombstones,
     jobPropertyPhotoConsent,
     query,
     ping(): Promise<void> {

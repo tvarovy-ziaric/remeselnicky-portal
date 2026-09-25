@@ -69,6 +69,14 @@ export const privacyDispositionStateEnum = pgEnum(
   "privacy_disposition_state",
   PRIVACY_DISPOSITION_STATE_VALUES,
 );
+export const privacyDispositionJobStateEnum = pgEnum(
+  "privacy_disposition_job_state",
+  ["PENDING", "PROCESSING", "SUCCEEDED", "TERMINAL"],
+);
+export const privacyDispositionJobTerminalReasonEnum = pgEnum(
+  "privacy_disposition_job_terminal_reason",
+  ["NON_RETRYABLE", "RETRIES_EXHAUSTED"],
+);
 
 export const privacyPolicyVersions = pgTable(
   "privacy_policy_versions",
@@ -330,9 +338,11 @@ export const privacyDataDispositionEvents = pgTable(
       () => privacyRetentionPolicyVersions.policyVersionId,
       { onDelete: "restrict" },
     ),
-    actorUserId: uuid("actor_user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "restrict" }),
+    actorUserId: uuid("actor_user_id").references(() => users.id, {
+      onDelete: "restrict",
+    }),
+    actorSystemReference: text("actor_system_reference"),
+    dispositionJobId: uuid("disposition_job_id"),
     actionCode: text("action_code").notNull(),
     occurredAt: timestamp("occurred_at", {
       mode: "date",
@@ -408,6 +418,133 @@ export const privacyDataDispositionAdminCommands = pgTable(
   ],
 );
 
+export const privacyRecoveryTombstones = pgTable(
+  "privacy_recovery_tombstones",
+  {
+    tombstoneId: uuid("tombstone_id").primaryKey(),
+    sourceDispositionEventId: uuid("source_disposition_event_id")
+      .notNull()
+      .unique()
+      .references(() => privacyDataDispositionEvents.eventId, {
+        onDelete: "restrict",
+      }),
+    caseId: uuid("case_id")
+      .notNull()
+      .references(() => privacyRequestCases.caseId, { onDelete: "restrict" }),
+    subjectUserId: uuid("subject_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    category: privacyRetentionCategoryEnum("category").notNull(),
+    disposition: privacyDataDispositionEnum("disposition").notNull(),
+    policyVersionId: uuid("policy_version_id")
+      .notNull()
+      .references(() => privacyRetentionPolicyVersions.policyVersionId, {
+        onDelete: "restrict",
+      }),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+);
+
+export const privacyRecoveryTombstoneReceipts = pgTable(
+  "privacy_recovery_tombstone_receipts",
+  {
+    tombstoneId: uuid("tombstone_id")
+      .primaryKey()
+      .references(() => privacyRecoveryTombstones.tombstoneId, {
+        onDelete: "restrict",
+      }),
+    ledgerCode: text("ledger_code").notNull(),
+    receiptDigest: char("receipt_digest", { length: 64 }).notNull().unique(),
+    acknowledgedAt: timestamp("acknowledged_at", {
+      mode: "date",
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+);
+
+export const privacyDataDispositionJobs = pgTable(
+  "privacy_data_disposition_jobs",
+  {
+    jobId: uuid("job_id").primaryKey(),
+    sourceDispositionEventId: uuid("source_disposition_event_id")
+      .notNull()
+      .unique()
+      .references(() => privacyDataDispositionEvents.eventId, {
+        onDelete: "restrict",
+      }),
+    tombstoneId: uuid("tombstone_id")
+      .notNull()
+      .unique()
+      .references(() => privacyRecoveryTombstones.tombstoneId, {
+        onDelete: "restrict",
+      }),
+    caseId: uuid("case_id")
+      .notNull()
+      .references(() => privacyRequestCases.caseId, { onDelete: "restrict" }),
+    subjectUserId: uuid("subject_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    category: privacyRetentionCategoryEnum("category").notNull(),
+    disposition: privacyDataDispositionEnum("disposition").notNull(),
+    policyVersionId: uuid("policy_version_id")
+      .notNull()
+      .references(() => privacyRetentionPolicyVersions.policyVersionId, {
+        onDelete: "restrict",
+      }),
+    state: privacyDispositionJobStateEnum("state").notNull().default("PENDING"),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    failedAttemptCount: integer("failed_attempt_count").notNull().default(0),
+    retryCount: integer("retry_count").notNull().default(0),
+    maxAttempts: integer("max_attempts").notNull().default(10),
+    availableAt: timestamp("available_at", {
+      mode: "date",
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+    leaseToken: uuid("lease_token"),
+    leaseExpiresAt: timestamp("lease_expires_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
+    lastErrorCode: text("last_error_code"),
+    completedAt: timestamp("completed_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
+    terminalReason: privacyDispositionJobTerminalReasonEnum("terminal_reason"),
+    terminalRunId: text("terminal_run_id"),
+    terminalAt: timestamp("terminal_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
+    enqueuedAt: timestamp("enqueued_at", {
+      mode: "date",
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("privacy_disposition_jobs_claim_idx").on(
+      table.availableAt,
+      table.enqueuedAt,
+      table.jobId,
+    ),
+    index("privacy_disposition_jobs_reclaim_idx").on(
+      table.leaseExpiresAt,
+      table.jobId,
+    ),
+  ],
+);
+
 export type PrivacyPolicyVersionRecord =
   typeof privacyPolicyVersions.$inferSelect;
 export type PrivacyConsentPurposeRecord =
@@ -427,3 +564,9 @@ export type PrivacyDataDispositionEventRecord =
   typeof privacyDataDispositionEvents.$inferSelect;
 export type PrivacyDataDispositionAdminCommandRecord =
   typeof privacyDataDispositionAdminCommands.$inferSelect;
+export type PrivacyRecoveryTombstoneRecord =
+  typeof privacyRecoveryTombstones.$inferSelect;
+export type PrivacyRecoveryTombstoneReceiptRecord =
+  typeof privacyRecoveryTombstoneReceipts.$inferSelect;
+export type PrivacyDataDispositionJobRecord =
+  typeof privacyDataDispositionJobs.$inferSelect;

@@ -6,7 +6,9 @@ import type { Sql } from "postgres";
 import { expect } from "vitest";
 
 import {
+  createPrivacyDispositionQueue,
   createPrivacyOperationsRepository,
+  createPrivacyRecoveryTombstoneStore,
   createPrivacyRepository,
 } from "../src/index.js";
 
@@ -393,6 +395,133 @@ export async function runPrivacyIntegrationAssertions(
     SET reason = 'History rewrite attempt.'
     WHERE command_id = ${dispositionCommandId}
   `).rejects.toThrow(/privacy operational history is append-only/u);
+
+  const reviewedDraftPolicyId = randomUUID();
+  await expect(
+    repository.appendRetentionPolicyVersion({
+      category: "ABANDONED_DRAFT",
+      durationDays: 1,
+      launchState: "READY",
+      legalReviewState: "APPROVED",
+      policyVersionId: reviewedDraftPolicyId,
+      rationaleCode: "SYNTHETIC_TEST_POLICY",
+      supersedesPolicyVersionId: "12000000-0000-4000-8000-000000000002",
+      version: 2,
+    }),
+  ).resolves.toMatchObject({ status: "APPENDED" });
+  const destructiveCommandId = randomUUID();
+  await expect(
+    operations.decideDataDisposition({
+      actionCode: "ABANDONED_DRAFT_DELETE_QUEUED",
+      actor: adminActor,
+      caseId,
+      category: "ABANDONED_DRAFT",
+      commandId: destructiveCommandId,
+      disposition: "DELETE",
+      expectedDisposition: "REVIEW_REQUIRED",
+      expectedRevision: 1,
+      expectedState: "BLOCKED",
+      policyVersionId: reviewedDraftPolicyId,
+      privilegedSessionId: admin.privilegedSessionId,
+      reason: "Synthetic reviewed draft deletion decision for queue proof.",
+    }),
+  ).resolves.toMatchObject({
+    disposition: { state: "READY" },
+    status: "APPLIED",
+  });
+
+  const dispositionQueue = createPrivacyDispositionQueue(sql);
+  const recoveryTombstones = createPrivacyRecoveryTombstoneStore(sql);
+  await expect(dispositionQueue.take(Date.now())).resolves.toBeUndefined();
+  await expect(recoveryTombstones.listPending()).resolves.toEqual([
+    expect.objectContaining({
+      category: "ABANDONED_DRAFT",
+      disposition: "DELETE",
+      subjectUserId: subject.id,
+      tombstoneId: destructiveCommandId,
+    }),
+  ]);
+  const syntheticReceipt = `synthetic-independent-ledger:${randomUUID()}`;
+  await expect(
+    recoveryTombstones.acknowledge({
+      ledgerCode: "synthetic.integration",
+      receipt: syntheticReceipt,
+      tombstoneId: destructiveCommandId,
+    }),
+  ).resolves.toBe("ACKNOWLEDGED");
+  await expect(
+    recoveryTombstones.acknowledge({
+      ledgerCode: "synthetic.integration",
+      receipt: syntheticReceipt,
+      tombstoneId: destructiveCommandId,
+    }),
+  ).resolves.toBe("DEDUPLICATED");
+  const delivery = await dispositionQueue.take(Date.now());
+  expect(delivery).toMatchObject({
+    attempt: 1,
+    jobId: destructiveCommandId,
+    payload: {
+      category: "ABANDONED_DRAFT",
+      disposition: "DELETE",
+      tombstoneId: destructiveCommandId,
+    },
+  });
+  if (delivery === undefined)
+    throw new Error("Expected acknowledged privacy disposition delivery.");
+  await dispositionQueue.retry(delivery, {
+    availableAt: Date.now() - 1_000,
+    errorCode: "SYNTHETIC_EXECUTOR_UNAVAILABLE",
+  });
+  await expect(
+    operations.listDispositions({
+      actor: adminActor,
+      caseId,
+      privilegedSessionId: admin.privilegedSessionId,
+    }),
+  ).resolves.toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        category: "ABANDONED_DRAFT",
+        disposition: "DELETE",
+        state: "FAILED",
+      }),
+    ]),
+  );
+  const [storedReceipt] = await sql<Array<{ readonly receiptDigest: string }>>`
+    SELECT receipt_digest AS "receiptDigest"
+    FROM privacy_recovery_tombstone_receipts
+    WHERE tombstone_id = ${destructiveCommandId}`;
+  expect(storedReceipt?.receiptDigest).toBe(
+    createHash("sha256").update(syntheticReceipt, "utf8").digest("hex"),
+  );
+  expect(storedReceipt?.receiptDigest).not.toBe(syntheticReceipt);
+
+  const retryQueue = createPrivacyDispositionQueue(sql);
+  for (let expectedAttempt = 2; expectedAttempt <= 9; expectedAttempt += 1) {
+    const retryDelivery = await retryQueue.take(Date.now());
+    expect(retryDelivery?.attempt).toBe(expectedAttempt);
+    if (retryDelivery === undefined)
+      throw new Error("Expected retryable privacy disposition delivery.");
+    await retryQueue.retry(retryDelivery, {
+      availableAt: Date.now() - 1_000,
+      errorCode: "SYNTHETIC_EXECUTOR_UNAVAILABLE",
+    });
+  }
+  const crashQueue = createPrivacyDispositionQueue(sql, {
+    leaseDurationMs: 50,
+  });
+  const finalLease = await crashQueue.take(Date.now());
+  expect(finalLease?.attempt).toBe(10);
+  await sql`SELECT pg_sleep(0.1)`;
+  await expect(crashQueue.take(Date.now())).resolves.toBeUndefined();
+  await expect(crashQueue.terminalFailures()).resolves.toEqual([
+    expect.objectContaining({
+      attempts: 10,
+      errorCode: "LEASE_EXPIRED",
+      jobId: destructiveCommandId,
+      reason: "retries_exhausted",
+    }),
+  ]);
 
   const [closed] = await sql<
     Array<{

@@ -32,6 +32,7 @@ export function createInvitationNotificationProcessor(input: {
   readonly now?: () => number;
   readonly onAnalyticsError?: (error: unknown) => void;
   readonly outbox: OutboxWorker;
+  readonly privacyDispositions?: QueueWorker;
   readonly quotes: QuoteLifecycleMaintenancePersistence;
   readonly reminders: JobInvitationReminderStore;
 }): WorkerLoopProcessor {
@@ -60,6 +61,7 @@ export function createInvitationNotificationProcessor(input: {
 
       const result = await input.outbox.processNext();
       const media = await input.mediaProcessing?.processNext();
+      const privacy = await input.privacyDispositions?.processNext();
       let analytics: R3AnalyticsProcessResult | undefined;
       try {
         analytics = await input.analytics?.processNext();
@@ -70,6 +72,7 @@ export function createInvitationNotificationProcessor(input: {
         status:
           result.status === "IDLE" &&
           (media === undefined || media.status === "idle") &&
+          (privacy === undefined || privacy.status === "idle") &&
           (analytics === undefined || analytics.status === "IDLE")
             ? "idle"
             : "succeeded",

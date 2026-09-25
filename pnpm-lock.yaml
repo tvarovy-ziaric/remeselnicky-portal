@@ -220,6 +220,9 @@ importers:
       '@portal/outbox':
         specifier: workspace:*
         version: link:../../packages/outbox
+      '@portal/privacy':
+        specifier: workspace:*
+        version: link:../../packages/privacy
       '@portal/queue':
         specifier: workspace:*
         version: link:../../packages/queue

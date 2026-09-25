@@ -11,3 +11,7 @@ export {
   INVITATION_MAINTENANCE_INTERVAL_MS,
 } from "./notification-delivery.js";
 export { createMediaProcessingWorker } from "./media-processing.js";
+export {
+  createPrivacyDispositionWorker,
+  type PrivacyDispositionExecutor,
+} from "./privacy-disposition.js";

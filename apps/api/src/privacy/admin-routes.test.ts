@@ -100,6 +100,7 @@ function fixture(input?: {
   });
   const disposition = {
     actionCode: "LEGAL_POLICY_REVIEW_REQUIRED",
+    actorSystemReference: null,
     actorUserId: adminId,
     category: "ACCOUNT_CORE",
     disposition: "REVIEW_REQUIRED",
