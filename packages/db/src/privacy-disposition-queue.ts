@@ -100,7 +100,11 @@ export function createPrivacyRecoveryTombstoneStore(
   sql: Sql,
 ): PrivacyRecoveryTombstoneStore {
   return Object.freeze({
-    async acknowledge(input) {
+    async acknowledge(input: {
+      readonly ledgerCode: string;
+      readonly receipt: string;
+      readonly tombstoneId: string;
+    }) {
       assertUuid(input.tombstoneId, "tombstoneId");
       if (!ledgerCodePattern.test(input.ledgerCode))
         throw new TypeError("Invalid recovery ledger code.");
@@ -174,7 +178,7 @@ export function createPrivacyDispositionQueue(
   assertPositiveInteger(leaseDurationMs, "leaseDurationMs");
 
   return Object.freeze({
-    async acknowledge(delivery) {
+    async acknowledge(delivery: QueueDelivery<PrivacyDispositionJob>) {
       assertDelivery(delivery);
       await transaction(sql, async (tx) => {
         const rows = await tx<MutationRow[]>`
@@ -230,7 +234,10 @@ export function createPrivacyDispositionQueue(
       return { jobId: job.jobId, status: "enqueued" };
     },
 
-    async moveToTerminal(delivery, terminal: TerminalJobOptions) {
+    async moveToTerminal(
+      delivery: QueueDelivery<PrivacyDispositionJob>,
+      terminal: TerminalJobOptions,
+    ) {
       assertDelivery(delivery);
       assertErrorCode(terminal.errorCode);
       assertFiniteTimestamp(terminal.failedAt, "failedAt");
@@ -258,7 +265,10 @@ export function createPrivacyDispositionQueue(
       });
     },
 
-    async retry(delivery, retry: RetryJobOptions) {
+    async retry(
+      delivery: QueueDelivery<PrivacyDispositionJob>,
+      retry: RetryJobOptions,
+    ) {
       assertDelivery(delivery);
       assertErrorCode(retry.errorCode);
       assertFiniteTimestamp(retry.availableAt, "availableAt");
@@ -318,12 +328,14 @@ export function createPrivacyDispositionQueue(
         depth: row.depth,
         failedAttempts: row.failedAttempts,
         inFlight: row.inFlight,
-        ...(row.oldestInFlightAgeMs === null
-          ? {}
-          : { oldestInFlightAgeMs: Math.max(0, row.oldestInFlightAgeMs) }),
-        ...(row.oldestPendingAgeMs === null
-          ? {}
-          : { oldestPendingAgeMs: Math.max(0, row.oldestPendingAgeMs) }),
+        oldestInFlightAgeMs:
+          row.oldestInFlightAgeMs === null
+            ? undefined
+            : Math.max(0, row.oldestInFlightAgeMs),
+        oldestPendingAgeMs:
+          row.oldestPendingAgeMs === null
+            ? undefined
+            : Math.max(0, row.oldestPendingAgeMs),
         retriesScheduled: row.retriesScheduled,
         succeeded: row.succeeded,
         terminalFailures: row.terminalFailures,
