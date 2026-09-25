@@ -1001,6 +1001,8 @@ export type {
   PropertyPhotoConsentPolicy,
 } from "./job-property-photo-consent-repository.js";
 export type {
+  DecidePrivacyDataDispositionInput,
+  DecidePrivacyDataDispositionResult,
   ExecuteAccountClosureInput,
   ExecuteAccountClosureResult,
   PrivacyDataDisposition,

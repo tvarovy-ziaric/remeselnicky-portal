@@ -26,6 +26,7 @@ import {
   RETENTION_LAUNCH_STATE_VALUES,
 } from "@portal/privacy";
 
+import { auditEvents } from "./audit.js";
 import { users } from "./user.js";
 
 export const privacyPolicyKindEnum = pgEnum(
@@ -320,6 +321,11 @@ export const privacyDataDispositionEvents = pgTable(
     revision: integer("revision").notNull(),
     disposition: privacyDataDispositionEnum("disposition").notNull(),
     state: privacyDispositionStateEnum("state").notNull(),
+    dispositionAdminCommandId: uuid("disposition_admin_command_id")
+      .unique()
+      .references(() => privacyDataDispositionAdminCommands.commandId, {
+        onDelete: "restrict",
+      }),
     policyVersionId: uuid("policy_version_id").references(
       () => privacyRetentionPolicyVersions.policyVersionId,
       { onDelete: "restrict" },
@@ -349,6 +355,59 @@ export const privacyDataDispositionEvents = pgTable(
   ],
 );
 
+export const privacyDataDispositionAdminCommands = pgTable(
+  "privacy_data_disposition_admin_commands",
+  {
+    commandId: uuid("command_id").primaryKey(),
+    caseId: uuid("case_id")
+      .notNull()
+      .references(() => privacyRequestCases.caseId, { onDelete: "restrict" }),
+    category: privacyRetentionCategoryEnum("category").notNull(),
+    actorUserId: uuid("actor_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    actorPrivilegedSessionHash: char("actor_privileged_session_hash", {
+      length: 64,
+    }).notNull(),
+    expectedRevision: integer("expected_revision").notNull(),
+    expectedDisposition: privacyDataDispositionEnum(
+      "expected_disposition",
+    ).notNull(),
+    expectedState: privacyDispositionStateEnum("expected_state").notNull(),
+    resultingRevision: integer("resulting_revision").notNull(),
+    resultingDisposition: privacyDataDispositionEnum(
+      "resulting_disposition",
+    ).notNull(),
+    resultingState: privacyDispositionStateEnum("resulting_state").notNull(),
+    policyVersionId: uuid("policy_version_id")
+      .notNull()
+      .references(() => privacyRetentionPolicyVersions.policyVersionId, {
+        onDelete: "restrict",
+      }),
+    actionCode: text("action_code").notNull(),
+    reason: text("reason").notNull(),
+    payloadFingerprint: char("payload_fingerprint", { length: 64 }).notNull(),
+    auditEventId: uuid("audit_event_id")
+      .notNull()
+      .references(() => auditEvents.eventId, { onDelete: "restrict" }),
+    occurredAt: timestamp("occurred_at", {
+      mode: "date",
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    unique("privacy_data_disposition_admin_audit_event_unique").on(
+      table.auditEventId,
+    ),
+    check(
+      "privacy_disposition_admin_revision_step",
+      sql`${table.resultingRevision} = ${table.expectedRevision} + 1`,
+    ),
+  ],
+);
+
 export type PrivacyPolicyVersionRecord =
   typeof privacyPolicyVersions.$inferSelect;
 export type PrivacyConsentPurposeRecord =
@@ -366,3 +425,5 @@ export type PrivacyRequestAdminCommandRecord =
   typeof privacyRequestAdminCommands.$inferSelect;
 export type PrivacyDataDispositionEventRecord =
   typeof privacyDataDispositionEvents.$inferSelect;
+export type PrivacyDataDispositionAdminCommandRecord =
+  typeof privacyDataDispositionAdminCommands.$inferSelect;

@@ -21,6 +21,13 @@ const closurePath = ADMIN_PRIVACY_PATHS.accountClosure.replace(
   ":caseId",
   caseId,
 );
+const dispositionsPath = ADMIN_PRIVACY_PATHS.dispositions.replace(
+  ":caseId",
+  caseId,
+);
+const dispositionDecisionPath = ADMIN_PRIVACY_PATHS.dispositionDecision
+  .replace(":caseId", caseId)
+  .replace(":category", "ACCOUNT_CORE");
 const actor: PrivilegedActor = {
   capabilities: new Set(["admin.privacy.manage"]),
   mfaAuthenticatedAt: occurredAt,
@@ -91,6 +98,29 @@ function fixture(input?: {
     requestState: "ACTION_REQUIRED",
     status: "APPLIED",
   });
+  const disposition = {
+    actionCode: "LEGAL_POLICY_REVIEW_REQUIRED",
+    actorUserId: adminId,
+    category: "ACCOUNT_CORE",
+    disposition: "REVIEW_REQUIRED",
+    occurredAt,
+    policyVersionId: null,
+    revision: 1,
+    state: "BLOCKED",
+  };
+  const listDispositions = vi.fn().mockResolvedValue([disposition]);
+  const decideDataDisposition = vi.fn().mockResolvedValue({
+    commandId,
+    disposition: {
+      ...disposition,
+      actionCode: "ACCOUNT_CORE_RETAINED",
+      disposition: "RETAIN",
+      policyVersionId: "71000000-0000-4000-8000-000000000005",
+      revision: 2,
+      state: "COMPLETED",
+    },
+    status: "APPLIED",
+  });
   registerAdminPrivacyRoutes(app, {
     adminAccess: { authorize },
     csrfProtection: (_request, reply, done) => {
@@ -109,13 +139,21 @@ function fixture(input?: {
             : { status: "ACTIVE", user: { id: adminId } },
         ),
     },
-    operations: { executeAccountClosure, listQueue, transitionRequest },
+    operations: {
+      decideDataDisposition,
+      executeAccountClosure,
+      listDispositions,
+      listQueue,
+      transitionRequest,
+    },
     rateLimit: { max: 20, timeWindowMs: 60_000 },
   });
   return {
     app,
     authorize,
+    decideDataDisposition,
     executeAccountClosure,
+    listDispositions,
     listQueue,
     transitionRequest,
   };
@@ -192,6 +230,59 @@ describe("MFA-backed admin privacy operations", () => {
     });
   });
 
+  it("lists and records exact category dispositions behind recent MFA", async () => {
+    const { app, decideDataDisposition, listDispositions } = fixture();
+    const listed = await app.inject({ method: "GET", url: dispositionsPath });
+    expect(listed.statusCode).toBe(200);
+    expect(listed.json()).toMatchObject({
+      items: [
+        {
+          category: "ACCOUNT_CORE",
+          disposition: "REVIEW_REQUIRED",
+          state: "BLOCKED",
+        },
+      ],
+    });
+    expect(listDispositions).toHaveBeenCalledWith({
+      actor,
+      caseId,
+      privilegedSessionId: "opaque-privacy-admin-session",
+    });
+
+    const policyVersionId = "71000000-0000-4000-8000-000000000005";
+    const body = {
+      actionCode: "ACCOUNT_CORE_RETAINED",
+      commandId,
+      disposition: "RETAIN",
+      expectedDisposition: "REVIEW_REQUIRED",
+      expectedRevision: 1,
+      expectedState: "BLOCKED",
+      policyVersionId,
+      reason: "Reviewed account-core retention decision.",
+    };
+    const decided = await app.inject({
+      method: "POST",
+      payload: body,
+      url: dispositionDecisionPath,
+    });
+    expect(decided.statusCode).toBe(201);
+    expect(decided.json()).toMatchObject({
+      disposition: {
+        disposition: "RETAIN",
+        revision: 2,
+        state: "COMPLETED",
+      },
+      status: "APPLIED",
+    });
+    expect(decideDataDisposition).toHaveBeenCalledWith({
+      ...body,
+      actor,
+      caseId,
+      category: "ACCOUNT_CORE",
+      privilegedSessionId: "opaque-privacy-admin-session",
+    });
+  });
+
   it("fails closed for anonymous, stale MFA, CSRF failure and extra fields", async () => {
     const anonymous = fixture({ identity: "ANONYMOUS" });
     expect(
@@ -240,5 +331,27 @@ describe("MFA-backed admin privacy operations", () => {
       ).statusCode,
     ).toBe(400);
     expect(extra.executeAccountClosure).not.toHaveBeenCalled();
+
+    const extraDisposition = fixture();
+    expect(
+      (
+        await extraDisposition.app.inject({
+          method: "POST",
+          payload: {
+            actionCode: "ACCOUNT_CORE_RETAINED",
+            commandId,
+            disposition: "RETAIN",
+            expectedDisposition: "REVIEW_REQUIRED",
+            expectedRevision: 1,
+            expectedState: "BLOCKED",
+            policyVersionId: "71000000-0000-4000-8000-000000000005",
+            reason: "Reviewed account-core retention decision.",
+            skipLegalReview: true,
+          },
+          url: dispositionDecisionPath,
+        })
+      ).statusCode,
+    ).toBe(400);
+    expect(extraDisposition.decideDataDisposition).not.toHaveBeenCalled();
   });
 });

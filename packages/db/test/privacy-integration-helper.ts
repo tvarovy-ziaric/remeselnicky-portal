@@ -326,6 +326,74 @@ export async function runPrivacyIntegrationAssertions(
     ),
   ).toBe(true);
 
+  await expect(
+    operations.decideDataDisposition({
+      actionCode: "ACCOUNT_CORE_RETAINED",
+      actor: adminActor,
+      caseId,
+      category: "ACCOUNT_CORE",
+      commandId: randomUUID(),
+      disposition: "RETAIN",
+      expectedDisposition: "REVIEW_REQUIRED",
+      expectedRevision: 1,
+      expectedState: "BLOCKED",
+      policyVersionId: "12000000-0000-4000-8000-000000000001",
+      privilegedSessionId: admin.privilegedSessionId,
+      reason: "Unreviewed retention policy must fail closed.",
+    }),
+  ).rejects.toThrow(/executable reviewed retention policy required/u);
+
+  const reviewedAccountPolicyId = randomUUID();
+  await expect(
+    repository.appendRetentionPolicyVersion({
+      category: "ACCOUNT_CORE",
+      durationDays: 30,
+      launchState: "READY",
+      legalReviewState: "APPROVED",
+      policyVersionId: reviewedAccountPolicyId,
+      rationaleCode: "SYNTHETIC_TEST_POLICY",
+      supersedesPolicyVersionId: "12000000-0000-4000-8000-000000000001",
+      version: 2,
+    }),
+  ).resolves.toMatchObject({ status: "APPENDED" });
+  const dispositionCommandId = randomUUID();
+  const dispositionDecision = {
+    actionCode: "ACCOUNT_CORE_RETAINED",
+    actor: adminActor,
+    caseId,
+    category: "ACCOUNT_CORE" as const,
+    commandId: dispositionCommandId,
+    disposition: "RETAIN" as const,
+    expectedDisposition: "REVIEW_REQUIRED" as const,
+    expectedRevision: 1,
+    expectedState: "BLOCKED" as const,
+    policyVersionId: reviewedAccountPolicyId,
+    privilegedSessionId: admin.privilegedSessionId,
+    reason: "Synthetic reviewed retention decision for integration proof.",
+  };
+  await expect(
+    operations.decideDataDisposition(dispositionDecision),
+  ).resolves.toMatchObject({
+    disposition: {
+      category: "ACCOUNT_CORE",
+      disposition: "RETAIN",
+      revision: 2,
+      state: "COMPLETED",
+    },
+    status: "APPLIED",
+  });
+  await expect(
+    operations.decideDataDisposition(dispositionDecision),
+  ).resolves.toMatchObject({
+    disposition: { revision: 2, state: "COMPLETED" },
+    status: "DEDUPLICATED",
+  });
+  await expect(sql`
+    UPDATE privacy_data_disposition_admin_commands
+    SET reason = 'History rewrite attempt.'
+    WHERE command_id = ${dispositionCommandId}
+  `).rejects.toThrow(/privacy operational history is append-only/u);
+
   const [closed] = await sql<
     Array<{
       readonly accountState: string;

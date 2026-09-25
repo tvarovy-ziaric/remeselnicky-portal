@@ -245,6 +245,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
           "0107_final_permission_matrix.sql",
           "0108_privacy_account_closure.sql",
           "0109_job_property_photo_consent.sql",
+          "0110_privacy_disposition_decisions.sql",
         ],
         alreadyApplied: 0,
       });
@@ -253,7 +254,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         testDatabaseUrl,
         migrationsDirectory,
       );
-      expect(secondRun).toEqual({ applied: [], alreadyApplied: 110 });
+      expect(secondRun).toEqual({ applied: [], alreadyApplied: 111 });
 
       const sql = postgres(testDatabaseUrl, { max: 5 });
       try {
@@ -299,7 +300,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         `;
 
         expect(postgis?.extversion).toMatch(/^3\./);
-        expect(ledger?.count).toBe(110);
+        expect(ledger?.count).toBe(111);
         expect(created).toMatchObject({ account_state: "ACTIVE" });
         expect(created?.id).toMatch(
           /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,

@@ -4,6 +4,8 @@ import type { PrivilegedActor } from "@portal/admin-auth";
 import { auditActorFromPrivilegedActor } from "@portal/audit";
 import type { UserId } from "@portal/domain";
 import type {
+  PrivacyDataDispositionKind,
+  PrivacyDispositionState,
   PrivacyRequestState,
   PrivacyRequestType,
   RetentionCategory,
@@ -37,13 +39,36 @@ export interface PrivacyDataDisposition {
   readonly actionCode: string;
   readonly actorUserId: UserId;
   readonly category: RetentionCategory;
-  readonly disposition:
-    "ANONYMIZE" | "DELETE" | "NO_DATA" | "RETAIN" | "REVIEW_REQUIRED";
+  readonly disposition: PrivacyDataDispositionKind;
   readonly occurredAt: Date;
   readonly policyVersionId: string | null;
   readonly revision: number;
-  readonly state: "BLOCKED" | "COMPLETED" | "FAILED" | "PROCESSING" | "READY";
+  readonly state: PrivacyDispositionState;
 }
+
+export interface DecidePrivacyDataDispositionInput {
+  readonly actionCode: string;
+  readonly actor: PrivilegedActor;
+  readonly caseId: string;
+  readonly category: RetentionCategory;
+  readonly commandId: string;
+  readonly disposition: Exclude<PrivacyDataDispositionKind, "REVIEW_REQUIRED">;
+  readonly expectedDisposition: PrivacyDataDispositionKind;
+  readonly expectedRevision: number;
+  readonly expectedState: PrivacyDispositionState;
+  readonly policyVersionId: string;
+  readonly privilegedSessionId: string;
+  readonly reason: string;
+}
+
+export type DecidePrivacyDataDispositionResult =
+  | Readonly<{
+      readonly commandId: string;
+      readonly disposition: PrivacyDataDisposition;
+      readonly status: "APPLIED" | "DEDUPLICATED";
+    }>
+  | Readonly<{ readonly status: "NOT_FOUND" }>
+  | Readonly<{ readonly status: "STALE_STATE" }>;
 
 export interface ExecuteAccountClosureInput {
   readonly actor: PrivilegedActor;
@@ -114,6 +139,20 @@ interface RequestAdminCommandRow {
   readonly payloadFingerprint: string;
   readonly revision: number;
   readonly state: Exclude<PrivacyRequestState, "RECEIVED">;
+}
+
+interface DispositionAdminCommandRow {
+  readonly actionCode: string;
+  readonly actorUserId: UserId;
+  readonly caseId: string;
+  readonly category: RetentionCategory;
+  readonly commandId: string;
+  readonly disposition: Exclude<PrivacyDataDispositionKind, "REVIEW_REQUIRED">;
+  readonly occurredAt: Date;
+  readonly payloadFingerprint: string;
+  readonly policyVersionId: string;
+  readonly revision: number;
+  readonly state: Extract<PrivacyDispositionState, "COMPLETED" | "READY">;
 }
 
 export class PrivacyAccountClosureIdempotencyError extends Error {}
@@ -193,6 +232,146 @@ export function createPrivacyOperationsRepository(sql: RootSql) {
           received_at, case_id
         LIMIT ${limit}`;
       return freezeRows(rows);
+    });
+  }
+
+  async function listDispositions(input: {
+    readonly actor: PrivilegedActor;
+    readonly caseId: string;
+    readonly privilegedSessionId: string;
+  }): Promise<readonly PrivacyDataDisposition[] | null> {
+    validateAdmin(input.actor, input.privilegedSessionId);
+    id(input.caseId);
+    return transaction(sql, async (tx) => {
+      await requireRecentSession(tx, input.actor, input.privilegedSessionId);
+      const [request] = await tx<Array<{ readonly allowed: boolean }>>`
+        SELECT true AS allowed
+        FROM privacy_request_cases
+        WHERE case_id = ${input.caseId}
+          AND request_type IN ('ERASURE', 'ACCOUNT_CLOSURE')`;
+      if (request?.allowed !== true) return null;
+      const rows = await tx<PrivacyDataDisposition[]>`
+        SELECT category::text, revision, disposition::text, state::text,
+          policy_version_id AS "policyVersionId",
+          actor_user_id AS "actorUserId", action_code AS "actionCode",
+          occurred_at AS "occurredAt"
+        FROM current_privacy_data_dispositions
+        WHERE case_id = ${input.caseId}
+        ORDER BY category`;
+      return freezeRows(rows);
+    });
+  }
+
+  async function decideDataDisposition(
+    input: DecidePrivacyDataDispositionInput,
+  ): Promise<DecidePrivacyDataDispositionResult> {
+    validateDispositionDecision(input);
+    const resultingState =
+      input.disposition === "DELETE" || input.disposition === "ANONYMIZE"
+        ? ("READY" as const)
+        : ("COMPLETED" as const);
+    const payloadFingerprint = digest(
+      JSON.stringify([
+        input.caseId,
+        input.category,
+        input.actor.userId,
+        input.expectedRevision,
+        input.expectedDisposition,
+        input.expectedState,
+        input.disposition,
+        input.policyVersionId,
+        input.actionCode,
+        input.reason,
+      ]),
+    );
+    const auditEventId = derivedUuid(
+      `privacy-disposition-audit:${input.commandId}`,
+    );
+    return transaction(sql, async (tx) => {
+      await tx`SELECT pg_advisory_xact_lock(
+        hashtextextended(${input.commandId}::text, 427_026_110)
+      )`;
+      const [existing] = await tx<DispositionAdminCommandRow[]>`
+        SELECT command_id AS "commandId", case_id AS "caseId",
+          category::text, actor_user_id AS "actorUserId",
+          resulting_revision AS revision,
+          resulting_disposition::text AS disposition,
+          resulting_state::text AS state,
+          policy_version_id AS "policyVersionId",
+          action_code AS "actionCode",
+          payload_fingerprint AS "payloadFingerprint",
+          occurred_at AS "occurredAt"
+        FROM privacy_data_disposition_admin_commands
+        WHERE command_id = ${input.commandId}`;
+      if (existing !== undefined) {
+        if (existing.actorUserId !== input.actor.userId)
+          return { status: "NOT_FOUND" };
+        if (
+          existing.caseId !== input.caseId ||
+          existing.category !== input.category ||
+          existing.payloadFingerprint !== payloadFingerprint
+        )
+          throw new PrivacyAccountClosureIdempotencyError(
+            "Privacy disposition command ID was reused with another intent.",
+          );
+        return dispositionDecisionResult(existing, "DEDUPLICATED");
+      }
+
+      const [current] = await tx<PrivacyDataDisposition[]>`
+        SELECT category::text, revision, disposition::text, state::text,
+          policy_version_id AS "policyVersionId",
+          actor_user_id AS "actorUserId", action_code AS "actionCode",
+          occurred_at AS "occurredAt"
+        FROM current_privacy_data_dispositions
+        WHERE case_id = ${input.caseId} AND category = ${input.category}`;
+      if (current === undefined) return { status: "NOT_FOUND" };
+      if (
+        current.revision !== input.expectedRevision ||
+        current.disposition !== input.expectedDisposition ||
+        current.state !== input.expectedState
+      )
+        return { status: "STALE_STATE" };
+
+      const [inserted] = await tx<DispositionAdminCommandRow[]>`
+        INSERT INTO privacy_data_disposition_admin_commands (
+          command_id, case_id, category, actor_user_id,
+          actor_privileged_session_hash, expected_revision,
+          expected_disposition, expected_state, resulting_revision,
+          resulting_disposition, resulting_state, policy_version_id,
+          action_code, reason, payload_fingerprint, audit_event_id
+        ) VALUES (
+          ${input.commandId}, ${input.caseId}, ${input.category},
+          ${input.actor.userId}, ${digest(input.privilegedSessionId)},
+          ${input.expectedRevision}, ${input.expectedDisposition},
+          ${input.expectedState}, ${input.expectedRevision + 1},
+          ${input.disposition}, ${resultingState}, ${input.policyVersionId},
+          ${input.actionCode}, ${input.reason}, ${payloadFingerprint},
+          ${auditEventId}
+        ) RETURNING command_id AS "commandId", case_id AS "caseId",
+          category::text, actor_user_id AS "actorUserId",
+          resulting_revision AS revision,
+          resulting_disposition::text AS disposition,
+          resulting_state::text AS state,
+          policy_version_id AS "policyVersionId",
+          action_code AS "actionCode",
+          payload_fingerprint AS "payloadFingerprint",
+          occurred_at AS "occurredAt"`;
+      if (inserted === undefined)
+        throw new Error("Privacy disposition decision effect missing.");
+      await createAuditRepository(tx).append({
+        action: "admin.privacy.disposition_decided",
+        actor: auditActorFromPrivilegedActor(
+          input.actor,
+          "admin.privacy.manage",
+        ),
+        category: "PRIVILEGED_COMMAND",
+        changes: {},
+        correlationId: input.commandId,
+        eventId: auditEventId,
+        reason: input.reason,
+        target: { id: input.caseId, type: "PRIVACY_REQUEST" },
+      });
+      return dispositionDecisionResult(inserted, "APPLIED");
     });
   }
 
@@ -424,11 +603,33 @@ export function createPrivacyOperationsRepository(sql: RootSql) {
   }
 
   return Object.freeze({
+    decideDataDisposition,
     executeAccountClosure,
     hasOpenObligations,
+    listDispositions,
     listQueue,
     listForSubject,
     transitionRequest,
+  });
+}
+
+function dispositionDecisionResult(
+  command: DispositionAdminCommandRow,
+  status: "APPLIED" | "DEDUPLICATED",
+): Extract<DecidePrivacyDataDispositionResult, { status: typeof status }> {
+  return Object.freeze({
+    commandId: command.commandId,
+    disposition: Object.freeze({
+      actionCode: command.actionCode,
+      actorUserId: command.actorUserId,
+      category: command.category,
+      disposition: command.disposition,
+      occurredAt: command.occurredAt,
+      policyVersionId: command.policyVersionId,
+      revision: command.revision,
+      state: command.state,
+    }),
+    status,
   });
 }
 
@@ -453,6 +654,46 @@ async function closureResult(
     requestState: "ACTION_REQUIRED" as const,
     status,
   });
+}
+
+function validateDispositionDecision(
+  input: DecidePrivacyDataDispositionInput,
+): void {
+  validateAdmin(input.actor, input.privilegedSessionId);
+  id(input.caseId);
+  id(input.commandId);
+  id(input.policyVersionId);
+  if (
+    ![
+      "ACCOUNT_CORE",
+      "ABANDONED_DRAFT",
+      "PRE_JOB_CONVERSATION",
+      "COMMERCIAL_JOB_RECORD",
+      "PRIVATE_JOB_MEDIA",
+      "PUBLIC_PORTFOLIO_MEDIA",
+      "CREDENTIAL_EVIDENCE",
+      "REJECTED_CREDENTIAL",
+      "MALWARE_QUARANTINE",
+      "DISPUTE_EVIDENCE",
+      "MODERATION_SECURITY",
+      "RISK_FLAG",
+      "APPLICATION_LOG",
+      "NOTIFICATION_DELIVERY",
+      "AUDIT_EVENT",
+      "PRIVACY_REQUEST_CASE",
+      "BACKUP",
+    ].includes(input.category) ||
+    !["ANONYMIZE", "DELETE", "NO_DATA", "RETAIN"].includes(input.disposition) ||
+    !["REVIEW_REQUIRED", "ANONYMIZE", "DELETE", "NO_DATA", "RETAIN"].includes(
+      input.expectedDisposition,
+    ) ||
+    !["BLOCKED", "READY", "FAILED"].includes(input.expectedState) ||
+    !Number.isSafeInteger(input.expectedRevision) ||
+    input.expectedRevision < 1 ||
+    !reasonCode.test(input.actionCode)
+  )
+    throw new TypeError("Invalid privacy disposition decision.");
+  safeReason(input.reason);
 }
 
 function validateClosure(input: ExecuteAccountClosureInput): void {

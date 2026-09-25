@@ -1,12 +1,20 @@
 import type { AdminAccessService, PrivilegedActor } from "@portal/admin-auth";
 import {
   PrivacyAccountClosureIdempotencyError,
+  type DecidePrivacyDataDispositionInput,
+  type PrivacyDataDisposition,
   type PrivacyRequestSummary,
   type TransitionPrivacyRequestInput,
   type createPrivacyOperationsRepository,
 } from "@portal/db";
 import type { UserId } from "@portal/domain";
-import { PRIVACY_REQUEST_STATE_VALUES } from "@portal/privacy";
+import {
+  PRIVACY_DATA_DISPOSITION_VALUES,
+  PRIVACY_DISPOSITION_STATE_VALUES,
+  PRIVACY_REQUEST_STATE_VALUES,
+  RETENTION_CATEGORY_VALUES,
+  type RetentionCategory,
+} from "@portal/privacy";
 import type {
   FastifyInstance,
   FastifyReply,
@@ -21,6 +29,9 @@ type Operations = ReturnType<typeof createPrivacyOperationsRepository>;
 export const ADMIN_PRIVACY_PATHS = Object.freeze({
   accountClosure:
     "/v1/admin/privacy/requests/:caseId/account-closure/deactivate",
+  dispositionDecision:
+    "/v1/admin/privacy/requests/:caseId/dispositions/:category/decision",
+  dispositions: "/v1/admin/privacy/requests/:caseId/dispositions",
   queue: "/v1/admin/privacy/requests",
   transition: "/v1/admin/privacy/requests/:caseId/transition",
 } as const);
@@ -33,7 +44,11 @@ export interface AdminPrivacyRouteDependencies {
   };
   readonly operations: Pick<
     Operations,
-    "executeAccountClosure" | "listQueue" | "transitionRequest"
+    | "decideDataDisposition"
+    | "executeAccountClosure"
+    | "listDispositions"
+    | "listQueue"
+    | "transitionRequest"
   >;
   readonly rateLimit: { readonly max: number; readonly timeWindowMs: number };
 }
@@ -55,6 +70,17 @@ interface ClosureBody {
   readonly reason: string;
   readonly reasonCode: string;
   readonly subjectUserId: UserId;
+}
+
+interface DispositionDecisionBody {
+  readonly actionCode: string;
+  readonly commandId: string;
+  readonly disposition: DecidePrivacyDataDispositionInput["disposition"];
+  readonly expectedDisposition: DecidePrivacyDataDispositionInput["expectedDisposition"];
+  readonly expectedRevision: number;
+  readonly expectedState: DecidePrivacyDataDispositionInput["expectedState"];
+  readonly policyVersionId: string;
+  readonly reason: string;
 }
 
 export function registerAdminPrivacyRoutes(
@@ -124,6 +150,68 @@ export function registerAdminPrivacyRoutes(
         return reply.code(result.status === "APPLIED" ? 201 : 200).send({
           ...result,
           occurredAt: result.occurredAt.toISOString(),
+        });
+      } catch (error) {
+        return errorReply(reply, error);
+      }
+    },
+  );
+
+  app.get<{ Params: { caseId: string } }>(
+    ADMIN_PRIVACY_PATHS.dispositions,
+    { onRequest: rejectQuery, onSend: privateHeaders },
+    async (request, reply) => {
+      const actor = await authorize(request, reply, dependencies);
+      if (actor === undefined) return;
+      if (!validId(request.params.caseId))
+        return reply.code(400).send({ code: "INVALID_REQUEST" });
+      try {
+        const items = await dependencies.operations.listDispositions({
+          actor,
+          caseId: request.params.caseId,
+          privilegedSessionId: request.session.sessionId,
+        });
+        if (items === null) return reply.code(404).send({ code: "NOT_FOUND" });
+        return reply.send({ items: items.map(dispositionDto) });
+      } catch {
+        return reply.code(503).send({ code: "TEMPORARILY_UNAVAILABLE" });
+      }
+    },
+  );
+
+  app.post<{
+    Body: DispositionDecisionBody;
+    Params: { caseId: string; category: string };
+  }>(
+    ADMIN_PRIVACY_PATHS.dispositionDecision,
+    writeOptions(dependencies),
+    async (request, reply) => {
+      const actor = await authorize(request, reply, dependencies);
+      if (actor === undefined) return;
+      if (
+        !validDispositionDecision(
+          request.params.caseId,
+          request.params.category,
+          request.body,
+        )
+      )
+        return reply.code(400).send({ code: "INVALID_REQUEST" });
+      try {
+        const result = await dependencies.operations.decideDataDisposition({
+          ...request.body,
+          actor,
+          caseId: request.params.caseId,
+          category: request.params.category as RetentionCategory,
+          privilegedSessionId: request.session.sessionId,
+        });
+        if (result.status === "NOT_FOUND")
+          return reply.code(404).send({ code: "NOT_FOUND" });
+        if (result.status === "STALE_STATE")
+          return reply.code(409).send({ code: "STALE_STATE" });
+        return reply.code(result.status === "APPLIED" ? 201 : 200).send({
+          commandId: result.commandId,
+          disposition: dispositionDto(result.disposition),
+          status: result.status,
         });
       } catch (error) {
         return errorReply(reply, error);
@@ -232,6 +320,13 @@ function adminRequestDto(item: PrivacyRequestSummary) {
   };
 }
 
+function dispositionDto(item: PrivacyDataDisposition) {
+  return {
+    ...item,
+    occurredAt: item.occurredAt.toISOString(),
+  };
+}
+
 function validTransition(
   caseId: string,
   body: unknown,
@@ -288,6 +383,52 @@ function validClosure(caseId: string, body: unknown): body is ClosureBody {
     (body["expectedRequestRevision"] as number) > 0 &&
     body["expectedRequestState"] === "IN_REVIEW" &&
     validCode(body["reasonCode"]) &&
+    validReason(body["reason"])
+  );
+}
+
+function validDispositionDecision(
+  caseId: string,
+  category: string,
+  body: unknown,
+): body is DispositionDecisionBody {
+  if (
+    !validId(caseId) ||
+    !RETENTION_CATEGORY_VALUES.includes(category as RetentionCategory) ||
+    !record(body) ||
+    !exactKeys(body, [
+      "actionCode",
+      "commandId",
+      "disposition",
+      "expectedDisposition",
+      "expectedRevision",
+      "expectedState",
+      "policyVersionId",
+      "reason",
+    ])
+  )
+    return false;
+  return (
+    validCode(body["actionCode"]) &&
+    validId(body["commandId"]) &&
+    validId(body["policyVersionId"]) &&
+    body["disposition"] !== "REVIEW_REQUIRED" &&
+    PRIVACY_DATA_DISPOSITION_VALUES.includes(
+      body["disposition"] as DecidePrivacyDataDispositionInput["disposition"],
+    ) &&
+    PRIVACY_DATA_DISPOSITION_VALUES.includes(
+      body[
+        "expectedDisposition"
+      ] as DecidePrivacyDataDispositionInput["expectedDisposition"],
+    ) &&
+    PRIVACY_DISPOSITION_STATE_VALUES.includes(
+      body[
+        "expectedState"
+      ] as DecidePrivacyDataDispositionInput["expectedState"],
+    ) &&
+    ["BLOCKED", "READY", "FAILED"].includes(body["expectedState"] as string) &&
+    Number.isSafeInteger(body["expectedRevision"]) &&
+    (body["expectedRevision"] as number) > 0 &&
     validReason(body["reason"])
   );
 }

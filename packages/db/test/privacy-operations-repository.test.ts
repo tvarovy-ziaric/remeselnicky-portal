@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import type { PrivilegedActor } from "@portal/admin-auth";
 import type { UserId } from "@portal/domain";
 import type { Sql } from "postgres";
@@ -5,6 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   createPrivacyOperationsRepository,
+  type DecidePrivacyDataDispositionInput,
   type ExecuteAccountClosureInput,
   type TransitionPrivacyRequestInput,
 } from "../src/index.js";
@@ -13,6 +16,7 @@ const actorUserId = "10000000-0000-4000-8000-000000000001" as UserId;
 const subjectUserId = "20000000-0000-4000-8000-000000000002" as UserId;
 const caseId = "30000000-0000-4000-8000-000000000003";
 const commandId = "40000000-0000-4000-8000-000000000004";
+const policyVersionId = "50000000-0000-4000-8000-000000000005";
 const now = new Date("2026-09-25T00:00:00.000Z");
 
 function fakeSql(responses: unknown[]) {
@@ -82,6 +86,52 @@ function transition(
     reason: "Identity and request scope were verified.",
     resultingState: "VERIFIED",
     ...overrides,
+  };
+}
+
+function disposition(
+  overrides: Partial<DecidePrivacyDataDispositionInput> = {},
+): DecidePrivacyDataDispositionInput {
+  return {
+    actionCode: "ACCOUNT_CORE_RETAINED",
+    actor: actor(),
+    caseId,
+    category: "ACCOUNT_CORE",
+    commandId,
+    disposition: "RETAIN",
+    expectedDisposition: "REVIEW_REQUIRED",
+    expectedRevision: 1,
+    expectedState: "BLOCKED",
+    policyVersionId,
+    privilegedSessionId: "privileged-session-identity",
+    reason: "Reviewed account-core retention decision.",
+    ...overrides,
+  };
+}
+
+function derivedUuid(seed: string): string {
+  const hex = createHash("sha256").update(seed, "utf8").digest("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
+
+function auditRow(action: string, reason: string, eventId: string) {
+  return {
+    action,
+    actorCapability: "admin.privacy.manage",
+    actorKind: "AUTHENTICATED_USER" as const,
+    actorSystemReference: null,
+    actorUserId,
+    category: "PRIVILEGED_COMMAND" as const,
+    changes: {},
+    contextId: null,
+    contextType: null,
+    correlationId: commandId,
+    eventId,
+    occurredAt: now,
+    reason,
+    sensitiveAccessPurpose: null,
+    targetId: caseId,
+    targetType: "PRIVACY_REQUEST",
   };
 }
 
@@ -165,7 +215,13 @@ describe("privacy operations repository", () => {
       [],
       [{ revision: 1, state: "RECEIVED" }],
       [inserted],
-      [],
+      [
+        auditRow(
+          "admin.privacy.request_transitioned",
+          "Identity and request scope were verified.",
+          derivedUuid(`privacy-request-audit:${commandId}`),
+        ),
+      ],
     ]);
     await expect(
       createPrivacyOperationsRepository(fixture.sql).transitionRequest(
@@ -180,6 +236,68 @@ describe("privacy operations repository", () => {
     expect(
       fixture.calls.some((statement) =>
         statement.join("?").includes("privacy_request_admin_commands"),
+      ),
+    ).toBe(true);
+    expect(
+      fixture.calls.some((statement) =>
+        statement.join("?").includes("INSERT INTO audit_events"),
+      ),
+    ).toBe(true);
+  });
+
+  it("records an exact reviewed category decision and immutable audit", async () => {
+    const current = {
+      actionCode: "LEGAL_POLICY_REVIEW_REQUIRED",
+      actorUserId,
+      category: "ACCOUNT_CORE" as const,
+      disposition: "REVIEW_REQUIRED" as const,
+      occurredAt: now,
+      policyVersionId: null,
+      revision: 1,
+      state: "BLOCKED" as const,
+    };
+    const inserted = {
+      actionCode: "ACCOUNT_CORE_RETAINED",
+      actorUserId,
+      caseId,
+      category: "ACCOUNT_CORE" as const,
+      commandId,
+      disposition: "RETAIN" as const,
+      occurredAt: now,
+      payloadFingerprint: "ignored-by-applied-path",
+      policyVersionId,
+      revision: 2,
+      state: "COMPLETED" as const,
+    };
+    const fixture = fakeSql([
+      [],
+      [],
+      [current],
+      [inserted],
+      [
+        auditRow(
+          "admin.privacy.disposition_decided",
+          "Reviewed account-core retention decision.",
+          derivedUuid(`privacy-disposition-audit:${commandId}`),
+        ),
+      ],
+    ]);
+    await expect(
+      createPrivacyOperationsRepository(fixture.sql).decideDataDisposition(
+        disposition(),
+      ),
+    ).resolves.toMatchObject({
+      disposition: {
+        category: "ACCOUNT_CORE",
+        disposition: "RETAIN",
+        revision: 2,
+        state: "COMPLETED",
+      },
+      status: "APPLIED",
+    });
+    expect(
+      fixture.calls.some((statement) =>
+        statement.join("?").includes("privacy_data_disposition_admin_commands"),
       ),
     ).toBe(true);
     expect(
@@ -230,22 +348,20 @@ describe("privacy operations repository", () => {
   });
 
   it("deduplicates an exact command and returns category review state", async () => {
-    const fingerprint = await import("node:crypto").then(({ createHash }) =>
-      createHash("sha256")
-        .update(
-          JSON.stringify([
-            caseId,
-            subjectUserId,
-            actorUserId,
-            4,
-            "IN_REVIEW",
-            "VERIFIED_ACCOUNT_CLOSURE",
-            "Overená žiadosť bez otvorených záväzkov.",
-          ]),
-          "utf8",
-        )
-        .digest("hex"),
-    );
+    const fingerprint = createHash("sha256")
+      .update(
+        JSON.stringify([
+          caseId,
+          subjectUserId,
+          actorUserId,
+          4,
+          "IN_REVIEW",
+          "VERIFIED_ACCOUNT_CLOSURE",
+          "Overená žiadosť bez otvorených záväzkov.",
+        ]),
+        "utf8",
+      )
+      .digest("hex");
     const fixture = fakeSql([
       [],
       [
