@@ -1,6 +1,6 @@
 # Production Alpha privacy HUMAN GATE
 
-Status: `SHORTLIST PREPARED — BLOCKED PENDING REVIEWER/PROVIDER SELECTION`
+Status: `DEFERRED DURING SYNTHETIC TEST OPERATION — REQUIRED BEFORE REAL USERS`
 
 This gate applies before the first real-user production Alpha. It does not
 block synthetic development or CI, and it does not authorize a vendor, account,
@@ -11,6 +11,12 @@ review and independent-ledger shortlist only. The resulting no-spend research,
 prices, account requirements, credential boundaries and comparison are recorded
 in [Legal and recovery-ledger shortlist](./legal-and-recovery-ledger-shortlist.md).
 No firm was contacted and no provider account or resource was created.
+
+On 2026-09-26 the human explicitly deferred legal work and production-provider
+selection while the portal remains in test operation. This removes the gate
+from the current synthetic-test workstream only. It does not waive D27/D30,
+authorize real personal data, enable destructive unreviewed disposition jobs,
+or permit a production/real-user launch.
 
 ## Technical baseline already implemented
 
@@ -117,12 +123,12 @@ approval.
 
 ## Exact human decision requested
 
-Choose which shortlisted legal firms may be contacted for fixed-scope quotes,
-which ledger options may receive a non-binding calculator/design comparison,
-the proposed internal privacy/incident owner, and legal/monthly-ledger budget
-ceilings. This authorizes requests and planning only. Engagement, provider
-selection, contract acceptance, account creation, credentials, provisioning and
-real-user rollout each remain separately gated.
+No legal/provider decision is requested for the current synthetic test
+operation. Before any real-user or production-data rollout, explicitly reopen
+this gate and then choose the reviewer, approved matrix, provider/account,
+region, owners, credential custodians and budget ceilings. Engagement, contract
+acceptance, account creation, credentials, provisioning and real-user rollout
+remain separately gated.
 
 Until then, keep production disposition jobs, production-class restore and
 real-user rollout disabled. Do not weaken the fail-closed policy to advance the

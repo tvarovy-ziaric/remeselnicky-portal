@@ -1,8 +1,13 @@
 # Production Alpha legal and recovery-ledger shortlist
 
-Status: `RESEARCH ONLY — NO ACCOUNT, ENGAGEMENT OR SPEND AUTHORIZED`
+Status: `DEFERRED REFERENCE — NO ACCOUNT, ENGAGEMENT OR SPEND AUTHORIZED`
 
 Checked: 2026-09-25
+
+Decision update: on 2026-09-26 the human deferred all legal-review and
+production-provider work while the portal remains a synthetic test operation.
+Do not contact candidates or provision a ledger until production/real-user
+readiness is explicitly reopened.
 
 This package records the shortlist authorized by the human selection of option
 1 in the [Production Alpha privacy HUMAN GATE](./production-alpha-privacy-gate.md).
