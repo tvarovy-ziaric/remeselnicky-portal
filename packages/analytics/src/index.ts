@@ -77,3 +77,18 @@ export type {
   TrustedAnalyticsPublisher,
 } from "./types.js";
 export { validateAnalyticsEnvelope } from "./validation.js";
+export {
+  ALPHA_KPI_DEFINITION_VERSION,
+  alphaKpiCatalog,
+  buildAlphaAnalyticsDashboard,
+  segmentMayBePublished,
+  type AlphaAnalyticsDashboard,
+  type AlphaAnalyticsTrafficClass,
+  type AlphaKpiDefinition,
+  type AlphaKpiId,
+  type AlphaMetric,
+  type AlphaRequestJourneyFact,
+  type AlphaResultCountBucket,
+  type AlphaSearchLiquidityFact,
+  type AlphaSupplyFact,
+} from "./alpha-dashboard.js";
