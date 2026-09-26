@@ -236,12 +236,14 @@ export const alphaKpiCatalog: Readonly<Record<AlphaKpiId, AlphaKpiDefinition>> =
     ),
   });
 
-export function buildAlphaAnalyticsDashboard(input: Readonly<{
-  generated_at: string;
-  requests: readonly AlphaRequestJourneyFact[];
-  searches: readonly AlphaSearchLiquidityFact[];
-  supply: readonly AlphaSupplyFact[];
-}>): AlphaAnalyticsDashboard {
+export function buildAlphaAnalyticsDashboard(
+  input: Readonly<{
+    generated_at: string;
+    requests: readonly AlphaRequestJourneyFact[];
+    searches: readonly AlphaSearchLiquidityFact[];
+    supply: readonly AlphaSupplyFact[];
+  }>,
+): AlphaAnalyticsDashboard {
   assertTimestamp(input.generated_at, "generated_at");
   const requests = uniqueRealFacts(input.requests, "request_id");
   const searches = uniqueRealFacts(input.searches, "search_id");
@@ -251,7 +253,10 @@ export function buildAlphaAnalyticsDashboard(input: Readonly<{
   supply.forEach(assertSupplyFact);
 
   const submitted = requests.length;
-  const engaged = count(requests, (fact) => fact.first_engaged_at !== undefined);
+  const engaged = count(
+    requests,
+    (fact) => fact.first_engaged_at !== undefined,
+  );
   const quoted = count(requests, (fact) => fact.first_quote_at !== undefined);
   const confirmed = requests.filter(hasConfirmedJob);
   const completed = confirmed.filter((fact) => fact.completed_at !== undefined);
@@ -269,7 +274,11 @@ export function buildAlphaAnalyticsDashboard(input: Readonly<{
       ratio("requests_with_engagement_rate", engaged, submitted),
       ratio("requests_with_quote_rate", quoted, submitted),
       ratio("requests_confirmed_rate", confirmed.length, submitted),
-      ratio("confirmed_jobs_completed_rate", completed.length, confirmed.length),
+      ratio(
+        "confirmed_jobs_completed_rate",
+        completed.length,
+        confirmed.length,
+      ),
       ratio("completed_jobs_reviewed_rate", reviewed.length, completed.length),
     ]),
     supply: Object.freeze([
@@ -302,10 +311,8 @@ export function buildAlphaAnalyticsDashboard(input: Readonly<{
         requests,
         (fact) => durationHours(fact.submitted_at, fact.first_engaged_at),
       ),
-      medianDurationMetric(
-        "median_request_to_quote_hours",
-        requests,
-        (fact) => durationHours(fact.submitted_at, fact.first_quote_at),
+      medianDurationMetric("median_request_to_quote_hours", requests, (fact) =>
+        durationHours(fact.submitted_at, fact.first_quote_at),
       ),
       medianDurationMetric(
         "median_quote_to_confirmation_hours",
@@ -368,7 +375,13 @@ function countDefinition(
   description: string,
   formula: string,
 ): AlphaKpiDefinition {
-  return definition(dashboard, description, "Not applicable.", formula, "COUNT");
+  return definition(
+    dashboard,
+    description,
+    "Not applicable.",
+    formula,
+    "COUNT",
+  );
 }
 
 function rateDefinition(
@@ -428,16 +441,17 @@ for (const [id, value] of Object.entries(alphaKpiCatalog)) {
   (value as { id: AlphaKpiId }).id = id as AlphaKpiId;
 }
 
-function uniqueRealFacts<T extends { readonly traffic_class: AlphaAnalyticsTrafficClass }>(
-  facts: readonly T[],
-  key: keyof T,
-): T[] {
+function uniqueRealFacts<
+  T extends { readonly traffic_class: AlphaAnalyticsTrafficClass },
+>(facts: readonly T[], key: keyof T): T[] {
   const unique = new Map<string, T>();
   for (const fact of facts) {
     if (fact.traffic_class !== "REAL") continue;
     const value = fact[key];
     if (typeof value !== "string" || value.length === 0) {
-      throw new TypeError(`${String(key)} must be a non-empty opaque identifier`);
+      throw new TypeError(
+        `${String(key)} must be a non-empty opaque identifier`,
+      );
     }
     if (unique.has(value)) {
       throw new TypeError(`duplicate ${String(key)} analytics fact`);
@@ -449,11 +463,24 @@ function uniqueRealFacts<T extends { readonly traffic_class: AlphaAnalyticsTraff
 
 function assertRequestFact(fact: AlphaRequestJourneyFact): void {
   assertExactFactKeys(fact, [
-    "request_id", "traffic_class", "submitted_at", "profession_code",
-    "region_code", "first_engaged_at", "first_quote_at", "quote_count",
-    "job_id", "confirmed_at", "started_at", "completed_at", "reviewed_at",
-    "invitation_count", "completion_attempt_count", "change_order_count",
-    "dispute_count", "report_count",
+    "request_id",
+    "traffic_class",
+    "submitted_at",
+    "profession_code",
+    "region_code",
+    "first_engaged_at",
+    "first_quote_at",
+    "quote_count",
+    "job_id",
+    "confirmed_at",
+    "started_at",
+    "completed_at",
+    "reviewed_at",
+    "invitation_count",
+    "completion_attempt_count",
+    "change_order_count",
+    "dispute_count",
+    "report_count",
   ]);
   assertTimestamp(fact.submitted_at, "submitted_at");
   assertMachineCode(fact.profession_code, "profession_code");
@@ -467,17 +494,23 @@ function assertRequestFact(fact: AlphaRequestJourneyFact): void {
     fact.completed_at,
     fact.reviewed_at,
   ];
-  for (const value of sequence) if (value !== undefined) assertTimestamp(value, "journey timestamp");
+  for (const value of sequence)
+    if (value !== undefined) assertTimestamp(value, "journey timestamp");
   for (let index = 1; index < sequence.length; index += 1) {
     const current = sequence[index];
     if (current === undefined) continue;
-    const prior = sequence.slice(0, index).filter((value): value is string => value !== undefined).at(-1);
+    const prior = sequence
+      .slice(0, index)
+      .filter((value): value is string => value !== undefined)
+      .at(-1);
     if (prior !== undefined && Date.parse(current) < Date.parse(prior)) {
       throw new TypeError("request journey timestamps must be monotonic");
     }
   }
   if ((fact.job_id === undefined) !== (fact.confirmed_at === undefined)) {
-    throw new TypeError("confirmed request requires both job_id and confirmed_at");
+    throw new TypeError(
+      "confirmed request requires both job_id and confirmed_at",
+    );
   }
   if (fact.first_quote_at === undefined && fact.quote_count !== 0) {
     throw new TypeError("quote_count requires first_quote_at");
@@ -494,8 +527,14 @@ function assertRequestFact(fact: AlphaRequestJourneyFact): void {
 
 function assertSearchFact(fact: AlphaSearchLiquidityFact): void {
   assertExactFactKeys(fact, [
-    "search_id", "traffic_class", "occurred_at", "profession_code",
-    "region_code", "result_count_bucket", "profile_opened", "candidate_count",
+    "search_id",
+    "traffic_class",
+    "occurred_at",
+    "profession_code",
+    "region_code",
+    "result_count_bucket",
+    "profile_opened",
+    "candidate_count",
   ]);
   assertTimestamp(fact.occurred_at, "occurred_at");
   assertMachineCode(fact.profession_code, "profession_code");
@@ -508,8 +547,14 @@ function assertSearchFact(fact: AlphaSearchLiquidityFact): void {
 
 function assertSupplyFact(fact: AlphaSupplyFact): void {
   assertExactFactKeys(fact, [
-    "craftsman_profile_id", "traffic_class", "profession_code", "region_code",
-    "invitation_count", "engaged_count", "quote_count", "won_job_count",
+    "craftsman_profile_id",
+    "traffic_class",
+    "profession_code",
+    "region_code",
+    "invitation_count",
+    "engaged_count",
+    "quote_count",
+    "won_job_count",
     "completed_job_count",
   ]);
   assertMachineCode(fact.profession_code, "profession_code");
@@ -523,10 +568,7 @@ function assertSupplyFact(fact: AlphaSupplyFact): void {
   ]);
 }
 
-function assertExactFactKeys(
-  fact: object,
-  allowed: readonly string[],
-): void {
+function assertExactFactKeys(fact: object, allowed: readonly string[]): void {
   const allowedKeys = new Set(allowed);
   const unknown = Object.keys(fact).find((key) => !allowedKeys.has(key));
   if (unknown !== undefined) {
@@ -534,7 +576,10 @@ function assertExactFactKeys(
   }
 }
 
-function assertCounters<T extends object>(fact: T, keys: readonly (keyof T)[]): void {
+function assertCounters<T extends object>(
+  fact: T,
+  keys: readonly (keyof T)[],
+): void {
   for (const key of keys) assertCounter(fact[key], String(key));
 }
 
@@ -556,17 +601,26 @@ function assertMachineCode(value: string, name: string): void {
   }
 }
 
-function assertOptionalMachineCode(value: string | undefined, name: string): void {
+function assertOptionalMachineCode(
+  value: string | undefined,
+  name: string,
+): void {
   if (value !== undefined) assertMachineCode(value, name);
 }
 
 function hasConfirmedJob(
   fact: AlphaRequestJourneyFact,
-): fact is AlphaRequestJourneyFact & { readonly job_id: string; readonly confirmed_at: string } {
+): fact is AlphaRequestJourneyFact & {
+  readonly job_id: string;
+  readonly confirmed_at: string;
+} {
   return fact.job_id !== undefined && fact.confirmed_at !== undefined;
 }
 
-function count<T>(values: readonly T[], predicate: (value: T) => boolean): number {
+function count<T>(
+  values: readonly T[],
+  predicate: (value: T) => boolean,
+): number {
   return values.reduce((total, value) => total + (predicate(value) ? 1 : 0), 0);
 }
 
@@ -574,8 +628,17 @@ function sum<T>(values: readonly T[], select: (value: T) => number): number {
   return values.reduce((total, value) => total + select(value), 0);
 }
 
-function ratio(id: AlphaKpiId, numerator: number, denominator: number): AlphaMetric {
-  return metric(id, numerator, denominator, denominator === 0 ? null : numerator / denominator);
+function ratio(
+  id: AlphaKpiId,
+  numerator: number,
+  denominator: number,
+): AlphaMetric {
+  return metric(
+    id,
+    numerator,
+    denominator,
+    denominator === 0 ? null : numerator / denominator,
+  );
 }
 
 function metric(
@@ -587,7 +650,10 @@ function metric(
   return Object.freeze({ definition_id, denominator, numerator, value });
 }
 
-function durationHours(start: string | undefined, end: string | undefined): number | undefined {
+function durationHours(
+  start: string | undefined,
+  end: string | undefined,
+): number | undefined {
   if (start === undefined || end === undefined) return undefined;
   return (Date.parse(end) - Date.parse(start)) / 3_600_000;
 }

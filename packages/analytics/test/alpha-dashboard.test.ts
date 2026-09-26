@@ -81,7 +81,9 @@ describe("D28 alpha KPI catalog", () => {
     expect(metric(dashboard, "requests_confirmed_rate")?.value).toBe(0.5);
     expect(metric(dashboard, "confirmed_jobs_completed_rate")?.value).toBe(1);
     expect(metric(dashboard, "completed_jobs_reviewed_rate")?.value).toBe(1);
-    expect(metric(dashboard, "completion_attempts_per_completed_job")?.value).toBe(2);
+    expect(
+      metric(dashboard, "completion_attempts_per_completed_job")?.value,
+    ).toBe(2);
     expect(metric(dashboard, "change_order_job_rate")?.value).toBe(1);
   });
 
@@ -102,7 +104,9 @@ describe("D28 alpha KPI catalog", () => {
       numerator: 0,
       value: null,
     });
-    expect(metric(dashboard, "median_request_to_quote_hours")?.value).toBeNull();
+    expect(
+      metric(dashboard, "median_request_to_quote_hours")?.value,
+    ).toBeNull();
   });
 
   it("uses server-time medians and privacy-safe search/supply aggregates", () => {
@@ -152,7 +156,9 @@ describe("D28 alpha KPI catalog", () => {
       ],
     });
 
-    expect(metric(dashboard, "median_request_to_engagement_hours")?.value).toBe(4);
+    expect(metric(dashboard, "median_request_to_engagement_hours")?.value).toBe(
+      4,
+    );
     expect(metric(dashboard, "zero_result_search_rate")?.value).toBe(0.5);
     expect(metric(dashboard, "search_profile_open_rate")?.value).toBe(0.5);
     expect(metric(dashboard, "mean_candidates_per_search")?.value).toBe(3.5);
