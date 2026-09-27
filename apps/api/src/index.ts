@@ -1,5 +1,10 @@
 export { buildApi } from "./app.js";
 export {
+  ADMIN_ALPHA_ANALYTICS_PATH,
+  registerAdminAnalyticsRoutes,
+} from "./admin-analytics/index.js";
+export type { AdminAnalyticsRouteDependencies } from "./admin-analytics/index.js";
+export {
   PUBLIC_CRAFTSMAN_PROFILE_PATH,
   registerPublicCraftsmanProfileRoutes,
 } from "./public-craftsman-profile/routes.js";

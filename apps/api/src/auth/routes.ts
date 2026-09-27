@@ -26,6 +26,10 @@ import {
   type AdminAuthRouteDependencies,
 } from "../admin-auth/index.js";
 import {
+  registerAdminAnalyticsRoutes,
+  type AdminAnalyticsRouteDependencies,
+} from "../admin-analytics/index.js";
+import {
   registerCustomerShortlistRoutes,
   type CustomerShortlistRouteDependencies,
 } from "../customer-shortlist/routes.js";
@@ -230,6 +234,7 @@ import type {
 
 export interface AuthModuleDependencies {
   readonly adminAccess?: Pick<AdminAuthRouteDependencies, "service">;
+  readonly adminAnalytics?: Pick<AdminAnalyticsRouteDependencies, "analytics">;
   readonly clock?: () => Date;
   readonly config: AuthRuntimeConfig;
   readonly customerShortlist?: Pick<
@@ -955,6 +960,13 @@ async function configureAuthModule(
       persistence: dependencies.persistence,
       service: dependencies.adminAccess.service,
     });
+    if (dependencies.adminAnalytics !== undefined) {
+      registerAdminAnalyticsRoutes(app, {
+        analytics: dependencies.adminAnalytics.analytics,
+        guard,
+        service: dependencies.adminAccess.service,
+      });
+    }
     if (dependencies.adminJobCompletion !== undefined) {
       registerAdminJobCompletionRoutes(app, {
         adminAccess: dependencies.adminAccess.service,

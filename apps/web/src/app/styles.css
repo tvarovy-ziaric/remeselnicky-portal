@@ -822,6 +822,70 @@ p {
   font-weight: 800;
 }
 
+.admin-analytics {
+  width: min(100%, 76rem);
+}
+
+.admin-analytics-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+
+.admin-analytics-header > p {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+  color: #29372e;
+  text-align: right;
+}
+
+.admin-analytics-header small,
+.admin-metric-grid small,
+.admin-analytics-note {
+  color: #55705f;
+}
+
+.admin-analytics-group {
+  margin-top: 2rem;
+}
+
+.admin-analytics-group h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+}
+
+.admin-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.75rem;
+}
+
+.admin-metric-grid article {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1rem;
+  border: 1px solid #d8d4c8;
+  border-radius: 0.75rem;
+  background: #f8f7f2;
+}
+
+.admin-metric-grid strong {
+  color: #234d31;
+  font-size: 1.55rem;
+}
+
+.admin-metric-grid span {
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.admin-analytics-note {
+  margin: 2rem 0 0;
+  font-size: 0.875rem;
+}
+
 .admin-operations {
   width: min(100%, 76rem);
 }

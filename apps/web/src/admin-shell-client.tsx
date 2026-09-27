@@ -12,6 +12,7 @@ import {
 } from "./admin-shell-model";
 import { AdminDisputeWorkspace, AdminJobOperations } from "./admin-operations";
 import { AdminModerationWorkspace } from "./admin-moderation";
+import { AdminAnalyticsDashboard } from "./admin-analytics-dashboard";
 
 export type AdminShellState =
   | { readonly status: "LOADING" }
@@ -97,6 +98,8 @@ export function AdminShellClient({
             <AdminJobOperations />
           ) : selected.id === "reports" ? (
             <AdminModerationWorkspace />
+          ) : selected.id === "dashboard" ? (
+            <AdminAnalyticsDashboard />
           ) : (
             <AdminModulePlaceholder module={selected} />
           )}
