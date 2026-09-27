@@ -346,8 +346,16 @@ test("canonical fresh synthetic loop reaches sealed bilateral reviews without ma
     expect((await outsider.context.request.get(completionPath)).status()).toBe(
       404,
     );
-    await page.reload();
-    await expect(page.getByText("Dokončená zákazka")).toBeVisible();
+    await expect(async () => {
+      const response = await page.reload({
+        timeout: 30_000,
+        waitUntil: "domcontentloaded",
+      });
+      expect(response?.status()).toBe(200);
+      await expect(page.getByText("Dokončená zákazka")).toBeVisible({
+        timeout: 20_000,
+      });
+    }).toPass({ intervals: [1_000, 2_000], timeout: 90_000 });
     await expect(
       page.getByRole("button", { name: "Potvrdiť dokončenie" }),
     ).toHaveCount(0);

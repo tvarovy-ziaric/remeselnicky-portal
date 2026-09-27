@@ -33,6 +33,7 @@ $env:STAGING_E2E_QUOTE_B_ID = $fixture.quoteB
 $env:STAGING_E2E_PROVIDER_A_CANARY = $fixture.canaryA
 $env:STAGING_E2E_PROVIDER_B_CANARY = $fixture.canaryB
 $env:STAGING_E2E_CUSTOMER_AUTH_STATE = Join-Path $repo '.alpha/r3-e2e-auth-101.json'
+$env:STAGING_E2E_CUSTOMER_A_AUTH_STATE = $env:STAGING_E2E_CUSTOMER_AUTH_STATE
 $env:STAGING_E2E_CUSTOMER_B_AUTH_STATE = Join-Path $repo '.alpha/r3-e2e-auth-104.json'
 $env:STAGING_E2E_PROVIDER_A_AUTH_STATE = Join-Path $repo '.alpha/r3-e2e-auth-102.json'
 $env:STAGING_E2E_PROVIDER_B_AUTH_STATE = Join-Path $repo '.alpha/r3-e2e-auth-103.json'

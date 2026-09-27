@@ -3,6 +3,7 @@ name: remeselnicky-alpha
 x-app-environment: &app-environment
   APP_ENV: staging
   APP_ORIGIN: https://${ALPHA_APP_HOSTNAME:?Set ALPHA_APP_HOSTNAME in .env.alpha}
+  AUTH_RATE_LIMIT_MAX: ${AUTH_RATE_LIMIT_MAX:-10}
   NODE_EXTRA_CA_CERTS: /run/alpha-tls/ca.crt
   OBJECT_STORAGE_ACCESS_KEY_ID_FILE: /run/secrets/minio_access_key
   OBJECT_STORAGE_ENDPOINT: https://minio:9000
