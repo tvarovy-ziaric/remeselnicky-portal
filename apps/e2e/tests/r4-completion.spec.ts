@@ -13,7 +13,7 @@ test.skip(
   "Synthetic public Alpha is not provisioned",
 );
 
-test("fresh synthetic Job preserves customer proposals and bilateral handover history", async ({
+test("canonical fresh synthetic loop reaches sealed bilateral reviews without manual DB intervention", async ({
   browser,
   browserName,
 }) => {
@@ -191,6 +191,114 @@ test("fresh synthetic Job preserves customer proposals and bilateral handover hi
     const finished = await get(customer, jobPath);
     expect(finished.state).toBe("COMPLETED");
     expect(agreement(finished)).toEqual(original);
+
+    const mainReviewPath = `${jobPath}/reviews/main`;
+    expect((await outsider.context.request.get(mainReviewPath)).status()).toBe(
+      404,
+    );
+    const customerOpportunity = await get(customer, mainReviewPath);
+    expect(customerOpportunity).toMatchObject({
+      direction: "CUSTOMER_TO_PROVIDER",
+      state: "OPEN",
+      ownReview: null,
+      counterpartyReview: null,
+    });
+    const reviewedProviderProfileId = requiredString(
+      customerOpportunity.targetProfileId,
+    );
+    const customerReviewCommandId = randomUUID();
+    const customerReview = await checked(
+      await post(customer, mainReviewPath, {
+        commandId: customerReviewCommandId,
+        expectedVersion: 0,
+        ratings: {
+          work_quality: 5,
+          price_adherence: 5,
+          schedule_adherence: 4,
+          communication: 5,
+          cleanliness: 5,
+          problem_solving: 4,
+          would_hire_again: 5,
+        },
+        comment: "Syntetická zákazka bola riadne dokončená.",
+      }),
+      201,
+    );
+    expect(customerReview).toMatchObject({
+      direction: "CUSTOMER_TO_PROVIDER",
+      revisionId: customerReviewCommandId,
+      version: 1,
+    });
+    const sealed = await get(customer, mainReviewPath);
+    expect(sealed).toMatchObject({
+      state: "SUBMITTED_SEALED",
+      counterpartyReview: null,
+      ownReview: { revisionId: customerReviewCommandId, version: 1 },
+    });
+
+    const providerOpportunity = await get(provider, mainReviewPath);
+    expect(providerOpportunity).toMatchObject({
+      direction: "PROVIDER_TO_CUSTOMER",
+      state: "OPEN",
+      ownReview: null,
+      counterpartyReview: null,
+    });
+    const providerReviewCommandId = randomUUID();
+    const providerReview = await checked(
+      await post(provider, mainReviewPath, {
+        commandId: providerReviewCommandId,
+        expectedVersion: 0,
+        ratings: {
+          agreement_payment_experience: 5,
+          site_readiness: 4,
+          brief_clarity: 5,
+          communication: 5,
+          unplanned_changes: 4,
+          fairness: 5,
+        },
+        comment: "Syntetická spolupráca prebehla korektne.",
+      }),
+      201,
+    );
+    expect(providerReview).toMatchObject({
+      direction: "PROVIDER_TO_CUSTOMER",
+      revisionId: providerReviewCommandId,
+      version: 1,
+    });
+    const unlockedCustomerReview = await get(customer, mainReviewPath);
+    expect(unlockedCustomerReview).toMatchObject({
+      state: "UNLOCKED",
+      counterpartyReview: {
+        direction: "PROVIDER_TO_CUSTOMER",
+        revisionId: providerReviewCommandId,
+      },
+      ownReview: { revisionId: customerReviewCommandId, version: 1 },
+    });
+    const unlockedProviderReview = await get(provider, mainReviewPath);
+    expect(unlockedProviderReview).toMatchObject({
+      state: "UNLOCKED",
+      counterpartyReview: {
+        direction: "CUSTOMER_TO_PROVIDER",
+        revisionId: customerReviewCommandId,
+      },
+      ownReview: { revisionId: providerReviewCommandId, version: 1 },
+    });
+    const publicReviews = await get(
+      customer,
+      `/v1/public/craftsmen/${reviewedProviderProfileId}/reviews?limit=20`,
+    );
+    expect(publicReviews.reviews).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          reviewId: customerReviewCommandId,
+          comment: "Syntetická zákazka bola riadne dokončená.",
+        }),
+      ]),
+    );
+    expect(JSON.stringify(publicReviews)).not.toMatch(
+      /customerId|jobId|reviewerName/iu,
+    );
+
     expect(
       (
         await post(customer, `${jobPath}/change-orders`, {
