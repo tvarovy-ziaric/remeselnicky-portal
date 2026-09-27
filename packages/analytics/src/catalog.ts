@@ -38,8 +38,42 @@ export const analyticsEventNames = [
   "quote_comparison_pdf_opened",
   "quote_accepted",
   "job_confirmed",
+  "job_started",
+  "job_participant_invited",
+  "job_participant_joined",
+  "job_participant_left",
+  "job_progress_update_created",
+  "job_issue_created",
+  "job_milestone_created",
+  "job_milestone_state_changed",
+  "change_order_proposed",
+  "change_order_revised",
+  "change_order_approved",
+  "change_order_rejected",
+  "change_order_withdrawn",
+  "job_completion_requested",
+  "job_completion_request_viewed",
+  "job_completion_accepted",
+  "job_completion_rejected",
   "job_completed",
+  "review_opportunity_opened",
   "review_submitted",
+  "review_opportunity_expired",
+  "review_pair_completed",
+  "participant_review_submitted",
+  "workgroup_review_submitted",
+  "supervisor_evaluation_submitted",
+  "review_response_created",
+  "review_report_created",
+  "dispute_opened",
+  "dispute_closed",
+  "report_created",
+  "moderation_action_applied",
+  "notification_created",
+  "notification_delivery_succeeded",
+  "notification_delivery_failed",
+  "notification_in_app_read",
+  "notification_deep_link_opened",
 ] as const;
 
 export type AnalyticsEventName = (typeof analyticsEventNames)[number];
@@ -61,6 +95,7 @@ export type AnalyticsPropertyKind =
   | "INVITATION_WITHDRAWAL_SOURCE"
   | "LOCATION_AREA_GRANULARITY"
   | "LOCATION_SCOPE"
+  | "MACHINE_CODE"
   | "MESSAGE_COUNT_BUCKET"
   | "MATERIAL_REVISION_COUNT_BUCKET"
   | "PHOTO_COUNT_BUCKET"
@@ -399,15 +434,185 @@ export const analyticsEventCatalog = Object.freeze({
     "After the atomic Quote acceptance and Job creation transaction commits.",
     { job_id: "UUID", job_request_id: "UUID", quote_id: "UUID" },
   ),
+  job_started: definition(
+    "A confirmed Job entered actual execution.",
+    "After the authoritative Job start transition commits.",
+    { job_id: "UUID" },
+  ),
+  job_participant_invited: definition(
+    "A verified Job participant invitation was created.",
+    "After the participant invitation transaction commits.",
+    { job_id: "UUID", participant_id: "UUID", role_code: "MACHINE_CODE" },
+  ),
+  job_participant_joined: definition(
+    "An invited participant joined the Job.",
+    "After the participant join transition commits.",
+    { job_id: "UUID", participant_id: "UUID", role_code: "MACHINE_CODE" },
+  ),
+  job_participant_left: definition(
+    "A participant left or was removed from the Job.",
+    "After the history-preserving leave transition commits.",
+    { job_id: "UUID", participant_id: "UUID", role_code: "MACHINE_CODE" },
+  ),
+  job_progress_update_created: definition(
+    "A bounded Job progress update was created.",
+    "After the progress update commits; message text and media metadata are excluded.",
+    { job_id: "UUID", progress_state: "MACHINE_CODE" },
+  ),
+  job_issue_created: definition(
+    "A Job issue marker was created.",
+    "After the issue commits; explanatory text is excluded.",
+    { issue_category: "MACHINE_CODE", job_id: "UUID" },
+  ),
+  job_milestone_created: definition(
+    "A Job milestone was created.",
+    "After milestone creation commits; title and notes are excluded.",
+    { job_id: "UUID", milestone_id: "UUID" },
+  ),
+  job_milestone_state_changed: definition(
+    "A Job milestone entered a new governed state.",
+    "After the authoritative milestone transition commits.",
+    { job_id: "UUID", milestone_id: "UUID", milestone_state: "MACHINE_CODE" },
+  ),
+  change_order_proposed: changeOrderDefinition("was proposed", "PROPOSED"),
+  change_order_revised: changeOrderDefinition(
+    "received a revised proposal",
+    "REVISED",
+  ),
+  change_order_approved: changeOrderDefinition("was approved", "APPROVED"),
+  change_order_rejected: changeOrderDefinition("was rejected", "REJECTED"),
+  change_order_withdrawn: changeOrderDefinition("was withdrawn", "WITHDRAWN"),
+  job_completion_requested: definition(
+    "Completion was requested for a Job.",
+    "After a completion-attempt request commits.",
+    { completion_attempt_id: "UUID", job_id: "UUID" },
+  ),
+  job_completion_request_viewed: definition(
+    "A customer actually viewed a completion request.",
+    "After an authorized visible-client observation is committed.",
+    { completion_attempt_id: "UUID", job_id: "UUID" },
+    "CLIENT_UX",
+  ),
+  job_completion_accepted: definition(
+    "A completion request was accepted.",
+    "After the authoritative customer/admin acceptance commits.",
+    {
+      completion_attempt_id: "UUID",
+      decision_source: "MACHINE_CODE",
+      job_id: "UUID",
+    },
+  ),
+  job_completion_rejected: definition(
+    "A completion request was rejected with a governed category.",
+    "After rejection commits; objection text is excluded.",
+    {
+      completion_attempt_id: "UUID",
+      job_id: "UUID",
+      rejection_category: "MACHINE_CODE",
+    },
+  ),
   job_completed: definition(
     "A Job reached its final COMPLETED state.",
     "After the completion transaction commits.",
     { job_id: "UUID" },
   ),
+  review_opportunity_opened: definition(
+    "A verified completed-Job review opportunity opened.",
+    "After the authoritative opportunity is created or unlocked.",
+    { job_id: "UUID", review_source: "MACHINE_CODE" },
+  ),
   review_submitted: definition(
     "An eligible verified-Job review was submitted.",
     "After the review submission transaction commits.",
     { job_id: "UUID", review_id: "UUID" },
+  ),
+  review_opportunity_expired: definition(
+    "A review opportunity expired without submission.",
+    "After the server closes the review window.",
+    { job_id: "UUID", review_source: "MACHINE_CODE" },
+  ),
+  review_pair_completed: definition(
+    "Both bilateral main-review sides submitted for a completed Job.",
+    "After the second authoritative main review commits.",
+    { job_id: "UUID" },
+  ),
+  participant_review_submitted: definition(
+    "An optional verified participant review was submitted.",
+    "After the Job-context participant review transaction commits.",
+    { job_id: "UUID", participant_id: "UUID", review_id: "UUID" },
+  ),
+  workgroup_review_submitted: definition(
+    "An optional historical workgroup review was submitted.",
+    "After the Job-context workgroup review transaction commits.",
+    { job_id: "UUID", review_id: "UUID", workgroup_id: "UUID" },
+  ),
+  supervisor_evaluation_submitted: definition(
+    "A verified supervisor evaluation was submitted.",
+    "After the non-bilateral evaluation transaction commits.",
+    { evaluation_id: "UUID", job_id: "UUID", participant_id: "UUID" },
+  ),
+  review_response_created: definition(
+    "A rated profile owner created a public review response.",
+    "After the response transaction commits; response text is excluded.",
+    { job_id: "UUID", review_id: "UUID" },
+  ),
+  review_report_created: definition(
+    "A review-context moderation report was created.",
+    "After the independent report transaction commits; report text is excluded.",
+    {
+      job_id: "UUID",
+      reason_code: "MACHINE_CODE",
+      target_type: "MACHINE_CODE",
+    },
+  ),
+  dispute_opened: definition(
+    "A private Job dispute case was opened.",
+    "After the dispute transaction commits; statements and evidence are excluded.",
+    { dispute_id: "UUID", job_id: "UUID", reason_code: "MACHINE_CODE" },
+  ),
+  dispute_closed: definition(
+    "A private Job dispute case reached a terminal outcome.",
+    "After the authoritative terminal transition commits.",
+    { dispute_id: "UUID", job_id: "UUID", outcome_code: "MACHINE_CODE" },
+  ),
+  report_created: definition(
+    "A governed moderation report was created.",
+    "After report creation commits; narrative and evidence are excluded.",
+    {
+      reason_code: "MACHINE_CODE",
+      report_id: "UUID",
+      target_type: "MACHINE_CODE",
+    },
+  ),
+  moderation_action_applied: definition(
+    "A history-preserving moderation action was applied.",
+    "After the privileged action transaction commits.",
+    {
+      action_code: "MACHINE_CODE",
+      reason_code: "MACHINE_CODE",
+      target_type: "MACHINE_CODE",
+    },
+  ),
+  notification_created: notificationDefinition(
+    "A canonical notification was created.",
+    "After canonical notification fanout commits.",
+  ),
+  notification_delivery_succeeded: notificationDefinition(
+    "A notification delivery succeeded.",
+    "After the provider delivery receipt is committed.",
+  ),
+  notification_delivery_failed: notificationDefinition(
+    "A notification delivery failed terminally.",
+    "After the terminal delivery failure receipt is committed.",
+  ),
+  notification_in_app_read: notificationDefinition(
+    "A user marked an in-app notification as read.",
+    "After the authenticated read command commits; this is not business acceptance.",
+  ),
+  notification_deep_link_opened: notificationDefinition(
+    "A user opened a notification deep link.",
+    "After an authorized explicit navigation observation; this is not business acceptance.",
+    "CLIENT_UX",
   ),
 } satisfies Readonly<Record<AnalyticsEventName, AnalyticsEventDefinition>>);
 
@@ -584,11 +789,90 @@ export type AnalyticsPropertiesByName = {
     job_request_id: string;
     quote_id: string;
   }>;
+  readonly job_started: AnalyticsJobIdentity;
+  readonly job_participant_invited: AnalyticsParticipantIdentity;
+  readonly job_participant_joined: AnalyticsParticipantIdentity;
+  readonly job_participant_left: AnalyticsParticipantIdentity;
+  readonly job_progress_update_created: Readonly<
+    AnalyticsJobIdentity & { progress_state: string }
+  >;
+  readonly job_issue_created: Readonly<
+    AnalyticsJobIdentity & { issue_category: string }
+  >;
+  readonly job_milestone_created: AnalyticsMilestoneIdentity;
+  readonly job_milestone_state_changed: Readonly<
+    AnalyticsMilestoneIdentity & { milestone_state: string }
+  >;
+  readonly change_order_proposed: AnalyticsChangeOrderIdentity;
+  readonly change_order_revised: AnalyticsChangeOrderIdentity;
+  readonly change_order_approved: AnalyticsChangeOrderIdentity;
+  readonly change_order_rejected: AnalyticsChangeOrderIdentity;
+  readonly change_order_withdrawn: AnalyticsChangeOrderIdentity;
+  readonly job_completion_requested: AnalyticsCompletionIdentity;
+  readonly job_completion_request_viewed: AnalyticsCompletionIdentity;
+  readonly job_completion_accepted: Readonly<
+    AnalyticsCompletionIdentity & { decision_source: string }
+  >;
+  readonly job_completion_rejected: Readonly<
+    AnalyticsCompletionIdentity & { rejection_category: string }
+  >;
   readonly job_completed: Readonly<{ job_id: string }>;
+  readonly review_opportunity_opened: Readonly<
+    AnalyticsJobIdentity & { review_source: string }
+  >;
   readonly review_submitted: Readonly<{
     job_id: string;
     review_id: string;
   }>;
+  readonly review_opportunity_expired: Readonly<
+    AnalyticsJobIdentity & { review_source: string }
+  >;
+  readonly review_pair_completed: AnalyticsJobIdentity;
+  readonly participant_review_submitted: Readonly<{
+    job_id: string;
+    participant_id: string;
+    review_id: string;
+  }>;
+  readonly workgroup_review_submitted: Readonly<{
+    job_id: string;
+    review_id: string;
+    workgroup_id: string;
+  }>;
+  readonly supervisor_evaluation_submitted: Readonly<{
+    evaluation_id: string;
+    job_id: string;
+    participant_id: string;
+  }>;
+  readonly review_response_created: Readonly<{
+    job_id: string;
+    review_id: string;
+  }>;
+  readonly review_report_created: AnalyticsReportContext;
+  readonly dispute_opened: Readonly<{
+    dispute_id: string;
+    job_id: string;
+    reason_code: string;
+  }>;
+  readonly dispute_closed: Readonly<{
+    dispute_id: string;
+    job_id: string;
+    outcome_code: string;
+  }>;
+  readonly report_created: Readonly<{
+    reason_code: string;
+    report_id: string;
+    target_type: string;
+  }>;
+  readonly moderation_action_applied: Readonly<{
+    action_code: string;
+    reason_code: string;
+    target_type: string;
+  }>;
+  readonly notification_created: AnalyticsNotificationIdentity;
+  readonly notification_delivery_succeeded: AnalyticsNotificationIdentity;
+  readonly notification_delivery_failed: AnalyticsNotificationIdentity;
+  readonly notification_in_app_read: AnalyticsNotificationIdentity;
+  readonly notification_deep_link_opened: AnalyticsNotificationIdentity;
 };
 
 export type AnalyticsResultCountBucket = "ZERO" | "ONE_TO_FOUR" | "FIVE_PLUS";
@@ -633,6 +917,38 @@ type AnalyticsQuoteIdentity = Readonly<{
   quote_id: string;
   quote_revision: number;
 }>;
+type AnalyticsJobIdentity = Readonly<{ job_id: string }>;
+type AnalyticsParticipantIdentity = Readonly<{
+  job_id: string;
+  participant_id: string;
+  role_code: string;
+}>;
+type AnalyticsMilestoneIdentity = Readonly<{
+  job_id: string;
+  milestone_id: string;
+}>;
+type AnalyticsChangeOrderIdentity = Readonly<{
+  change_order_id: string;
+  changed_material: boolean;
+  changed_price: boolean;
+  changed_schedule: boolean;
+  changed_scope: boolean;
+  job_id: string;
+}>;
+type AnalyticsCompletionIdentity = Readonly<{
+  completion_attempt_id: string;
+  job_id: string;
+}>;
+type AnalyticsReportContext = Readonly<{
+  job_id: string;
+  reason_code: string;
+  target_type: string;
+}>;
+type AnalyticsNotificationIdentity = Readonly<{
+  channel: string;
+  notification_id: string;
+  notification_type: string;
+}>;
 
 function definition(
   description: string,
@@ -671,6 +987,41 @@ function quoteTerminalDefinition(
     `A submitted Quote revision was ${description}.`,
     `After the authoritative ${state} state effect commits.`,
     { ...quoteIdentityProperties(), ...extra },
+  );
+}
+
+function changeOrderDefinition(
+  description: string,
+  state: string,
+): Readonly<AnalyticsEventDefinition> {
+  return definition(
+    `A Change order ${description}.`,
+    `After the authoritative ${state} Change-order effect commits.`,
+    {
+      change_order_id: "UUID",
+      changed_material: "BOOLEAN",
+      changed_price: "BOOLEAN",
+      changed_schedule: "BOOLEAN",
+      changed_scope: "BOOLEAN",
+      job_id: "UUID",
+    },
+  );
+}
+
+function notificationDefinition(
+  description: string,
+  trigger: string,
+  source: AnalyticsEventDefinition["source"] = "SERVER_DOMAIN",
+): Readonly<AnalyticsEventDefinition> {
+  return definition(
+    description,
+    trigger,
+    {
+      channel: "MACHINE_CODE",
+      notification_id: "UUID",
+      notification_type: "MACHINE_CODE",
+    },
+    source,
   );
 }
 

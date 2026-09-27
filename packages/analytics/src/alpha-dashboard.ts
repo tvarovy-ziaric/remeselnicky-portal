@@ -83,6 +83,11 @@ export type AlphaKpiId =
   | "median_quote_to_confirmation_hours"
   | "median_confirmation_to_start_hours"
   | "median_start_to_completion_hours"
+  | "p90_request_to_engagement_hours"
+  | "p90_request_to_quote_hours"
+  | "p90_quote_to_confirmation_hours"
+  | "p90_confirmation_to_start_hours"
+  | "p90_start_to_completion_hours"
   | "completion_attempts_per_completed_job"
   | "change_order_job_rate"
   | "dispute_job_rate"
@@ -107,134 +112,168 @@ export interface AlphaAnalyticsDashboard {
   readonly review: readonly AlphaMetric[];
 }
 
+const alphaKpiDefinitions = {
+  requests_submitted: countDefinition(
+    "CORE_FUNNEL",
+    "Unique submitted JobRequests in the reporting cohort.",
+    "Count distinct request_id.",
+  ),
+  requests_with_engagement_rate: rateDefinition(
+    "CORE_FUNNEL",
+    "Submitted requests reaching at least one ENGAGED invitation.",
+    "Unique submitted JobRequests.",
+    "Requests with first_engaged_at / submitted requests.",
+  ),
+  requests_with_quote_rate: rateDefinition(
+    "CORE_FUNNEL",
+    "Submitted requests receiving at least one submitted Quote.",
+    "Unique submitted JobRequests.",
+    "Requests with first_quote_at / submitted requests.",
+  ),
+  requests_confirmed_rate: rateDefinition(
+    "CORE_FUNNEL",
+    "Submitted requests producing one confirmed Job.",
+    "Unique submitted JobRequests.",
+    "Requests with confirmed_at and job_id / submitted requests.",
+  ),
+  confirmed_jobs_completed_rate: rateDefinition(
+    "CORE_FUNNEL",
+    "Confirmed Jobs reaching authoritative completion.",
+    "Unique confirmed job_id.",
+    "Unique completed job_id / unique confirmed job_id.",
+  ),
+  completed_jobs_reviewed_rate: rateDefinition(
+    "CORE_FUNNEL",
+    "Completed Jobs receiving at least one verified main review.",
+    "Unique completed job_id.",
+    "Unique reviewed completed job_id / unique completed job_id.",
+  ),
+  public_approved_craftsmen: countDefinition(
+    "SUPPLY",
+    "Unique public and approved CraftsmanProfiles in the snapshot.",
+    "Count distinct craftsman_profile_id.",
+  ),
+  invitation_response_rate: rateDefinition(
+    "SUPPLY",
+    "ENGAGED provider responses among sent invitations.",
+    "Sent invitations in the reporting cohort.",
+    "Engaged invitations / sent invitations.",
+  ),
+  quotes_per_engaged_provider: rateDefinition(
+    "SUPPLY",
+    "Submitted Quotes per provider engagement.",
+    "Engaged provider responses.",
+    "Submitted Quotes / engaged responses.",
+  ),
+  wins_per_quote: rateDefinition(
+    "SUPPLY",
+    "Won Jobs among submitted Quotes.",
+    "Submitted Quotes.",
+    "Won Jobs / submitted Quotes.",
+  ),
+  searches: countDefinition(
+    "SEARCH_LIQUIDITY",
+    "Unique completed authoritative searches.",
+    "Count distinct search_id.",
+  ),
+  zero_result_search_rate: rateDefinition(
+    "SEARCH_LIQUIDITY",
+    "Searches with no eligible result.",
+    "Unique completed searches.",
+    "ZERO result searches / completed searches.",
+  ),
+  search_profile_open_rate: rateDefinition(
+    "SEARCH_LIQUIDITY",
+    "Searches producing at least one actual result-profile open.",
+    "Unique completed searches.",
+    "Searches with profile_opened / completed searches.",
+  ),
+  mean_candidates_per_search: rateDefinition(
+    "SEARCH_LIQUIDITY",
+    "Mean privacy-safe candidate count per completed search.",
+    "Unique completed searches.",
+    "Sum candidate_count / completed searches.",
+  ),
+  median_request_to_engagement_hours: hoursDefinition(
+    "Request submission to first ENGAGED provider.",
+    "Requests with first_engaged_at.",
+  ),
+  median_request_to_quote_hours: hoursDefinition(
+    "Request submission to first submitted Quote.",
+    "Requests with first_quote_at.",
+  ),
+  median_quote_to_confirmation_hours: hoursDefinition(
+    "First submitted Quote to Job confirmation.",
+    "Confirmed requests with first_quote_at.",
+  ),
+  median_confirmation_to_start_hours: hoursDefinition(
+    "Job confirmation to actual start.",
+    "Jobs with started_at.",
+  ),
+  median_start_to_completion_hours: hoursDefinition(
+    "Actual Job start to authoritative completion.",
+    "Completed Jobs with started_at.",
+  ),
+  p90_request_to_engagement_hours: hoursDefinition(
+    "90th percentile from request submission to first ENGAGED provider.",
+    "Requests with first_engaged_at.",
+    "90th percentile",
+  ),
+  p90_request_to_quote_hours: hoursDefinition(
+    "90th percentile from request submission to first submitted Quote.",
+    "Requests with first_quote_at.",
+    "90th percentile",
+  ),
+  p90_quote_to_confirmation_hours: hoursDefinition(
+    "90th percentile from first submitted Quote to Job confirmation.",
+    "Confirmed requests with first_quote_at.",
+    "90th percentile",
+  ),
+  p90_confirmation_to_start_hours: hoursDefinition(
+    "90th percentile from Job confirmation to actual start.",
+    "Jobs with started_at.",
+    "90th percentile",
+  ),
+  p90_start_to_completion_hours: hoursDefinition(
+    "90th percentile from actual Job start to authoritative completion.",
+    "Completed Jobs with started_at.",
+    "90th percentile",
+  ),
+  completion_attempts_per_completed_job: rateDefinition(
+    "QUALITY_PROCESS",
+    "Completion attempts per completed Job; descriptive only.",
+    "Unique completed Jobs.",
+    "Completion attempts / completed Jobs.",
+  ),
+  change_order_job_rate: jobProcessRate(
+    "Jobs with at least one Change order.",
+    "Confirmed Jobs with change_order_count > 0 / confirmed Jobs.",
+  ),
+  dispute_job_rate: jobProcessRate(
+    "Jobs with at least one dispute; never a ranking signal.",
+    "Confirmed Jobs with dispute_count > 0 / confirmed Jobs.",
+  ),
+  report_job_rate: jobProcessRate(
+    "Jobs with at least one report; never a ranking signal.",
+    "Confirmed Jobs with report_count > 0 / confirmed Jobs.",
+  ),
+  completion_to_review_rate: rateDefinition(
+    "REVIEW",
+    "Completed Jobs receiving at least one verified main review.",
+    "Unique completed Jobs.",
+    "Reviewed completed Jobs / completed Jobs.",
+  ),
+} satisfies Record<AlphaKpiId, Omit<AlphaKpiDefinition, "id">>;
+
 export const alphaKpiCatalog: Readonly<Record<AlphaKpiId, AlphaKpiDefinition>> =
-  Object.freeze({
-    requests_submitted: countDefinition(
-      "CORE_FUNNEL",
-      "Unique submitted JobRequests in the reporting cohort.",
-      "Count distinct request_id.",
-    ),
-    requests_with_engagement_rate: rateDefinition(
-      "CORE_FUNNEL",
-      "Submitted requests reaching at least one ENGAGED invitation.",
-      "Unique submitted JobRequests.",
-      "Requests with first_engaged_at / submitted requests.",
-    ),
-    requests_with_quote_rate: rateDefinition(
-      "CORE_FUNNEL",
-      "Submitted requests receiving at least one submitted Quote.",
-      "Unique submitted JobRequests.",
-      "Requests with first_quote_at / submitted requests.",
-    ),
-    requests_confirmed_rate: rateDefinition(
-      "CORE_FUNNEL",
-      "Submitted requests producing one confirmed Job.",
-      "Unique submitted JobRequests.",
-      "Requests with confirmed_at and job_id / submitted requests.",
-    ),
-    confirmed_jobs_completed_rate: rateDefinition(
-      "CORE_FUNNEL",
-      "Confirmed Jobs reaching authoritative completion.",
-      "Unique confirmed job_id.",
-      "Unique completed job_id / unique confirmed job_id.",
-    ),
-    completed_jobs_reviewed_rate: rateDefinition(
-      "CORE_FUNNEL",
-      "Completed Jobs receiving at least one verified main review.",
-      "Unique completed job_id.",
-      "Unique reviewed completed job_id / unique completed job_id.",
-    ),
-    public_approved_craftsmen: countDefinition(
-      "SUPPLY",
-      "Unique public and approved CraftsmanProfiles in the snapshot.",
-      "Count distinct craftsman_profile_id.",
-    ),
-    invitation_response_rate: rateDefinition(
-      "SUPPLY",
-      "ENGAGED provider responses among sent invitations.",
-      "Sent invitations in the reporting cohort.",
-      "Engaged invitations / sent invitations.",
-    ),
-    quotes_per_engaged_provider: rateDefinition(
-      "SUPPLY",
-      "Submitted Quotes per provider engagement.",
-      "Engaged provider responses.",
-      "Submitted Quotes / engaged responses.",
-    ),
-    wins_per_quote: rateDefinition(
-      "SUPPLY",
-      "Won Jobs among submitted Quotes.",
-      "Submitted Quotes.",
-      "Won Jobs / submitted Quotes.",
-    ),
-    searches: countDefinition(
-      "SEARCH_LIQUIDITY",
-      "Unique completed authoritative searches.",
-      "Count distinct search_id.",
-    ),
-    zero_result_search_rate: rateDefinition(
-      "SEARCH_LIQUIDITY",
-      "Searches with no eligible result.",
-      "Unique completed searches.",
-      "ZERO result searches / completed searches.",
-    ),
-    search_profile_open_rate: rateDefinition(
-      "SEARCH_LIQUIDITY",
-      "Searches producing at least one actual result-profile open.",
-      "Unique completed searches.",
-      "Searches with profile_opened / completed searches.",
-    ),
-    mean_candidates_per_search: rateDefinition(
-      "SEARCH_LIQUIDITY",
-      "Mean privacy-safe candidate count per completed search.",
-      "Unique completed searches.",
-      "Sum candidate_count / completed searches.",
-    ),
-    median_request_to_engagement_hours: hoursDefinition(
-      "Request submission to first ENGAGED provider.",
-      "Requests with first_engaged_at.",
-    ),
-    median_request_to_quote_hours: hoursDefinition(
-      "Request submission to first submitted Quote.",
-      "Requests with first_quote_at.",
-    ),
-    median_quote_to_confirmation_hours: hoursDefinition(
-      "First submitted Quote to Job confirmation.",
-      "Confirmed requests with first_quote_at.",
-    ),
-    median_confirmation_to_start_hours: hoursDefinition(
-      "Job confirmation to actual start.",
-      "Jobs with started_at.",
-    ),
-    median_start_to_completion_hours: hoursDefinition(
-      "Actual Job start to authoritative completion.",
-      "Completed Jobs with started_at.",
-    ),
-    completion_attempts_per_completed_job: rateDefinition(
-      "QUALITY_PROCESS",
-      "Completion attempts per completed Job; descriptive only.",
-      "Unique completed Jobs.",
-      "Completion attempts / completed Jobs.",
-    ),
-    change_order_job_rate: jobProcessRate(
-      "Jobs with at least one Change order.",
-      "Confirmed Jobs with change_order_count > 0 / confirmed Jobs.",
-    ),
-    dispute_job_rate: jobProcessRate(
-      "Jobs with at least one dispute; never a ranking signal.",
-      "Confirmed Jobs with dispute_count > 0 / confirmed Jobs.",
-    ),
-    report_job_rate: jobProcessRate(
-      "Jobs with at least one report; never a ranking signal.",
-      "Confirmed Jobs with report_count > 0 / confirmed Jobs.",
-    ),
-    completion_to_review_rate: rateDefinition(
-      "REVIEW",
-      "Completed Jobs receiving at least one verified main review.",
-      "Unique completed Jobs.",
-      "Reviewed completed Jobs / completed Jobs.",
-    ),
-  });
+  Object.freeze(
+    Object.fromEntries(
+      Object.entries(alphaKpiDefinitions).map(([id, value]) => [
+        id,
+        Object.freeze({ ...value, id: id as AlphaKpiId }),
+      ]),
+    ) as Record<AlphaKpiId, AlphaKpiDefinition>,
+  );
 
 export function buildAlphaAnalyticsDashboard(
   input: Readonly<{
@@ -245,12 +284,25 @@ export function buildAlphaAnalyticsDashboard(
   }>,
 ): AlphaAnalyticsDashboard {
   assertTimestamp(input.generated_at, "generated_at");
-  const requests = uniqueRealFacts(input.requests, "request_id");
-  const searches = uniqueRealFacts(input.searches, "search_id");
-  const supply = uniqueRealFacts(input.supply, "craftsman_profile_id");
-  requests.forEach(assertRequestFact);
-  searches.forEach(assertSearchFact);
-  supply.forEach(assertSupplyFact);
+  input.requests.forEach(assertRequestFact);
+  input.searches.forEach(assertSearchFact);
+  input.supply.forEach(assertSupplyFact);
+  const requests = uniqueRealFacts(
+    input.requests,
+    (fact) => fact.request_id,
+    "request_id",
+  );
+  const searches = uniqueRealFacts(
+    input.searches,
+    (fact) => fact.search_id,
+    "search_id",
+  );
+  const supply = uniqueRealFacts(
+    input.supply,
+    (fact) =>
+      `${fact.craftsman_profile_id}\u0000${fact.profession_code}\u0000${fact.region_code ?? ""}`,
+    "craftsman_profile_id/profession_code/region_code",
+  );
 
   const submitted = requests.length;
   const engaged = count(
@@ -265,6 +317,9 @@ export function buildAlphaAnalyticsDashboard(
   const engagedCount = sum(supply, (fact) => fact.engaged_count);
   const quoteCount = sum(supply, (fact) => fact.quote_count);
   const winCount = sum(supply, (fact) => fact.won_job_count);
+  const publicApprovedCraftsmen = new Set(
+    supply.map((fact) => fact.craftsman_profile_id),
+  ).size;
 
   return Object.freeze({
     definition_version: ALPHA_KPI_DEFINITION_VERSION,
@@ -282,7 +337,12 @@ export function buildAlphaAnalyticsDashboard(
       ratio("completed_jobs_reviewed_rate", reviewed.length, completed.length),
     ]),
     supply: Object.freeze([
-      metric("public_approved_craftsmen", supply.length, null, supply.length),
+      metric(
+        "public_approved_craftsmen",
+        publicApprovedCraftsmen,
+        null,
+        publicApprovedCraftsmen,
+      ),
       ratio("invitation_response_rate", engagedCount, invitationCount),
       ratio("quotes_per_engaged_provider", quoteCount, engagedCount),
       ratio("wins_per_quote", winCount, quoteCount),
@@ -329,6 +389,36 @@ export function buildAlphaAnalyticsDashboard(
         requests,
         (fact) => durationHours(fact.started_at, fact.completed_at),
       ),
+      percentileDurationMetric(
+        "p90_request_to_engagement_hours",
+        requests,
+        (fact) => durationHours(fact.submitted_at, fact.first_engaged_at),
+        0.9,
+      ),
+      percentileDurationMetric(
+        "p90_request_to_quote_hours",
+        requests,
+        (fact) => durationHours(fact.submitted_at, fact.first_quote_at),
+        0.9,
+      ),
+      percentileDurationMetric(
+        "p90_quote_to_confirmation_hours",
+        requests,
+        (fact) => durationHours(fact.first_quote_at, fact.confirmed_at),
+        0.9,
+      ),
+      percentileDurationMetric(
+        "p90_confirmation_to_start_hours",
+        requests,
+        (fact) => durationHours(fact.confirmed_at, fact.started_at),
+        0.9,
+      ),
+      percentileDurationMetric(
+        "p90_start_to_completion_hours",
+        requests,
+        (fact) => durationHours(fact.started_at, fact.completed_at),
+        0.9,
+      ),
     ]),
     quality_process: Object.freeze([
       ratio(
@@ -374,7 +464,7 @@ function countDefinition(
   dashboard: AlphaKpiDefinition["dashboard"],
   description: string,
   formula: string,
-): AlphaKpiDefinition {
+): Omit<AlphaKpiDefinition, "id"> {
   return definition(
     dashboard,
     description,
@@ -389,19 +479,20 @@ function rateDefinition(
   description: string,
   denominator: string,
   formula: string,
-): AlphaKpiDefinition {
+): Omit<AlphaKpiDefinition, "id"> {
   return definition(dashboard, description, denominator, formula, "RATIO");
 }
 
 function hoursDefinition(
   description: string,
   denominator: string,
-): AlphaKpiDefinition {
+  statistic = "Median",
+): Omit<AlphaKpiDefinition, "id"> {
   return definition(
     "SPEED",
     description,
     denominator,
-    "Median of non-negative server-time duration in hours.",
+    `${statistic} of non-negative server-time duration in hours.`,
     "HOURS",
   );
 }
@@ -409,7 +500,7 @@ function hoursDefinition(
 function jobProcessRate(
   description: string,
   formula: string,
-): AlphaKpiDefinition {
+): Omit<AlphaKpiDefinition, "id"> {
   return rateDefinition(
     "QUALITY_PROCESS",
     description,
@@ -424,37 +515,29 @@ function definition(
   denominator: string,
   formula: string,
   unit: AlphaKpiDefinition["unit"],
-): AlphaKpiDefinition {
+): Omit<AlphaKpiDefinition, "id"> {
   return {
     dashboard,
     description,
     denominator,
     formula,
-    id: "requests_submitted",
     unit,
     version: ALPHA_KPI_DEFINITION_VERSION,
   };
 }
 
-// Helpers avoid repeating IDs; normalize each definition from its catalog key.
-for (const [id, value] of Object.entries(alphaKpiCatalog)) {
-  (value as { id: AlphaKpiId }).id = id as AlphaKpiId;
-}
-
 function uniqueRealFacts<
   T extends { readonly traffic_class: AlphaAnalyticsTrafficClass },
->(facts: readonly T[], key: keyof T): T[] {
+>(facts: readonly T[], selectKey: (fact: T) => string, keyName: string): T[] {
   const unique = new Map<string, T>();
   for (const fact of facts) {
     if (fact.traffic_class !== "REAL") continue;
-    const value = fact[key];
-    if (typeof value !== "string" || value.length === 0) {
-      throw new TypeError(
-        `${String(key)} must be a non-empty opaque identifier`,
-      );
+    const value = selectKey(fact);
+    if (value.length === 0) {
+      throw new TypeError(`${keyName} must be a non-empty opaque identifier`);
     }
     if (unique.has(value)) {
-      throw new TypeError(`duplicate ${String(key)} analytics fact`);
+      throw new TypeError(`duplicate ${keyName} analytics fact`);
     }
     unique.set(value, fact);
   }
@@ -482,6 +565,7 @@ function assertRequestFact(fact: AlphaRequestJourneyFact): void {
     "dispute_count",
     "report_count",
   ]);
+  assertTrafficClass(fact.traffic_class);
   assertTimestamp(fact.submitted_at, "submitted_at");
   assertMachineCode(fact.profession_code, "profession_code");
   assertOptionalMachineCode(fact.region_code, "region_code");
@@ -512,6 +596,24 @@ function assertRequestFact(fact: AlphaRequestJourneyFact): void {
       "confirmed request requires both job_id and confirmed_at",
     );
   }
+  if (
+    fact.first_quote_at !== undefined &&
+    fact.first_engaged_at === undefined
+  ) {
+    throw new TypeError("first_quote_at requires first_engaged_at");
+  }
+  if (fact.confirmed_at !== undefined && fact.first_quote_at === undefined) {
+    throw new TypeError("confirmed_at requires first_quote_at");
+  }
+  if (fact.started_at !== undefined && fact.confirmed_at === undefined) {
+    throw new TypeError("started_at requires confirmed_at");
+  }
+  if (fact.completed_at !== undefined && fact.confirmed_at === undefined) {
+    throw new TypeError("completed_at requires confirmed_at");
+  }
+  if (fact.reviewed_at !== undefined && fact.completed_at === undefined) {
+    throw new TypeError("reviewed_at requires completed_at");
+  }
   if (fact.first_quote_at === undefined && fact.quote_count !== 0) {
     throw new TypeError("quote_count requires first_quote_at");
   }
@@ -523,6 +625,17 @@ function assertRequestFact(fact: AlphaRequestJourneyFact): void {
     "dispute_count",
     "report_count",
   ]);
+  if (fact.quote_count > 0 && fact.first_quote_at === undefined) {
+    throw new TypeError("positive quote_count requires first_quote_at");
+  }
+  const jobProcessCount =
+    fact.completion_attempt_count +
+    fact.change_order_count +
+    fact.dispute_count +
+    fact.report_count;
+  if (jobProcessCount > 0 && fact.job_id === undefined) {
+    throw new TypeError("Job process counts require job_id");
+  }
 }
 
 function assertSearchFact(fact: AlphaSearchLiquidityFact): void {
@@ -536,10 +649,21 @@ function assertSearchFact(fact: AlphaSearchLiquidityFact): void {
     "profile_opened",
     "candidate_count",
   ]);
+  assertTrafficClass(fact.traffic_class);
   assertTimestamp(fact.occurred_at, "occurred_at");
   assertMachineCode(fact.profession_code, "profession_code");
   assertOptionalMachineCode(fact.region_code, "region_code");
   assertCounter(fact.candidate_count, "candidate_count");
+  if (
+    fact.result_count_bucket !== "ZERO" &&
+    fact.result_count_bucket !== "ONE_TO_FOUR" &&
+    fact.result_count_bucket !== "FIVE_PLUS"
+  ) {
+    throw new TypeError("result_count_bucket is invalid");
+  }
+  if (typeof fact.profile_opened !== "boolean") {
+    throw new TypeError("profile_opened must be boolean");
+  }
   if (fact.result_count_bucket === "ZERO" && fact.candidate_count !== 0) {
     throw new TypeError("zero-result search must have zero candidates");
   }
@@ -557,6 +681,7 @@ function assertSupplyFact(fact: AlphaSupplyFact): void {
     "won_job_count",
     "completed_job_count",
   ]);
+  assertTrafficClass(fact.traffic_class);
   assertMachineCode(fact.profession_code, "profession_code");
   assertOptionalMachineCode(fact.region_code, "region_code");
   assertCounters(fact, [
@@ -566,6 +691,12 @@ function assertSupplyFact(fact: AlphaSupplyFact): void {
     "won_job_count",
     "completed_job_count",
   ]);
+}
+
+function assertTrafficClass(value: unknown): void {
+  if (value !== "REAL" && value !== "INTERNAL" && value !== "TEST") {
+    throw new TypeError("traffic_class is invalid");
+  }
 }
 
 function assertExactFactKeys(fact: object, allowed: readonly string[]): void {
@@ -676,4 +807,19 @@ function medianDurationMetric<T>(
       ? right
       : ((durations[middle - 1] ?? right) + right) / 2;
   return metric(id, null, durations.length, value);
+}
+
+function percentileDurationMetric<T>(
+  id: AlphaKpiId,
+  facts: readonly T[],
+  select: (fact: T) => number | undefined,
+  percentile: number,
+): AlphaMetric {
+  const durations = facts
+    .map(select)
+    .filter((value): value is number => value !== undefined && value >= 0)
+    .sort((left, right) => left - right);
+  if (durations.length === 0) return metric(id, null, 0, null);
+  const index = Math.max(0, Math.ceil(percentile * durations.length) - 1);
+  return metric(id, null, durations.length, durations[index] ?? null);
 }

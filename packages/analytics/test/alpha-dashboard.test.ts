@@ -44,12 +44,13 @@ function metric(
 
 describe("D28 alpha KPI catalog", () => {
   it("gives every dashboard metric an immutable version and exact denominator", () => {
-    expect(Object.keys(alphaKpiCatalog)).toHaveLength(24);
+    expect(Object.keys(alphaKpiCatalog)).toHaveLength(29);
     for (const [id, definition] of Object.entries(alphaKpiCatalog)) {
       expect(definition.id).toBe(id);
       expect(definition.version).toBe(ALPHA_KPI_DEFINITION_VERSION);
       expect(definition.denominator.length).toBeGreaterThan(0);
       expect(definition.formula.length).toBeGreaterThan(0);
+      expect(Object.isFrozen(definition)).toBe(true);
     }
   });
 
@@ -159,10 +160,36 @@ describe("D28 alpha KPI catalog", () => {
     expect(metric(dashboard, "median_request_to_engagement_hours")?.value).toBe(
       4,
     );
+    expect(metric(dashboard, "p90_request_to_engagement_hours")?.value).toBe(6);
     expect(metric(dashboard, "zero_result_search_rate")?.value).toBe(0.5);
     expect(metric(dashboard, "search_profile_open_rate")?.value).toBe(0.5);
     expect(metric(dashboard, "mean_candidates_per_search")?.value).toBe(3.5);
     expect(metric(dashboard, "invitation_response_rate")?.value).toBe(0.5);
+  });
+
+  it("counts a multi-profession profile once while preserving dimension rows", () => {
+    const supplyBase = {
+      craftsman_profile_id: "profile-1",
+      traffic_class: "REAL" as const,
+      region_code: "REGION:BA",
+      invitation_count: 1,
+      engaged_count: 1,
+      quote_count: 1,
+      won_job_count: 0,
+      completed_job_count: 0,
+    };
+    const dashboard = buildAlphaAnalyticsDashboard({
+      generated_at: "2026-09-30T00:00:00.000Z",
+      requests: [],
+      searches: [],
+      supply: [
+        { ...supplyBase, profession_code: "PROF:ELECTRICIAN" },
+        { ...supplyBase, profession_code: "PROF:PLUMBER" },
+      ],
+    });
+
+    expect(metric(dashboard, "public_approved_craftsmen")?.value).toBe(1);
+    expect(metric(dashboard, "invitation_response_rate")?.denominator).toBe(2);
   });
 
   it("rejects duplicate entity facts, impossible ordering and arbitrary PII fields", () => {
@@ -199,6 +226,43 @@ describe("D28 alpha KPI catalog", () => {
         supply: [],
       }),
     ).toThrow("unknown analytics fact property: email");
+
+    expect(() =>
+      buildAlphaAnalyticsDashboard({
+        generated_at: "2026-09-30T00:00:00.000Z",
+        requests: [
+          {
+            ...requestFact({ traffic_class: "TEST" }),
+            email: "still-rejected@example.test",
+          } as AlphaRequestJourneyFact,
+        ],
+        searches: [],
+        supply: [],
+      }),
+    ).toThrow("unknown analytics fact property: email");
+
+    expect(() =>
+      buildAlphaAnalyticsDashboard({
+        generated_at: "2026-09-30T00:00:00.000Z",
+        requests: [requestFact({ traffic_class: "BOT" as "REAL" })],
+        searches: [],
+        supply: [],
+      }),
+    ).toThrow("traffic_class is invalid");
+
+    expect(() =>
+      buildAlphaAnalyticsDashboard({
+        generated_at: "2026-09-30T00:00:00.000Z",
+        requests: [
+          requestFact({
+            first_quote_at: "2026-09-01T10:00:00.000Z",
+            quote_count: 1,
+          }),
+        ],
+        searches: [],
+        supply: [],
+      }),
+    ).toThrow("first_quote_at requires first_engaged_at");
   });
 
   it("suppresses tiny cohorts with an explicit configurable floor", () => {

@@ -85,6 +85,7 @@ const timingOptions = new Set([
 const professionCodePattern = /^PROF:[A-Z0-9][A-Z0-9_]{1,62}$/u;
 const specializationCodePattern = /^SPEC:[A-Z0-9][A-Z0-9_]{1,62}$/u;
 const governedLocationAreaCodePattern = /^[A-Z0-9][A-Z0-9._:-]{0,63}$/u;
+const governedMachineCodePattern = /^[A-Z0-9][A-Z0-9._:-]{0,63}$/u;
 
 export function validateAnalyticsEnvelope(value: unknown): AnalyticsEnvelope {
   const envelope = assertPlainObject(value, "analytics envelope");
@@ -407,6 +408,8 @@ function validateProperty(
       return assertPattern(value, specializationCodePattern, key);
     case "GOVERNED_LOCATION_AREA_CODE":
       return assertPattern(value, governedLocationAreaCodePattern, key);
+    case "MACHINE_CODE":
+      return assertPattern(value, governedMachineCodePattern, key);
     case "CTA_ORIGIN":
       return assertEnum(value, ctaOrigins, key);
     case "LOCATION_AREA_GRANULARITY":
