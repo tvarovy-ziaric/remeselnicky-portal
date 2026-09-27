@@ -30,6 +30,17 @@ after a staging baseline. A future durable queue adapter may add a bounded queue
 class so analytics failures can route below transactional-delivery failures;
 user/job identifiers remain forbidden.
 
+R4-028 adds `system-health-dashboard.json`, conservative API error/latency and
+worker-readiness alerts, plus seven read-only critical invariant checks. The
+worker runs the checker at a bounded interval and exports only the invariant
+name, aggregate violation count, success bit and last-success timestamp. It
+never exports entity IDs and never repairs data. A confirmed finding follows
+[`critical-invariant-violation.md`](../runbooks/critical-invariant-violation.md).
+The JSON dashboard is provider-portable Grafana format and Kustomize publishes
+it as the labelled `portal-system-health-dashboard` ConfigMap for a compatible
+dashboard sidecar. Installing/connecting an actual monitoring service remains
+an operator step until an approved monitoring account exists.
+
 ## Staging channel verification
 
 Before a channel is considered tested:

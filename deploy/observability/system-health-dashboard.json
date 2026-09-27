@@ -1,0 +1,118 @@
+{
+  "annotations": { "list": [] },
+  "editable": false,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Workload availability",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "up{service=~\"portal-api|portal-worker\"}",
+          "legendFormat": "{{service}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "API request rate by result",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum by (result) (rate(portal_http_requests_total{service=\"api\"}[5m]))",
+          "legendFormat": "{{result}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "API latency percentiles (ms)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(portal_http_request_duration_milliseconds_bucket{service=\"api\"}[5m])))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(portal_http_request_duration_milliseconds_bucket{service=\"api\"}[5m])))",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(portal_http_request_duration_milliseconds_bucket{service=\"api\"}[5m])))",
+          "legendFormat": "p99"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Database readiness",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "portal_database_available{service=\"api\"}",
+          "legendFormat": "PostgreSQL"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Queue depth and oldest pending age",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "portal_queue_depth{service=\"worker\"}",
+          "legendFormat": "depth"
+        },
+        {
+          "expr": "portal_queue_oldest_pending_age_seconds{service=\"worker\"}",
+          "legendFormat": "oldest seconds"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Queue outcomes",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum by (outcome) (rate(portal_queue_jobs_total{service=\"worker\"}[5m]))",
+          "legendFormat": "{{outcome}}"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Critical invariant violations",
+      "type": "table",
+      "targets": [
+        {
+          "expr": "portal_invariant_violations{service=\"worker\"}",
+          "legendFormat": "{{invariant}}"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Invariant checker freshness",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "portal_invariant_check_success{service=\"worker\"}",
+          "legendFormat": "success"
+        },
+        {
+          "expr": "time() - portal_invariant_last_check_timestamp_seconds{service=\"worker\"}",
+          "legendFormat": "age seconds"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["remeselnicky-portal", "d29", "system-health"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timezone": "browser",
+  "title": "Remeselnícky portál — system health",
+  "uid": "portal-system-health",
+  "version": 1
+}

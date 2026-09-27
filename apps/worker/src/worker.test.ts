@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { vi } from "vitest";
 import { createPortalMetrics } from "@portal/observability";
+import { OPERATIONAL_INVARIANT_NAMES } from "@portal/observability";
 
 import { runWorker } from "./worker.js";
 import {
@@ -152,6 +153,8 @@ describe("worker skeleton", () => {
         recordHttp: vi.fn(),
         recordQueueEvent: vi.fn(),
         render: () => "",
+        setInvariantCheckFailed: vi.fn(),
+        setInvariantSnapshot: vi.fn(),
         setQueueSnapshot,
         setWorkerReady: vi.fn(),
       },
@@ -181,5 +184,42 @@ describe("worker skeleton", () => {
       oldestInFlightAgeMs: 50,
       oldestPendingAgeMs: 500,
     });
+  });
+
+  it("runs read-only invariant checks on a bounded interval", async () => {
+    const abortController = new AbortController();
+    const metrics = createPortalMetrics({
+      environment: "staging",
+      releaseRevision: "test-revision",
+      service: "worker",
+    });
+    let now = 1_000;
+    let polls = 0;
+    const check = vi.fn().mockResolvedValue(
+      OPERATIONAL_INVARIANT_NAMES.map((name) => ({
+        name,
+        violationCount: 0,
+      })),
+    );
+
+    await runWorkerLoop({
+      invariantCheckIntervalMs: 500,
+      invariantChecks: { check },
+      metrics,
+      now: () => now,
+      pollIntervalMs: 1,
+      processor: {
+        processNext: () => {
+          polls += 1;
+          now += 600;
+          if (polls === 2) abortController.abort();
+          return Promise.resolve({ status: "work" });
+        },
+      },
+      signal: abortController.signal,
+    });
+
+    expect(check).toHaveBeenCalledTimes(2);
+    expect(metrics.render()).toContain("portal_invariant_check_success");
   });
 });

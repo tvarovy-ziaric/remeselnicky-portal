@@ -34,7 +34,7 @@ for (const environment of ["staging", "production"]) {
   ) {
     failures.push(`${environment}: same-origin API routing is missing`);
   }
-  if (!kustomization.includes("../../observability/monitoring.yaml")) {
+  if (!kustomization.includes("../../observability")) {
     failures.push(
       `${environment}: operational monitoring resources are missing`,
     );
@@ -45,6 +45,17 @@ for (const environment of ["staging", "production"]) {
 }
 
 const monitoring = read("observability/monitoring.yaml");
+const observabilityKustomization = read("observability/kustomization.yaml");
+for (const required of [
+  "monitoring.yaml",
+  "portal-system-health-dashboard",
+  "system-health-dashboard.json",
+  "grafana_dashboard",
+]) {
+  if (!observabilityKustomization.includes(required)) {
+    failures.push(`observability provisioning: missing ${required}`);
+  }
+}
 for (const required of [
   "kind: ServiceMonitor",
   "kind: PrometheusRule",
@@ -55,9 +66,27 @@ for (const required of [
   "sendResolved: true",
   "docs/runbooks/api-or-database-unavailable.md",
   "docs/runbooks/queue-terminal-failure.md",
+  "docs/runbooks/critical-invariant-violation.md",
+  "docs/runbooks/http-or-worker-degradation.md",
+  "PortalCriticalInvariantViolation",
+  "PortalApiServerErrorSpike",
 ]) {
   if (!monitoring.includes(required)) {
     failures.push(`observability: missing ${required}`);
+  }
+}
+
+const dashboard = read("observability/system-health-dashboard.json");
+for (const required of [
+  '"title": "Remeselnícky portál — system health"',
+  "portal_http_requests_total",
+  "portal_http_request_duration_milliseconds_bucket",
+  "portal_database_available",
+  "portal_queue_oldest_pending_age_seconds",
+  "portal_invariant_violations",
+]) {
+  if (!dashboard.includes(required)) {
+    failures.push(`observability dashboard: missing ${required}`);
   }
 }
 

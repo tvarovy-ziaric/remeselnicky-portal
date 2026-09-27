@@ -89,10 +89,13 @@ const outboxWorker = createOutboxWorker({
         outcome: event.outcome,
       };
       if (event.outcome === "TERMINAL_FAILURE") {
+        metrics.recordQueueEvent("job_terminal_failure");
         logger.error("outbox_terminal_failure", fields);
       } else if (event.outcome === "RETRY_SCHEDULED") {
+        metrics.recordQueueEvent("job_retry_scheduled");
         logger.warn("outbox_retry_scheduled", fields);
       } else {
+        metrics.recordQueueEvent("job_attempt_succeeded");
         logger.info("outbox_published", fields);
       }
     },
@@ -206,7 +209,53 @@ try {
   metrics.setWorkerReady(true);
   await runWorkerLoop({
     heartbeat: () => readiness.heartbeat(),
+    invariantChecks: {
+      async check() {
+        const results = await database.operationalInvariants.check();
+        for (const result of results) {
+          if (result.violationCount > 0) {
+            logger.error("operational_invariant_violation", {
+              invariant: result.name,
+              violationCount: result.violationCount,
+            });
+          }
+        }
+        return results;
+      },
+    },
     metrics,
+    onInvariantCheckError(error) {
+      errorTracker.capture(error, {
+        handled: true,
+        mechanism: "worker",
+      });
+    },
+    queueMetrics: {
+      async snapshot(now) {
+        const [outbox, media, privacy] = await Promise.all([
+          database.outbox.snapshot(),
+          database.mediaProcessingQueue.snapshot(now),
+          database.privacyDispositionQueue.snapshot(now),
+        ]);
+        const pendingAges = [
+          outbox.oldestBacklogAgeMs ?? undefined,
+          media.oldestPendingAgeMs,
+          privacy.oldestPendingAgeMs,
+        ].filter((value): value is number => value !== undefined);
+        const inFlightAges = [
+          media.oldestInFlightAgeMs,
+          privacy.oldestInFlightAgeMs,
+        ].filter((value): value is number => value !== undefined);
+        return {
+          depth: outbox.pending + media.depth + privacy.depth,
+          inFlight: outbox.processing + media.inFlight + privacy.inFlight,
+          oldestInFlightAgeMs:
+            inFlightAges.length === 0 ? undefined : Math.max(...inFlightAges),
+          oldestPendingAgeMs:
+            pendingAges.length === 0 ? undefined : Math.max(...pendingAges),
+        };
+      },
+    },
     processor,
     signal: abortController.signal,
   });

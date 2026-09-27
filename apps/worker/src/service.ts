@@ -1,4 +1,5 @@
 import type {
+  OperationalInvariantSnapshot,
   PortalMetrics,
   QueueMetricSnapshot,
   StructuredLogger,
@@ -11,10 +12,15 @@ export interface WorkerLoopProcessor {
 
 export interface WorkerLoopOptions {
   readonly heartbeat?: () => void;
+  readonly invariantCheckIntervalMs?: number;
+  readonly invariantChecks?: {
+    check(): Promise<OperationalInvariantSnapshot["results"]>;
+  };
   readonly metrics?: PortalMetrics;
   readonly now?: () => number;
   readonly pollIntervalMs?: number;
   readonly processor: WorkerLoopProcessor;
+  readonly onInvariantCheckError?: (error: unknown) => void;
   readonly queueMetrics?: {
     snapshot(now: number): Promise<QueueMetricSnapshot>;
   };
@@ -83,19 +89,46 @@ export async function runWorkerLoop(options: WorkerLoopOptions): Promise<void> {
   const pollIntervalMs = options.pollIntervalMs ?? 1_000;
   const sleep = options.sleep ?? abortableSleep;
   const now = options.now ?? Date.now;
+  const invariantCheckIntervalMs = options.invariantCheckIntervalMs ?? 300_000;
+  let nextInvariantCheckAt = 0;
 
   if (!Number.isSafeInteger(pollIntervalMs) || pollIntervalMs < 1) {
     throw new RangeError("pollIntervalMs must be a positive safe integer");
+  }
+  if (
+    !Number.isSafeInteger(invariantCheckIntervalMs) ||
+    invariantCheckIntervalMs < 1
+  ) {
+    throw new RangeError(
+      "invariant check interval must be a positive safe integer",
+    );
   }
 
   while (!options.signal.aborted) {
     options.heartbeat?.();
     const result = await options.processor.processNext();
     options.heartbeat?.();
+    const observedAt = now();
+    if (
+      options.invariantChecks !== undefined &&
+      options.metrics !== undefined &&
+      observedAt >= nextInvariantCheckAt
+    ) {
+      nextInvariantCheckAt = observedAt + invariantCheckIntervalMs;
+      try {
+        options.metrics.setInvariantSnapshot({
+          checkedAtMs: observedAt,
+          results: await options.invariantChecks.check(),
+        });
+      } catch (error) {
+        options.metrics.setInvariantCheckFailed();
+        options.onInvariantCheckError?.(error);
+      }
+    }
     if (options.queueMetrics !== undefined && options.metrics !== undefined) {
       try {
         options.metrics.setQueueSnapshot(
-          await options.queueMetrics.snapshot(now()),
+          await options.queueMetrics.snapshot(observedAt),
         );
       } catch {
         // A scrape snapshot is best effort and cannot fail queue processing.

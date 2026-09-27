@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   createMonitoringServer,
   createPortalMetrics,
+  OPERATIONAL_INVARIANT_NAMES,
   type MonitoringServer,
 } from "../src/index.js";
 
@@ -88,6 +89,43 @@ describe("bounded operational metrics", () => {
     const output = metrics.render();
     expect(output).toContain('route="other"');
     expect(output).not.toContain('route="/synthetic/route-139"');
+  });
+
+  it("publishes exact bounded invariant health without entity identifiers", () => {
+    const metrics = createPortalMetrics(context);
+    metrics.setInvariantSnapshot({
+      checkedAtMs: 1_789_382_400_000,
+      results: OPERATIONAL_INVARIANT_NAMES.map((name) => ({
+        name,
+        violationCount: name === "COMPLETED_JOB_CONTEXT" ? 2 : 0,
+      })),
+    });
+
+    const output = metrics.render();
+    expect(output).toContain("portal_invariant_check_success");
+    expect(output).toContain("portal_invariant_last_check_timestamp_seconds");
+    expect(output).toContain(
+      'invariant="COMPLETED_JOB_CONTEXT",release_revision="git-a1b2c3d4",service="api"} 2',
+    );
+    expect(output).not.toMatch(/job_?id=/iu);
+  });
+
+  it("fails closed for incomplete or malformed invariant snapshots", () => {
+    const metrics = createPortalMetrics(context);
+    expect(() =>
+      metrics.setInvariantSnapshot({ checkedAtMs: 1, results: [] }),
+    ).toThrow(/every check/u);
+    expect(() =>
+      metrics.setInvariantSnapshot({
+        checkedAtMs: 1,
+        results: OPERATIONAL_INVARIANT_NAMES.map((name) => ({
+          name,
+          violationCount: name === "COMPLETED_JOB_CONTEXT" ? -1 : 0,
+        })),
+      }),
+    ).toThrow(/violation count/u);
+    metrics.setInvariantCheckFailed();
+    expect(metrics.render()).toContain("portal_invariant_check_success");
   });
 
   it("serves only minimal health and metrics responses", async () => {

@@ -8,6 +8,26 @@ const DATABASE_DURATION_BUCKETS_MS = [
 ] as const;
 const MAX_ROUTE_SERIES = 128;
 
+export const OPERATIONAL_INVARIANT_NAMES = Object.freeze([
+  "JOB_REQUEST_SINGLE_JOB",
+  "JOB_ACCEPTANCE_PROVENANCE",
+  "APPROVED_CHANGE_ORDER_PROVENANCE",
+  "COMPLETED_JOB_CONTEXT",
+  "SEALED_REVIEW_PUBLICATION",
+  "PUBLIC_PROJECTION_PRIVATE_FIELDS",
+  "PRIVILEGED_JOB_CORRECTION_AUDIT",
+] as const);
+export type OperationalInvariantName =
+  (typeof OPERATIONAL_INVARIANT_NAMES)[number];
+
+export interface OperationalInvariantSnapshot {
+  readonly checkedAtMs: number;
+  readonly results: readonly Readonly<{
+    name: OperationalInvariantName;
+    violationCount: number;
+  }>[];
+}
+
 type HttpResult =
   | "authentication_failed"
   | "authorization_denied"
@@ -44,6 +64,8 @@ export interface PortalMetrics {
   }): void;
   recordQueueEvent(event: QueueMetricEvent): void;
   render(): string;
+  setInvariantCheckFailed(): void;
+  setInvariantSnapshot(snapshot: OperationalInvariantSnapshot): void;
   setQueueSnapshot(snapshot: QueueMetricSnapshot): void;
   setWorkerReady(ready: boolean): void;
 }
@@ -221,6 +243,18 @@ export function createPortalMetrics(
           "Age of the oldest in-flight queue delivery in seconds.",
         ],
         ["portal_worker_ready", "Worker loop readiness, where 1 is ready."],
+        [
+          "portal_invariant_check_success",
+          "Latest operational invariant check result, where 1 is successful.",
+        ],
+        [
+          "portal_invariant_last_check_timestamp_seconds",
+          "Unix timestamp of the latest successful invariant check.",
+        ],
+        [
+          "portal_invariant_violations",
+          "Current critical invariant violation count by bounded invariant name.",
+        ],
       ] as const) {
         appendMetric(lines, {
           help: definition[1],
@@ -236,6 +270,44 @@ export function createPortalMetrics(
         type: "counter",
       });
       return `${lines.join("\n")}\n`;
+    },
+    setInvariantCheckFailed(): void {
+      setGauge("portal_invariant_check_success", labels({}), 0);
+    },
+    setInvariantSnapshot(snapshot): void {
+      if (!Number.isFinite(snapshot.checkedAtMs) || snapshot.checkedAtMs < 0) {
+        throw new TypeError("invariant check timestamp is invalid");
+      }
+      const exact = new Map(
+        snapshot.results.map((result) => [result.name, result] as const),
+      );
+      if (
+        exact.size !== OPERATIONAL_INVARIANT_NAMES.length ||
+        snapshot.results.length !== OPERATIONAL_INVARIANT_NAMES.length
+      ) {
+        throw new TypeError("invariant snapshot must contain every check once");
+      }
+      for (const name of OPERATIONAL_INVARIANT_NAMES) {
+        const result = exact.get(name);
+        if (
+          result === undefined ||
+          !Number.isSafeInteger(result.violationCount) ||
+          result.violationCount < 0
+        ) {
+          throw new TypeError("invariant violation count is invalid");
+        }
+        setGauge(
+          "portal_invariant_violations",
+          labels({ invariant: name }),
+          result.violationCount,
+        );
+      }
+      setGauge("portal_invariant_check_success", labels({}), 1);
+      setGauge(
+        "portal_invariant_last_check_timestamp_seconds",
+        labels({}),
+        Math.floor(snapshot.checkedAtMs / 1_000),
+      );
     },
     setQueueSnapshot(snapshot): void {
       const queueLabels = labels({ queue: "default" });

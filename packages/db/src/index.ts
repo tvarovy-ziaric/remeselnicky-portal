@@ -142,6 +142,17 @@ import {
   createAlphaAnalyticsDashboardRepository,
   type AlphaAnalyticsDashboardRepository,
 } from "./alpha-analytics-repository.js";
+import {
+  createOperationalInvariantRepository,
+  type OperationalInvariantRepository,
+} from "./operational-invariant-repository.js";
+export {
+  createOperationalInvariantRepository,
+  OPERATIONAL_INVARIANT_NAMES,
+  type OperationalInvariantName,
+  type OperationalInvariantRepository,
+  type OperationalInvariantResult,
+} from "./operational-invariant-repository.js";
 export {
   createAlphaAnalyticsDashboardRepository,
   type AlphaAnalyticsDashboardQuery,
@@ -1332,6 +1343,7 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly r3AnalyticsObservations: R3AnalyticsObservationPersistence;
   readonly r3PdfDeliveryObservations: R3PdfDeliveryObservationPersistence;
   readonly alphaAnalytics: AlphaAnalyticsDashboardRepository;
+  readonly operationalInvariants: OperationalInvariantRepository;
   readonly conversations: ConversationPersistence;
   readonly conversationChat: ConversationChatPersistence;
   readonly quotes: QuotePersistence;
@@ -1525,6 +1537,7 @@ export function createDatabase(
   const r3PdfDeliveryObservations =
     createR3PdfDeliveryObservationRepository(sql);
   const alphaAnalytics = createAlphaAnalyticsDashboardRepository(sql);
+  const operationalInvariants = createOperationalInvariantRepository(sql);
   const conversations = createConversationRepository(sql);
   const conversationChat = createConversationChatRepository(sql);
   const quotes = createQuoteRepository(sql);
@@ -1644,6 +1657,7 @@ export function createDatabase(
     r3AnalyticsObservations,
     r3PdfDeliveryObservations,
     alphaAnalytics,
+    operationalInvariants,
     conversations,
     conversationChat,
     quotes,

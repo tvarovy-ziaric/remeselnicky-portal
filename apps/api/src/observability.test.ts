@@ -60,6 +60,8 @@ describe("API observability boundary", () => {
           recordHttp: fail,
           recordQueueEvent: fail,
           render: () => "",
+          setInvariantCheckFailed: fail,
+          setInvariantSnapshot: fail,
           setQueueSnapshot: fail,
           setWorkerReady: fail,
         },

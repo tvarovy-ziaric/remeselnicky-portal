@@ -10,6 +10,9 @@ export {
 } from "./logger.js";
 export {
   createPortalMetrics,
+  OPERATIONAL_INVARIANT_NAMES,
+  type OperationalInvariantName,
+  type OperationalInvariantSnapshot,
   type PortalMetrics,
   type QueueMetricEvent,
   type QueueMetricSnapshot,
