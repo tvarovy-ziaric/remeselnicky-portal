@@ -99,3 +99,22 @@ Actual staging execution, provider backup activation, alert-channel wiring,
 media-provider mapping and any real production recovery are outside this local
 scaffold. They require the appropriate environment/account access; provider or
 paid-service selection is a HUMAN GATE and the first-user go/no-go remains D30.
+
+## Local synthetic engineering rehearsal
+
+On Windows with Docker Desktop available, the provider-independent mechanics
+can be rehearsed without touching existing staging:
+
+```powershell
+& .\infra\postgres\recovery\rehearse-local-synthetic-restore.ps1 `
+  -EvidenceDirectory "$env:TEMP\portal-restore-evidence"
+```
+
+The helper creates generated Docker network/container names, uses tmpfs rather
+than a persistent volume, discovers the current migration version, restores a
+synthetic custom-format archive through this canonical verifier, checks one
+synthetic marker and all D29 operational invariants, then removes only its exact
+temporary container and network. It never invokes `docker system prune`, volume
+cleanup, the existing staging stack or production. Its evidence proves local
+mechanics only; use the operational-readiness checklist and the provider runbook
+for an actual staging or production-class rehearsal.

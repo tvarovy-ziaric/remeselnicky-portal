@@ -345,3 +345,20 @@ test("refuses to overwrite an existing evidence record before running commands",
   );
   assert.equal(commandRan, false);
 });
+
+test("local rehearsal isolates disposable Docker resources and uses the canonical verifier", () => {
+  const script = readFileSync(
+    new URL("./rehearse-local-synthetic-restore.ps1", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(script, /--tmpfs\s+"\/var\/lib\/postgresql\/data:/u);
+  assert.match(script, /postgis\/postgis:17-3\.5-alpine/u);
+  assert.match(script, /verify-restore\.mjs/u);
+  assert.match(script, /portal_restore_verify_\$\{runDate\}_\$runSuffix/u);
+  assert.match(script, /existingStagingTouched\s*=\s*\$false/u);
+  assert.match(script, /docker rm --force \$containerName/u);
+  assert.match(script, /docker network rm \$networkName/u);
+  assert.doesNotMatch(script, /docker\s+system\s+prune/iu);
+  assert.doesNotMatch(script, /docker\s+volume\s+(?:rm|prune)/iu);
+});
