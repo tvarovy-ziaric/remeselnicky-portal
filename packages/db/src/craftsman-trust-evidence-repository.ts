@@ -162,9 +162,15 @@ function volume(row: TrustRow): TrustEvidenceVolumeCandidate {
 function quality(row: TrustRow): TrustEvidenceQualityCandidate {
   return {
     customerQualityAvailable: row.customerQualityAvailable,
-    customerScore: row.customerScore,
+    customerScore: normalizeDatabaseScore(row.customerScore),
     supervisorQualityAvailable: row.supervisorQualityAvailable,
   };
+}
+
+function normalizeDatabaseScore(value: unknown): unknown {
+  if (typeof value !== "string" || value.trim() === "") return value;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : value;
 }
 
 function confidence(row: TrustRow): TrustEvidenceConfidenceCandidate {

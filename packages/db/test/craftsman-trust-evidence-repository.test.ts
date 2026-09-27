@@ -135,6 +135,35 @@ describe("craftsman trust/evidence repository", () => {
     );
   });
 
+  it("normalizes PostgreSQL numeric review scores without weakening validation", async () => {
+    const responses = completeResponses();
+    responses[0] = [
+      {
+        ...(responses[0]?.[0] as object),
+        customerReviewCount: 1,
+        customerScore: "4.71",
+        customerQualityAvailable: true,
+        independentEvidenceSourceCount: 1,
+      },
+    ];
+    responses[1] = [
+      {
+        ...(responses[1]?.[0] as object),
+        customerReviewCount: 1,
+        customerScore: "4.71",
+        customerQualityAvailable: true,
+        independentEvidenceSourceCount: 1,
+      },
+    ];
+
+    const [result] = await createCraftsmanTrustEvidenceRepository(
+      scriptedSql(responses),
+    ).listCurrent({ profileIds: [profileId] });
+
+    expect(result?.quality.customerScore).toBe(4.71);
+    expect(result?.professions[0]?.quality.customerScore).toBe(4.71);
+  });
+
   it("returns supervisor volume separately while quality remains deliberately unavailable", async () => {
     const responses = completeResponses();
     responses[0] = [
