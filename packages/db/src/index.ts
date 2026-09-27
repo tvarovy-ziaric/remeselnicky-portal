@@ -138,6 +138,16 @@ export {
   createR3AnalyticsObservationRepository,
   createR3PdfDeliveryObservationRepository,
 } from "./r3-analytics-repository.js";
+import {
+  createAlphaAnalyticsDashboardRepository,
+  type AlphaAnalyticsDashboardRepository,
+} from "./alpha-analytics-repository.js";
+export {
+  createAlphaAnalyticsDashboardRepository,
+  type AlphaAnalyticsDashboardQuery,
+  type AlphaAnalyticsDashboardRepository,
+  type AlphaSearchFactInput,
+} from "./alpha-analytics-repository.js";
 import type {
   R3AnalyticsLeaseStore,
   R3AnalyticsObservationPersistence,
@@ -1321,6 +1331,7 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly r3Analytics: R3AnalyticsLeaseStore;
   readonly r3AnalyticsObservations: R3AnalyticsObservationPersistence;
   readonly r3PdfDeliveryObservations: R3PdfDeliveryObservationPersistence;
+  readonly alphaAnalytics: AlphaAnalyticsDashboardRepository;
   readonly conversations: ConversationPersistence;
   readonly conversationChat: ConversationChatPersistence;
   readonly quotes: QuotePersistence;
@@ -1513,6 +1524,7 @@ export function createDatabase(
   const r3AnalyticsObservations = createR3AnalyticsObservationRepository(sql);
   const r3PdfDeliveryObservations =
     createR3PdfDeliveryObservationRepository(sql);
+  const alphaAnalytics = createAlphaAnalyticsDashboardRepository(sql);
   const conversations = createConversationRepository(sql);
   const conversationChat = createConversationChatRepository(sql);
   const quotes = createQuoteRepository(sql);
@@ -1631,6 +1643,7 @@ export function createDatabase(
     r3Analytics,
     r3AnalyticsObservations,
     r3PdfDeliveryObservations,
+    alphaAnalytics,
     conversations,
     conversationChat,
     quotes,
