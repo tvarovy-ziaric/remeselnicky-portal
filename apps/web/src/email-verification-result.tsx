@@ -35,21 +35,25 @@ export function EmailVerificationResult({
 }) {
   const auth = useMemo(() => client ?? createAuthOnboardingClient(), [client]);
   const started = useRef(false);
+  const inFlight = useRef(false);
   const [state, setState] = useState<ResultState>("LOADING");
   const [authenticated, setAuthenticated] = useState(false);
 
   useEffect(() => {
-    if (started.current) return;
-    started.current = true;
-    const token = takeEmailVerificationTokenFromFragment(
-      window.location,
-      (path) => window.history.replaceState(null, "", path),
-    );
-    if (token === null) {
-      setState("INVALID");
-      return;
-    }
-    void (async () => {
+    async function verifyFromFragment() {
+      const token = takeEmailVerificationTokenFromFragment(
+        window.location,
+        (path) => window.history.replaceState(null, "", path),
+      );
+      if (token === null) {
+        setAuthenticated(false);
+        setState("INVALID");
+        return;
+      }
+      if (inFlight.current) return;
+      inFlight.current = true;
+      setAuthenticated(false);
+      setState("LOADING");
       const result = await auth.confirmEmail(token);
       if (result.status !== "VERIFIED") {
         setState(
@@ -59,12 +63,22 @@ export function EmailVerificationResult({
               ? "RATE_LIMITED"
               : "UNAVAILABLE",
         );
+        inFlight.current = false;
         return;
       }
       const session = await auth.loadSession();
       setAuthenticated(session.status === "READY");
       setState("SUCCESS");
-    })();
+      inFlight.current = false;
+    }
+
+    const onHashChange = () => void verifyFromFragment();
+    window.addEventListener("hashchange", onHashChange);
+    if (!started.current) {
+      started.current = true;
+      void verifyFromFragment();
+    }
+    return () => window.removeEventListener("hashchange", onHashChange);
   }, [auth]);
 
   const text =
