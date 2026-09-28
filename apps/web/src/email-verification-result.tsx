@@ -14,13 +14,14 @@ export function takeEmailVerificationTokenFromFragment(
   location: Readonly<{ hash: string; pathname: string; search: string }>,
   replaceState: (path: string) => void,
 ): string | null {
+  const hash = location.hash;
+  const pathname = location.pathname;
   // This dedicated route has no legitimate query parameters. Remove both the
   // fragment and query before parsing so a malformed link cannot leave a
   // verification secret in browser history, referrers or copied URLs.
-  replaceState(location.pathname);
-  if (!location.hash.startsWith("#") || location.hash.includes("&"))
-    return null;
-  const parameters = new URLSearchParams(location.hash.slice(1));
+  replaceState(pathname);
+  if (!hash.startsWith("#") || hash.includes("&")) return null;
+  const parameters = new URLSearchParams(hash.slice(1));
   if ([...parameters.keys()].length !== 1 || !parameters.has("token"))
     return null;
   const token = parameters.get("token");

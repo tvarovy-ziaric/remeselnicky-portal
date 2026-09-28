@@ -28,16 +28,28 @@ describe("auth onboarding UI", () => {
   it("strips the fragment before returning a one-time email token", () => {
     const replace = vi.fn();
     const token = "a".repeat(48);
+    const liveLocation = {
+      hash: `#token=${token}`,
+      pathname: "/overenie-emailu",
+      search: "",
+    };
     expect(
       takeEmailVerificationTokenFromFragment(
-        {
-          hash: `#token=${token}`,
-          pathname: "/overenie-emailu",
-          search: "",
-        },
-        replace,
+        liveLocation,
+        vi.fn(() => {
+          liveLocation.hash = "";
+        }),
       ),
     ).toBe(token);
+    expect(liveLocation.hash).toBe("");
+    takeEmailVerificationTokenFromFragment(
+      {
+        hash: `#token=${token}`,
+        pathname: "/overenie-emailu",
+        search: "",
+      },
+      replace,
+    );
     expect(replace).toHaveBeenCalledWith("/overenie-emailu");
     expect(
       takeEmailVerificationTokenFromFragment(
