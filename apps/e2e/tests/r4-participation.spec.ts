@@ -46,6 +46,10 @@ test("participant invitation, bilateral skill evidence and privacy survive the p
     );
     const participantProfileId = requiredString(participantProfile?.profileId);
     const providerProfileId = requiredString(providerProfile?.profileId);
+    const publicProfilePath = `/v1/public/craftsmen/${participantProfileId}`;
+    const evidenceBefore = verifiedWorkEvidence(
+      await read(customer.context, publicProfilePath),
+    );
     const selectedJobId = await createSyntheticJob(
       customer,
       provider,
@@ -120,6 +124,86 @@ test("participant invitation, bilateral skill evidence and privacy survive the p
     await expect(
       historyPage.getByRole("heading", { name: "Potvrdená účasť" }),
     ).toBeVisible();
+
+    const confirmedRoleCommandId = randomUUID();
+    await post(
+      provider,
+      `/v1/me/job-participations/${participantId}/roles`,
+      {
+        action: "ASSIGN",
+        commandId: confirmedRoleCommandId,
+        role: "LEAD",
+      },
+      201,
+    );
+    const correctionRoleCommandId = randomUUID();
+    await post(
+      provider,
+      `/v1/me/job-participations/${participantId}/roles`,
+      {
+        action: "ASSIGN",
+        commandId: correctionRoleCommandId,
+        role: "SITE_MANAGER",
+      },
+      201,
+    );
+    const roleAssignmentsPath = `/v1/me/job-participations/${participantId}/role-assignments`;
+    const pendingRoles = await read(participant.context, roleAssignmentsPath);
+    const pendingRoleItems = pendingRoles.items as Array<
+      Record<string, unknown>
+    >;
+    const confirmedRoleAssignmentId = requiredString(
+      pendingRoleItems.find((item) => item.role === "LEAD")?.assignmentEventId,
+    );
+    const correctionRoleAssignmentId = requiredString(
+      pendingRoleItems.find((item) => item.role === "SITE_MANAGER")
+        ?.assignmentEventId,
+    );
+    expect(pendingRoles.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          assignmentEventId: confirmedRoleAssignmentId,
+          role: "LEAD",
+        }),
+        expect.objectContaining({
+          assignmentEventId: correctionRoleAssignmentId,
+          role: "SITE_MANAGER",
+        }),
+      ]),
+    );
+    expect(
+      (await customer.context.request.get(roleAssignmentsPath)).status(),
+    ).toBe(404);
+    await historyPage.reload({ waitUntil: "domcontentloaded" });
+    const roleRegion = historyPage.getByRole("region", {
+      name: "Potvrdenie rolí na zákazke",
+    });
+    const leadRole = roleRegion
+      .getByText("Vedúci", { exact: true })
+      .locator("..");
+    await expect(leadRole.getByText("Vedúci", { exact: true })).toBeVisible();
+    await leadRole.getByRole("button", { name: "Potvrdiť rolu" }).click();
+    await expect(
+      historyPage.getByRole("status").filter({
+        hasText: "Rolu ste potvrdili",
+      }),
+    ).toBeVisible();
+    await expect(roleRegion.getByText("Vedúci", { exact: true })).toHaveCount(
+      0,
+    );
+    await post(
+      participant,
+      `${roleAssignmentsPath}/${correctionRoleAssignmentId}/decision`,
+      {
+        commandId: randomUUID(),
+        decision: "REQUEST_CORRECTION",
+        reason: "Túto rolu som na zákazke nevykonával.",
+      },
+      201,
+    );
+    expect(
+      (await read(participant.context, roleAssignmentsPath)).items,
+    ).toEqual([]);
     await historyPage.close();
 
     const collection = `/v1/me/job-participations/${participantId}/capabilities`;
@@ -157,6 +241,24 @@ test("participant invitation, bilateral skill evidence and privacy survive the p
         (item) => item.claimId === claimId,
       )?.status,
     ).toBe("CONFIRMED");
+
+    const professionProposal = await post(
+      provider,
+      collection,
+      {
+        commandId: randomUUID(),
+        kind: "PROFESSION",
+        professionCode: "PROF:ALPHA_SYNTHETIC",
+      },
+      201,
+    );
+    const professionClaimId = requiredString(professionProposal.claimId);
+    await post(
+      participant,
+      `${collection}/${professionClaimId}/confirm`,
+      { commandId: randomUUID() },
+      200,
+    );
     const capabilityPage = await participant.context.newPage();
     expect(
       (
@@ -169,6 +271,85 @@ test("participant invitation, bilateral skill evidence and privacy survive the p
       }),
     ).toBeVisible();
     await capabilityPage.close();
+
+    expect(
+      await read(
+        participant.context,
+        `/v1/me/job-participations/${participantId}`,
+      ),
+    ).toMatchObject({
+      verifiedCompletedWork: false,
+      verifiedProfessionCodes: [],
+      verifiedRoles: [],
+    });
+
+    const jobPath = `/v1/me/jobs/${selectedJobId}`;
+    expect(
+      (
+        await post(
+          provider,
+          `${jobPath}/start`,
+          {
+            commandId: randomUUID(),
+          },
+          201,
+        )
+      ).state,
+    ).toBe("IN_PROGRESS");
+    const completion = await post(
+      provider,
+      `${jobPath}/completion/request`,
+      {
+        commandId: randomUUID(),
+        finalMediaAssetIds: [],
+        note: "Syntetické dokončenie s overenou účasťou.",
+      },
+      201,
+    );
+    const attemptId = requiredString(completion.attemptId);
+    expect(
+      (
+        await post(
+          customer,
+          `${jobPath}/completion/${attemptId}/accept`,
+          { commandId: randomUUID() },
+          201,
+        )
+      ).jobState,
+    ).toBe("COMPLETED");
+
+    const completedDetail = await read(
+      participant.context,
+      `/v1/me/job-participations/${participantId}`,
+    );
+    expect(completedDetail).toMatchObject({
+      jobState: "COMPLETED",
+      verifiedCompletedWork: true,
+      verifiedProfessionCodes: expect.arrayContaining(["PROF:ALPHA_SYNTHETIC"]),
+      verifiedRoles: expect.arrayContaining(["MEMBER", "LEAD"]),
+    });
+    expect(completedDetail.verifiedRoles).not.toContain("SITE_MANAGER");
+    const completedPage = await participant.context.newPage();
+    expect(
+      (await completedPage.goto(`/ucasti/historia/${participantId}`))?.status(),
+    ).toBe(200);
+    await expect(
+      completedPage.getByText(
+        "Overená účasť na dokončenej zákazke. Nie je to hodnotenie kvality.",
+      ),
+    ).toBeVisible();
+    await expect(
+      completedPage.getByText("Vedúci", { exact: false }),
+    ).toBeVisible();
+    await completedPage.close();
+
+    const publicProfileAfter = await read(customer.context, publicProfilePath);
+    const serializedPublicProfile = JSON.stringify(publicProfileAfter);
+    expect(serializedPublicProfile).not.toContain(selectedJobId);
+    expect(serializedPublicProfile).not.toContain(participantId);
+    const evidenceAfter = verifiedWorkEvidence(publicProfileAfter);
+    expect(evidenceAfter.total).toBe(evidenceBefore.total + 1);
+    expect(evidenceAfter.profession).toBe(evidenceBefore.profession + 1);
   } finally {
     await Promise.all([
       provider.context.close(),
@@ -407,5 +588,31 @@ function requiredEnv(name: string): string {
   const value = process.env[name];
   if (value === undefined || value.length === 0)
     throw new Error(`Missing synthetic E2E input ${name}`);
+  return value;
+}
+
+function verifiedWorkEvidence(profile: Record<string, unknown>): {
+  readonly profession: number;
+  readonly total: number;
+} {
+  const trust = object(profile.trust);
+  const profession = (profile.professions as unknown[]).find(
+    (item) => object(item).code === "PROF:ALPHA_SYNTHETIC",
+  );
+  return {
+    profession: nonnegativeInteger(object(profession).verifiedJobCount),
+    total: nonnegativeInteger(trust.verifiedWorkCount),
+  };
+}
+
+function object(value: unknown): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value))
+    throw new Error("Synthetic public evidence is invalid");
+  return value as Record<string, unknown>;
+}
+
+function nonnegativeInteger(value: unknown): number {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0)
+    throw new Error("Synthetic public evidence count is invalid");
   return value;
 }
