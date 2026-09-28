@@ -46,9 +46,12 @@ The sink has three bounded HTTP operations:
 
 Every response is `Cache-Control: no-store`. There is no list/search endpoint,
 mailbox UI, Nginx route, tunnel route or public service port. The service joins
-only the internal Alpha network; its host port is bound to loopback for the
-local E2E runner. The API can ingest but cannot claim, and the test runner can
-claim but cannot ingest.
+the internal Alpha network for API delivery and a dedicated host bridge used by
+no other service; its host port is bound to loopback for the local E2E runner.
+Nginx, Cloudflare, and the Alpha edge network never receive a route to it. The
+dedicated bridge is required on Docker Desktop because an `internal: true`
+network does not publish a usable Windows-host loopback port. The API can ingest
+but cannot claim, and the test runner can claim but cannot ingest.
 
 Pending secrets are stored in a dedicated SQLite volume as AES-GCM ciphertext.
 Lookup uses an HMAC of the normalized destination rather than destination

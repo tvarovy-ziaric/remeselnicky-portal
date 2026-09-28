@@ -250,7 +250,7 @@ services:
       - synthetic_verification_ingest_key
     volumes:
       - alpha-synthetic-verification:/var/lib/synthetic-verification
-    networks: [alpha-internal]
+    networks: [alpha-internal, alpha-synthetic-claim]
     ports:
       - "127.0.0.1:${ALPHA_SYNTHETIC_VERIFICATION_PORT:-8467}:8467"
     healthcheck:
@@ -538,6 +538,10 @@ networks:
     name: remeselnicky-alpha-egress
   alpha-edge:
     name: remeselnicky-alpha-edge
+  alpha-synthetic-claim:
+    name: remeselnicky-alpha-synthetic-claim
+    driver_opts:
+      com.docker.network.bridge.host_binding_ipv4: "127.0.0.1"
 
 volumes:
   alpha-postgres-data:

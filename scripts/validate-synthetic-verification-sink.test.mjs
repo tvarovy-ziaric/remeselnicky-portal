@@ -40,6 +40,8 @@ test("keeps the synthetic verification sink off every public edge", () => {
   const sinkService = serviceBlock("synthetic-verification-sink");
 
   assert.match(sinkService, /alpha-internal/u);
+  assert.match(sinkService, /alpha-synthetic-claim/u);
+  assert.match(sinkService, /alpha-synthetic-claim/u);
   assert.doesNotMatch(sinkService, /alpha-edge/u);
   assert.match(
     sinkService,
