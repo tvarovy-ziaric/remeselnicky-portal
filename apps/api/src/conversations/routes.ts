@@ -451,7 +451,8 @@ function registerConversationChatRoutes(
     CONVERSATION_PATHS.mediaDownload,
     { schema: { params: mediaDownloadParamsSchema } },
     async (request, reply) => {
-      const actorUserId = await requireActor(request, reply, guard);
+      void reply.header("x-content-type-options", "nosniff");
+      const actorUserId = await requirePrivateMediaActor(request, reply, guard);
       if (actorUserId === undefined) return;
       if (chat.privateMediaDelivery === undefined) {
         return reply.code(503).send({ code: "MEDIA_DELIVERY_UNAVAILABLE" });
@@ -460,10 +461,7 @@ function registerConversationChatRoutes(
         actorUserId,
         mediaAssetId: request.params.mediaAssetId,
       });
-      reply.headers({
-        ...result.headers,
-        "x-content-type-options": "nosniff",
-      });
+      reply.headers(result.headers);
       if (result.statusCode === 303) {
         await chat.pdfDeliveryObservation
           ?.recordSuccessfulDelivery({
@@ -476,6 +474,23 @@ function registerConversationChatRoutes(
       return reply.code(result.statusCode).send(result.body);
     },
   );
+}
+
+async function requirePrivateMediaActor(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  guard: Guard,
+): Promise<UserId | undefined> {
+  const result = await guard.evaluate(request);
+  if (result.status === "AUTHENTICATION_REQUIRED") {
+    await reply.code(401).send({ code: result.status });
+    return undefined;
+  }
+  if (result.status === "ACCOUNT_NOT_ACTIVE") {
+    await reply.code(404).send({ code: "MEDIA_NOT_FOUND" });
+    return undefined;
+  }
+  return result.user.id;
 }
 
 function sendConversation(

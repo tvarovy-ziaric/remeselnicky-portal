@@ -73,7 +73,6 @@ describe("R3 Fastify/session/CSRF security adapter", () => {
     });
     expect(report.missingProductionSeams).toEqual([
       "PRIVATE_MEDIA_PRODUCTION_COMPOSITION",
-      "JOB_REQUEST_PRIVATE_MEDIA_DELIVERY",
       "BROWSER_STAGING_E2E",
     ]);
   }, 15_000);

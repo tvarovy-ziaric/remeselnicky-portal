@@ -229,9 +229,11 @@ export function ConversationChat({
                   {entry.author === "SELF" ? "Vy" : "Druhá strana"}
                 </p>
                 <p>
-                  {entry.hiddenByModeration
-                    ? "Správa bola skrytá z dôvodu porušenia pravidiel."
-                    : linkPlainText(entry.body ?? "")}
+                  {entry.hiddenByModeration ? (
+                    "Správa bola skrytá z dôvodu porušenia pravidiel."
+                  ) : (
+                    <SafeLinkedText value={entry.body ?? ""} />
+                  )}
                 </p>
                 {entry.attachments.length === 0 ? null : (
                   <ul aria-label="Prílohy správy">
@@ -736,7 +738,11 @@ function parseParticipantState(
   return value as unknown as ConversationTimelineView["participantState"];
 }
 
-function linkPlainText(value: string): React.ReactNode {
+export function SafeLinkedText({
+  value,
+}: {
+  readonly value: string;
+}): React.ReactNode {
   return value.split(/(https?:\/\/[^\s]+)/giu).map((part, index) =>
     /^https?:\/\//iu.test(part) ? (
       <a

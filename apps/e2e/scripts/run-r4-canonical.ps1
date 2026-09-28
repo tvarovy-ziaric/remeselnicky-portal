@@ -6,6 +6,8 @@ $fixture = Get-Content -LiteralPath $fixturePath -Raw | ConvertFrom-Json
 $alphaEnv = Get-Content -LiteralPath (Join-Path $repo '.env.alpha') -Raw
 $hostname = [regex]::Match($alphaEnv, '(?m)^ALPHA_APP_HOSTNAME=([a-z0-9-]+\.trycloudflare\.com)\r?$').Groups[1].Value
 if (-not $hostname -or $fixture.baseURL -ne "https://$hostname") { throw 'Quick Tunnel origin mismatch' }
+$sinkPort = [regex]::Match($alphaEnv, '(?m)^ALPHA_SYNTHETIC_VERIFICATION_PORT=([0-9]+)\r?$').Groups[1].Value
+if (-not $sinkPort -or [int]$sinkPort -lt 1 -or [int]$sinkPort -gt 65535) { throw 'Synthetic verification sink port is invalid' }
 
 $gatePasswordPath = Join-Path $repo '.alpha/secrets/quick_gate_password'
 $accountPasswordPath = Join-Path $repo '.alpha/secrets/synthetic_seed_password'
@@ -27,7 +29,7 @@ $env:STAGING_E2E_PROVIDER_B_AUTH_STATE = $providerStatePath
 $env:STAGING_E2E_PROVIDER_A_AUTH_STATE = $competitorStatePath
 $env:STAGING_E2E_SYNTHETIC_REGISTRATION_KEY_FILE = $registrationKeyPath
 $env:STAGING_E2E_SYNTHETIC_CLAIM_KEY_FILE = $claimKeyPath
-$env:STAGING_E2E_SYNTHETIC_SINK_ORIGIN = 'http://127.0.0.1:8467'
+$env:STAGING_E2E_SYNTHETIC_SINK_ORIGIN = "http://127.0.0.1:$sinkPort"
 
 Push-Location $repo
 try {
