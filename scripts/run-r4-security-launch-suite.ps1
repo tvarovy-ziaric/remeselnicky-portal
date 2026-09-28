@@ -56,7 +56,7 @@ function Invoke-VitestWithoutSkips {
     throw "$Label did not finish with every discovered test passing and zero skipped/todo tests."
   }
   Write-Host "${Label}: $($result.numPassedTests)/$($result.numTotalTests) passed; 0 skipped."
-  return [ordered]@{
+  return [pscustomobject][ordered]@{
     label = $Label
     package = $Package
     script = $Script
