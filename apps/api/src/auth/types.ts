@@ -18,6 +18,18 @@ export type RegistrationPersistenceResult =
   | { readonly status: "CREATED"; readonly user: AuthUser }
   | { readonly status: "DUPLICATE" };
 
+export type RegistrationAdmissionResult =
+  RegistrationPersistenceResult | { readonly status: "NOT_AVAILABLE" };
+
+/** Owns eligibility admission and account creation as one operation. */
+export interface RegistrationAdmissionPort {
+  register(input: {
+    readonly adultAttested: true;
+    readonly normalizedEmail: string;
+    readonly passwordHash: string;
+  }): Promise<RegistrationAdmissionResult>;
+}
+
 export interface StoredSession {
   readonly expiresAt: Date;
   readonly id: string;
@@ -74,6 +86,7 @@ export interface ResetTokenService {
 }
 
 export interface RegistrationEligibilityPort {
+  /** @deprecated Temporary compatibility seam for synthetic staging only. */
   isEligible(input: { readonly normalizedEmail: string }): Promise<boolean>;
 }
 

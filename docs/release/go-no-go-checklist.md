@@ -131,18 +131,18 @@ cannot be marked as a manual `PASS` from automated Playwright evidence alone.
 
 ## F. Provider and production operations
 
-| Gate                                                       | Current status       | Required evidence                                                                                                        |
-| ---------------------------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Provider-managed isolated staging                          | `BLOCKED_HUMAN_GATE` | Approved account, billing owner, DNS names, credentials and provider apply.                                              |
-| Uninterrupted provider-staging canonical E2E               | `NOT_EVALUATED`      | Exact provider-managed staging run; Quick Tunnel evidence is not equivalent.                                             |
-| Named Access-protected staging and external port probe     | `BLOCKED_HUMAN_GATE` | Approved account/zone/Access identities and outside-device result.                                                       |
-| Real email and SMS provider delivery                       | `BLOCKED_HUMAN_GATE` | Approved processors/accounts/credentials and delivery/failure evidence. The synthetic sink is not a production fallback. |
-| Production DNS/TLS and object-storage permissions          | `BLOCKED_HUMAN_GATE` | Approved production accounts/configuration and verification.                                                             |
-| Automated production database backups and media recovery   | `BLOCKED_HUMAN_GATE` | Provider mapping, monitoring, recovery credentials and successful rehearsal.                                             |
-| Production logging/error tracking/monitoring/alert channel | `BLOCKED_HUMAN_GATE` | Approved collector/receiver, named incident owner and firing/resolved evidence.                                          |
-| Real admin MFA enrollment/bootstrap/recovery               | `BLOCKED_HUMAN_GATE` | Approved TOTP/WebAuthn provider, named administrators and audited bootstrap.                                             |
-| Invite-only intake pause/throttle                          | `NOT_EVALUATED`      | Production-safe operational control and smoke evidence.                                                                  |
-| Production smoke and rollback/forward-fix exercise         | `NOT_EVALUATED`      | Protected deployment evidence, prior digest or first-release containment plan.                                           |
+| Gate                                                       | Current status       | Required evidence                                                                                                                                         |
+| ---------------------------------------------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Provider-managed isolated staging                          | `BLOCKED_HUMAN_GATE` | Approved account, billing owner, DNS names, credentials and provider apply.                                                                               |
+| Uninterrupted provider-staging canonical E2E               | `NOT_EVALUATED`      | Exact provider-managed staging run; Quick Tunnel evidence is not equivalent.                                                                              |
+| Named Access-protected staging and external port probe     | `BLOCKED_HUMAN_GATE` | Approved account/zone/Access identities and outside-device result.                                                                                        |
+| Real email and SMS provider delivery                       | `BLOCKED_HUMAN_GATE` | Approved processors/accounts/credentials and delivery/failure evidence. The synthetic sink is not a production fallback.                                  |
+| Production DNS/TLS and object-storage permissions          | `BLOCKED_HUMAN_GATE` | Approved production accounts/configuration and verification.                                                                                              |
+| Automated production database backups and media recovery   | `BLOCKED_HUMAN_GATE` | Provider mapping, monitoring, recovery credentials and successful rehearsal.                                                                              |
+| Production logging/error tracking/monitoring/alert channel | `BLOCKED_HUMAN_GATE` | Approved collector/receiver, named incident owner and firing/resolved evidence.                                                                           |
+| Real admin MFA enrollment/bootstrap/recovery               | `BLOCKED_HUMAN_GATE` | Approved TOTP/WebAuthn provider, named administrators and audited bootstrap.                                                                              |
+| Invite-only intake pause/throttle                          | `NOT_EVALUATED`      | Local migration/repository/admin-route evidence exists (ADR 0028); protected production wiring, real MFA operation and smoke evidence are still required. |
+| Production smoke and rollback/forward-fix exercise         | `NOT_EVALUATED`      | Protected deployment evidence, prior digest or first-release containment plan.                                                                            |
 
 ## G. Defects
 

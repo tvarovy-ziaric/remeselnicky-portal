@@ -23,6 +23,7 @@ import {
 } from "../src/index.js";
 import { runNotificationIntegrationAssertions } from "./notification-integration-helper.js";
 import { runAlphaNotificationIntegrationAssertions } from "./alpha-notification-integration-helper.js";
+import { runAlphaRegistrationIntakeIntegrationAssertions } from "./alpha-registration-intake-integration-helper.js";
 import { runAuditIntegrationAssertions } from "./audit-integration-helper.js";
 import { runPrivacyIntegrationAssertions } from "./privacy-integration-helper.js";
 import { runTaxonomyIntegrationAssertions } from "./taxonomy-integration-helper.js";
@@ -250,6 +251,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
           "0112_privacy_notification_delivery_disposition.sql",
           "0113_privacy_restore_reapplication.sql",
           "0114_alpha_analytics_read_models.sql",
+          "0115_alpha_registration_intake.sql",
         ],
         alreadyApplied: 0,
       });
@@ -258,7 +260,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         testDatabaseUrl,
         migrationsDirectory,
       );
-      expect(secondRun).toEqual({ applied: [], alreadyApplied: 115 });
+      expect(secondRun).toEqual({ applied: [], alreadyApplied: 116 });
 
       const sql = postgres(testDatabaseUrl, { max: 5 });
       try {
@@ -304,7 +306,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         `;
 
         expect(postgis?.extversion).toMatch(/^3\./);
-        expect(ledger?.count).toBe(115);
+        expect(ledger?.count).toBe(116);
         expect(created).toMatchObject({ account_state: "ACTIVE" });
         expect(created?.id).toMatch(
           /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
@@ -1959,6 +1961,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
           privilegedSessionId: adminSessionId,
         });
         await runAlphaNotificationIntegrationAssertions(sql);
+        await runAlphaRegistrationIntakeIntegrationAssertions(sql);
 
         await adminAccess.revokePrivilegedSession(superSessionDigest);
         await expect(

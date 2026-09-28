@@ -10,6 +10,10 @@ import {
   type AuthRepository,
 } from "./auth-repository.js";
 import {
+  createAlphaRegistrationIntakeRepository,
+  type AlphaRegistrationIntakeRepository,
+} from "./alpha-registration-intake-repository.js";
+import {
   createEmailVerificationRepository,
   type EmailVerificationRepository,
 } from "./email-verification-repository.js";
@@ -961,6 +965,16 @@ export type {
 } from "./schema/index.js";
 
 export { createAuthRepository } from "./auth-repository.js";
+export {
+  AlphaRegistrationIntakeIdempotencyError,
+  createAlphaRegistrationIntakeRepository,
+  type AlphaRegistrationCommandResult,
+  type AlphaRegistrationIntakeRepository,
+  type AlphaRegistrationIntakeState,
+  type AlphaRegistrationIntakeStatus,
+  type AlphaRegistrationIssueResult,
+  type InvitedRegistrationResult,
+} from "./alpha-registration-intake-repository.js";
 export { createAdminAccessRepository } from "./admin-auth-repository.js";
 export type { AdminAccessRepository } from "@portal/admin-auth";
 export { createAuditRepository } from "./audit-repository.js";
@@ -1299,6 +1313,7 @@ export interface DatabaseClient extends DatabaseHealthProbe {
    */
   readonly query: PostgresJsDatabase<typeof schema>;
   readonly auth: AuthRepository;
+  readonly alphaRegistrationIntake: AlphaRegistrationIntakeRepository;
   readonly adminAccess: AdminAccessRepository;
   readonly audit: AuditRepository;
   readonly craftsmanProfiles: CraftsmanProfilePersistence;
@@ -1490,6 +1505,7 @@ export function createDatabase(
   });
   const query = drizzle(drizzleSql, { schema });
   const auth = createAuthRepository(sql);
+  const alphaRegistrationIntake = createAlphaRegistrationIntakeRepository(sql);
   const adminAccess = createAdminAccessRepository(sql);
   const audit = createAuditRepository(sql);
   const craftsmanProfiles = createCraftsmanProfileRepository(sql);
@@ -1615,6 +1631,7 @@ export function createDatabase(
 
   return Object.freeze({
     adminAccess,
+    alphaRegistrationIntake,
     audit,
     auth,
     craftsmanProfiles,

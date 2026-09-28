@@ -1,13 +1,70 @@
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 
 import type {
+  AlphaRegistrationIntakeRepository,
   AuthRepository,
   AuthSessionPayload,
   AuthUser as DatabaseAuthUser,
 } from "@portal/db";
 import type { UserId } from "@portal/domain";
 
-import type { AuthPersistence, AuthUser } from "./types.js";
+import type {
+  AuthPersistence,
+  AuthUser,
+  RegistrationAdmissionPort,
+} from "./types.js";
+
+export function createAlphaRegistrationAdmission(
+  repository: Pick<AlphaRegistrationIntakeRepository, "registerInvitedUser">,
+  hmacKey: string,
+): RegistrationAdmissionPort {
+  if (!/^[a-f0-9]{64}$/u.test(hmacKey))
+    throw new Error("Alpha registration intake configuration is invalid.");
+  return Object.freeze({
+    async register(
+      input: Parameters<RegistrationAdmissionPort["register"]>[0],
+    ) {
+      const result = await repository.registerInvitedUser({
+        ...input,
+        emailHmacDigest: invitationEmailDigest(hmacKey, input.normalizedEmail),
+      });
+      if (result.status !== "CREATED")
+        return { status: result.status } as const;
+      return { status: "CREATED", user: authUser(result.user) } as const;
+    },
+  });
+}
+
+export function createAlphaRegistrationIntakeOperations(
+  repository: Pick<
+    AlphaRegistrationIntakeRepository,
+    "issue" | "readStatus" | "revoke" | "setState"
+  >,
+  hmacKey: string,
+) {
+  if (!/^[a-f0-9]{64}$/u.test(hmacKey))
+    throw new Error("Alpha registration intake configuration is invalid.");
+  return Object.freeze({
+    issue(input: {
+      actorUserId: string;
+      cohortCode: string;
+      commandId: string;
+      expiresAt: Date;
+      normalizedEmail: string;
+    }) {
+      return repository.issue({
+        actorUserId: input.actorUserId,
+        cohortCode: input.cohortCode,
+        commandId: input.commandId,
+        emailHmacDigest: invitationEmailDigest(hmacKey, input.normalizedEmail),
+        expiresAt: input.expiresAt,
+      });
+    },
+    readStatus: () => repository.readStatus(),
+    revoke: repository.revoke.bind(repository),
+    setState: repository.setState.bind(repository),
+  });
+}
 
 export function createAuthPersistence(
   repository: AuthRepository,
@@ -126,4 +183,13 @@ function authUser(user: DatabaseAuthUser): AuthUser {
 
 function sessionDigest(sessionId: string): string {
   return createHash("sha256").update(sessionId, "utf8").digest("hex");
+}
+
+function invitationEmailDigest(hmacKey: string, normalizedEmail: string) {
+  return createHmac("sha256", hmacKey)
+    .update(
+      `portal-alpha-registration-invitation-v1\0${normalizedEmail}`,
+      "utf8",
+    )
+    .digest("hex");
 }

@@ -43,6 +43,7 @@ import {
 
 import { buildApi } from "./app.js";
 import {
+  createAlphaRegistrationAdmission,
   createAuthPersistence,
   createEmailVerificationPersistence,
   createPhoneVerificationPersistence,
@@ -80,6 +81,15 @@ const syntheticVerification =
           config.secrets.syntheticVerification.registrationSigningKey,
         sinkOrigin: config.syntheticVerification.sinkOrigin,
       });
+const registrationAdmission =
+  syntheticVerification !== undefined
+    ? syntheticVerification.createAdmission(authPersistence)
+    : config.secrets.alphaRegistrationInvitationHmacKey === undefined
+      ? undefined
+      : createAlphaRegistrationAdmission(
+          database.alphaRegistrationIntake,
+          config.secrets.alphaRegistrationInvitationHmacKey,
+        );
 const observabilityContext = {
   ...config.observability,
   service: "api",
@@ -153,9 +163,9 @@ const app = buildApi({
         database.emailVerification,
       ),
     },
-    ...(syntheticVerification === undefined
+    ...(registrationAdmission === undefined
       ? {}
-      : { eligibility: syntheticVerification.eligibility }),
+      : { admission: registrationAdmission }),
     phoneVerification: {
       ...(syntheticVerification === undefined
         ? {}

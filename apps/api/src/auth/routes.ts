@@ -30,6 +30,10 @@ import {
   type AdminAnalyticsRouteDependencies,
 } from "../admin-analytics/index.js";
 import {
+  registerAdminRegistrationIntakeRoutes,
+  type AdminRegistrationIntakeRouteDependencies,
+} from "../admin-registration-intake/index.js";
+import {
   registerCustomerShortlistRoutes,
   type CustomerShortlistRouteDependencies,
 } from "../customer-shortlist/routes.js";
@@ -228,11 +232,13 @@ import type {
   AuthUser,
   PasswordHasher,
   PasswordResetDeliveryPort,
+  RegistrationAdmissionPort,
   RegistrationEligibilityPort,
   ResetTokenService,
 } from "./types.js";
 
 export interface AuthModuleDependencies {
+  readonly admission?: RegistrationAdmissionPort;
   readonly adminAccess?: Pick<AdminAuthRouteDependencies, "service">;
   readonly adminAnalytics?: Pick<AdminAnalyticsRouteDependencies, "analytics">;
   readonly clock?: () => Date;
@@ -298,6 +304,10 @@ export interface AuthModuleDependencies {
     "moderation"
   >;
   readonly adminPrivacy?: Pick<AdminPrivacyRouteDependencies, "operations">;
+  readonly adminRegistrationIntake?: Pick<
+    AdminRegistrationIntakeRouteDependencies,
+    "clock" | "intake"
+  >;
   readonly jobDocumentation?: Pick<
     JobDocumentationRouteDependencies,
     "documentation"
@@ -399,6 +409,7 @@ export interface AuthModuleDependencies {
     readonly tokenTtlMs?: number;
     readonly tokens?: EmailVerificationTokenService;
   };
+  /** @deprecated Use admission. Synthetic staging compatibility only. */
   readonly eligibility?: RegistrationEligibilityPort;
   readonly hasher?: PasswordHasher;
   readonly persistence: AuthPersistence;
@@ -424,9 +435,29 @@ const phoneVerificationDefaults = Object.freeze({
   windowMs: 15 * 60 * 1_000,
 });
 
-const denyRegistration: RegistrationEligibilityPort = Object.freeze({
-  isEligible: () => Promise.resolve(false),
+const denyRegistration: RegistrationAdmissionPort = Object.freeze({
+  register: () => Promise.resolve({ status: "NOT_AVAILABLE" } as const),
 });
+
+function legacySyntheticAdmission(
+  eligibility: RegistrationEligibilityPort,
+  persistence: AuthPersistence,
+): RegistrationAdmissionPort {
+  return Object.freeze({
+    async register(
+      input: Parameters<RegistrationAdmissionPort["register"]>[0],
+    ) {
+      if (
+        !(await eligibility.isEligible({
+          normalizedEmail: input.normalizedEmail,
+        }))
+      ) {
+        return { status: "NOT_AVAILABLE" } as const;
+      }
+      return persistence.register(input);
+    },
+  });
+}
 const unavailableResetDelivery: PasswordResetDeliveryPort = Object.freeze({
   deliver: () => Promise.reject(new Error("Reset delivery is unavailable")),
 });
@@ -506,9 +537,16 @@ async function configureAuthModule(
   });
 
   const service = createAuthService({
+    admission:
+      dependencies.admission ??
+      (dependencies.eligibility === undefined
+        ? denyRegistration
+        : legacySyntheticAdmission(
+            dependencies.eligibility,
+            dependencies.persistence,
+          )),
     ...(dependencies.clock === undefined ? {} : { clock: dependencies.clock }),
     delivery: dependencies.delivery ?? unavailableResetDelivery,
-    eligibility: dependencies.eligibility ?? denyRegistration,
     ...(dependencies.hasher === undefined
       ? {}
       : { hasher: dependencies.hasher }),
@@ -1025,6 +1063,18 @@ async function configureAuthModule(
           max: config.rateLimitMax,
           timeWindowMs: config.rateLimitWindowMs,
         },
+      });
+    }
+    if (dependencies.adminRegistrationIntake !== undefined) {
+      registerAdminRegistrationIntakeRoutes(app, {
+        adminAccess: dependencies.adminAccess.service,
+        csrfProtection: csrfProtection(app),
+        guard,
+        rateLimit: {
+          max: config.rateLimitMax,
+          timeWindowMs: config.rateLimitWindowMs,
+        },
+        ...dependencies.adminRegistrationIntake,
       });
     }
   }

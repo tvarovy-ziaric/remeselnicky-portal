@@ -31,6 +31,31 @@ describe("synthetic verification runtime", () => {
     ).resolves.toBe(false);
   });
 
+  it("binds signed synthetic eligibility to registration admission", async () => {
+    const runtime = runtimeFixture();
+    const register = vi
+      .fn()
+      .mockResolvedValue({ status: "DUPLICATE" as const });
+    const admission = runtime.createAdmission({ register });
+    const registration = {
+      adultAttested: true as const,
+      normalizedEmail: email,
+      passwordHash: "opaque-password-hash",
+    };
+
+    await expect(admission.register(registration)).resolves.toEqual({
+      status: "DUPLICATE",
+    });
+    expect(register).toHaveBeenCalledWith(registration);
+    await expect(
+      admission.register({
+        ...registration,
+        normalizedEmail: "person@example.sk",
+      }),
+    ).resolves.toEqual({ status: "NOT_AVAILABLE" });
+    expect(register).toHaveBeenCalledTimes(1);
+  });
+
   it("delivers only synthetic destinations to the fixed internal sink", async () => {
     const fetchMock = vi
       .fn<typeof fetch>()

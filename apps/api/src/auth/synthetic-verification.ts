@@ -4,7 +4,11 @@ import type { DeploymentEnvironment } from "@portal/config/public";
 
 import type { EmailVerificationDeliveryPort } from "./email-verification.js";
 import type { PhoneVerificationDeliveryPort } from "./phone-verification.js";
-import type { RegistrationEligibilityPort } from "./types.js";
+import type {
+  AuthPersistence,
+  RegistrationAdmissionPort,
+  RegistrationEligibilityPort,
+} from "./types.js";
 
 const emailPattern =
   /^synthetic\.e2e\.([a-f0-9]{32})\.([a-f0-9]{32})@portal\.invalid$/u;
@@ -12,6 +16,9 @@ const phonePattern = /^\+999[0-9]{8,12}$/u;
 const fixedSinkOrigin = "http://synthetic-verification-sink:8467";
 
 export interface SyntheticVerificationRuntime {
+  readonly createAdmission: (
+    persistence: Pick<AuthPersistence, "register">,
+  ) => RegistrationAdmissionPort;
   readonly emailDelivery: EmailVerificationDeliveryPort;
   readonly eligibility: RegistrationEligibilityPort;
   readonly phoneDelivery: PhoneVerificationDeliveryPort;
@@ -49,7 +56,27 @@ export function createSyntheticVerificationRuntime(input: {
     }
   };
 
+  const createAdmission = (
+    persistence: Pick<AuthPersistence, "register">,
+  ): RegistrationAdmissionPort =>
+    Object.freeze({
+      async register(
+        registration: Parameters<RegistrationAdmissionPort["register"]>[0],
+      ) {
+        if (
+          !isEligibleSyntheticEmail(
+            registration.normalizedEmail,
+            input.registrationSigningKey,
+          )
+        ) {
+          return { status: "NOT_AVAILABLE" } as const;
+        }
+        return persistence.register(registration);
+      },
+    });
+
   return Object.freeze({
+    createAdmission,
     emailDelivery: Object.freeze({
       async deliver({
         normalizedEmail,

@@ -9,7 +9,7 @@ import type {
   AuthUser,
   PasswordHasher,
   PasswordResetDeliveryPort,
-  RegistrationEligibilityPort,
+  RegistrationAdmissionPort,
   ResetTokenService,
 } from "./types.js";
 
@@ -40,7 +40,7 @@ export interface AuthService {
 export function createAuthService(input: {
   readonly clock?: () => Date;
   readonly delivery: PasswordResetDeliveryPort;
-  readonly eligibility: RegistrationEligibilityPort;
+  readonly admission: RegistrationAdmissionPort;
   readonly hasher?: PasswordHasher;
   readonly passwordResetTtlMs: number;
   readonly persistence: AuthPersistence;
@@ -86,12 +86,8 @@ export function createAuthService(input: {
       if (registration.adultAttested !== true) {
         throw new AuthInputError();
       }
-      if (!(await input.eligibility.isEligible({ normalizedEmail }))) {
-        return { status: "NOT_AVAILABLE" };
-      }
-
       const passwordHash = await hasher.hash(registration.password);
-      const result = await input.persistence.register({
+      const result = await input.admission.register({
         adultAttested: true,
         normalizedEmail,
         passwordHash,

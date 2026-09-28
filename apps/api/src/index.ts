@@ -5,6 +5,11 @@ export {
 } from "./admin-analytics/index.js";
 export type { AdminAnalyticsRouteDependencies } from "./admin-analytics/index.js";
 export {
+  ADMIN_REGISTRATION_INTAKE_PATHS,
+  registerAdminRegistrationIntakeRoutes,
+} from "./admin-registration-intake/index.js";
+export type { AdminRegistrationIntakeRouteDependencies } from "./admin-registration-intake/index.js";
+export {
   PUBLIC_CRAFTSMAN_PROFILE_PATH,
   registerPublicCraftsmanProfileRoutes,
 } from "./public-craftsman-profile/routes.js";

@@ -1,5 +1,9 @@
 export { createArgon2PasswordHasher } from "./password.js";
-export { createAuthPersistence } from "./db-adapter.js";
+export {
+  createAlphaRegistrationAdmission,
+  createAlphaRegistrationIntakeOperations,
+  createAuthPersistence,
+} from "./db-adapter.js";
 export { createPostgresRateLimitStoreConstructor } from "./rate-limit-store.js";
 export { createResetTokenService } from "./reset-token.js";
 export {
@@ -54,6 +58,8 @@ export type {
   PasswordHasher,
   PasswordResetDeliveryPort,
   RateLimitConsumption,
+  RegistrationAdmissionPort,
+  RegistrationAdmissionResult,
   RegistrationEligibilityPort,
   RegistrationPersistenceResult,
   ResetTokenService,

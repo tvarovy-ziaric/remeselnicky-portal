@@ -32,6 +32,7 @@ import type {
   AuthRuntimeConfig,
   AuthUser,
   PasswordHasher,
+  RegistrationAdmissionPort,
   RegistrationEligibilityPort,
   ResetTokenService,
   StoredSession,
@@ -302,6 +303,39 @@ describe("authentication HTTP boundary", () => {
 
     expect(response.statusCode).toBe(403);
     expect(response.json()).toEqual({ code: "REGISTRATION_NOT_AVAILABLE" });
+    expect(
+      await fixture.persistence.findCredentialByEmail("person@example.com"),
+    ).toBeUndefined();
+  });
+
+  it("prefers atomic admission over the legacy eligibility precheck", async () => {
+    let legacyCalls = 0;
+    const fixture = createFixture({
+      admission: {
+        register: () => Promise.resolve({ status: "NOT_AVAILABLE" }),
+      },
+      eligibility: {
+        isEligible: () => {
+          legacyCalls += 1;
+          return Promise.resolve(true);
+        },
+      },
+    });
+    const session = await csrf(fixture.app);
+    const response = await fixture.app.inject({
+      headers: { cookie: session.cookie, "x-csrf-token": session.token },
+      method: "POST",
+      payload: {
+        adultAttested: true,
+        email: "person@example.com",
+        password: PASSWORD,
+      },
+      url: AUTH_API_PATHS.register,
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({ code: "REGISTRATION_NOT_AVAILABLE" });
+    expect(legacyCalls).toBe(0);
     expect(
       await fixture.persistence.findCredentialByEmail("person@example.com"),
     ).toBeUndefined();
@@ -1059,12 +1093,14 @@ interface Fixture {
 
 function createFixture(
   options: {
+    readonly admission?: RegistrationAdmissionPort;
     readonly config?: Partial<AuthRuntimeConfig>;
     readonly delivery?: boolean;
     readonly draftHandoff?: boolean;
     readonly emailVerification?: boolean;
     readonly emailVerificationDelivery?: boolean;
     readonly eligible?: boolean;
+    readonly eligibility?: RegistrationEligibilityPort;
     readonly phoneVerification?: boolean;
     readonly phoneVerificationDelivery?: boolean;
     readonly verificationResendLimit?: number;
@@ -1087,11 +1123,12 @@ function createFixture(
     clock,
   );
   const eligibility: RegistrationEligibilityPort | undefined =
-    options.eligible === undefined
+    options.eligibility ??
+    (options.eligible === undefined
       ? undefined
       : {
           isEligible: () => Promise.resolve(options.eligible === true),
-        };
+        });
   const config: AuthRuntimeConfig = {
     appOrigin: "https://portal.example",
     cookieName: "portal.sid",
@@ -1131,6 +1168,9 @@ function createFixture(
   };
   const app = buildApi({
     auth: {
+      ...(options.admission === undefined
+        ? {}
+        : { admission: options.admission }),
       clock,
       config,
       ...(options.delivery === false

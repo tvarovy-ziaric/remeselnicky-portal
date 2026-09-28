@@ -105,6 +105,22 @@ describe("server configuration", () => {
     });
   });
 
+  it("accepts only a 32-byte hex invitation HMAC key", () => {
+    const key = "c".repeat(64);
+    expect(
+      parseServerConfig({
+        ...productionEnvironment,
+        ALPHA_REGISTRATION_INVITATION_HMAC_KEY: key,
+      }).secrets.alphaRegistrationInvitationHmacKey,
+    ).toBe(key);
+    expect(() =>
+      parseServerConfig({
+        ...productionEnvironment,
+        ALPHA_REGISTRATION_INVITATION_HMAC_KEY: "not-a-secret",
+      }),
+    ).toThrow(/ALPHA_REGISTRATION_INVITATION_HMAC_KEY/u);
+  });
+
   it("enables the encrypted synthetic sink only for the explicit Alpha staging fixture", () => {
     const config = parseServerConfig({
       ...productionEnvironment,

@@ -89,6 +89,10 @@ const serverEnvironmentSchema = z
     PORT: portSchema.optional(),
     RELEASE_REVISION: z.string().trim().min(1),
     SESSION_SECRET: z.string().min(32),
+    ALPHA_REGISTRATION_INVITATION_HMAC_KEY: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/u, "must be a 32-byte lowercase hex secret")
+      .optional(),
     ALPHA_SYNTHETIC_FIXTURE: z.enum(["1"]).optional(),
     SYNTHETIC_REGISTRATION_SIGNING_KEY: z
       .string()
@@ -352,6 +356,7 @@ export interface ObservabilityContext {
 }
 
 export interface ServerSecrets {
+  readonly alphaRegistrationInvitationHmacKey?: string;
   readonly databaseUrl: string;
   readonly sessionSecret: string;
   readonly storage?: Readonly<{
@@ -488,6 +493,12 @@ export function parseServerConfig(
     port: result.data.PORT,
     releaseRevision: result.data.RELEASE_REVISION,
     secrets: Object.freeze({
+      ...(result.data.ALPHA_REGISTRATION_INVITATION_HMAC_KEY === undefined
+        ? {}
+        : {
+            alphaRegistrationInvitationHmacKey:
+              result.data.ALPHA_REGISTRATION_INVITATION_HMAC_KEY,
+          }),
       databaseUrl: result.data.DATABASE_URL,
       sessionSecret: result.data.SESSION_SECRET,
       ...(objectStorage === undefined
