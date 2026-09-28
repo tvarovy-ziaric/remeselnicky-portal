@@ -140,6 +140,22 @@ describe("job request draft client", () => {
     });
   });
 
+  it("surfaces account eligibility without losing the draft", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        Response.json({ code: "ACCOUNT_NOT_ELIGIBLE" }, { status: 403 }),
+      );
+    const client = createJobRequestDraftClient({
+      commandId: () => commandId,
+      fetch: fetcher,
+    });
+
+    await expect(
+      client.activate({ id: draftId, revision: 3, sections: [] }, csrfToken),
+    ).resolves.toEqual({ status: "ACCOUNT_NOT_ELIGIBLE" });
+  });
+
   it("reuses the same command after an ambiguous network failure", async () => {
     const fetcher = vi
       .fn<typeof fetch>()

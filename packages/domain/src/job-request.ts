@@ -64,6 +64,7 @@ export type JobRequestCommandResult = Readonly<
       readonly missingRequirements?: readonly JobRequestSubmissionRequirement[];
       readonly status:
         | "ACCOUNT_NOT_ACTIVE"
+        | "ACCOUNT_NOT_ELIGIBLE"
         | "ACTIVE_LIMIT_REACHED"
         | "INVALID_TRANSITION"
         | "NOT_FOUND"

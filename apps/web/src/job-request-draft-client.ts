@@ -27,6 +27,7 @@ export type JobRequestDraftWriteResult = Readonly<
 
 export type JobRequestActivationResult = Readonly<
   | { readonly status: "UNAVAILABLE" }
+  | { readonly status: "ACCOUNT_NOT_ELIGIBLE" }
   | { readonly currentRevision: number; readonly status: "STALE_REVISION" }
   | {
       readonly missingRequirements: readonly string[];
@@ -117,6 +118,13 @@ export function createJobRequestDraftClient(
           }),
         );
         const body: unknown = await response.json();
+        if (
+          response.status === 403 &&
+          record(body) &&
+          body["code"] === "ACCOUNT_NOT_ELIGIBLE"
+        ) {
+          return Object.freeze({ status: "ACCOUNT_NOT_ELIGIBLE" as const });
+        }
         if (
           response.status === 409 &&
           record(body) &&

@@ -292,11 +292,13 @@ export function JobRequestForm({
     }
     setStatus(result.status === "STALE_REVISION" ? "UNAVAILABLE" : "READY");
     setNotice(
-      result.status === "NOT_READY"
-        ? `Pred odoslaním doplňte: ${result.missingRequirements.map(requirementLabel).join(", ")}.`
-        : result.status === "STALE_REVISION"
-          ? "Dopyt sa zmenil v inom okne. Obnovte stránku."
-          : "Dopyt sa teraz nepodarilo odoslať. Uložené údaje zostali zachované.",
+      result.status === "ACCOUNT_NOT_ELIGIBLE"
+        ? "Účet momentálne nespĺňa podmienky na odoslanie dopytu. Skontrolujte overenie e-mailu a telefónu alebo stav účtu."
+        : result.status === "NOT_READY"
+          ? `Pred odoslaním doplňte: ${result.missingRequirements.map(requirementLabel).join(", ")}.`
+          : result.status === "STALE_REVISION"
+            ? "Dopyt sa zmenil v inom okne. Obnovte stránku."
+            : "Dopyt sa teraz nepodarilo odoslať. Uložené údaje zostali zachované.",
     );
   };
 
@@ -312,6 +314,8 @@ export function JobRequestForm({
       <FormMessage
         action="/prihlasenie"
         actionLabel="Prihlásiť sa"
+        secondaryAction="/registracia"
+        secondaryActionLabel="Zaregistrovať sa"
         title="Najprv sa prihláste"
         text="Po prihlásení môžete vytvoriť nový dopyt alebo pokračovať v uloženom koncepte."
       />
@@ -990,11 +994,15 @@ function ReviewRow({
 function FormMessage({
   action,
   actionLabel,
+  secondaryAction,
+  secondaryActionLabel,
   title,
   text,
 }: {
   readonly action?: string | null | undefined;
   readonly actionLabel?: string;
+  readonly secondaryAction?: string;
+  readonly secondaryActionLabel?: string;
   readonly title: string;
   readonly text: string;
 }) {
@@ -1007,6 +1015,11 @@ function FormMessage({
         {action === null || action === undefined ? null : (
           <a className="primary-action" href={action}>
             {actionLabel ?? "Pokračovať"}
+          </a>
+        )}
+        {secondaryAction === undefined ? null : (
+          <a className="secondary-action" href={secondaryAction}>
+            {secondaryActionLabel ?? "Ďalšia možnosť"}
           </a>
         )}
       </section>

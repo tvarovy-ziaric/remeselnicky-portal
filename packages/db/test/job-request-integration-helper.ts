@@ -43,6 +43,30 @@ export async function runJobRequestIntegrationAssertions(
   if (!("jobRequest" in applied)) throw new Error("Expected persisted draft.");
   const requestId: JobRequestId = applied.jobRequest.id;
 
+  await expect(
+    repository.activateOwned({
+      actorUserId: owner.id,
+      commandId: randomUUID(),
+      expectedRevision: 1,
+      jobRequestId: requestId,
+    }),
+  ).resolves.toEqual({ status: "ACCOUNT_NOT_ELIGIBLE" });
+  await sql`
+    INSERT INTO auth_credentials (
+      user_id, normalized_email, password_hash, email_verified_at,
+      normalized_phone, phone_verified_at
+    ) VALUES (
+      ${owner.id}, ${`${owner.id}@example.test`},
+      'test-fixture-password-hash', clock_timestamp(),
+      '+4219' || lpad(
+        (abs(hashtextextended(${owner.id}::text, 41007)) % 100000000)::text,
+        8,
+        '0'
+      ),
+      clock_timestamp()
+    )
+  `;
+
   const activationCommandId = randomUUID();
   const activationFingerprint = createHash("sha256")
     .update(
@@ -92,6 +116,14 @@ export async function runJobRequestIntegrationAssertions(
       updated_at = clock_timestamp()
     WHERE id = ${owner.id}
   `;
+  await expect(
+    repository.activateOwned({
+      actorUserId: owner.id,
+      commandId: randomUUID(),
+      expectedRevision: 1,
+      jobRequestId: requestId,
+    }),
+  ).resolves.toEqual({ status: "ACCOUNT_NOT_ELIGIBLE" });
   await expect(
     repository.createDraftOwned({
       actorUserId: owner.id,

@@ -13,6 +13,14 @@ export interface AuthenticatedActor {
   readonly csrfToken: string;
 }
 
+export interface SyntheticRegistrationFixture {
+  readonly claimEmailToken: () => Promise<string>;
+  readonly claimPhoneOtp: () => Promise<string>;
+  readonly email: string;
+  readonly password: string;
+  readonly phone: string;
+}
+
 interface VerificationClaim {
   readonly channel: "EMAIL" | "PHONE";
   readonly destination: string;
@@ -22,6 +30,35 @@ interface SyntheticRegistrationConfiguration {
   readonly claimKey: string;
   readonly registrationKey: string;
   readonly sinkOrigin: string;
+}
+
+export async function createSyntheticRegistrationFixture(): Promise<SyntheticRegistrationFixture> {
+  const configuration = await loadConfiguration();
+  const email = signedSyntheticEmail(configuration.registrationKey);
+  const phone = syntheticPhone();
+
+  return Object.freeze({
+    claimEmailToken: () =>
+      claimDeliveredSecret(configuration, {
+        channel: "EMAIL",
+        destination: email,
+      }),
+    claimPhoneOtp: async () => {
+      const otp = await claimDeliveredSecret(configuration, {
+        channel: "PHONE",
+        destination: phone,
+      });
+      if (!/^\d{6}$/u.test(otp)) {
+        throw new Error(
+          "Synthetic phone claim returned an invalid secret shape",
+        );
+      }
+      return otp;
+    },
+    email,
+    password: `D30!${randomUUID()}-${randomUUID()}`,
+    phone,
+  });
 }
 
 export async function registerVerifiedSyntheticCustomer(

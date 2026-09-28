@@ -38,6 +38,7 @@ export async function runJobRequestVersionIntegrationAssertions(
     VALUES (${owner.id}) RETURNING id
   `;
   if (customer === undefined) throw new Error("Expected R3-005 customer.");
+  await verifyFixtureUser(sql, owner.id);
 
   const drafts = createJobRequestDraftRepository(sql);
   const requests = createJobRequestRepository(sql);
@@ -222,6 +223,24 @@ export async function runJobRequestVersionIntegrationAssertions(
     `;
     }),
   ).rejects.toThrow(/classification|effect/u);
+}
+
+async function verifyFixtureUser(sql: Sql, userId: UserId): Promise<void> {
+  await sql`
+    INSERT INTO auth_credentials (
+      user_id, normalized_email, password_hash, email_verified_at,
+      normalized_phone, phone_verified_at
+    ) VALUES (
+      ${userId}, ${`${userId}@example.test`},
+      'test-fixture-password-hash', clock_timestamp(),
+      '+4219' || lpad(
+        (abs(hashtextextended(${userId}::text, 41007)) % 100000000)::text,
+        8,
+        '0'
+      ),
+      clock_timestamp()
+    )
+  `;
 }
 
 function reviseBudget(

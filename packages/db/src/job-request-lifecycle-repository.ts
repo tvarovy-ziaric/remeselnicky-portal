@@ -319,12 +319,17 @@ async function executeOwned(
 ): Promise<JobRequestLifecycleCommandResult> {
   return sql.begin(async (transaction) => {
     await lockNotificationRequest(transaction, input.jobRequestId);
-    const customerProfileId = await lockActiveActorCustomer(
-      transaction,
-      input.actorUserId,
-    );
+    const customerProfileId =
+      kind === "REACTIVATE"
+        ? await lockVerifiedCustomer(transaction, input.actorUserId)
+        : await lockActiveActorCustomer(transaction, input.actorUserId);
     if (customerProfileId === null) {
-      return Object.freeze({ status: "ACCOUNT_NOT_ACTIVE" as const });
+      return Object.freeze({
+        status:
+          kind === "REACTIVATE"
+            ? ("ACCOUNT_NOT_ELIGIBLE" as const)
+            : ("ACCOUNT_NOT_ACTIVE" as const),
+      });
     }
     await lockCommand(transaction, input.commandId);
     const fingerprint = commandFingerprint(kind, {
@@ -431,6 +436,25 @@ async function lockActiveActorCustomer(
     JOIN customer_profiles customer ON customer.owner_user_id = actor.id
     WHERE actor.id = ${actorUserId} AND actor.account_state = 'ACTIVE'
     FOR UPDATE OF actor, customer
+  `;
+  return row === undefined
+    ? null
+    : (row.customerProfileId as CustomerProfileId);
+}
+
+async function lockVerifiedCustomer(
+  sql: TransactionSql,
+  actorUserId: UserId,
+): Promise<CustomerProfileId | null> {
+  const [row] = await sql<{ readonly customerProfileId: string }[]>`
+    SELECT customer.id AS "customerProfileId"
+    FROM users actor
+    JOIN auth_credentials credential ON credential.user_id = actor.id
+    JOIN customer_profiles customer ON customer.owner_user_id = actor.id
+    WHERE actor.id = ${actorUserId} AND actor.account_state = 'ACTIVE'
+      AND credential.email_verified_at IS NOT NULL
+      AND credential.phone_verified_at IS NOT NULL
+    FOR UPDATE OF actor, credential, customer
   `;
   return row === undefined
     ? null

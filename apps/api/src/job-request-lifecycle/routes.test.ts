@@ -111,10 +111,44 @@ describe("job request lifecycle routes", () => {
     expect(deniedFixture.extendOwned).not.toHaveBeenCalled();
     await deniedApp.close();
   });
+
+  it("uses one non-eligible denial for unverified and inactive reactivation", async () => {
+    const fixture = createFixture();
+    fixture.reactivateOwned.mockResolvedValueOnce({
+      status: "ACCOUNT_NOT_ELIGIBLE",
+    });
+    const app = Fastify();
+    registerJobRequestLifecycleRoutes(app, fixture.dependencies);
+    const unverified = await app.inject({
+      method: "POST",
+      payload: { commandId, expectedRevision: 4 },
+      url: path(JOB_REQUEST_LIFECYCLE_PATHS.reactivate),
+    });
+    expect(unverified.statusCode).toBe(403);
+    expect(unverified.json()).toEqual({ code: "ACCOUNT_NOT_ELIGIBLE" });
+    await app.close();
+
+    const inactiveFixture = createFixture("ACCOUNT_NOT_ACTIVE");
+    const inactiveApp = Fastify();
+    registerJobRequestLifecycleRoutes(
+      inactiveApp,
+      inactiveFixture.dependencies,
+    );
+    const inactive = await inactiveApp.inject({
+      method: "POST",
+      payload: { commandId, expectedRevision: 4 },
+      url: path(JOB_REQUEST_LIFECYCLE_PATHS.reactivate),
+    });
+    expect(inactive.statusCode).toBe(403);
+    expect(inactive.json()).toEqual({ code: "ACCOUNT_NOT_ELIGIBLE" });
+    expect(inactiveFixture.reactivateOwned).not.toHaveBeenCalled();
+    await inactiveApp.close();
+  });
 });
 
 function createFixture(
-  status: "ACTIVE" | "AUTHENTICATION_REQUIRED" = "ACTIVE",
+  status:
+    "ACCOUNT_NOT_ACTIVE" | "ACTIVE" | "AUTHENTICATION_REQUIRED" = "ACTIVE",
 ) {
   const lifecycle = lifecycleRecord();
   const cancelOwned = vi.fn().mockResolvedValue({
@@ -159,7 +193,7 @@ function createFixture(
           Promise.resolve(
             status === "ACTIVE"
               ? { status: "ACTIVE" as const, user: { id: actor } }
-              : { status: "AUTHENTICATION_REQUIRED" as const },
+              : { status },
           ),
       },
       lifecycle: createJobRequestLifecycleService({ persistence }),

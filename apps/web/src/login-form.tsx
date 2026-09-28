@@ -1,8 +1,19 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import React, { useMemo, useState, type FormEvent } from "react";
 
-export function LoginForm() {
+import {
+  createAuthOnboardingClient,
+  type AuthOnboardingClient,
+  type AuthOnboardingSession,
+} from "./auth-onboarding-client";
+
+export function LoginForm({
+  client,
+}: {
+  readonly client?: AuthOnboardingClient;
+}) {
+  const auth = useMemo(() => client ?? createAuthOnboardingClient(), [client]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -14,38 +25,15 @@ export function LoginForm() {
     setBusy(true);
     setMessage("");
     try {
-      const csrfResponse = await fetch("/v1/auth/csrf", {
-        cache: "no-store",
-        credentials: "same-origin",
-      });
-      if (!csrfResponse.ok) throw new Error("CSRF unavailable");
-      const csrf: unknown = await csrfResponse.json();
-      if (
-        typeof csrf !== "object" ||
-        csrf === null ||
-        !("csrfToken" in csrf) ||
-        typeof csrf.csrfToken !== "string"
-      ) {
-        throw new Error("Invalid CSRF response");
-      }
-      const response = await fetch("/v1/auth/login", {
-        body: JSON.stringify({ email: email.trim(), password }),
-        cache: "no-store",
-        credentials: "same-origin",
-        headers: {
-          "content-type": "application/json",
-          "x-csrf-token": csrf.csrfToken,
-        },
-        method: "POST",
-      });
-      if (response.ok) {
-        window.location.assign("/dopyt");
+      const result = await auth.login({ email, password });
+      if (result.status === "AUTHENTICATED") {
+        window.location.assign(loginDestination(result.session));
         return;
       }
       setMessage(
-        response.status === 401
+        result.status === "INVALID_CREDENTIALS"
           ? "E-mail alebo heslo nie je správne."
-          : response.status === 429
+          : result.status === "RATE_LIMITED"
             ? "Príliš veľa pokusov. Skúste to neskôr."
             : "Prihlásenie sa nepodarilo. Skúste to znova.",
       );
@@ -89,7 +77,16 @@ export function LoginForm() {
             {busy ? "Prihlasujem…" : "Prihlásiť sa a pokračovať"}
           </button>
         </form>
+        <p className="onboarding-links">
+          <a href="/registracia">Nemáte účet? Zaregistrujte sa s pozvánkou.</a>
+        </p>
       </section>
     </main>
   );
+}
+
+export function loginDestination(session: AuthOnboardingSession): string {
+  return session.user.emailVerified && session.user.phoneVerified
+    ? "/dopyt"
+    : "/overenie";
 }

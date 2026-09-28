@@ -66,6 +66,28 @@ describe("job request lifecycle repository", () => {
     expect(harness.statements.at(-1)).toContain("clock_timestamp()");
   });
 
+  it("denies reactivation before command writes when verification is incomplete", async () => {
+    const harness = transactionHarness([[], []]);
+    await expect(
+      createJobRequestLifecycleRepository(harness.sql).reactivateOwned({
+        actorUserId: actor,
+        commandId,
+        expectedRevision: 2,
+        jobRequestId: request,
+      }),
+    ).resolves.toEqual({ status: "ACCOUNT_NOT_ELIGIBLE" });
+    expect(harness.statements).toHaveLength(2);
+    expect(harness.statements[1]).toContain("JOIN auth_credentials credential");
+    expect(harness.statements[1]).toContain("email_verified_at IS NOT NULL");
+    expect(harness.statements[1]).toContain("phone_verified_at IS NOT NULL");
+    expect(harness.statements.join("\n")).not.toContain(
+      "INSERT INTO job_request_commands",
+    );
+    expect(harness.statements.join("\n")).not.toContain(
+      "INSERT INTO job_request_revisions",
+    );
+  });
+
   it("duplicates current content into a new draft without copying history", async () => {
     const sourceMedia = {
       documentMediaAssetIds: ["9a000000-0000-4000-8000-000000000010"],

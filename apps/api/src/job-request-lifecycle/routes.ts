@@ -88,7 +88,14 @@ export function registerJobRequestLifecycleRoutes(
       path,
       { ...options, schema: { body: commandSchema, params: paramsSchema } },
       async (request, reply) => {
-        const actor = await requireActor(request, reply, dependencies.guard);
+        const actor = await requireActor(
+          request,
+          reply,
+          dependencies.guard,
+          operation === "reactivate"
+            ? "ACCOUNT_NOT_ELIGIBLE"
+            : "ACCOUNT_NOT_ACTIVE",
+        );
         if (actor === undefined) return;
         try {
           const result = await dependencies.lifecycle[operation]({
@@ -164,6 +171,8 @@ async function requireActor(
   request: FastifyRequest,
   reply: FastifyReply,
   guard: Guard,
+  inactiveCode:
+    "ACCOUNT_NOT_ACTIVE" | "ACCOUNT_NOT_ELIGIBLE" = "ACCOUNT_NOT_ACTIVE",
 ): Promise<UserId | undefined> {
   const result = await guard.evaluate(request);
   if (result.status === "AUTHENTICATION_REQUIRED") {
@@ -171,7 +180,7 @@ async function requireActor(
     return undefined;
   }
   if (result.status === "ACCOUNT_NOT_ACTIVE") {
-    await reply.code(403).send({ code: result.status });
+    await reply.code(403).send({ code: inactiveCode });
     return undefined;
   }
   return result.user.id;
@@ -207,7 +216,7 @@ function sendDenial(
   currentRevision?: number,
   activeLimit?: number,
 ) {
-  if (status === "ACCOUNT_NOT_ACTIVE") {
+  if (status === "ACCOUNT_NOT_ACTIVE" || status === "ACCOUNT_NOT_ELIGIBLE") {
     return reply.code(403).send({ code: status });
   }
   if (status === "NOT_FOUND") return reply.code(404).send({ code: status });

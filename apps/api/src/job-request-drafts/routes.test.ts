@@ -7,6 +7,7 @@ import {
   type JobRequestDraftPersistence,
   type JobRequestDraftService,
   type JobRequestId,
+  type JobRequestService,
   type UserId,
 } from "@portal/domain";
 import type { JobRequestMediaUploadService } from "@portal/media";
@@ -146,6 +147,37 @@ describe("job request draft routes", () => {
     await app.close();
   });
 
+  it("uses one non-eligible denial for unverified and inactive activation", async () => {
+    const fixture = createFixture();
+    fixture.activate.mockResolvedValueOnce({
+      status: "ACCOUNT_NOT_ELIGIBLE",
+    });
+    const app = Fastify();
+    registerJobRequestDraftRoutes(app, fixture.dependencies);
+    const unverified = await app.inject({
+      method: "POST",
+      payload: { commandId, expectedRevision: 3 },
+      url: `/v1/me/job-request-drafts/${requestId}/activate`,
+    });
+    expect(unverified.statusCode).toBe(403);
+    expect(unverified.json()).toEqual({ code: "ACCOUNT_NOT_ELIGIBLE" });
+    expect(fixture.activate).toHaveBeenCalledTimes(1);
+    await app.close();
+
+    const inactiveFixture = createFixture("ACCOUNT_NOT_ACTIVE");
+    const inactiveApp = Fastify();
+    registerJobRequestDraftRoutes(inactiveApp, inactiveFixture.dependencies);
+    const inactive = await inactiveApp.inject({
+      method: "POST",
+      payload: { commandId, expectedRevision: 3 },
+      url: `/v1/me/job-request-drafts/${requestId}/activate`,
+    });
+    expect(inactive.statusCode).toBe(403);
+    expect(inactive.json()).toEqual({ code: "ACCOUNT_NOT_ELIGIBLE" });
+    expect(inactiveFixture.activate).not.toHaveBeenCalled();
+    await inactiveApp.close();
+  });
+
   it("accepts only private binary uploads at the current owned revision", async () => {
     const fixture = createFixture();
     const upload = vi.fn<JobRequestMediaUploadService["upload"]>(() =>
@@ -233,7 +265,8 @@ describe("job request draft routes", () => {
 });
 
 function createFixture(
-  guardStatus: "ACTIVE" | "AUTHENTICATION_REQUIRED" = "ACTIVE",
+  guardStatus:
+    "ACCOUNT_NOT_ACTIVE" | "ACTIVE" | "AUTHENTICATION_REQUIRED" = "ACTIVE",
 ) {
   const create = vi.fn<
     JobRequestDraftPersistence["createDraftWithInitialSectionOwned"]
@@ -267,6 +300,12 @@ function createFixture(
       status: "OK" as const,
     }),
   );
+  const activate = vi.fn<JobRequestService["activate"]>(() =>
+    Promise.resolve({
+      missingRequirements: ["MUNICIPALITY" as const],
+      status: "NOT_READY" as const,
+    }),
+  );
   const dependencies = {
     csrfProtection: (_request, _reply, done) => done(),
     customerProfiles: {
@@ -294,19 +333,15 @@ function createFixture(
         Promise.resolve(
           guardStatus === "ACTIVE"
             ? { status: "ACTIVE" as const, user: { id: actorId } }
-            : { status: "AUTHENTICATION_REQUIRED" as const },
+            : { status: guardStatus },
         ),
     },
     requests: {
-      activate: () =>
-        Promise.resolve({
-          missingRequirements: ["MUNICIPALITY" as const],
-          status: "NOT_READY" as const,
-        }),
+      activate,
       createDraft: () => Promise.reject(new Error("not used")),
     },
   } satisfies JobRequestDraftRouteDependencies;
-  return { autosave, create, dependencies, recover };
+  return { activate, autosave, create, dependencies, recover };
 }
 
 function coreSection() {

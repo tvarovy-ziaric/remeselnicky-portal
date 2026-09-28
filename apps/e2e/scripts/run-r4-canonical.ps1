@@ -33,7 +33,7 @@ $env:STAGING_E2E_SYNTHETIC_SINK_ORIGIN = "http://127.0.0.1:$sinkPort"
 
 Push-Location $repo
 try {
-  corepack pnpm --filter @portal/e2e test tests/r4-canonical-loop.spec.ts --project=chromium @PlaywrightArgs
+  corepack pnpm --filter @portal/e2e test tests/r4-browser-onboarding.spec.ts tests/r4-canonical-loop.spec.ts --project=chromium @PlaywrightArgs
   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 } finally {
   Pop-Location

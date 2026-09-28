@@ -36,12 +36,12 @@ export function createJobRequestRepository(sql: Sql): JobRequestPersistence {
     ): Promise<JobRequestCommandResult> {
       assertActivateJobRequestInput(input);
       return sql.begin(async (transaction) => {
-        const customerProfileId = await lockActiveActorCustomer(
+        const customerProfileId = await lockVerifiedCustomer(
           transaction,
           input.actorUserId,
         );
         if (customerProfileId === null) {
-          return Object.freeze({ status: "ACCOUNT_NOT_ACTIVE" as const });
+          return Object.freeze({ status: "ACCOUNT_NOT_ELIGIBLE" as const });
         }
         await lockCommand(transaction, input.commandId);
         const fingerprint = commandFingerprint("ACTIVATE", input);
@@ -326,16 +326,19 @@ async function lockActiveCustomer(
   return rows.length === 1;
 }
 
-async function lockActiveActorCustomer(
+async function lockVerifiedCustomer(
   sql: TransactionSql,
   actorUserId: UserId,
 ): Promise<CustomerProfileId | null> {
   const [row] = await sql<{ readonly customerProfileId: string }[]>`
     SELECT customer.id AS "customerProfileId"
     FROM users actor
+    JOIN auth_credentials credential ON credential.user_id = actor.id
     JOIN customer_profiles customer ON customer.owner_user_id = actor.id
     WHERE actor.id = ${actorUserId} AND actor.account_state = 'ACTIVE'
-    FOR UPDATE OF actor, customer
+      AND credential.email_verified_at IS NOT NULL
+      AND credential.phone_verified_at IS NOT NULL
+    FOR UPDATE OF actor, credential, customer
   `;
   return row === undefined
     ? null

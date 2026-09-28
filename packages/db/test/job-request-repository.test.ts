@@ -75,6 +75,34 @@ describe("job request repository", () => {
       }),
     ).rejects.toBeInstanceOf(JobRequestIdempotencyError);
     expect(harness.statements[0]).toMatch(/account_state = 'ACTIVE'/u);
+    expect(harness.statements[0]).toContain("JOIN auth_credentials credential");
+    expect(harness.statements[0]).toContain("email_verified_at IS NOT NULL");
+    expect(harness.statements[0]).toContain("phone_verified_at IS NOT NULL");
+  });
+
+  it("denies activation before any command write when account verification is incomplete", async () => {
+    const harness = transactionHarness([[]]);
+    const repository = createJobRequestRepository(harness.sql);
+
+    await expect(
+      repository.activateOwned({
+        actorUserId: actor,
+        commandId,
+        expectedRevision: 1,
+        jobRequestId: request,
+      }),
+    ).resolves.toEqual({ status: "ACCOUNT_NOT_ELIGIBLE" });
+    expect(harness.statements).toHaveLength(1);
+    expect(harness.statements[0]).toContain("JOIN auth_credentials credential");
+    expect(harness.statements[0]).toContain(
+      "FOR UPDATE OF actor, credential, customer",
+    );
+    expect(harness.statements.join("\n")).not.toContain(
+      "INSERT INTO job_request_commands",
+    );
+    expect(harness.statements.join("\n")).not.toContain(
+      "INSERT INTO job_request_revisions",
+    );
   });
 
   it("keeps activation fail-closed on server-derived missing requirements", async () => {

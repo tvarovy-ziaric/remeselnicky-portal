@@ -397,6 +397,18 @@ section {
   border-radius: 0.6rem;
 }
 
+.login-form .checkbox-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 0.65rem;
+}
+
+.login-form .checkbox-row input {
+  width: auto;
+  margin-top: 0.2rem;
+}
+
 .login-form button {
   margin-top: 0.5rem;
   padding: 0.8rem 1.2rem;
@@ -411,6 +423,41 @@ section {
 .login-form button:disabled {
   cursor: wait;
   opacity: 0.5;
+}
+
+.onboarding-links,
+.onboarding-actions {
+  margin-top: 1.25rem;
+}
+
+.verification-list {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.verification-list > section {
+  padding: 1rem;
+  border: 1px solid #d5d8d2;
+  border-radius: 0.8rem;
+  background: #fffdf8;
+}
+
+.onboarding-actions button,
+.verification-list button {
+  padding: 0.7rem 1rem;
+  border: 0;
+  border-radius: 0.6rem;
+  background: #234d31;
+  color: #fff;
+  font-weight: 750;
+}
+
+.secondary-action {
+  display: inline-flex;
+  margin: 1rem 0 0 1rem;
+  color: #234d31;
+  font-weight: 750;
 }
 
 .job-request-page {

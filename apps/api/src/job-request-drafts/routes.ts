@@ -237,6 +237,7 @@ export function registerJobRequestDraftRoutes(
         request,
         reply,
         dependencies.guard,
+        "ACCOUNT_NOT_ELIGIBLE",
       );
       if (actor === undefined) return;
       try {
@@ -399,6 +400,8 @@ function sendDomainDenial(
   switch (status) {
     case "ACCOUNT_NOT_ACTIVE":
       return reply.code(403).send({ code: "ACCOUNT_NOT_ACTIVE" });
+    case "ACCOUNT_NOT_ELIGIBLE":
+      return reply.code(403).send({ code: "ACCOUNT_NOT_ELIGIBLE" });
     case "NOT_FOUND":
       return reply.code(404).send({ code: "NOT_FOUND" });
     case "STALE_REVISION":
@@ -435,6 +438,8 @@ async function requireActiveActor(
   request: FastifyRequest,
   reply: FastifyReply,
   guard: Guard,
+  inactiveCode:
+    "ACCOUNT_NOT_ACTIVE" | "ACCOUNT_NOT_ELIGIBLE" = "ACCOUNT_NOT_ACTIVE",
 ): Promise<UserId | undefined> {
   const result = await guard.evaluate(request);
   if (result.status === "AUTHENTICATION_REQUIRED") {
@@ -442,7 +447,7 @@ async function requireActiveActor(
     return undefined;
   }
   if (result.status === "ACCOUNT_NOT_ACTIVE") {
-    await reply.code(403).send({ code: "ACCOUNT_NOT_ACTIVE" });
+    await reply.code(403).send({ code: inactiveCode });
     return undefined;
   }
   return result.user.id;

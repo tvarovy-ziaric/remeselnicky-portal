@@ -55,6 +55,7 @@ export type JobRequestLifecycleCommandResult = Readonly<
       readonly currentRevision?: number;
       readonly status:
         | "ACCOUNT_NOT_ACTIVE"
+        | "ACCOUNT_NOT_ELIGIBLE"
         | "ACTIVE_LIMIT_REACHED"
         | "INVALID_TRANSITION"
         | "NOT_FOUND"
