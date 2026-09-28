@@ -46,6 +46,10 @@ import {
   type CraftsmanPortfolioRouteDependencies,
 } from "../craftsman-portfolio/index.js";
 import {
+  registerCraftsmanCredentialRoutes,
+  type CraftsmanCredentialRouteDependencies,
+} from "../craftsman-credentials/index.js";
+import {
   registerCustomerShortlistRoutes,
   type CustomerShortlistRouteDependencies,
 } from "../customer-shortlist/routes.js";
@@ -331,6 +335,10 @@ export interface AuthModuleDependencies {
   readonly craftsmanPortfolio?: Pick<
     CraftsmanPortfolioRouteDependencies,
     "context" | "photos" | "projects" | "uploads"
+  >;
+  readonly craftsmanCredentials?: Pick<
+    CraftsmanCredentialRouteDependencies,
+    "claims" | "context" | "types" | "uploads"
   >;
   readonly jobDocumentation?: Pick<
     JobDocumentationRouteDependencies,
@@ -1035,6 +1043,17 @@ async function configureAuthModule(
         timeWindowMs: config.rateLimitWindowMs,
       },
       ...dependencies.craftsmanPortfolio,
+    });
+  }
+  if (dependencies.craftsmanCredentials !== undefined) {
+    registerCraftsmanCredentialRoutes(app, {
+      csrfProtection: csrfProtection(app),
+      guard,
+      rateLimit: {
+        max: config.rateLimitMax,
+        timeWindowMs: config.rateLimitWindowMs,
+      },
+      ...dependencies.craftsmanCredentials,
     });
   }
   if (dependencies.adminAccess !== undefined) {

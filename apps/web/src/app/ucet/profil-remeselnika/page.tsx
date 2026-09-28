@@ -15,6 +15,9 @@ export default function CraftsmanProfilePage() {
       <p>
         <Link href="/ucet/portfolio">Pokračovať do súkromného portfólia</Link>
       </p>
+      <p>
+        <Link href="/ucet/doklady">Spravovať doklady a oprávnenia</Link>
+      </p>
     </main>
   );
 }

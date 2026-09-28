@@ -36,6 +36,19 @@ const location = Object.freeze({
   sourceRevision: "synthetic-v1",
 });
 
+const credentialTypes = Object.freeze([
+  Object.freeze({
+    code: "test.required-license",
+    evidenceRequirement: "REQUIRED" as const,
+    sourceReference: "test-fixture:alpha/r4-032-required",
+  }),
+  Object.freeze({
+    code: "test.optional-certificate",
+    evidenceRequirement: "OPTIONAL" as const,
+    sourceReference: "test-fixture:alpha/r4-032-optional",
+  }),
+]);
+
 async function main(): Promise<void> {
   if (
     process.env["APP_ENV"] !== "staging" ||
@@ -83,6 +96,39 @@ async function main(): Promise<void> {
     }
 
     await sql.begin(async (transaction) => {
+      for (const credentialType of credentialTypes) {
+        await transaction`
+          INSERT INTO credential_type_policies (
+            code, evidence_requirement, source_reference
+          ) VALUES (
+            ${credentialType.code}, ${credentialType.evidenceRequirement},
+            ${credentialType.sourceReference}
+          ) ON CONFLICT (code) DO NOTHING
+        `;
+        const [storedCredentialType] = await transaction<
+          {
+            active: boolean;
+            evidenceRequirement: string;
+            sourceReference: string;
+          }[]
+        >`
+          SELECT active, evidence_requirement AS "evidenceRequirement",
+            source_reference AS "sourceReference"
+          FROM credential_type_policies
+          WHERE code = ${credentialType.code}
+        `;
+        if (
+          storedCredentialType?.active !== true ||
+          storedCredentialType.evidenceRequirement !==
+            credentialType.evidenceRequirement ||
+          storedCredentialType.sourceReference !==
+            credentialType.sourceReference
+        ) {
+          throw new Error(
+            "Existing synthetic alpha credential type fixture conflicts.",
+          );
+        }
+      }
       await transaction`
         INSERT INTO location_regions (
           code, name_sk, source_reference, source_revision
@@ -151,7 +197,7 @@ async function main(): Promise<void> {
       }
     });
     process.stdout.write(
-      `${JSON.stringify({ dataClass: "synthetic", installed, municipalityCode: location.municipalityCode, professionCode: release.professions[0]?.code })}\n`,
+      `${JSON.stringify({ credentialTypeCodes: credentialTypes.map(({ code }) => code), dataClass: "synthetic", installed, municipalityCode: location.municipalityCode, professionCode: release.professions[0]?.code })}\n`,
     );
   } finally {
     await sql.end({ timeout: 5 });

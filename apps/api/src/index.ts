@@ -31,6 +31,14 @@ export {
 } from "./craftsman-portfolio/index.js";
 export type { CraftsmanPortfolioRouteDependencies } from "./craftsman-portfolio/index.js";
 export {
+  CRAFTSMAN_CREDENTIAL_PATHS,
+  registerCraftsmanCredentialRoutes,
+} from "./craftsman-credentials/index.js";
+export type {
+  CraftsmanCredentialRouteDependencies,
+  CredentialTypeReadRepository,
+} from "./craftsman-credentials/index.js";
+export {
   PUBLIC_CRAFTSMAN_PROFILE_PATH,
   registerPublicCraftsmanProfileRoutes,
 } from "./public-craftsman-profile/routes.js";

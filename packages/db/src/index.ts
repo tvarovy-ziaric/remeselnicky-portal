@@ -39,7 +39,13 @@ import {
   createPublicPortfolioDeliveryRepository,
 } from "./portfolio-publication-repository.js";
 import { createPortfolioProjectPhotoUploadAuthorization } from "./portfolio-project-upload-repository.js";
+import {
+  createCredentialEvidenceUploadAuthorization,
+  createCredentialTypeReadRepository,
+  type CredentialTypeReadRepository,
+} from "./credential-evidence-upload-repository.js";
 import type {
+  CredentialEvidenceUploadAuthorization,
   ConversationAttachmentUploadAuthorization,
   JobRequestMediaUploadAuthorization,
   MediaEntityAccessResolver,
@@ -1244,6 +1250,14 @@ export {
   createCredentialReviewService,
   CredentialClaimIdempotencyError,
 } from "./credential-claim-repository.js";
+export {
+  createCredentialEvidenceUploadAuthorization,
+  createCredentialTypeReadRepository,
+} from "./credential-evidence-upload-repository.js";
+export type {
+  ActiveCredentialType,
+  CredentialTypeReadRepository,
+} from "./credential-evidence-upload-repository.js";
 export type {
   CredentialClaimRepository,
   CredentialReviewResult,
@@ -1374,6 +1388,8 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly municipalityAutocomplete: MunicipalityAutocompletePersistence;
   readonly credentialQualifications: CredentialQualificationPolicyPersistence;
   readonly credentialClaims: CredentialClaimRepository;
+  readonly credentialEvidenceUploads: CredentialEvidenceUploadAuthorization;
+  readonly credentialTypes: CredentialTypeReadRepository;
   readonly customerProfiles: CustomerProfilePersistence;
   readonly customerShortlist: CustomerShortlistPersistence;
   readonly jobRequests: JobRequestPersistence;
@@ -1574,6 +1590,11 @@ export function createDatabase(
     createMunicipalityAutocompleteRepository(sql);
   const credentialQualifications = createCredentialQualificationRepository(sql);
   const credentialClaims = createCredentialClaimRepository(sql);
+  const credentialEvidenceUploads = createCredentialEvidenceUploadAuthorization(
+    sql,
+    credentialClaims,
+  );
+  const credentialTypes = createCredentialTypeReadRepository(sql);
   const customerProfiles = createCustomerProfileRepository(sql);
   const customerShortlist = createCustomerShortlistRepository(sql);
   const jobRequests = createJobRequestRepository(sql);
@@ -1701,6 +1722,8 @@ export function createDatabase(
     municipalityAutocomplete,
     credentialQualifications,
     credentialClaims,
+    credentialEvidenceUploads,
+    credentialTypes,
     customerProfiles,
     customerShortlist,
     jobRequests,

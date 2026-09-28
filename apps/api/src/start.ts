@@ -14,6 +14,7 @@ import {
 import {
   createControlledMediaUploadService,
   createConversationAttachmentUploadService,
+  createCredentialEvidenceUploadService,
   createDisputeEvidenceUploadService,
   createJobRequestMediaUploadService,
   createPortfolioProjectPhotoUploadService,
@@ -190,6 +191,14 @@ const app = buildApi({
       ...(mediaRuntime === undefined
         ? {}
         : { uploads: mediaRuntime.portfolioProjectPhotoUploads }),
+    },
+    craftsmanCredentials: {
+      claims: database.credentialClaims,
+      context: database.craftsmanAuthoringContext,
+      types: database.credentialTypes,
+      ...(mediaRuntime === undefined
+        ? {}
+        : { uploads: mediaRuntime.credentialEvidenceUploads }),
     },
     draftHandoff: {
       customerProfiles,
@@ -404,6 +413,11 @@ function createApiMediaRuntime() {
   return Object.freeze({
     conversationAttachmentUploads: createConversationAttachmentUploadService({
       authorization: database.conversationAttachmentUploads,
+      processing,
+      uploads,
+    }),
+    credentialEvidenceUploads: createCredentialEvidenceUploadService({
+      authorization: database.credentialEvidenceUploads,
       processing,
       uploads,
     }),

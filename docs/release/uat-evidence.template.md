@@ -54,19 +54,20 @@ manual `PASS`.
 
 Add rows as needed. One row is one tester-observed case on one browser/device.
 
-| Case                                              | Perspective                   | Browser/device | Status               | Expected result                                       | Bounded actual result | Defect ID | Evidence reference |
-| ------------------------------------------------- | ----------------------------- | -------------- | -------------------- | ----------------------------------------------------- | --------------------- | --------- | ------------------ |
-| UAT-01 anonymous/responsive entry                 | Anonymous                     |                | `NOT_EVALUATED`      |                                                       |                       |           |                    |
-| UAT-02 draft autosave/recovery                    | Customer                      |                | `NOT_EVALUATED`      |                                                       |                       |           |                    |
-| UAT-03 search/shortlist/invitations               | Customer/craftsman            |                | `NOT_EVALUATED`      |                                                       |                       |           |                    |
-| UAT-04 conversation/attachment/Quote              | Craftsman/customer            |                | `NOT_EVALUATED`      |                                                       |                       |           |                    |
-| UAT-05 acceptance/confirmed Job                   | Customer/craftsman/competitor |                | `NOT_EVALUATED`      |                                                       |                       |           |                    |
-| UAT-06 Job/change/completion                      | Customer/craftsman            |                | `NOT_EVALUATED`      |                                                       |                       |           |                    |
-| UAT-07 reviews/notifications/dispute/privacy      | Customer/craftsman            |                | `NOT_EVALUATED`      |                                                       |                       |           |                    |
-| UAT-08 restrictions/session boundary              | Restricted/suspended actor    |                | `NOT_EVALUATED`      |                                                       |                       |           |                    |
-| Browser registration + email/phone verification   | New customer                  |                | `NOT_EVALUATED`      | UI exists; record named manual browser/device result. |                       |           |                    |
-| Craftsman onboarding/profile/credential/portfolio | New craftsman                 |                | `NOT_EVALUATED`      | Browser authoring UI is absent.                       |                       |           |                    |
-| Admin operational UI with provider-backed MFA     | Admin                         |                | `BLOCKED_HUMAN_GATE` | Real TOTP/WebAuthn enrollment and privileged session. |                       |           |                    |
+| Case                                            | Perspective                   | Browser/device | Status               | Expected result                                       | Bounded actual result | Defect ID | Evidence reference |
+| ----------------------------------------------- | ----------------------------- | -------------- | -------------------- | ----------------------------------------------------- | --------------------- | --------- | ------------------ |
+| UAT-01 anonymous/responsive entry               | Anonymous                     |                | `NOT_EVALUATED`      |                                                       |                       |           |                    |
+| UAT-02 draft autosave/recovery                  | Customer                      |                | `NOT_EVALUATED`      |                                                       |                       |           |                    |
+| UAT-03 search/shortlist/invitations             | Customer/craftsman            |                | `NOT_EVALUATED`      |                                                       |                       |           |                    |
+| UAT-04 conversation/attachment/Quote            | Craftsman/customer            |                | `NOT_EVALUATED`      |                                                       |                       |           |                    |
+| UAT-05 acceptance/confirmed Job                 | Customer/craftsman/competitor |                | `NOT_EVALUATED`      |                                                       |                       |           |                    |
+| UAT-06 Job/change/completion                    | Customer/craftsman            |                | `NOT_EVALUATED`      |                                                       |                       |           |                    |
+| UAT-07 reviews/notifications/dispute/privacy    | Customer/craftsman            |                | `NOT_EVALUATED`      |                                                       |                       |           |                    |
+| UAT-08 restrictions/session boundary            | Restricted/suspended actor    |                | `NOT_EVALUATED`      |                                                       |                       |           |                    |
+| Browser registration + email/phone verification | New customer                  |                | `NOT_EVALUATED`      | UI exists; record named manual browser/device result. |                       |           |                    |
+| Craftsman onboarding/profile/portfolio          | New craftsman                 |                | `NOT_EVALUATED`      | Record named profile and private portfolio authoring. |                       |           |                    |
+| UAT-10 private credential claim/evidence        | New craftsman                 |                | `NOT_EVALUATED`      | Pending is not verified; private READY evidence only. |                       |           |                    |
+| Admin operational UI with provider-backed MFA   | Admin                         |                | `BLOCKED_HUMAN_GATE` | Real TOTP/WebAuthn enrollment and privileged session. |                       |           |                    |
 
 ## Exploratory and failure results
 

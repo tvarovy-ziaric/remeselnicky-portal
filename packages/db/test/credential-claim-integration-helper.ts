@@ -19,6 +19,7 @@ import {
   createCredentialClaimRepository,
   createCredentialReviewService,
 } from "../src/credential-claim-repository.js";
+import { createCredentialEvidenceUploadAuthorization } from "../src/credential-evidence-upload-repository.js";
 import { createCraftsmanProfessionRepository } from "../src/craftsman-profession-repository.js";
 import { createMediaRepository } from "../src/media-repository.js";
 import type { CreateProcessingMediaAssetInput } from "../src/media-repository.js";
@@ -120,6 +121,33 @@ export async function runCredentialClaimIntegrationAssertions(
     ownerId: fixture.ownerId,
     provenance: uploadPreparation.provenance,
   });
+  const evidenceAuthorization = createCredentialEvidenceUploadAuthorization(
+    sql,
+    repository,
+  );
+  await expect(
+    evidenceAuthorization.listOwnedUploads({
+      actorUserId: fixture.ownerId,
+      claimId,
+      craftsmanProfileId: fixture.profileId,
+    }),
+  ).resolves.toEqual([
+    { assetId: mediaAssetId, kind: "DOCUMENT", status: "READY" },
+  ]);
+  await expect(
+    evidenceAuthorization.listOwnedUploads({
+      actorUserId: fixture.nonOwnerId,
+      claimId,
+      craftsmanProfileId: fixture.profileId,
+    }),
+  ).resolves.toEqual([]);
+  await expect(
+    evidenceAuthorization.listOwnedUploads({
+      actorUserId: fixture.ownerId,
+      claimId: randomUUID(),
+      craftsmanProfileId: fixture.profileId,
+    }),
+  ).resolves.toEqual([]);
   const attachCommand = {
     actorUserId: fixture.ownerId,
     claimId,
@@ -128,6 +156,13 @@ export async function runCredentialClaimIntegrationAssertions(
     expectedRevision: 1,
     mediaAssetId,
   } as const;
+  await expect(
+    repository.attachEvidence({
+      ...attachCommand,
+      actorUserId: fixture.nonOwnerId,
+      commandId: randomUUID(),
+    }),
+  ).resolves.toEqual({ status: "PROFILE_UNAVAILABLE" });
   await expect(repository.attachEvidence(attachCommand)).resolves.toMatchObject(
     {
       claim: {

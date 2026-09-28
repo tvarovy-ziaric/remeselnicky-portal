@@ -94,7 +94,7 @@ These are findings, not passed cases:
   passed registration, fragment-only single-use email verification, invalid and
   valid phone OTP handling and the verified `/dopyt` continuation. This is
   `AUTOMATED_SYNTHETIC`, not a named tester/browser/device manual pass.
-- **Craftsman onboarding, profile and private portfolio authoring — implemented locally, manual
+- **Craftsman onboarding, profile, credentials and private portfolio authoring — implemented locally, manual
   result `NOT_EVALUATED`, blocking.** `/ucet/profil-remeselnika` now covers
   profile identity/About, one or more governed professions with declared level,
   base municipality, normal radius, the exact locked first-publication
@@ -103,10 +103,17 @@ These are findings, not passed cases:
   active professions, explicit unverified labelling, canonical private image
   processing, status polling and phase-aware photo attachment. It does not
   publish the project or reinterpret it as verified Job evidence. The
-  privacy-minimal admin review UI/API is present but remains inaccessible
-  without genuine recent-MFA `admin.profiles.review` authority. Credential
-  authoring, a full browser approval pass and named manual evidence remain
-  unevaluated; seeded profiles are still not acceptable UAT evidence.
+  `/ucet/doklady` flow lists only server-governed credential types, creates an
+  owner claim in `PENDING`, accepts a private synthetic PDF/image through the
+  scanner and attaches only `READY` evidence. Pending/rejected/revoked claims
+  are explicitly not verified; only `APPROVED` may be presented as verified.
+  The staging-only seed provides only `test.*` types and is not a Slovak legal
+  or regulated-profession taxonomy. The
+  existing domain review service requires genuine recent-MFA
+  `admin.credentials.review` authority. A privacy-minimal reviewer evidence
+  delivery route and credential review HTTP/UI are not wired yet, so credential
+  approval, a full browser pass and named manual evidence remain unevaluated;
+  seeded profiles are still not acceptable UAT evidence.
 - **Admin entry and MFA — `BLOCKED_HUMAN_GATE` for production evidence.** The
   existing short-lived synthetic database session is an internal seed aid, not
   a browser login or proof of provider-backed MFA. Do not create an
@@ -260,6 +267,31 @@ the worker-created canonical image is the only delivered image; EXIF/GPS is not
 retained in the deliverable; the project stays unverified and private. This
 script does not test credential review, verified Job provenance, customer
 photo-consent publication or genuine admin approval.
+
+### UAT-10 — private credential claim and evidence
+
+1. Sign in as a synthetic craftsman with an active synthetic profession and
+   open `/ucet/doklady`.
+2. Select an active owned profession and one server-listed `test.*` credential
+   type. Confirm the browser does not allow a free-text type or profession ID.
+3. Create the claim and confirm it reads `Čaká na kontrolu` and explicitly says
+   it is not verified. Do not treat the synthetic type code as a real Slovak
+   licence or authorization.
+4. Upload a synthetic PDF or JPEG/PNG containing no real identity, address or
+   qualification data. Observe `PROCESSING`, then explicit `REJECTED` or
+   `READY`; attach only a ready upload.
+5. Refresh during processing and retry an ambiguous create/attach intent.
+   Confirm the claim/evidence is not duplicated and the attached-evidence count
+   is restored without showing a filename, preview, asset ID or download URL.
+6. Try a wrong MIME, oversized file, foreign profile/claim URL and a suspended
+   or publishing-restricted synthetic account. Confirm uniform denial and no
+   storage metadata, reviewer identity or evidence bytes leak.
+
+Expected: the evidence remains private and owner-scoped, a required-evidence
+claim stays pending until a separate authorized admin review, and only an
+actual `APPROVED` state is rendered as verified. Without genuine recent admin
+MFA, record the approval part `NOT_EVALUATED`; never change the database by
+hand to manufacture a pass.
 
 ## Exploratory and compatibility matrix
 

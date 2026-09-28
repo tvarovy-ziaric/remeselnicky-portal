@@ -58,9 +58,8 @@ automated verification or verdict path.
 
 ## Integration helper
 
-`runCredentialClaimIntegrationAssertions(sql)` is a standalone helper for the
-single clean-migration PostgreSQL integration suite. It covers ownership,
-READY/private evidence, required-evidence approval, CAS/idempotency, immutable
-history, capability/MFA denial, revoked evidence, and suspension/revocation
-races. It is intentionally not wired into `migration.integration.test.ts` by
-this ticket owner.
+`runCredentialClaimIntegrationAssertions(sql)` runs inside the single
+clean-migration PostgreSQL integration suite. It covers ownership, cross-owner
+and foreign-claim upload denial, READY/private evidence, required-evidence
+approval, CAS/idempotency, immutable history, capability/MFA denial, revoked
+evidence, and suspension/revocation races.

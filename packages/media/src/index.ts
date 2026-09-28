@@ -68,6 +68,16 @@ export type {
   PortfolioProjectPhotoUploadStatus,
   PreparePortfolioProjectPhotoUploadResult,
 } from "./portfolio-project-upload.js";
+export { createCredentialEvidenceUploadService } from "./credential-evidence.js";
+export type {
+  CredentialEvidenceMediaKind,
+  CredentialEvidenceProcessingDispatcher,
+  CredentialEvidenceUploadAuthorization,
+  CredentialEvidenceUploadResult,
+  CredentialEvidenceUploadService,
+  CredentialEvidenceUploadStatus,
+  PrepareCredentialEvidenceUploadResult,
+} from "./credential-evidence.js";
 export {
   IMAGE_CANONICALIZATION_JOB_NAME,
   IMAGE_PROCESSING_LIMITS,
