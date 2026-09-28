@@ -869,6 +869,54 @@ p {
   font-weight: 800;
 }
 
+.admin-mfa-entry {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  padding: 1rem;
+  border: 1px solid #d8d4c8;
+  border-radius: 0.75rem;
+  background: #f4f8f3;
+}
+
+.admin-mfa-entry form {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.admin-mfa-entry input {
+  width: min(100%, 18rem);
+  min-height: 2.75rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #9eaa9d;
+  border-radius: 0.55rem;
+  color: inherit;
+  background: #fff;
+  font: inherit;
+  letter-spacing: 0.08em;
+}
+
+.admin-mfa-entry button {
+  justify-self: start;
+  min-height: 2.7rem;
+  padding: 0.65rem 1rem;
+  border: 0;
+  border-radius: 0.55rem;
+  color: #fff;
+  background: #214e3b;
+  font: inherit;
+  font-weight: 700;
+}
+
+.admin-mfa-entry button:disabled {
+  opacity: 0.55;
+}
+
+.admin-mfa-entry p {
+  margin: 0;
+  color: #55705f;
+}
+
 .admin-analytics {
   width: min(100%, 76rem);
 }

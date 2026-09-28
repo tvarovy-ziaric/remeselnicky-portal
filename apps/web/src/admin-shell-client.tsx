@@ -15,10 +15,12 @@ import { AdminModerationWorkspace } from "./admin-moderation";
 import { AdminAnalyticsDashboard } from "./admin-analytics-dashboard";
 import { AdminProfileReviewWorkspace } from "./admin-profile-review";
 import { AdminCredentialReviewWorkspace } from "./admin-credential-review";
+import { AdminMfaEntry } from "./admin-mfa-client";
 
 export type AdminShellState =
   | { readonly status: "LOADING" }
   | { readonly status: "AUTHENTICATION_REQUIRED" }
+  | { readonly status: "MFA_REQUIRED" }
   | { readonly status: "ACCESS_DENIED" }
   | { readonly status: "UNAVAILABLE" }
   | {
@@ -134,7 +136,7 @@ function AdminModulePlaceholder({
   );
 }
 
-function LockedAdminState({
+export function LockedAdminState({
   status,
 }: Readonly<{
   status: Exclude<AdminShellState["status"], "AUTHORIZED">;
@@ -144,21 +146,33 @@ function LockedAdminState({
       ? ["Overujem prístup", "Kontrolujeme aktívnu MFA reláciu."]
       : status === "AUTHENTICATION_REQUIRED"
         ? ["Prihlásenie je potrebné", "Prihláste sa a dokončite MFA overenie."]
-        : status === "ACCESS_DENIED"
+        : status === "MFA_REQUIRED"
           ? [
-              "Prístup nie je povolený",
-              "Účet nemá aktívne oprávnenie administrátora.",
+              "Vyžaduje sa privilegované overenie",
+              "Pokračujte cez MFA. Server po overení znovu vyhodnotí aktuálnu rolu a oprávnenia.",
             ]
-          : [
-              "Administrácia je nedostupná",
-              "Prístup sa nepodarilo bezpečne overiť. Skúste to neskôr.",
-            ];
+          : status === "ACCESS_DENIED"
+            ? [
+                "Prístup nie je povolený",
+                "Aktuálna relácia nemá oprávnenie pre požadovaný administrátorský modul.",
+              ]
+            : [
+                "Administrácia je nedostupná",
+                "Prístup sa nepodarilo bezpečne overiť. Skúste to neskôr.",
+              ];
   return (
     <main className="admin-locked">
       <section aria-live="polite" aria-labelledby="admin-state-title">
         <p className="admin-kicker">Interná administrácia</p>
         <h1 id="admin-state-title">{copy[0]}</h1>
         <p>{copy[1]}</p>
+        {status === "AUTHENTICATION_REQUIRED" ? (
+          <a className="admin-primary-link" href="/prihlasenie">
+            Prejsť na prihlásenie
+          </a>
+        ) : status === "MFA_REQUIRED" ? (
+          <AdminMfaEntry />
+        ) : null}
       </section>
     </main>
   );
@@ -177,7 +191,7 @@ export async function loadAdminShell(
     });
     if (sessionResponse.status === 401)
       return { status: "AUTHENTICATION_REQUIRED" };
-    if (sessionResponse.status === 403) return { status: "ACCESS_DENIED" };
+    if (sessionResponse.status === 403) return { status: "MFA_REQUIRED" };
     if (!sessionResponse.ok) return { status: "UNAVAILABLE" };
     const session = parseAdminSession(await sessionResponse.json());
     if (session === undefined) return { status: "UNAVAILABLE" };

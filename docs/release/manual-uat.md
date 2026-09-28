@@ -119,8 +119,12 @@ These are findings, not passed cases:
   acceptable UAT evidence.
 - **Admin entry and MFA — `BLOCKED_HUMAN_GATE` for production evidence.** The
   existing short-lived synthetic database session is an internal seed aid, not
-  a browser login or proof of provider-backed MFA. Do not create an
-  authorization-only bypass.
+  a browser login or proof of provider-backed MFA. The admin shell now has a
+  provider-neutral, user-initiated TOTP challenge/verification form with fresh
+  CSRF, one-shot challenge handling and post-verification reauthorization, but
+  the deployed runtime still has no real adapter or enrolled factor. WebAuthn
+  remains fail-closed pending a reviewed provider ceremony contract. Do not
+  create an authorization-only bypass.
 - **Privacy Notice and Terms — `BLOCKED_HUMAN_GATE` for real users.** The
   privacy center is not approved legal notice or terms evidence.
 

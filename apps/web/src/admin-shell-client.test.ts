@@ -1,6 +1,8 @@
+import * as React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { loadAdminShell } from "./admin-shell-client";
+import { loadAdminShell, LockedAdminState } from "./admin-shell-client";
 
 const session = {
   capabilities: ["admin.access", "admin.sensitive.read"],
@@ -25,6 +27,54 @@ const modules = {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("admin shell loader", () => {
+  it("routes a missing base login to sign-in without offering MFA", () => {
+    vi.stubGlobal("React", React);
+    const markup = renderToStaticMarkup(
+      React.createElement(LockedAdminState, {
+        status: "AUTHENTICATION_REQUIRED",
+      }),
+    );
+
+    expect(markup).toContain('href="/prihlasenie"');
+    expect(markup).not.toContain("Pokračovať cez MFA");
+  });
+
+  it("offers MFA for a base-authenticated session without leaking denial detail", () => {
+    vi.stubGlobal("React", React);
+    const markup = renderToStaticMarkup(
+      React.createElement(LockedAdminState, { status: "MFA_REQUIRED" }),
+    );
+
+    expect(markup).toContain("Vyžaduje sa privilegované overenie");
+    expect(markup).toContain("Pokračovať cez MFA");
+    expect(markup).not.toContain('href="/prihlasenie"');
+    expect(markup).not.toContain("nemá aktívne oprávnenie administrátora");
+  });
+
+  it("keeps downstream capability denial separate from the MFA prompt", () => {
+    vi.stubGlobal("React", React);
+    const markup = renderToStaticMarkup(
+      React.createElement(LockedAdminState, { status: "ACCESS_DENIED" }),
+    );
+
+    expect(markup).toContain("Prístup nie je povolený");
+    expect(markup).not.toContain("Pokračovať cez MFA");
+    expect(markup).not.toContain('href="/prihlasenie"');
+  });
+
+  it("maps only the initial privileged-session denial to MFA_REQUIRED", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn<typeof fetch>()
+        .mockResolvedValueOnce(new Response(null, { status: 403 })),
+    );
+
+    await expect(
+      loadAdminShell("dashboard", new AbortController().signal),
+    ).resolves.toEqual({ status: "MFA_REQUIRED" });
+  });
+
   it("re-authorizes a deep link through its backend module endpoint", async () => {
     const fetchMock = vi
       .fn<typeof fetch>()

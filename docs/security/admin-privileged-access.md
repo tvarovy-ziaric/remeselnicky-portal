@@ -61,6 +61,27 @@ privileged sessions and appends `admin_role_change_events` in the same
 transaction. Those event rows reject update/delete and are ready to feed the
 unified R0-024 audit facility.
 
+## Browser entry boundary
+
+The admin shell distinguishes an absent base login from an authenticated
+session that still needs privileged MFA. An unauthenticated browser is sent to
+the ordinary login page. A `403` privileged-session result exposes only a
+generic, user-initiated MFA prompt; it does not assert that the current account
+has a role or enrolled factor.
+
+The browser obtains a fresh CSRF token before both challenge and verification,
+requests only the fixed `PRIVILEGED_SESSION` purpose and retains the one-shot
+challenge and response only in component memory. The initial browser flow
+supports provider-backed TOTP codes. It discards the challenge after every
+verification failure and reloads the admin session after `204`, so UI state is
+never treated as authority. WebAuthn remains fail-closed until a provider
+adapter supplies a reviewed browser-ceremony serialization; arbitrary provider
+challenge strings are not parsed or submitted as assertions.
+
+This UI does not register admin routes, enroll a factor, select a provider or
+create a synthetic authorization bypass. Runtime wiring still requires the
+real adapter and enrollment described below.
+
 ## Production bootstrap gate
 
 The repository intentionally does not select an MFA vendor, create a paid

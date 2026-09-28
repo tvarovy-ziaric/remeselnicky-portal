@@ -183,9 +183,9 @@ Reasons:
 - production infrastructure, monitoring, backups and recovery are not ready;
 - real provider-backed admin MFA is not selected or enrolled;
 - legal/privacy/processor/retention decisions remain human-gated;
-- browser craftsman onboarding/authoring is not implemented, customer
-  onboarding has only automated synthetic evidence, and manual UAT is not
-  complete;
+- browser craftsman onboarding/authoring is implemented locally but lacks
+  deployed provider-staging and named manual evidence; customer onboarding has
+  only automated synthetic evidence, and manual UAT is not complete;
 - the initial invite cohort and explicit D30 production approval have not been
   authorized.
 
