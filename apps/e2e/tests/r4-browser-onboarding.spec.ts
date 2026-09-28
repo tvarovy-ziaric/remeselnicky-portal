@@ -25,7 +25,7 @@ test("a fresh user completes provider-neutral browser onboarding without exposin
   await page.getByLabel(/^E-mail$/u).fill(synthetic.email);
   await page.getByLabel(/^Heslo$/u).fill(synthetic.password);
   await page
-    .getByLabel(/^(?:Zopakujte|Potvrdenie) hesla$/u)
+    .getByLabel(/^(?:Zopakujte heslo|Potvrdenie hesla)$/u)
     .fill(synthetic.password);
   await page.getByRole("checkbox", { name: /18 rokov/u }).check();
   await page.getByRole("button", { name: /^Vytvoriť účet$/u }).click();
