@@ -14,6 +14,7 @@ import { AdminDisputeWorkspace, AdminJobOperations } from "./admin-operations";
 import { AdminModerationWorkspace } from "./admin-moderation";
 import { AdminAnalyticsDashboard } from "./admin-analytics-dashboard";
 import { AdminProfileReviewWorkspace } from "./admin-profile-review";
+import { AdminCredentialReviewWorkspace } from "./admin-credential-review";
 
 export type AdminShellState =
   | { readonly status: "LOADING" }
@@ -101,6 +102,8 @@ export function AdminShellClient({
             <AdminModerationWorkspace />
           ) : selected.id === "profiles" ? (
             <AdminProfileReviewWorkspace />
+          ) : selected.id === "credentials" ? (
+            <AdminCredentialReviewWorkspace />
           ) : selected.id === "dashboard" ? (
             <AdminAnalyticsDashboard />
           ) : (

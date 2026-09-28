@@ -15,6 +15,7 @@ import type { Sql } from "postgres";
 import { expect } from "vitest";
 
 import { createAdminAccessRepository } from "../src/admin-auth-repository.js";
+import { createCredentialReviewerMediaAccessResolver } from "../src/admin-credential-review-repository.js";
 import {
   createCredentialClaimRepository,
   createCredentialReviewService,
@@ -22,6 +23,7 @@ import {
 import { createCredentialEvidenceUploadAuthorization } from "../src/credential-evidence-upload-repository.js";
 import { createCraftsmanProfessionRepository } from "../src/craftsman-profession-repository.js";
 import { createMediaRepository } from "../src/media-repository.js";
+import { createPrivateMediaDeliveryRepository } from "../src/media-delivery-repository.js";
 import type { CreateProcessingMediaAssetInput } from "../src/media-repository.js";
 
 /** Runs inside the one clean-migration integration test to avoid migration races. */
@@ -172,6 +174,39 @@ export async function runCredentialClaimIntegrationAssertions(
       status: "APPLIED",
     },
   );
+
+  const reviewerSnapshot = await createPrivateMediaDeliveryRepository(
+    sql,
+  ).loadPrivateDeliverySnapshot({
+    actorUserId: fixture.adminId,
+    mediaAssetId,
+  });
+  if (reviewerSnapshot === null)
+    throw new Error("Expected private credential delivery snapshot.");
+  const reviewerAccess = createCredentialReviewerMediaAccessResolver(sql);
+  await expect(
+    reviewerAccess.resolvePrivateMediaAccess(reviewerSnapshot),
+  ).resolves.toMatchObject({ grants: ["CREDENTIAL_REVIEWER"] });
+  const ordinaryUserSnapshot = await createPrivateMediaDeliveryRepository(
+    sql,
+  ).loadPrivateDeliverySnapshot({
+    actorUserId: fixture.nonOwnerId,
+    mediaAssetId,
+  });
+  if (ordinaryUserSnapshot === null)
+    throw new Error("Expected ordinary-user credential delivery snapshot.");
+  await expect(
+    reviewerAccess.resolvePrivateMediaAccess(ordinaryUserSnapshot),
+  ).resolves.toMatchObject({ grants: [] });
+  await expect(
+    reviewerAccess.resolvePrivateMediaAccess({
+      ...reviewerSnapshot,
+      asset: {
+        ...reviewerSnapshot.asset,
+        provenanceEntityId: randomUUID(),
+      },
+    }),
+  ).resolves.toMatchObject({ grants: [] });
   await expect(repository.attachEvidence(attachCommand)).resolves.toMatchObject(
     {
       claim: { revision: 2 },
@@ -236,6 +271,9 @@ export async function runCredentialClaimIntegrationAssertions(
     claim: { revision: 4, state: "REVOKED" },
     status: "APPLIED",
   });
+  await expect(
+    reviewerAccess.resolvePrivateMediaAccess(reviewerSnapshot),
+  ).resolves.toMatchObject({ grants: [] });
 
   const [counts] = await sql<
     {

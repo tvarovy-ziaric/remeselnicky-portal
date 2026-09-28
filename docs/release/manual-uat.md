@@ -110,10 +110,13 @@ These are findings, not passed cases:
   The staging-only seed provides only `test.*` types and is not a Slovak legal
   or regulated-profession taxonomy. The
   existing domain review service requires genuine recent-MFA
-  `admin.credentials.review` authority. A privacy-minimal reviewer evidence
-  delivery route and credential review HTTP/UI are not wired yet, so credential
-  approval, a full browser pass and named manual evidence remain unevaluated;
-  seeded profiles are still not acceptable UAT evidence.
+  `admin.credentials.review` authority. A privacy-minimal pending queue,
+  approve/reject/revoke HTTP commands, admin UI and credential-only private
+  evidence delivery are implemented locally. They are intentionally not
+  registered by the deployed runtime until genuine admin access with recent
+  MFA is available. Credential approval, a full browser pass and named manual
+  evidence therefore remain unevaluated; seeded profiles are still not
+  acceptable UAT evidence.
 - **Admin entry and MFA — `BLOCKED_HUMAN_GATE` for production evidence.** The
   existing short-lived synthetic database session is an internal seed aid, not
   a browser login or proof of provider-backed MFA. Do not create an
@@ -292,6 +295,35 @@ claim stays pending until a separate authorized admin review, and only an
 actual `APPROVED` state is rendered as verified. Without genuine recent admin
 MFA, record the approval part `NOT_EVALUATED`; never change the database by
 hand to manufacture a pass.
+
+### UAT-11 — admin credential review and private evidence
+
+Run this case only with a genuine ACTIVE admin account, an unexpired privileged
+session, recent MFA and `admin.credentials.review`. A seeded database session
+or direct SQL state change is not acceptable evidence.
+
+1. Open the admin `Doklady` module and confirm the queue contains only pending
+   synthetic claims with profile, profession, literal `test.*` type, expiry and
+   evidence metadata. Confirm no filename, storage key, signed URL, owner ID or
+   reviewer identity appears in JSON or the page.
+2. Open each evidence link. Confirm the browser receives only a short-lived
+   private redirect and that another claim ID, asset ID, ordinary user, stale
+   MFA session and revoked admin session all fail without revealing existence.
+3. Try to approve a required-evidence claim without current ready evidence.
+   Confirm the action is blocked. Approve a valid synthetic claim, refresh the
+   owner page and confirm only the resulting `APPROVED` state is labelled
+   verified.
+4. Reject another claim with a bounded category and user-facing reason. Retry
+   the same ambiguous command and confirm it is deduplicated; retry with a
+   conflicting payload and confirm no second decision is created.
+5. Using an approved synthetic claim ID, execute the authorized revoke command
+   and confirm future verified presentation and reviewer evidence delivery are
+   denied while history remains intact.
+
+Expected: all decisions are explicit, revision-checked, idempotent and audited;
+evidence stays private and purpose-bound; a role/session/MFA revocation during
+delivery cannot return the redirect. Until the real MFA/provider gate is
+resolved, record this whole case `NOT_EVALUATED`.
 
 ## Exploratory and compatibility matrix
 

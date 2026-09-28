@@ -18,6 +18,11 @@ export type {
   AdminProfileReviewView,
 } from "./admin-profile-review/index.js";
 export {
+  ADMIN_CREDENTIAL_REVIEW_PATHS,
+  registerAdminCredentialReviewRoutes,
+} from "./admin-credential-review/index.js";
+export type { AdminCredentialReviewRouteDependencies } from "./admin-credential-review/index.js";
+export {
   CRAFTSMAN_AUTHORING_PATHS,
   registerCraftsmanAuthoringRoutes,
 } from "./craftsman-authoring/index.js";

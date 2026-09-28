@@ -96,6 +96,28 @@ describe("admin shell response boundary", () => {
       )?.id,
     ).toBe("profiles");
     expect(
+      parseAdminModule(
+        {
+          description: "Fronta dokladov a profesijných oprávnení.",
+          id: "credentials",
+          label: "Doklady",
+          state: "OPERATIONAL",
+        },
+        "credentials",
+      )?.id,
+    ).toBe("credentials");
+    expect(
+      parseAdminModule(
+        {
+          description: "Fronta dokladov a profesijných oprávnení.",
+          id: "credentials",
+          label: "Doklady",
+          state: "PLACEHOLDER",
+        },
+        "credentials",
+      ),
+    ).toBeUndefined();
+    expect(
       parseAdminModule({ ...response, id: "disputes" }, "disputes"),
     ).toBeUndefined();
   });

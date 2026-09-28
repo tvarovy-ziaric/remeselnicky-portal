@@ -40,8 +40,12 @@ claim IDs alone can therefore never manufacture trusted upload provenance.
 Owner and review projections expose only allowlisted asset IDs, kinds and
 attachment timestamps. They never expose bytes, filenames, hashes, storage
 keys, signed URLs, session hashes or audit fingerprints. Evidence delivery
-continues through `@portal/media` private delivery with the
-`CREDENTIAL_REVIEWER` relation grant; no public derivative is created.
+continues through a credential-only `@portal/media` private-delivery instance
+with the `CREDENTIAL_REVIEWER` relation grant; no public derivative is created.
+The general private-media route intentionally has no `CREDENTIAL_*` mapping.
+The admin endpoint checks the exact claim/evidence relation and genuine recent
+MFA both before signing and again before returning the short-lived redirect, so
+claim substitution or a concurrent session/role revocation fails closed.
 
 ## Admin boundary
 
@@ -55,6 +59,12 @@ diff, but no evidence content or authentication material.
 
 The queue order is deterministic (`created_at`, then claim ID). There is no
 automated verification or verdict path.
+
+The optional HTTP module exposes a bounded `PENDING` review queue, private
+detail/evidence delivery and explicit `APPROVE`, `REJECT` and `REVOKE`
+commands. All reads are private/no-store and all writes require CSRF. The
+runtime does not register these routes until the real admin-access/MFA adapter
+is supplied; the synthetic test stack does not gain an authorization bypass.
 
 ## Integration helper
 

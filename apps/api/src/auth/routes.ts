@@ -38,6 +38,10 @@ import {
   type AdminProfileReviewRouteDependencies,
 } from "../admin-profile-review/index.js";
 import {
+  registerAdminCredentialReviewRoutes,
+  type AdminCredentialReviewRouteDependencies,
+} from "../admin-credential-review/index.js";
+import {
   registerCraftsmanAuthoringRoutes,
   type CraftsmanAuthoringRouteDependencies,
 } from "../craftsman-authoring/index.js";
@@ -327,6 +331,10 @@ export interface AuthModuleDependencies {
   readonly adminProfileReview?: Pick<
     AdminProfileReviewRouteDependencies,
     "publications" | "reviews"
+  >;
+  readonly adminCredentialReview?: Pick<
+    AdminCredentialReviewRouteDependencies,
+    "credentialReview" | "evidenceDelivery" | "reviews"
   >;
   readonly craftsmanAuthoring?: Pick<
     CraftsmanAuthoringRouteDependencies,
@@ -1059,6 +1067,8 @@ async function configureAuthModule(
   if (dependencies.adminAccess !== undefined) {
     registerAdminAuthRoutes(app, {
       config,
+      credentialReviewAvailable:
+        dependencies.adminCredentialReview !== undefined,
       guard,
       persistence: dependencies.persistence,
       service: dependencies.adminAccess.service,
@@ -1152,6 +1162,18 @@ async function configureAuthModule(
           timeWindowMs: config.rateLimitWindowMs,
         },
         ...dependencies.adminProfileReview,
+      });
+    }
+    if (dependencies.adminCredentialReview !== undefined) {
+      registerAdminCredentialReviewRoutes(app, {
+        adminAccess: dependencies.adminAccess.service,
+        csrfProtection: csrfProtection(app),
+        guard,
+        rateLimit: {
+          max: config.rateLimitMax,
+          timeWindowMs: config.rateLimitWindowMs,
+        },
+        ...dependencies.adminCredentialReview,
       });
     }
   }

@@ -1770,6 +1770,37 @@ p {
   font: inherit;
 }
 
+.admin-credential-review select {
+  display: block;
+  width: 100%;
+  margin-block: 0.4rem 0.75rem;
+  padding: 0.65rem;
+  border: 1px solid #9eaa9d;
+  border-radius: 0.55rem;
+  background: #fff;
+  font: inherit;
+}
+
+.admin-credential-evidence {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-credential-evidence li {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.75rem;
+  border: 1px solid #d8d4c8;
+  border-radius: 0.55rem;
+}
+
+.admin-credential-evidence span {
+  color: #5b615c;
+  font-size: 0.88rem;
+}
+
 .admin-profile-review-actions {
   display: flex;
   flex-wrap: wrap;

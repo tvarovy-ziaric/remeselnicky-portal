@@ -14,6 +14,7 @@ import {
 } from "./model.js";
 
 export interface AdminConsoleRouteDependencies {
+  readonly credentialReviewAvailable?: boolean;
   readonly guard: {
     evaluate(request: FastifyRequest): Promise<SessionGuardResult>;
   };
@@ -74,6 +75,8 @@ export function registerAdminConsoleRoutes(
         label: module.label,
         state:
           moduleId === "disputes" ||
+          (moduleId === "credentials" &&
+            dependencies.credentialReviewAvailable === true) ||
           moduleId === "jobs" ||
           moduleId === "profiles" ||
           moduleId === "reports" ||

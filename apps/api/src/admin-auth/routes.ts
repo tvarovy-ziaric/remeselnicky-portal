@@ -20,6 +20,7 @@ export interface AdminAuthRouteDependencies {
     AuthRuntimeConfig,
     "rateLimitMax" | "rateLimitWindowMs" | "sessionSecret"
   >;
+  readonly credentialReviewAvailable?: boolean;
   readonly guard: {
     evaluate(request: FastifyRequest): Promise<SessionGuardResult>;
   };

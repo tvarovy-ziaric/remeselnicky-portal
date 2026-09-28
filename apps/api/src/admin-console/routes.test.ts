@@ -130,6 +130,26 @@ describe("admin console routes", () => {
     }
   });
 
+  it("advertises credential review as operational only when its routes are registered", async () => {
+    for (const [credentialReviewAvailable, state] of [
+      [false, "PLACEHOLDER"],
+      [true, "OPERATIONAL"],
+    ] as const) {
+      const fixture = createFixture(
+        "ACTIVE",
+        adminActor(),
+        "CAPABILITY_DENIED",
+        credentialReviewAvailable,
+      );
+      const response = await fixture.app.inject({
+        method: "GET",
+        url: `${ADMIN_CONSOLE_BASE_PATH}/modules/credentials`,
+      });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({ id: "credentials", state });
+    }
+  });
+
   it("fails closed if a service returns an actor for a different identity", async () => {
     const actor = adminActor();
     const fixture = createFixture("ACTIVE", {
@@ -165,6 +185,7 @@ function createFixture(
     | "AUTHENTICATION_REQUIRED"
     | "MFA_TOO_OLD"
     | "CAPABILITY_DENIED" = "CAPABILITY_DENIED",
+  credentialReviewAvailable = false,
 ) {
   const app = Fastify({ logger: false });
   apps.push(app);
@@ -183,6 +204,7 @@ function createFixture(
     return Promise.resolve({ actor, status: "AUTHORIZED" });
   });
   registerAdminConsoleRoutes(app, {
+    credentialReviewAvailable,
     guard: {
       evaluate: vi
         .fn()

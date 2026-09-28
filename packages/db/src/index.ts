@@ -14,6 +14,20 @@ export type {
   AdminProfileReviewProfession,
   AdminProfileReviewRepository,
 } from "./admin-profile-review-repository.js";
+import {
+  createAdminCredentialReviewRepository,
+  createCredentialReviewerMediaAccessResolver,
+  type AdminCredentialReviewRepository,
+} from "./admin-credential-review-repository.js";
+export {
+  createAdminCredentialReviewRepository,
+  createCredentialReviewerMediaAccessResolver,
+} from "./admin-credential-review-repository.js";
+export type {
+  AdminCredentialEvidenceItem,
+  AdminCredentialReviewItem,
+  AdminCredentialReviewRepository,
+} from "./admin-credential-review-repository.js";
 import { createAuditRepository } from "./audit-repository.js";
 import type { AuditRepository } from "@portal/audit";
 import {
@@ -1355,6 +1369,7 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly auth: AuthRepository;
   readonly alphaRegistrationIntake: AlphaRegistrationIntakeRepository;
   readonly adminAccess: AdminAccessRepository;
+  readonly adminCredentialReviews: AdminCredentialReviewRepository;
   readonly adminProfileReviews: AdminProfileReviewRepository;
   readonly audit: AuditRepository;
   readonly craftsmanProfiles: CraftsmanProfilePersistence;
@@ -1389,6 +1404,7 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly credentialQualifications: CredentialQualificationPolicyPersistence;
   readonly credentialClaims: CredentialClaimRepository;
   readonly credentialEvidenceUploads: CredentialEvidenceUploadAuthorization;
+  readonly credentialReviewerMediaAccess: MediaEntityAccessResolver;
   readonly credentialTypes: CredentialTypeReadRepository;
   readonly customerProfiles: CustomerProfilePersistence;
   readonly customerShortlist: CustomerShortlistPersistence;
@@ -1553,6 +1569,7 @@ export function createDatabase(
   const auth = createAuthRepository(sql);
   const alphaRegistrationIntake = createAlphaRegistrationIntakeRepository(sql);
   const adminAccess = createAdminAccessRepository(sql);
+  const adminCredentialReviews = createAdminCredentialReviewRepository(sql);
   const adminProfileReviews = createAdminProfileReviewRepository(sql);
   const audit = createAuditRepository(sql);
   const craftsmanProfiles = createCraftsmanProfileRepository(sql);
@@ -1594,6 +1611,8 @@ export function createDatabase(
     sql,
     credentialClaims,
   );
+  const credentialReviewerMediaAccess =
+    createCredentialReviewerMediaAccessResolver(sql);
   const credentialTypes = createCredentialTypeReadRepository(sql);
   const customerProfiles = createCustomerProfileRepository(sql);
   const customerShortlist = createCustomerShortlistRepository(sql);
@@ -1689,6 +1708,7 @@ export function createDatabase(
 
   return Object.freeze({
     adminAccess,
+    adminCredentialReviews,
     adminProfileReviews,
     alphaRegistrationIntake,
     audit,
@@ -1723,6 +1743,7 @@ export function createDatabase(
     credentialQualifications,
     credentialClaims,
     credentialEvidenceUploads,
+    credentialReviewerMediaAccess,
     credentialTypes,
     customerProfiles,
     customerShortlist,

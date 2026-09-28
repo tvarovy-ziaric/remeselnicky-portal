@@ -410,6 +410,17 @@ function createApiMediaRuntime() {
     repository: database.privateMediaDelivery,
     storage,
   });
+  const credentialEvidenceDelivery = createPrivateMediaDeliveryService({
+    applicationOrigin: config.appOrigin,
+    entityAccess: createPurposeBoundMediaEntityAccessResolver({
+      byPurpose: {
+        CREDENTIAL_DOCUMENT: database.credentialReviewerMediaAccess,
+        CREDENTIAL_IMAGE: database.credentialReviewerMediaAccess,
+      },
+    }),
+    repository: database.privateMediaDelivery,
+    storage,
+  });
   return Object.freeze({
     conversationAttachmentUploads: createConversationAttachmentUploadService({
       authorization: database.conversationAttachmentUploads,
@@ -421,6 +432,7 @@ function createApiMediaRuntime() {
       processing,
       uploads,
     }),
+    credentialEvidenceDelivery,
     disputeEvidenceUploads: createDisputeEvidenceUploadService({
       authorization: database.jobDisputes,
       processing,
