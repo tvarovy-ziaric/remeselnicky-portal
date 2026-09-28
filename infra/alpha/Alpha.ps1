@@ -108,7 +108,7 @@ switch ($Action) {
     Build-IfMissing "postgres" "remeselnicky-alpha-postgres:latest"
     Build-IfMissing "minio" "remeselnicky-alpha-minio:RELEASE.2025-10-15T17-29-55Z"
     Build-IfMissing "minio-init" "remeselnicky-alpha-mc:RELEASE.2025-08-13T08-35-41Z"
-    Build-Images -Services @("api", "worker", "web")
+    Build-Images -Services @("synthetic-verification-sink", "api", "worker", "web")
     Invoke-Compose @("up", "--detach", "--no-build")
     Invoke-Compose @("ps")
     break
@@ -153,7 +153,7 @@ switch ($Action) {
     [IO.File]::WriteAllText((Join-Path $state "previous-release"), $previous, [Text.UTF8Encoding]::new($false))
     Set-Release $next
     try {
-      Build-Images -Services @("api", "worker", "web")
+      Build-Images -Services @("synthetic-verification-sink", "api", "worker", "web")
       Invoke-Compose @("up", "--detach", "--no-build")
       # Nginx resolves upstream service addresses at startup; Compose may replace
       # web/API containers without recreating the proxy, leaving stale addresses.
