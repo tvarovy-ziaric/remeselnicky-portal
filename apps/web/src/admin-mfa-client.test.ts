@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   AdminMfaEntry,
+  containAdminMfaClientFailures,
   createAdminMfaClient,
   parseAdminMfaChallengeResponse,
   type AdminMfaClient,
@@ -103,6 +104,49 @@ describe("admin MFA browser client", () => {
     expect(markup).toContain("Pokračovať cez MFA");
     expect(markup).toContain("neukladajú do prehliadača");
     expect(markup).not.toContain('autoComplete="one-time-code"');
+  });
+
+  it("contains a throwing provider adapter as an unavailable result", async () => {
+    const client = containAdminMfaClientFailures({
+      beginChallenge: vi.fn().mockRejectedValue(new Error("provider failed")),
+      verify: vi.fn().mockRejectedValue(new Error("provider failed")),
+    });
+
+    await expect(client.beginChallenge()).resolves.toEqual({
+      status: "UNAVAILABLE",
+    });
+    await expect(
+      client.verify({
+        challengeToken,
+        factorKind: "TOTP",
+        response: "123456",
+      }),
+    ).resolves.toBe("UNAVAILABLE");
+  });
+
+  it("fails closed on malformed adapter outcomes", async () => {
+    const client = containAdminMfaClientFailures({
+      beginChallenge: vi
+        .fn<AdminMfaClient["beginChallenge"]>()
+        .mockResolvedValue({
+          challenge: undefined,
+          status: "CHALLENGE_CREATED",
+        } as never),
+      verify: vi
+        .fn<AdminMfaClient["verify"]>()
+        .mockResolvedValue("VERIFIED_BY_PROVIDER" as never),
+    });
+
+    await expect(client.beginChallenge()).resolves.toEqual({
+      status: "UNAVAILABLE",
+    });
+    await expect(
+      client.verify({
+        challengeToken,
+        factorKind: "TOTP",
+        response: "123456",
+      }),
+    ).resolves.toBe("UNAVAILABLE");
   });
 
   it("gets an exact CSRF token and begins a privileged-session challenge", async () => {

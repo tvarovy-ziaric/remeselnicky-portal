@@ -39,6 +39,29 @@ export interface AdminMfaClient {
   }): Promise<AdminMfaVerifyResult>;
 }
 
+export function containAdminMfaClientFailures(
+  client: AdminMfaClient,
+): AdminMfaClient {
+  return Object.freeze<AdminMfaClient>({
+    async beginChallenge(): Promise<AdminMfaBeginResult> {
+      try {
+        const result: unknown = await client.beginChallenge();
+        return parseBeginResult(result);
+      } catch {
+        return { status: "UNAVAILABLE" };
+      }
+    },
+    async verify(input): Promise<AdminMfaVerifyResult> {
+      try {
+        const result: unknown = await client.verify(input);
+        return isVerifyResult(result) ? result : "UNAVAILABLE";
+      } catch {
+        return "UNAVAILABLE";
+      }
+    },
+  });
+}
+
 export function createAdminMfaClient(
   input: {
     readonly fetch?: typeof fetch;
@@ -130,7 +153,10 @@ export function parseAdminMfaChallengeResponse(
 export function AdminMfaEntry({
   client,
 }: Readonly<{ readonly client?: AdminMfaClient }>) {
-  const mfa = useMemo(() => client ?? createAdminMfaClient(), [client]);
+  const mfa = useMemo(
+    () => containAdminMfaClientFailures(client ?? createAdminMfaClient()),
+    [client],
+  );
   const [challenge, setChallenge] = useState<AdminMfaChallenge | null>(null);
   const [response, setResponse] = useState("");
   const [busy, setBusy] = useState(false);
@@ -315,5 +341,38 @@ function exactRecord(
     !Array.isArray(value) &&
     Object.keys(value).length === keys.length &&
     keys.every((key) => Object.hasOwn(value, key))
+  );
+}
+
+function parseBeginResult(value: unknown): AdminMfaBeginResult {
+  if (!exactRecord(value, ["status"])) return parseCreatedChallenge(value);
+  return value.status === "ACCESS_DENIED" ||
+    value.status === "AUTHENTICATION_REQUIRED" ||
+    value.status === "RATE_LIMITED" ||
+    value.status === "UNAVAILABLE"
+    ? { status: value.status }
+    : { status: "UNAVAILABLE" };
+}
+
+function parseCreatedChallenge(value: unknown): AdminMfaBeginResult {
+  if (
+    !exactRecord(value, ["challenge", "status"]) ||
+    value.status !== "CHALLENGE_CREATED"
+  )
+    return { status: "UNAVAILABLE" };
+  const challenge = parseAdminMfaChallengeResponse(value.challenge);
+  return challenge === null
+    ? { status: "UNAVAILABLE" }
+    : { challenge, status: "CHALLENGE_CREATED" };
+}
+
+function isVerifyResult(value: unknown): value is AdminMfaVerifyResult {
+  return (
+    value === "ACCESS_DENIED" ||
+    value === "AUTHENTICATION_REQUIRED" ||
+    value === "INVALID_RESPONSE" ||
+    value === "RATE_LIMITED" ||
+    value === "UNAVAILABLE" ||
+    value === "VERIFIED"
   );
 }
