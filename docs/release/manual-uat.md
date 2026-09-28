@@ -88,10 +88,12 @@ evidence record.
 
 These are findings, not passed cases:
 
-- **Registration and verification UI — `NOT_EVALUATED`, blocking.** The API and
-  synthetic automated flow register and verify users, but the web application
-  has no browser registration, email-verification, or phone-verification page.
-  A passing API/Playwright helper must not be recorded as manual onboarding UAT.
+- **Registration and verification UI — implemented and automated, manual result
+  still `NOT_EVALUATED`.** The web application now provides `/registracia`,
+  `/overenie-emailu` and `/overenie`; the public synthetic Chromium scenario
+  passed registration, fragment-only single-use email verification, invalid and
+  valid phone OTP handling and the verified `/dopyt` continuation. This is
+  `AUTOMATED_SYNTHETIC`, not a named tester/browser/device manual pass.
 - **Craftsman onboarding and profile authoring — `NOT_EVALUATED`, blocking.**
   Seeded public profiles allow marketplace testing, but they bypass browser
   onboarding, profession/skill/service-area authoring, credentials, portfolio,
@@ -247,13 +249,13 @@ Only run these cases after recording a healthy state and only against the
 disposable/synthetic Alpha. Restore the exact stopped service after each case.
 Do not combine outages.
 
-| Failure                       | Manual observation                                                                                                                        | Required integrity check                                                                                        |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| Verification sink unavailable | Registration delivery fails generically without a token/OTP leak. Browser-manual result stays `NOT_EVALUATED` until onboarding UI exists. | No verified flag or partial registration side effect is invented; recovery uses normal resend/verify semantics. |
-| Worker stopped and restarted  | Pending upload/notification processing reports a bounded pending state and later recovers.                                                | No duplicate business effect and no queue deletion.                                                             |
-| Scanner unavailable           | PDF remains quarantined/unavailable rather than being treated as clean.                                                                   | No signed delivery for an unverified object.                                                                    |
-| Object storage unavailable    | Upload/download fails safely and existing business state remains readable where appropriate.                                              | No public/private fallback or storage identifier leak.                                                          |
-| API or PostgreSQL unavailable | The browser shows a bounded unavailable state and later recovers after health is restored.                                                | No partial acceptance, Change order, completion or review effect.                                               |
+| Failure                       | Manual observation                                                                                                                                                          | Required integrity check                                                                                        |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Verification sink unavailable | Registration delivery must fail generically without a token/OTP leak. The browser-manual outage result remains `NOT_EVALUATED` until a named tester runs this failure case. | No verified flag or partial registration side effect is invented; recovery uses normal resend/verify semantics. |
+| Worker stopped and restarted  | Pending upload/notification processing reports a bounded pending state and later recovers.                                                                                  | No duplicate business effect and no queue deletion.                                                             |
+| Scanner unavailable           | PDF remains quarantined/unavailable rather than being treated as clean.                                                                                                     | No signed delivery for an unverified object.                                                                    |
+| Object storage unavailable    | Upload/download fails safely and existing business state remains readable where appropriate.                                                                                | No public/private fallback or storage identifier leak.                                                          |
+| API or PostgreSQL unavailable | The browser shows a bounded unavailable state and later recovers after health is restored.                                                                                  | No partial acceptance, Change order, completion or review effect.                                               |
 
 Use the existing runbooks for diagnosis. Never weaken readiness,
 authorization, malware scanning, or transaction checks to make a failure case

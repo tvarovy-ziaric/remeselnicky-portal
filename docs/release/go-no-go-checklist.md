@@ -82,13 +82,14 @@ per bounded run.
 | Quote comparison/acceptance/confirmed Job                   | `NOT_EVALUATED`      | Named manual evidence for one Job, immutable recap and contact boundary.                                                                     |
 | Job operation/change/completion/review journey              | `NOT_EVALUATED`      | Named manual evidence including history preservation and sealed unlock.                                                                      |
 | Notifications/dispute/privacy-request UX                    | `NOT_EVALUATED`      | Named manual evidence without overpromising unsupported legal completion.                                                                    |
-| Browser registration + email/phone verification             | `NOT_EVALUATED`      | **Blocking missing UI:** API/automated synthetic verification is not manual onboarding UAT.                                                  |
+| Browser registration + email/phone verification             | `NOT_EVALUATED`      | UI and automated synthetic flow pass; named manual browser/device onboarding evidence is still missing.                                      |
 | Craftsman onboarding/profile/credential/portfolio authoring | `NOT_EVALUATED`      | **Blocking missing UI:** seeded public profiles bypass the journey.                                                                          |
 | Admin operational perspective                               | `NOT_EVALUATED`      | No browser-usable synthetic MFA entry currently exists. Functional synthetic admin evidence, if later added, remains separate from real MFA. |
 | Real provider-backed admin MFA                              | `BLOCKED_HUMAN_GATE` | Approved provider, named enrollment, replay/rate/expiry and emergency recovery evidence.                                                     |
 
-The two missing onboarding rows cannot be marked `PASS` based on API calls,
-seed data, Playwright request contexts, or a written workaround.
+The craftsman authoring journey cannot be marked `PASS` from seed data or a
+written workaround. The implemented customer browser onboarding likewise
+cannot be marked as a manual `PASS` from automated Playwright evidence alone.
 
 ## C. Exploratory, compatibility and accessibility
 
@@ -107,7 +108,7 @@ seed data, Playwright request contexts, or a written workaround.
 
 | Gate                                      | Current status  | Required evidence                                                                                                                                |
 | ----------------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Synthetic verification-sink outage        | `NOT_EVALUATED` | Generic failure, no secret leak or invented verification; browser result awaits onboarding UI.                                                   |
+| Synthetic verification-sink outage        | `NOT_EVALUATED` | Generic failure, no secret leak or invented verification; named manual failure-injection evidence is still required.                             |
 | Worker/queue retry and terminal behavior  | `NOT_EVALUATED` | Durable recovery, no duplicate business effect and runbook timeline.                                                                             |
 | Scanner/media/object-storage failure      | `NOT_EVALUATED` | Quarantine/fail-closed delivery and recovery evidence.                                                                                           |
 | API/database unavailability               | `NOT_EVALUATED` | Bounded UX, health signal and no partial transaction.                                                                                            |
@@ -182,8 +183,9 @@ Reasons:
 - production infrastructure, monitoring, backups and recovery are not ready;
 - real provider-backed admin MFA is not selected or enrolled;
 - legal/privacy/processor/retention decisions remain human-gated;
-- browser customer and craftsman onboarding journeys are not implemented and
-  manual UAT is not complete;
+- browser craftsman onboarding/authoring is not implemented, customer
+  onboarding has only automated synthetic evidence, and manual UAT is not
+  complete;
 - the initial invite cohort and explicit D30 production approval have not been
   authorized.
 

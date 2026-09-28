@@ -64,7 +64,7 @@ Add rows as needed. One row is one tester-observed case on one browser/device.
 | UAT-06 Job/change/completion                      | Customer/craftsman            |                | `NOT_EVALUATED`      |                                                       |                       |           |                    |
 | UAT-07 reviews/notifications/dispute/privacy      | Customer/craftsman            |                | `NOT_EVALUATED`      |                                                       |                       |           |                    |
 | UAT-08 restrictions/session boundary              | Restricted/suspended actor    |                | `NOT_EVALUATED`      |                                                       |                       |           |                    |
-| Browser registration + email/phone verification   | New customer                  |                | `NOT_EVALUATED`      | Browser onboarding UI is absent.                      |                       |           |                    |
+| Browser registration + email/phone verification   | New customer                  |                | `NOT_EVALUATED`      | UI exists; record named manual browser/device result. |                       |           |                    |
 | Craftsman onboarding/profile/credential/portfolio | New craftsman                 |                | `NOT_EVALUATED`      | Browser authoring UI is absent.                       |                       |           |                    |
 | Admin operational UI with provider-backed MFA     | Admin                         |                | `BLOCKED_HUMAN_GATE` | Real TOTP/WebAuthn enrollment and privileged session. |                       |           |                    |
 
