@@ -12,7 +12,8 @@ $accountPasswordPath = Join-Path $repo '.alpha/secrets/synthetic_seed_password'
 $registrationKeyPath = Join-Path $repo '.alpha/secrets/synthetic_registration_signing_key'
 $claimKeyPath = Join-Path $repo '.alpha/secrets/synthetic_verification_claim_key'
 $providerStatePath = Join-Path $repo '.alpha/r3-e2e-auth-103.json'
-foreach ($path in @($gatePasswordPath, $accountPasswordPath, $registrationKeyPath, $claimKeyPath, $providerStatePath)) {
+$competitorStatePath = Join-Path $repo '.alpha/r3-e2e-auth-102.json'
+foreach ($path in @($gatePasswordPath, $accountPasswordPath, $registrationKeyPath, $claimKeyPath, $providerStatePath, $competitorStatePath)) {
   if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'Canonical synthetic E2E prerequisite is unavailable' }
 }
 
@@ -23,6 +24,7 @@ $env:STAGING_E2E_BASIC_AUTH_PASSWORD = (Get-Content -LiteralPath $gatePasswordPa
 $env:STAGING_E2E_PROVIDER_B_EMAIL = 'synthetic.account.103@portal.invalid'
 $env:STAGING_E2E_PROVIDER_B_PASSWORD = (Get-Content -LiteralPath $accountPasswordPath -Raw).Trim()
 $env:STAGING_E2E_PROVIDER_B_AUTH_STATE = $providerStatePath
+$env:STAGING_E2E_PROVIDER_A_AUTH_STATE = $competitorStatePath
 $env:STAGING_E2E_SYNTHETIC_REGISTRATION_KEY_FILE = $registrationKeyPath
 $env:STAGING_E2E_SYNTHETIC_CLAIM_KEY_FILE = $claimKeyPath
 $env:STAGING_E2E_SYNTHETIC_SINK_ORIGIN = 'http://127.0.0.1:8467'

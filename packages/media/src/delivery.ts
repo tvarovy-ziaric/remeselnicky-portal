@@ -433,7 +433,11 @@ function isUsableGrant(input: {
     returnedAt >= issuedAt &&
     expiresAt > issuedAt &&
     expiresAt > returnedAt &&
-    expiresAt <= issuedAt + input.ttlSeconds * 1_000
+    // The storage service starts its TTL clock while the grant is being
+    // issued, which can be a few milliseconds after `issuedAt`. Bound the
+    // lifetime visible to the caller from `returnedAt`; a signer whose clock
+    // is actually ahead still fails closed.
+    expiresAt <= returnedAt + input.ttlSeconds * 1_000
   );
 }
 

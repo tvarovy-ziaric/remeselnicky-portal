@@ -479,6 +479,21 @@ describe("private media delivery", () => {
     ).resolves.toMatchObject({ statusCode: 503 });
   });
 
+  it("accepts bounded signing latency without extending the returned lifetime", async () => {
+    const deliveryTimes = [now, new Date(now.valueOf() + 2)];
+    const fixture = privateService({
+      clock: () => deliveryTimes.shift() ?? deliveryTimes[0]!,
+      storageNow: new Date(now.valueOf() + 1),
+    });
+
+    await expect(
+      fixture.service.handleDownload({
+        actorUserId: aliceId,
+        mediaAssetId: assetId,
+      }),
+    ).resolves.toMatchObject({ statusCode: 303 });
+  });
+
   it("fails closed when the current entity relation cannot be resolved", async () => {
     const storageFixture = storage();
     const service = createPrivateMediaDeliveryService({
