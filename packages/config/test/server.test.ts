@@ -105,6 +105,63 @@ describe("server configuration", () => {
     });
   });
 
+  it("enables the encrypted synthetic sink only for the explicit Alpha staging fixture", () => {
+    const config = parseServerConfig({
+      ...productionEnvironment,
+      APP_ENV: "staging",
+      ALPHA_SYNTHETIC_FIXTURE: "1",
+      SYNTHETIC_REGISTRATION_SIGNING_KEY: "a".repeat(64),
+      SYNTHETIC_VERIFICATION_INGEST_KEY: "b".repeat(64),
+      SYNTHETIC_VERIFICATION_MODE: "encrypted-sink",
+      SYNTHETIC_VERIFICATION_SINK_ORIGIN:
+        "http://synthetic-verification-sink:8467",
+    });
+
+    expect(config.syntheticVerification).toEqual({
+      mode: "encrypted-sink",
+      sinkOrigin: "http://synthetic-verification-sink:8467",
+    });
+    expect(config.secrets.syntheticVerification).toEqual({
+      ingestKey: "b".repeat(64),
+      registrationSigningKey: "a".repeat(64),
+    });
+  });
+
+  it("rejects incomplete, external, disabled or production synthetic verification", () => {
+    const enabled = {
+      ...productionEnvironment,
+      APP_ENV: "staging",
+      ALPHA_SYNTHETIC_FIXTURE: "1",
+      SYNTHETIC_REGISTRATION_SIGNING_KEY: "a".repeat(64),
+      SYNTHETIC_VERIFICATION_INGEST_KEY: "b".repeat(64),
+      SYNTHETIC_VERIFICATION_MODE: "encrypted-sink",
+      SYNTHETIC_VERIFICATION_SINK_ORIGIN:
+        "http://synthetic-verification-sink:8467",
+    } as const;
+
+    expect(() =>
+      parseServerConfig({
+        ...enabled,
+        SYNTHETIC_VERIFICATION_INGEST_KEY: undefined,
+      }),
+    ).toThrow(/SYNTHETIC_VERIFICATION_INGEST_KEY/u);
+    expect(() =>
+      parseServerConfig({
+        ...enabled,
+        SYNTHETIC_VERIFICATION_SINK_ORIGIN: "https://sink.example",
+      }),
+    ).toThrow(/SYNTHETIC_VERIFICATION_SINK_ORIGIN/u);
+    expect(() =>
+      parseServerConfig({
+        ...enabled,
+        SYNTHETIC_VERIFICATION_MODE: "disabled",
+      }),
+    ).toThrow(/must not be configured/u);
+    expect(() =>
+      parseServerConfig({ ...enabled, APP_ENV: "production" }),
+    ).toThrow(/forbidden in production|restricted/u);
+  });
+
   it("requires a complete isolated storage configuration outside local tests", () => {
     const withoutStorage = { ...productionEnvironment } as Record<
       string,

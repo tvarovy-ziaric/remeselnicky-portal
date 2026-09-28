@@ -33,6 +33,10 @@ Write-NewSecret "minio_access_key" 16
 Write-NewSecret "minio_secret_key" 32
 Write-NewSecret "session_secret" 48
 Write-NewSecret "synthetic_seed_password" 24
+Write-NewSecret "synthetic_registration_signing_key" 32
+Write-NewSecret "synthetic_verification_claim_key" 32
+Write-NewSecret "synthetic_verification_encryption_key" 32
+Write-NewSecret "synthetic_verification_ingest_key" 32
 & (Join-Path $PSScriptRoot "Ensure-QuickGate.ps1")
 $tunnelTokenPath = Join-Path $secrets "cloudflare_tunnel_token"
 if (-not (Test-Path -LiteralPath $tunnelTokenPath)) {
@@ -80,6 +84,7 @@ $environment = @"
 ALPHA_APP_HOSTNAME=$AppHostname
 ALPHA_OBJECT_HOSTNAME=$ObjectHostname
 ALPHA_DIAGNOSTIC_PORT=8080
+ALPHA_SYNTHETIC_VERIFICATION_PORT=8467
 ALPHA_RELEASE_REVISION=$revision
 PORTAL_POSTGRES_DB=portal_alpha
 PORTAL_POSTGRES_USER=portal_alpha_owner

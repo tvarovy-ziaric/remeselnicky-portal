@@ -46,6 +46,7 @@ import {
   createAuthPersistence,
   createEmailVerificationPersistence,
   createPhoneVerificationPersistence,
+  createSyntheticVerificationRuntime,
 } from "./auth/index.js";
 import { createDatabaseFrontendErrorAdmission } from "./observability.js";
 import { createDatabaseConversationWriteAdmission } from "./conversations/write-admission.js";
@@ -62,7 +63,23 @@ const port = config.port ?? defaultPort;
 const database = createDatabase({
   connectionString: config.secrets.databaseUrl,
 });
-const authPersistence = createAuthPersistence(database.auth);
+const authPersistence = createAuthPersistence(
+  database.auth,
+  config.syntheticVerification === undefined
+    ? {}
+    : { registrationTrafficClass: "TEST" },
+);
+const syntheticVerification =
+  config.syntheticVerification === undefined ||
+  config.secrets.syntheticVerification === undefined
+    ? undefined
+    : createSyntheticVerificationRuntime({
+        environment: config.environment,
+        ingestKey: config.secrets.syntheticVerification.ingestKey,
+        registrationSigningKey:
+          config.secrets.syntheticVerification.registrationSigningKey,
+        sinkOrigin: config.syntheticVerification.sinkOrigin,
+      });
 const observabilityContext = {
   ...config.observability,
   service: "api",
@@ -129,11 +146,20 @@ const app = buildApi({
       sessionSecret: config.secrets.sessionSecret,
     },
     emailVerification: {
+      ...(syntheticVerification === undefined
+        ? {}
+        : { delivery: syntheticVerification.emailDelivery }),
       persistence: createEmailVerificationPersistence(
         database.emailVerification,
       ),
     },
+    ...(syntheticVerification === undefined
+      ? {}
+      : { eligibility: syntheticVerification.eligibility }),
     phoneVerification: {
+      ...(syntheticVerification === undefined
+        ? {}
+        : { delivery: syntheticVerification.phoneDelivery }),
       persistence: createPhoneVerificationPersistence(
         database.phoneVerification,
       ),

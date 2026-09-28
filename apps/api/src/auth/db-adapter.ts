@@ -11,6 +11,7 @@ import type { AuthPersistence, AuthUser } from "./types.js";
 
 export function createAuthPersistence(
   repository: AuthRepository,
+  options: Readonly<{ registrationTrafficClass?: "TEST" }> = {},
 ): AuthPersistence {
   const persistence: AuthPersistence = {
     async consumePasswordReset(input) {
@@ -83,6 +84,9 @@ export function createAuthPersistence(
         adultAttested: input.adultAttested,
         normalizedEmail: input.normalizedEmail,
         passwordHash: input.passwordHash,
+        ...(options.registrationTrafficClass === undefined
+          ? {}
+          : { trafficClass: options.registrationTrafficClass }),
       });
       if (result.status === "DUPLICATE") {
         return { status: "DUPLICATE" };

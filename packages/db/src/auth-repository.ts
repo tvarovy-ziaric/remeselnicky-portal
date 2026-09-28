@@ -10,6 +10,8 @@ export interface RegisterAuthUserInput {
   readonly adultAttested: true;
   readonly normalizedEmail: string;
   readonly passwordHash: string;
+  /** Server-owned classification; clients can never select this value. */
+  readonly trafficClass?: "TEST";
 }
 
 export interface AuthUser {
@@ -196,6 +198,20 @@ export function createAuthRepository(sql: Sql): AuthRepository {
             throw new Error(
               "Authentication registration did not create a user.",
             );
+          }
+
+          if (input.trafficClass === "TEST") {
+            await transaction`
+              INSERT INTO user_analytics_traffic_classification_events (
+                user_id,
+                revision,
+                traffic_class
+              ) VALUES (
+                ${createdUser.id},
+                1,
+                'TEST'
+              )
+            `;
           }
 
           return { user: createdUser };

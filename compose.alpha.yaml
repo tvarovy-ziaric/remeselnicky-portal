@@ -235,6 +235,43 @@ services:
     mem_limit: 4g
     cpus: 1.0
 
+  synthetic-verification-sink:
+    build:
+      context: .
+      dockerfile: infra/alpha/synthetic-verification-sink.Dockerfile
+    environment:
+      SYNTHETIC_VERIFICATION_CLAIM_KEY_FILE: /run/secrets/synthetic_verification_claim_key
+      SYNTHETIC_VERIFICATION_DATABASE_PATH: /var/lib/synthetic-verification/sink.sqlite
+      SYNTHETIC_VERIFICATION_ENCRYPTION_KEY_FILE: /run/secrets/synthetic_verification_encryption_key
+      SYNTHETIC_VERIFICATION_INGEST_KEY_FILE: /run/secrets/synthetic_verification_ingest_key
+    secrets:
+      - synthetic_verification_claim_key
+      - synthetic_verification_encryption_key
+      - synthetic_verification_ingest_key
+    volumes:
+      - alpha-synthetic-verification:/var/lib/synthetic-verification
+    networks: [alpha-internal]
+    ports:
+      - "127.0.0.1:${ALPHA_SYNTHETIC_VERIFICATION_PORT:-8467}:8467"
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://127.0.0.1:8467/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    mem_limit: 128m
+    cpus: 0.25
+
   api:
     image: remeselnicky-alpha-api:${ALPHA_RELEASE_REVISION}
     build:
@@ -247,13 +284,20 @@ services:
     environment:
       <<: *app-environment
       ALPHA_DATABASE_ROLE: runtime
+      ALPHA_SYNTHETIC_FIXTURE: "1"
       PORT: "3001"
       SESSION_SECRET_FILE: /run/secrets/session_secret
+      SYNTHETIC_REGISTRATION_SIGNING_KEY_FILE: /run/secrets/synthetic_registration_signing_key
+      SYNTHETIC_VERIFICATION_INGEST_KEY_FILE: /run/secrets/synthetic_verification_ingest_key
+      SYNTHETIC_VERIFICATION_MODE: encrypted-sink
+      SYNTHETIC_VERIFICATION_SINK_ORIGIN: http://synthetic-verification-sink:8467
     secrets:
       - postgres_app_password
       - minio_access_key
       - minio_secret_key
       - session_secret
+      - synthetic_registration_signing_key
+      - synthetic_verification_ingest_key
     volumes:
       - ./.alpha/tls:/run/alpha-tls:ro
     networks: [alpha-internal]
@@ -261,6 +305,7 @@ services:
       grant-runtime: { condition: service_completed_successfully }
       minio-init: { condition: service_completed_successfully }
       seed: { condition: service_completed_successfully }
+      synthetic-verification-sink: { condition: service_healthy }
     healthcheck:
       test:
         [
@@ -505,6 +550,8 @@ volumes:
     name: remeselnicky-alpha-clamav-log
   alpha-clamav-run:
     name: remeselnicky-alpha-clamav-run
+  alpha-synthetic-verification:
+    name: remeselnicky-alpha-synthetic-verification
 
 secrets:
   postgres_owner_password:
@@ -519,6 +566,14 @@ secrets:
     file: ./.alpha/secrets/session_secret
   synthetic_seed_password:
     file: ./.alpha/secrets/synthetic_seed_password
+  synthetic_registration_signing_key:
+    file: ./.alpha/secrets/synthetic_registration_signing_key
+  synthetic_verification_claim_key:
+    file: ./.alpha/secrets/synthetic_verification_claim_key
+  synthetic_verification_encryption_key:
+    file: ./.alpha/secrets/synthetic_verification_encryption_key
+  synthetic_verification_ingest_key:
+    file: ./.alpha/secrets/synthetic_verification_ingest_key
   cloudflare_tunnel_token:
     file: ./.alpha/secrets/cloudflare_tunnel_token
   quick_gate_htpasswd:

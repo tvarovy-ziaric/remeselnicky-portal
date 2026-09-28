@@ -391,6 +391,26 @@ describe.skipIf(testDatabaseUrl === undefined)(
           }),
         ).resolves.toEqual({ status: "DUPLICATE" });
 
+        const syntheticEmail = `synthetic-auth-${unique}@portal.invalid`;
+        const syntheticRegistration = await auth.registerUserWithCredential({
+          adultAttested: true,
+          normalizedEmail: syntheticEmail,
+          passwordHash: initialPasswordHash,
+          trafficClass: "TEST",
+        });
+        expect(syntheticRegistration.status).toBe("CREATED");
+        if (syntheticRegistration.status !== "CREATED") {
+          throw new Error("Expected a synthetic authentication user.");
+        }
+        const [syntheticClassification] = await sql<
+          { readonly trafficClass: string }[]
+        >`
+          SELECT traffic_class AS "trafficClass"
+          FROM current_user_analytics_traffic_classifications
+          WHERE user_id = ${syntheticRegistration.user.id}
+        `;
+        expect(syntheticClassification).toEqual({ trafficClass: "TEST" });
+
         const credential =
           await auth.findCredentialByNormalizedEmail(normalizedEmail);
         expect(credential?.emailVerifiedAt).toBeNull();

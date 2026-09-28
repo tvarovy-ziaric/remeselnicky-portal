@@ -25,6 +25,10 @@ export {
 } from "./service.js";
 export { createPostgresSessionStore } from "./session-store.js";
 export {
+  createSyntheticVerificationRuntime,
+  type SyntheticVerificationRuntime,
+} from "./synthetic-verification.js";
+export {
   createPhoneOtpCrypto,
   createPhoneVerificationPersistence,
   createPhoneVerificationService,

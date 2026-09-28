@@ -89,6 +89,20 @@ const serverEnvironmentSchema = z
     PORT: portSchema.optional(),
     RELEASE_REVISION: z.string().trim().min(1),
     SESSION_SECRET: z.string().min(32),
+    ALPHA_SYNTHETIC_FIXTURE: z.enum(["1"]).optional(),
+    SYNTHETIC_REGISTRATION_SIGNING_KEY: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/u, "must be a 32-byte lowercase hex secret")
+      .optional(),
+    SYNTHETIC_VERIFICATION_INGEST_KEY: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/u, "must be a 32-byte lowercase hex secret")
+      .optional(),
+    SYNTHETIC_VERIFICATION_MODE: z
+      .enum(["disabled", "encrypted-sink"])
+      .optional()
+      .transform((value) => value ?? "disabled"),
+    SYNTHETIC_VERIFICATION_SINK_ORIGIN: z.string().url().optional(),
     SESSION_TTL_SECONDS: boundedIntegerEnvironmentValue(
       604_800,
       300,
@@ -157,6 +171,69 @@ const serverEnvironmentSchema = z
         code: "custom",
         message: "must differ from the private container",
         path: ["OBJECT_STORAGE_PUBLIC_DERIVATIVE_CONTAINER"],
+      });
+    }
+
+    const syntheticFields = [
+      "SYNTHETIC_REGISTRATION_SIGNING_KEY",
+      "SYNTHETIC_VERIFICATION_INGEST_KEY",
+      "SYNTHETIC_VERIFICATION_SINK_ORIGIN",
+    ] as const;
+    const configuredSyntheticFields = syntheticFields.filter(
+      (field) => environment[field] !== undefined,
+    );
+    if (environment.SYNTHETIC_VERIFICATION_MODE === "encrypted-sink") {
+      if (
+        environment.APP_ENV !== "staging" ||
+        environment.ALPHA_SYNTHETIC_FIXTURE !== "1"
+      ) {
+        context.addIssue({
+          code: "custom",
+          message:
+            "is restricted to the explicit synthetic Alpha staging fixture",
+          path: ["SYNTHETIC_VERIFICATION_MODE"],
+        });
+      }
+      for (const field of syntheticFields) {
+        if (environment[field] === undefined) {
+          context.addIssue({
+            code: "custom",
+            message: "is required by the encrypted synthetic verification sink",
+            path: [field],
+          });
+        }
+      }
+      if (
+        environment.SYNTHETIC_VERIFICATION_SINK_ORIGIN !==
+        "http://synthetic-verification-sink:8467"
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: "must name the fixed Docker-internal synthetic sink origin",
+          path: ["SYNTHETIC_VERIFICATION_SINK_ORIGIN"],
+        });
+      }
+    } else if (configuredSyntheticFields.length > 0) {
+      for (const field of configuredSyntheticFields) {
+        context.addIssue({
+          code: "custom",
+          message:
+            "must not be configured while synthetic verification is disabled",
+          path: [field],
+        });
+      }
+    }
+
+    if (
+      environment.APP_ENV === "production" &&
+      (environment.ALPHA_SYNTHETIC_FIXTURE !== undefined ||
+        environment.SYNTHETIC_VERIFICATION_MODE !== "disabled" ||
+        configuredSyntheticFields.length > 0)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "is forbidden in production",
+        path: ["SYNTHETIC_VERIFICATION_MODE"],
       });
     }
 
@@ -281,6 +358,15 @@ export interface ServerSecrets {
     readonly accessKeyId: string;
     readonly secretAccessKey: string;
   }>;
+  readonly syntheticVerification?: Readonly<{
+    readonly ingestKey: string;
+    readonly registrationSigningKey: string;
+  }>;
+}
+
+export interface SyntheticVerificationServerConfig {
+  readonly mode: "encrypted-sink";
+  readonly sinkOrigin: "http://synthetic-verification-sink:8467";
 }
 
 export interface ObjectStorageServerConfig {
@@ -331,6 +417,7 @@ export interface ServerConfig {
   readonly port: number | undefined;
   readonly releaseRevision: string;
   readonly secrets: ServerSecrets;
+  readonly syntheticVerification: SyntheticVerificationServerConfig | undefined;
 }
 
 export class ConfigurationError extends Error {
@@ -411,7 +498,24 @@ export function parseServerConfig(
               secretAccessKey: objectStorage.secrets.secretAccessKey,
             }),
           }),
+      ...(result.data.SYNTHETIC_VERIFICATION_MODE !== "encrypted-sink"
+        ? {}
+        : {
+            syntheticVerification: Object.freeze({
+              ingestKey: result.data.SYNTHETIC_VERIFICATION_INGEST_KEY!,
+              registrationSigningKey:
+                result.data.SYNTHETIC_REGISTRATION_SIGNING_KEY!,
+            }),
+          }),
     }),
+    syntheticVerification:
+      result.data.SYNTHETIC_VERIFICATION_MODE !== "encrypted-sink"
+        ? undefined
+        : Object.freeze({
+            mode: "encrypted-sink" as const,
+            sinkOrigin: result.data
+              .SYNTHETIC_VERIFICATION_SINK_ORIGIN as "http://synthetic-verification-sink:8467",
+          }),
   });
 }
 
