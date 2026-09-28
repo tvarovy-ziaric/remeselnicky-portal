@@ -27,6 +27,7 @@ test("R4-031 launch suite is isolated, complete and cannot claim production read
     "existingStagingTouched = $false",
     "git -C $workspace status --short --untracked-files=all",
     "^portal-r4-031-[0-9a-f]{8}$",
+    "corepack pnpm",
   ]) {
     assert.ok(
       script.includes(required),
@@ -56,7 +57,7 @@ test("R4-031 launch suite is isolated, complete and cannot claim production read
     'realUserLaunchDecision = "NO-GO"',
     "previousFixtureDeleted = $false",
     "Restore-AlphaWorker",
-    'start worker | Out-Host',
+    "start worker | Out-Host",
     "Alpha worker did not recover within 60 seconds",
   ]) {
     assert.ok(publicRunner.includes(required));

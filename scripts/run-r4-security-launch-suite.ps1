@@ -28,7 +28,7 @@ function Invoke-VitestWithoutSkips {
   $ErrorActionPreference = "Continue"
   try {
     $output = @(
-      & pnpm --filter $Package $Script --reporter=json 2>&1 |
+      & corepack pnpm --filter $Package $Script --reporter=json 2>&1 |
         ForEach-Object { $_.ToString() }
     )
     $exitCode = $LASTEXITCODE
@@ -133,7 +133,7 @@ try {
   $encodedPassword = [uri]::EscapeDataString($password)
   $env:TEST_DATABASE_URL = "postgresql://portal_owner:${encodedPassword}@127.0.0.1:${hostPort}/portal_test?sslmode=disable"
 
-  & pnpm --filter "@portal/db..." build
+  & corepack pnpm --filter "@portal/db..." build
   Assert-NativeSuccess "Database integration dependency build"
 
   $testResults += Invoke-VitestWithoutSkips `

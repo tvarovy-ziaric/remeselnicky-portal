@@ -46,7 +46,7 @@ foreach ($statePath in @($env:STAGING_E2E_CUSTOMER_AUTH_STATE, $env:STAGING_E2E_
 }
 Push-Location $repo
 try {
-  pnpm --filter @portal/e2e exec playwright test @PlaywrightArgs
+  corepack pnpm --filter @portal/e2e exec playwright test @PlaywrightArgs
   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 } finally {
   Pop-Location
