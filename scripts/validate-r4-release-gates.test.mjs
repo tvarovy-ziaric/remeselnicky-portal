@@ -87,6 +87,11 @@ test("R4-032 artifacts keep manual evidence and production go/no-go separate", a
   assert.match(decision, /manual UAT/iu);
   assert.match(decision, /AUTOMATED_SYNTHETIC/u);
   assert.match(decision, /BLOCKED_HUMAN_GATE/u);
+  assert.match(decision, /provider-neutral browser TOTP entry/iu);
+  assert.doesNotMatch(
+    decision,
+    /No browser-usable synthetic MFA entry currently exists/iu,
+  );
   assert.match(manual, /registration|registr/u);
   assert.match(manual, /craftsman|remeseln/u);
   assert.match(manual, /refresh|obnov/u);
