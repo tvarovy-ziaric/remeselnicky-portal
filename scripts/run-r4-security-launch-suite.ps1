@@ -20,11 +20,21 @@ function Invoke-VitestWithoutSkips {
     [string]$Script = "test"
   )
 
-  $output = @(
-    & pnpm --filter $Package $Script --reporter=json 2>&1 |
-      ForEach-Object { $_.ToString() }
-  )
-  $exitCode = $LASTEXITCODE
+  # Windows PowerShell 5.1 promotes a native process' stderr records according
+  # to ErrorActionPreference. pnpm writes its script banner to stderr even for
+  # a successful run, so capture both streams and make the native exit code the
+  # authority instead of treating informational stderr as a terminating error.
+  $previousErrorActionPreference = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  try {
+    $output = @(
+      & pnpm --filter $Package $Script --reporter=json 2>&1 |
+        ForEach-Object { $_.ToString() }
+    )
+    $exitCode = $LASTEXITCODE
+  } finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+  }
   if ($exitCode -ne 0) {
     $output | Write-Output
     throw "$Label failed with exit code $exitCode."
