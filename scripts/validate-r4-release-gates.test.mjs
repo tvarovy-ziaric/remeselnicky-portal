@@ -55,6 +55,9 @@ test("R4-031 launch suite is isolated, complete and cannot claim production read
     "run-r4-canonical.ps1",
     'realUserLaunchDecision = "NO-GO"',
     "previousFixtureDeleted = $false",
+    "Restore-AlphaWorker",
+    'start worker | Out-Host',
+    "Alpha worker did not recover within 60 seconds",
   ]) {
     assert.ok(publicRunner.includes(required));
   }

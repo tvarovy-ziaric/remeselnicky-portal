@@ -10,6 +10,35 @@ function Assert-NativeSuccess {
   }
 }
 
+function Restore-AlphaWorker {
+  param([string]$Repository)
+
+  $composeArguments = @(
+    "compose"
+    "--env-file"
+    (Join-Path $Repository ".env.alpha")
+    "--file"
+    (Join-Path $Repository "compose.alpha.yaml")
+  )
+  & docker @composeArguments start worker | Out-Host
+  Assert-NativeSuccess "Alpha worker recovery"
+
+  $containerId = (& docker @composeArguments ps --quiet worker).Trim()
+  Assert-NativeSuccess "Alpha worker identity lookup"
+  if (-not $containerId) {
+    throw "Alpha worker recovery did not return a container identity."
+  }
+
+  for ($attempt = 0; $attempt -lt 60; $attempt += 1) {
+    $state = (& docker inspect --format "{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}" $containerId).Trim()
+    if ($LASTEXITCODE -eq 0 -and ($state -eq "running|healthy" -or $state -eq "running|none")) {
+      return
+    }
+    Start-Sleep -Seconds 1
+  }
+  throw "Alpha worker did not recover within 60 seconds."
+}
+
 $repo = (Resolve-Path (Join-Path $PSScriptRoot "../../..")).Path
 $alphaDirectory = Join-Path $repo ".alpha"
 $fixturePath = Join-Path $alphaDirectory "r3-e2e-fixture.json"
@@ -23,6 +52,7 @@ if (-not (Test-Path -LiteralPath $fixturePath -PathType Leaf)) {
 New-Item -ItemType Directory -Path $backupDirectory -Force | Out-Null
 Move-Item -LiteralPath $fixturePath -Destination $backupPath
 
+$runSucceeded = $false
 Push-Location $repo
 try {
   node apps/e2e/scripts/provision-r3-quick.mjs
@@ -40,6 +70,7 @@ try {
   & (Join-Path $PSScriptRoot "run-r4-canonical.ps1") -PlaywrightArgs $PlaywrightArgs
   Assert-NativeSuccess "Canonical sealed-review suite"
 
+  $runSucceeded = $true
   [ordered]@{
     status = "PASS"
     dataClass = "synthetic"
@@ -59,5 +90,17 @@ catch {
   throw
 }
 finally {
+  $workerRecoveryFailure = $null
+  try {
+    Restore-AlphaWorker -Repository $repo
+  } catch {
+    $workerRecoveryFailure = $_
+  }
   Pop-Location
+  if ($null -ne $workerRecoveryFailure) {
+    if ($runSucceeded) {
+      throw $workerRecoveryFailure
+    }
+    Write-Warning "The public suite failed and the Alpha worker recovery also failed: $($workerRecoveryFailure.Exception.Message)"
+  }
 }
