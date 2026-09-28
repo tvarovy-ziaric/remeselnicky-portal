@@ -94,15 +94,19 @@ These are findings, not passed cases:
   passed registration, fragment-only single-use email verification, invalid and
   valid phone OTP handling and the verified `/dopyt` continuation. This is
   `AUTOMATED_SYNTHETIC`, not a named tester/browser/device manual pass.
-- **Craftsman onboarding and profile authoring — implemented locally, manual
+- **Craftsman onboarding, profile and private portfolio authoring — implemented locally, manual
   result `NOT_EVALUATED`, blocking.** `/ucet/profil-remeselnika` now covers
   profile identity/About, one or more governed professions with declared level,
   base municipality, normal radius, the exact locked first-publication
   readiness list, review submission and deliberate visibility after approval.
-  The privacy-minimal admin review UI/API is present but remains inaccessible
-  without genuine recent-MFA `admin.profiles.review` authority. Credential and
-  portfolio authoring, a full browser approval pass and named manual evidence
-  remain unevaluated; seeded profiles are still not acceptable UAT evidence.
+  `/ucet/portfolio` now covers a private self-declared project, one or more
+  active professions, explicit unverified labelling, canonical private image
+  processing, status polling and phase-aware photo attachment. It does not
+  publish the project or reinterpret it as verified Job evidence. The
+  privacy-minimal admin review UI/API is present but remains inaccessible
+  without genuine recent-MFA `admin.profiles.review` authority. Credential
+  authoring, a full browser approval pass and named manual evidence remain
+  unevaluated; seeded profiles are still not acceptable UAT evidence.
 - **Admin entry and MFA — `BLOCKED_HUMAN_GATE` for production evidence.** The
   existing short-lived synthetic database session is an internal seed aid, not
   a browser login or proof of provider-backed MFA. Do not create an
@@ -230,6 +234,32 @@ requests do not promise unsupported automatic deletion or legal completion.
 4. If no supported fixture can produce a genuinely expired server session,
    record the expired-session row as `NOT_EVALUATED`; cookie deletion or logout
    is not equivalent evidence.
+
+### UAT-09 — craftsman profile and private self-declared portfolio
+
+1. Sign in as a synthetic craftsman and create or edit the private profile at
+   `/ucet/profil-remeselnika`; add a current governed profession with a declared
+   level and a synthetic base municipality/radius.
+2. Open `/ucet/portfolio`, create a project using synthetic title/description,
+   select at least one active owned profession and optionally describe the
+   craftsman's concrete contribution.
+3. Confirm the project is labelled `Vlastné vyhlásenie — neoverené` and remains
+   private. It must not appear as verified platform work or on a public profile.
+4. Upload a synthetic JPEG/PNG with no real property/person data. Observe
+   `PROCESSING`, then either an explicit rejection or `READY`; attach a ready
+   image with `BEFORE / PROGRESS / AFTER / OTHER` phase.
+5. Refresh during processing and after attachment. Retry an ambiguous project
+   save or attachment with the same intent and confirm no duplicate project or
+   attachment is created.
+6. Try a wrong MIME, oversized image, foreign project URL and a suspended or
+   publishing-restricted synthetic account. Confirm private data, storage keys,
+   filenames and other owner identifiers are not exposed.
+
+Expected: only the session owner can author the private self-declared project;
+the worker-created canonical image is the only delivered image; EXIF/GPS is not
+retained in the deliverable; the project stays unverified and private. This
+script does not test credential review, verified Job provenance, customer
+photo-consent publication or genuine admin approval.
 
 ## Exploratory and compatibility matrix
 

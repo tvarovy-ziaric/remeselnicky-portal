@@ -16,6 +16,7 @@ import {
   createConversationAttachmentUploadService,
   createDisputeEvidenceUploadService,
   createJobRequestMediaUploadService,
+  createPortfolioProjectPhotoUploadService,
   createMediaProcessingDispatcher,
   createPrivateMediaDeliveryService,
   createPublicPortfolioDeliveryResolver,
@@ -181,6 +182,14 @@ const app = buildApi({
       professions: database.craftsmanProfessions,
       publication: database.craftsmanPublication,
       serviceAreas: database.craftsmanServiceAreas,
+    },
+    craftsmanPortfolio: {
+      context: database.craftsmanAuthoringContext,
+      photos: database.portfolioProjectPhotos,
+      projects: database.portfolioProjects,
+      ...(mediaRuntime === undefined
+        ? {}
+        : { uploads: mediaRuntime.portfolioProjectPhotoUploads }),
     },
     draftHandoff: {
       customerProfiles,
@@ -383,6 +392,7 @@ function createApiMediaRuntime() {
         CHAT_IMAGE: database.conversationAttachmentMediaAccess,
         JOB_REQUEST_DOCUMENT: database.jobRequestMediaAccess,
         JOB_REQUEST_IMAGE: database.jobRequestMediaAccess,
+        PORTFOLIO_IMAGE: database.portfolioProjectPhotoMediaAccess,
         QUOTE_DOCUMENT: database.quoteDocumentMediaAccess,
         CHANGE_ORDER_DOCUMENT: database.changeOrderDocumentMediaAccess,
         DISPUTE_EVIDENCE: database.disputeEvidenceMediaAccess,
@@ -404,6 +414,11 @@ function createApiMediaRuntime() {
     }),
     jobRequestUploads: createJobRequestMediaUploadService({
       authorization: database.jobRequestMedia,
+      processing,
+      uploads,
+    }),
+    portfolioProjectPhotoUploads: createPortfolioProjectPhotoUploadService({
+      authorization: database.portfolioProjectPhotoUploads,
       processing,
       uploads,
     }),

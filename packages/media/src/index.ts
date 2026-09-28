@@ -59,6 +59,15 @@ export type {
   JobRequestMediaUploadService,
   PrepareJobRequestMediaUploadResult,
 } from "./job-request-upload.js";
+export { createPortfolioProjectPhotoUploadService } from "./portfolio-project-upload.js";
+export type {
+  PortfolioProjectPhotoProcessingDispatcher,
+  PortfolioProjectPhotoUploadAuthorization,
+  PortfolioProjectPhotoUploadResult,
+  PortfolioProjectPhotoUploadService,
+  PortfolioProjectPhotoUploadStatus,
+  PreparePortfolioProjectPhotoUploadResult,
+} from "./portfolio-project-upload.js";
 export {
   IMAGE_CANONICALIZATION_JOB_NAME,
   IMAGE_PROCESSING_LIMITS,

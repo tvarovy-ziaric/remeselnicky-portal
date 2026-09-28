@@ -38,10 +38,12 @@ import {
   createPortfolioPublicationRepository,
   createPublicPortfolioDeliveryRepository,
 } from "./portfolio-publication-repository.js";
+import { createPortfolioProjectPhotoUploadAuthorization } from "./portfolio-project-upload-repository.js";
 import type {
   ConversationAttachmentUploadAuthorization,
   JobRequestMediaUploadAuthorization,
   MediaEntityAccessResolver,
+  PortfolioProjectPhotoUploadAuthorization,
   PortfolioPublicationRepository,
   PrivateMediaDeliveryRepository,
   PublicPortfolioDeliveryRepository,
@@ -84,7 +86,10 @@ import { createPortfolioProjectRepository } from "./portfolio-project-repository
 import type { PortfolioProjectPersistence } from "@portal/domain";
 import { createPortfolioCollaborationRepository } from "./portfolio-collaboration-repository.js";
 import type { PortfolioCollaborationPersistence } from "@portal/domain";
-import { createPortfolioProjectPhotoRepository } from "./portfolio-project-media-repository.js";
+import {
+  createPortfolioMediaEntityAccessResolver,
+  createPortfolioProjectPhotoRepository,
+} from "./portfolio-project-media-repository.js";
 import type { PortfolioProjectPhotoPersistence } from "@portal/domain";
 import { createFeaturedProjectRepository } from "./featured-project-repository.js";
 import type { FeaturedProjectPersistence } from "@portal/domain";
@@ -1274,6 +1279,7 @@ export {
 } from "./portfolio-project-media-repository.js";
 export type { PreparePortfolioPhotoUploadResult } from "./portfolio-project-media-repository.js";
 export type { PortfolioProjectPhotoPersistence } from "@portal/domain";
+export { createPortfolioProjectPhotoUploadAuthorization } from "./portfolio-project-upload-repository.js";
 export {
   createPortfolioPublicationRepository,
   createPublicPortfolioDeliveryRepository,
@@ -1346,6 +1352,8 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly portfolioProjects: PortfolioProjectPersistence;
   readonly portfolioCollaborations: PortfolioCollaborationPersistence;
   readonly portfolioProjectPhotos: PortfolioProjectPhotoPersistence;
+  readonly portfolioProjectPhotoUploads: PortfolioProjectPhotoUploadAuthorization;
+  readonly portfolioProjectPhotoMediaAccess: MediaEntityAccessResolver;
   readonly portfolioPublication: PortfolioPublicationRepository;
   readonly publicPortfolioDelivery: PublicPortfolioDeliveryRepository;
   readonly featuredProjects: FeaturedProjectPersistence;
@@ -1541,6 +1549,10 @@ export function createDatabase(
   const portfolioProjects = createPortfolioProjectRepository(sql);
   const portfolioCollaborations = createPortfolioCollaborationRepository(sql);
   const portfolioProjectPhotos = createPortfolioProjectPhotoRepository(sql);
+  const portfolioProjectPhotoUploads =
+    createPortfolioProjectPhotoUploadAuthorization(sql);
+  const portfolioProjectPhotoMediaAccess =
+    createPortfolioMediaEntityAccessResolver(sql);
   const portfolioPublication = createPortfolioPublicationRepository(sql);
   const publicPortfolioDelivery = createPublicPortfolioDeliveryRepository(sql);
   const featuredProjects = createFeaturedProjectRepository(sql);
@@ -1669,6 +1681,8 @@ export function createDatabase(
     portfolioProjects,
     portfolioCollaborations,
     portfolioProjectPhotos,
+    portfolioProjectPhotoUploads,
+    portfolioProjectPhotoMediaAccess,
     portfolioPublication,
     publicPortfolioDelivery,
     featuredProjects,

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { CraftsmanProfileAuthoring } from "../../../craftsman-profile-authoring";
 
@@ -11,6 +12,9 @@ export default function CraftsmanProfilePage() {
   return (
     <main className="page-shell">
       <CraftsmanProfileAuthoring />
+      <p>
+        <Link href="/ucet/portfolio">Pokračovať do súkromného portfólia</Link>
+      </p>
     </main>
   );
 }

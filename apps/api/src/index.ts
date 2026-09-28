@@ -26,6 +26,11 @@ export type {
   CraftsmanAuthoringRouteDependencies,
 } from "./craftsman-authoring/index.js";
 export {
+  CRAFTSMAN_PORTFOLIO_PATHS,
+  registerCraftsmanPortfolioRoutes,
+} from "./craftsman-portfolio/index.js";
+export type { CraftsmanPortfolioRouteDependencies } from "./craftsman-portfolio/index.js";
+export {
   PUBLIC_CRAFTSMAN_PROFILE_PATH,
   registerPublicCraftsmanProfileRoutes,
 } from "./public-craftsman-profile/routes.js";
