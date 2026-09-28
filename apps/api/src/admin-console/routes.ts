@@ -75,6 +75,7 @@ export function registerAdminConsoleRoutes(
         state:
           moduleId === "disputes" ||
           moduleId === "jobs" ||
+          moduleId === "profiles" ||
           moduleId === "reports" ||
           moduleId === "privacy"
             ? "OPERATIONAL"

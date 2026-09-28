@@ -85,6 +85,17 @@ describe("admin shell response boundary", () => {
       )?.id,
     ).toBe("disputes");
     expect(
+      parseAdminModule(
+        {
+          description: "Profily čakajúce na prvé schválenie.",
+          id: "profiles",
+          label: "Profily",
+          state: "OPERATIONAL",
+        },
+        "profiles",
+      )?.id,
+    ).toBe("profiles");
+    expect(
       parseAdminModule({ ...response, id: "disputes" }, "disputes"),
     ).toBeUndefined();
   });

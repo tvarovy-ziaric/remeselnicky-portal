@@ -3,6 +3,17 @@ import postgres from "postgres";
 
 import { createAdminAccessRepository } from "./admin-auth-repository.js";
 import type { AdminAccessRepository } from "@portal/admin-auth";
+import {
+  createAdminProfileReviewRepository,
+  type AdminProfileReviewRepository,
+} from "./admin-profile-review-repository.js";
+export { createAdminProfileReviewRepository } from "./admin-profile-review-repository.js";
+export type {
+  AdminProfileReviewItem,
+  AdminProfileReviewPage,
+  AdminProfileReviewProfession,
+  AdminProfileReviewRepository,
+} from "./admin-profile-review-repository.js";
 import { createAuditRepository } from "./audit-repository.js";
 import type { AuditRepository } from "@portal/audit";
 import {
@@ -52,6 +63,15 @@ import { createProfessionTaxonomyRepository } from "./taxonomy-repository.js";
 import type { ProfessionTaxonomyPersistence } from "@portal/taxonomy";
 import { createCraftsmanProfessionRepository } from "./craftsman-profession-repository.js";
 import type { CraftsmanProfessionPersistence } from "@portal/domain";
+import {
+  createCraftsmanAuthoringContextRepository,
+  type CraftsmanAuthoringContextRepository,
+} from "./craftsman-authoring-context-repository.js";
+export { createCraftsmanAuthoringContextRepository } from "./craftsman-authoring-context-repository.js";
+export type {
+  CraftsmanAuthoringContextRepository,
+  CurrentGovernedProfession,
+} from "./craftsman-authoring-context-repository.js";
 import { createCraftsmanServiceAreaRepository } from "./craftsman-service-area-repository.js";
 import type { CraftsmanServiceAreaPersistence } from "@portal/domain";
 import { createCraftsmanCapabilityRepository } from "./craftsman-capability-repository.js";
@@ -1315,8 +1335,10 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly auth: AuthRepository;
   readonly alphaRegistrationIntake: AlphaRegistrationIntakeRepository;
   readonly adminAccess: AdminAccessRepository;
+  readonly adminProfileReviews: AdminProfileReviewRepository;
   readonly audit: AuditRepository;
   readonly craftsmanProfiles: CraftsmanProfilePersistence;
+  readonly craftsmanAuthoringContext: CraftsmanAuthoringContextRepository;
   readonly craftsmanProfessions: CraftsmanProfessionPersistence;
   readonly craftsmanCapabilities: CraftsmanCapabilityPersistence;
   readonly craftsmanServiceAreas: CraftsmanServiceAreaPersistence;
@@ -1507,8 +1529,11 @@ export function createDatabase(
   const auth = createAuthRepository(sql);
   const alphaRegistrationIntake = createAlphaRegistrationIntakeRepository(sql);
   const adminAccess = createAdminAccessRepository(sql);
+  const adminProfileReviews = createAdminProfileReviewRepository(sql);
   const audit = createAuditRepository(sql);
   const craftsmanProfiles = createCraftsmanProfileRepository(sql);
+  const craftsmanAuthoringContext =
+    createCraftsmanAuthoringContextRepository(sql);
   const craftsmanProfessions = createCraftsmanProfessionRepository(sql);
   const craftsmanCapabilities = createCraftsmanCapabilityRepository(sql);
   const craftsmanServiceAreas = createCraftsmanServiceAreaRepository(sql);
@@ -1631,9 +1656,11 @@ export function createDatabase(
 
   return Object.freeze({
     adminAccess,
+    adminProfileReviews,
     alphaRegistrationIntake,
     audit,
     auth,
+    craftsmanAuthoringContext,
     craftsmanProfiles,
     craftsmanProfessions,
     craftsmanCapabilities,

@@ -10,6 +10,22 @@ export {
 } from "./admin-registration-intake/index.js";
 export type { AdminRegistrationIntakeRouteDependencies } from "./admin-registration-intake/index.js";
 export {
+  ADMIN_PROFILE_REVIEW_PATHS,
+  registerAdminProfileReviewRoutes,
+} from "./admin-profile-review/index.js";
+export type {
+  AdminProfileReviewRouteDependencies,
+  AdminProfileReviewView,
+} from "./admin-profile-review/index.js";
+export {
+  CRAFTSMAN_AUTHORING_PATHS,
+  registerCraftsmanAuthoringRoutes,
+} from "./craftsman-authoring/index.js";
+export type {
+  CraftsmanAuthoringContext,
+  CraftsmanAuthoringRouteDependencies,
+} from "./craftsman-authoring/index.js";
+export {
   PUBLIC_CRAFTSMAN_PROFILE_PATH,
   registerPublicCraftsmanProfileRoutes,
 } from "./public-craftsman-profile/routes.js";

@@ -94,10 +94,15 @@ These are findings, not passed cases:
   passed registration, fragment-only single-use email verification, invalid and
   valid phone OTP handling and the verified `/dopyt` continuation. This is
   `AUTOMATED_SYNTHETIC`, not a named tester/browser/device manual pass.
-- **Craftsman onboarding and profile authoring — `NOT_EVALUATED`, blocking.**
-  Seeded public profiles allow marketplace testing, but they bypass browser
-  onboarding, profession/skill/service-area authoring, credentials, portfolio,
-  and initial publication readiness.
+- **Craftsman onboarding and profile authoring — implemented locally, manual
+  result `NOT_EVALUATED`, blocking.** `/ucet/profil-remeselnika` now covers
+  profile identity/About, one or more governed professions with declared level,
+  base municipality, normal radius, the exact locked first-publication
+  readiness list, review submission and deliberate visibility after approval.
+  The privacy-minimal admin review UI/API is present but remains inaccessible
+  without genuine recent-MFA `admin.profiles.review` authority. Credential and
+  portfolio authoring, a full browser approval pass and named manual evidence
+  remain unevaluated; seeded profiles are still not acceptable UAT evidence.
 - **Admin entry and MFA — `BLOCKED_HUMAN_GATE` for production evidence.** The
   existing short-lived synthetic database session is an internal seed aid, not
   a browser login or proof of provider-backed MFA. Do not create an

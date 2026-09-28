@@ -1543,3 +1543,209 @@ p {
 .participant-invitation-action {
   margin-block: 0.75rem;
 }
+
+.profile-authoring,
+.profile-authoring-state {
+  width: min(100%, 58rem);
+  margin-inline: auto;
+}
+
+.profile-authoring {
+  display: grid;
+  gap: 1rem;
+}
+
+.profile-authoring-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+
+.profile-authoring-header h1 {
+  margin-top: 0;
+}
+
+.profile-authoring-badge {
+  flex: none;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid #7c967f;
+  border-radius: 999px;
+  color: #214e3b;
+  background: #eef5ed;
+  font-weight: 700;
+}
+
+.profile-authoring-card,
+.profile-authoring-state {
+  padding: clamp(1rem, 3vw, 1.5rem);
+  border: 1px solid #d8d4c8;
+  border-radius: 0.9rem;
+  background: #fffdf8;
+}
+
+.profile-authoring-card h2 {
+  margin-top: 0;
+}
+
+.profile-authoring-form {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.profile-authoring-form input,
+.profile-authoring-form select,
+.profile-authoring-form textarea {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #9eaa9d;
+  border-radius: 0.55rem;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+}
+
+.profile-authoring-form textarea {
+  resize: vertical;
+}
+
+.profile-authoring button,
+.profile-authoring-state button {
+  justify-self: start;
+  min-height: 2.7rem;
+  padding: 0.65rem 1rem;
+  border: 0;
+  border-radius: 0.55rem;
+  background: #214e3b;
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.profile-authoring button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.profile-authoring-note {
+  color: #55705f;
+}
+
+.profile-authoring-warning {
+  padding: 0.75rem;
+  border-left: 0.25rem solid #a8613c;
+  background: #fff5ee;
+}
+
+.profile-authoring-list,
+.profile-authoring-suggestions {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.profile-authoring-suggestions {
+  margin-top: -0.35rem;
+  padding: 0.4rem;
+  border: 1px solid #d8d4c8;
+  border-radius: 0.55rem;
+  background: #fff;
+}
+
+.profile-authoring-suggestions button {
+  width: 100%;
+  min-height: auto;
+  padding: 0.55rem;
+  color: #214e3b;
+  background: transparent;
+  text-align: left;
+}
+
+.profile-authoring-suggestions button:hover,
+.profile-authoring-suggestions button:focus-visible {
+  background: #eef5ed;
+}
+
+@media (max-width: 40rem) {
+  .profile-authoring-header {
+    display: grid;
+  }
+}
+
+.admin-profile-review-layout {
+  display: grid;
+  grid-template-columns: minmax(14rem, 0.7fr) minmax(18rem, 1.3fr);
+  gap: 1rem;
+}
+
+.admin-profile-review-queue {
+  display: grid;
+  align-content: start;
+  gap: 0.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-profile-review-queue button {
+  display: grid;
+  gap: 0.25rem;
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #d8d4c8;
+  border-radius: 0.55rem;
+  color: inherit;
+  background: #fff;
+  text-align: left;
+}
+
+.admin-profile-review-queue button[aria-current="true"] {
+  border-color: #355b43;
+  background: #eef5ed;
+}
+
+.admin-profile-review-detail {
+  padding: 1rem;
+  border: 1px solid #d8d4c8;
+  border-radius: 0.75rem;
+  background: #fff;
+}
+
+.admin-profile-review-detail dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.75rem;
+}
+
+.admin-profile-review-detail dl > div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.admin-profile-review-detail dd {
+  margin: 0;
+}
+
+.admin-profile-review-detail textarea {
+  display: block;
+  width: 100%;
+  margin-block: 0.4rem 0.75rem;
+  padding: 0.65rem;
+  border: 1px solid #9eaa9d;
+  border-radius: 0.55rem;
+  font: inherit;
+}
+
+.admin-profile-review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+@media (max-width: 48rem) {
+  .admin-profile-review-layout {
+    grid-template-columns: 1fr;
+  }
+}

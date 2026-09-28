@@ -34,6 +34,14 @@ import {
   type AdminRegistrationIntakeRouteDependencies,
 } from "../admin-registration-intake/index.js";
 import {
+  registerAdminProfileReviewRoutes,
+  type AdminProfileReviewRouteDependencies,
+} from "../admin-profile-review/index.js";
+import {
+  registerCraftsmanAuthoringRoutes,
+  type CraftsmanAuthoringRouteDependencies,
+} from "../craftsman-authoring/index.js";
+import {
   registerCustomerShortlistRoutes,
   type CustomerShortlistRouteDependencies,
 } from "../customer-shortlist/routes.js";
@@ -307,6 +315,14 @@ export interface AuthModuleDependencies {
   readonly adminRegistrationIntake?: Pick<
     AdminRegistrationIntakeRouteDependencies,
     "clock" | "intake"
+  >;
+  readonly adminProfileReview?: Pick<
+    AdminProfileReviewRouteDependencies,
+    "publications" | "reviews"
+  >;
+  readonly craftsmanAuthoring?: Pick<
+    CraftsmanAuthoringRouteDependencies,
+    "context" | "profiles" | "professions" | "publication" | "serviceAreas"
   >;
   readonly jobDocumentation?: Pick<
     JobDocumentationRouteDependencies,
@@ -991,6 +1007,17 @@ async function configureAuthModule(
       ...dependencies.customerShortlist,
     });
   }
+  if (dependencies.craftsmanAuthoring !== undefined) {
+    registerCraftsmanAuthoringRoutes(app, {
+      csrfProtection: csrfProtection(app),
+      guard,
+      rateLimit: {
+        max: config.rateLimitMax,
+        timeWindowMs: config.rateLimitWindowMs,
+      },
+      ...dependencies.craftsmanAuthoring,
+    });
+  }
   if (dependencies.adminAccess !== undefined) {
     registerAdminAuthRoutes(app, {
       config,
@@ -1075,6 +1102,18 @@ async function configureAuthModule(
           timeWindowMs: config.rateLimitWindowMs,
         },
         ...dependencies.adminRegistrationIntake,
+      });
+    }
+    if (dependencies.adminProfileReview !== undefined) {
+      registerAdminProfileReviewRoutes(app, {
+        adminAccess: dependencies.adminAccess.service,
+        csrfProtection: csrfProtection(app),
+        guard,
+        rateLimit: {
+          max: config.rateLimitMax,
+          timeWindowMs: config.rateLimitWindowMs,
+        },
+        ...dependencies.adminProfileReview,
       });
     }
   }

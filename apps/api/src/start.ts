@@ -175,6 +175,13 @@ const app = buildApi({
       ),
     },
     customerShortlist: { shortlist: customerShortlist },
+    craftsmanAuthoring: {
+      context: database.craftsmanAuthoringContext,
+      profiles: database.craftsmanProfiles,
+      professions: database.craftsmanProfessions,
+      publication: database.craftsmanPublication,
+      serviceAreas: database.craftsmanServiceAreas,
+    },
     draftHandoff: {
       customerProfiles,
       drafts: database.jobRequestDrafts,

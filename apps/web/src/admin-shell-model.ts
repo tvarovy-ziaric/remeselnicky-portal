@@ -37,6 +37,7 @@ export function parseAdminModule(
   if (
     (value.id === "disputes" ||
       value.id === "jobs" ||
+      value.id === "profiles" ||
       value.id === "reports") !==
     (value.state === "OPERATIONAL")
   )
