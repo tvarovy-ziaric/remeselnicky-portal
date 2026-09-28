@@ -25,6 +25,7 @@ export {
 } from "./admin-credential-review-repository.js";
 export type {
   AdminCredentialEvidenceItem,
+  AdminCredentialReviewHistoryItem,
   AdminCredentialReviewItem,
   AdminCredentialReviewRepository,
 } from "./admin-credential-review-repository.js";

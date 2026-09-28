@@ -1,11 +1,20 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  AdminCredentialReviewDetail,
+  AdminCredentialReviewWorkspace,
   adminCredentialEvidenceHref,
+  appendAdminCredentialReviewPage,
+  credentialDecisionCommandId,
   decideAdminCredentialClaim,
   isVerifiedCredentialState,
+  loadAdminCredentialReviewHistory,
   loadAdminCredentialReviewQueue,
+  parseAdminCredentialReviewHistoryPage,
   parseAdminCredentialReviewPage,
+  settleCredentialDecisionAttempt,
 } from "./admin-credential-review";
 
 const claimId = "97000000-0000-4000-8000-000000000001";
@@ -43,7 +52,37 @@ const item = {
   updatedAt: "2026-09-28T16:05:00.000Z",
 } as const;
 
+const approvedItem = {
+  ...item,
+  reviewReasonCategory: null,
+  reviewReason: null,
+  reviewedAt: "2026-09-28T17:00:00.000Z",
+  revision: 3,
+  state: "APPROVED",
+  updatedAt: "2026-09-28T17:00:00.000Z",
+} as const;
+
+const rejectedItem = {
+  ...item,
+  reviewReasonCategory: "INSUFFICIENT_EVIDENCE",
+  reviewReason: "Doklad nepreukazuje deklarované oprávnenie.",
+  reviewedAt: "2026-09-28T17:00:00.000Z",
+  revision: 3,
+  state: "REJECTED",
+  updatedAt: "2026-09-28T17:00:00.000Z",
+} as const;
+
 describe("admin credential review client", () => {
+  it("offers all four credential review views", () => {
+    const workspace = renderToStaticMarkup(
+      createElement(AdminCredentialReviewWorkspace),
+    );
+    expect(workspace).toContain("Čakajúce");
+    expect(workspace).toContain("Schválené");
+    expect(workspace).toContain("Zamietnuté");
+    expect(workspace).toContain("Odobraté");
+  });
+
   it("accepts only the exact privacy-minimal pending queue", () => {
     expect(
       parseAdminCredentialReviewPage({ items: [item], nextCursor: null }),
@@ -96,6 +135,113 @@ describe("admin credential review client", () => {
         credentials: "same-origin",
       }),
     );
+  });
+
+  it("accepts exact history only for the requested state", () => {
+    expect(
+      parseAdminCredentialReviewHistoryPage(
+        { items: [approvedItem], nextCursor: null },
+        "APPROVED",
+      ),
+    ).toEqual({ items: [approvedItem], nextCursor: null });
+    expect(
+      parseAdminCredentialReviewHistoryPage(
+        { items: [approvedItem], nextCursor: null },
+        "REJECTED",
+      ),
+    ).toBeNull();
+    expect(
+      parseAdminCredentialReviewHistoryPage(
+        {
+          items: [{ ...approvedItem, storageKey: "private/credential.pdf" }],
+          nextCursor: null,
+        },
+        "APPROVED",
+      ),
+    ).toBeNull();
+    expect(
+      parseAdminCredentialReviewHistoryPage(
+        {
+          items: [{ ...approvedItem, reviewReason: "unexpected reason" }],
+          nextCursor: null,
+        },
+        "APPROVED",
+      ),
+    ).toBeNull();
+    expect(
+      parseAdminCredentialReviewHistoryPage(
+        { items: [rejectedItem], nextCursor: null },
+        "REJECTED",
+      ),
+    ).toEqual({ items: [rejectedItem], nextCursor: null });
+    expect(
+      parseAdminCredentialReviewHistoryPage(
+        {
+          items: [
+            {
+              ...rejectedItem,
+              evidence: [
+                { ...rejectedItem.evidence[0], signedUrl: "https://evil.test" },
+              ],
+            },
+          ],
+          nextCursor: null,
+        },
+        "REJECTED",
+      ),
+    ).toBeNull();
+  });
+
+  it("loads the exact state-filtered history URL without caching", async () => {
+    const cursor = "97000000-0000-4000-8000-000000000099";
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json({
+        items: [approvedItem],
+        nextCursor: null,
+      }),
+    );
+
+    await expect(
+      loadAdminCredentialReviewHistory("APPROVED", cursor, fetcher),
+    ).resolves.toEqual({
+      page: { items: [approvedItem], nextCursor: null },
+      status: "OK",
+    });
+    expect(fetcher).toHaveBeenCalledWith(
+      `/v1/admin/credential-claims/review-history?state=APPROVED&limit=20&cursor=${cursor}`,
+      expect.objectContaining({
+        cache: "no-store",
+        credentials: "same-origin",
+      }),
+    );
+  });
+
+  it("appends every cursor page only within the selected view", () => {
+    const nextClaimId = "97000000-0000-4000-8000-000000000002";
+    const firstPage = {
+      items: [approvedItem],
+      nextCursor: nextClaimId,
+    };
+    const nextPage = {
+      items: [{ ...approvedItem, claimId: nextClaimId }],
+      nextCursor: null,
+    };
+    expect(
+      appendAdminCredentialReviewPage(firstPage, nextPage, "APPROVED"),
+    ).toEqual({
+      items: [approvedItem, { ...approvedItem, claimId: nextClaimId }],
+      nextCursor: null,
+    });
+    expect(
+      appendAdminCredentialReviewPage(firstPage, firstPage, "APPROVED"),
+    ).toBeNull();
+    expect(
+      appendAdminCredentialReviewPage(
+        firstPage,
+        { items: [rejectedItem], nextCursor: null },
+        "APPROVED",
+      ),
+    ).toBeNull();
   });
 
   it("builds only the fixed same-origin evidence endpoint", () => {
@@ -207,6 +353,101 @@ describe("admin credential review client", () => {
         fetch: leaked,
       }),
     ).resolves.toBe("UNAVAILABLE");
+  });
+
+  it("revokes an approved claim with the exact reasoned command", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(Response.json({ csrfToken: "csrf-admin-token" }))
+      .mockResolvedValueOnce(
+        Response.json({
+          claim: {
+            claimId,
+            reviewReason: "Platnosť oprávnenia bola následne odobratá.",
+            reviewReasonCategory: "EXPIRED_OR_INVALID",
+            reviewedAt: "2026-09-28T18:00:00.000Z",
+            revision: 4,
+            state: "REVOKED",
+          },
+          status: "APPLIED",
+        }),
+      );
+
+    await expect(
+      decideAdminCredentialClaim({
+        action: "revoke",
+        claimId,
+        commandId,
+        expectedRevision: 3,
+        fetch: fetcher,
+        reason: "Platnosť oprávnenia bola následne odobratá.",
+        reasonCategory: "EXPIRED_OR_INVALID",
+      }),
+    ).resolves.toBe("OK");
+    expect(fetcher.mock.calls[1]?.[0]).toBe(
+      `/v1/admin/credential-claims/${claimId}/revoke`,
+    );
+    expect(JSON.parse(fetcher.mock.calls[1]?.[1]?.body as string)).toEqual({
+      commandId,
+      expectedRevision: 3,
+      reason: "Platnosť oprávnenia bola následne odobratá.",
+      reasonCategory: "EXPIRED_OR_INVALID",
+    });
+  });
+
+  it("keeps the revoke command id stable only for an unavailable retry", () => {
+    const attempts = new Map<string, string>();
+    const generate = vi.fn(() => commandId);
+    expect(
+      credentialDecisionCommandId(attempts, claimId, "revoke", generate),
+    ).toBe(commandId);
+    settleCredentialDecisionAttempt(attempts, claimId, "revoke", "UNAVAILABLE");
+    expect(
+      credentialDecisionCommandId(attempts, claimId, "revoke", generate),
+    ).toBe(commandId);
+    expect(generate).toHaveBeenCalledTimes(1);
+
+    settleCredentialDecisionAttempt(attempts, claimId, "revoke", "OK");
+    credentialDecisionCommandId(attempts, claimId, "revoke", generate);
+    expect(generate).toHaveBeenCalledTimes(2);
+  });
+
+  it("offers revoke only for approved history and keeps closed history read-only", () => {
+    const shared = {
+      busy: false,
+      message: null,
+      onDecision: vi.fn(),
+      onReasonCategoryChange: vi.fn(),
+      onReasonChange: vi.fn(),
+      reason: "Platnosť oprávnenia bola následne odobratá.",
+      reasonCategory: "EXPIRED_OR_INVALID" as const,
+    };
+    const approved = renderToStaticMarkup(
+      createElement(AdminCredentialReviewDetail, {
+        ...shared,
+        item: approvedItem,
+      }),
+    );
+    expect(approved).toContain("Overený doklad.");
+    expect(approved).toContain("Odobrať overenie");
+    expect(approved).toContain(
+      `/v1/admin/credential-claims/${claimId}/evidence/${assetId}`,
+    );
+    expect(approved).not.toContain("Schváliť doklad");
+
+    const rejected = renderToStaticMarkup(
+      createElement(AdminCredentialReviewDetail, {
+        ...shared,
+        item: rejectedItem,
+      }),
+    );
+    expect(rejected).toContain("Dôvod zamietnutia");
+    expect(rejected).toContain(rejectedItem.reviewReason);
+    expect(rejected).not.toContain("Odobrať overenie");
+    expect(rejected).not.toContain("credential-rejection-reason");
+    expect(rejected).not.toContain(
+      `/v1/admin/credential-claims/${claimId}/evidence/${assetId}`,
+    );
   });
 
   it("treats only approved credentials as verified", () => {

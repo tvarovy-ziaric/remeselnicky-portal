@@ -46,8 +46,42 @@ export interface AdminCredentialReviewPage {
   readonly nextCursor: string | null;
 }
 
+export const ADMIN_CREDENTIAL_HISTORY_STATES = Object.freeze([
+  "APPROVED",
+  "REJECTED",
+  "REVOKED",
+] as const);
+
+export type AdminCredentialHistoryState =
+  (typeof ADMIN_CREDENTIAL_HISTORY_STATES)[number];
+
+export type AdminCredentialReviewView = "PENDING" | AdminCredentialHistoryState;
+
+export interface AdminCredentialReviewHistoryItem extends Omit<
+  AdminCredentialReviewItem,
+  "state"
+> {
+  readonly reviewReasonCategory: CredentialRejectionCategory | null;
+  readonly reviewReason: string | null;
+  readonly reviewedAt: string;
+  readonly state: AdminCredentialHistoryState;
+}
+
+export interface AdminCredentialReviewHistoryPage {
+  readonly items: readonly AdminCredentialReviewHistoryItem[];
+  readonly nextCursor: string | null;
+}
+
+export type AdminCredentialReviewListItem =
+  AdminCredentialReviewItem | AdminCredentialReviewHistoryItem;
+
+export interface AdminCredentialReviewListPage {
+  readonly items: readonly AdminCredentialReviewListItem[];
+  readonly nextCursor: string | null;
+}
+
 type LoadResult =
-  | { readonly page: AdminCredentialReviewPage; readonly status: "OK" }
+  | { readonly page: AdminCredentialReviewListPage; readonly status: "OK" }
   | {
       readonly status: "AUTH_REQUIRED" | "ACCESS_DENIED" | "UNAVAILABLE";
     };
@@ -71,6 +105,7 @@ type CredentialDecisionInput = Readonly<{
 }>;
 
 const queuePath = "/v1/admin/credential-claims/review-queue";
+const historyPath = "/v1/admin/credential-claims/review-history";
 
 export async function loadAdminCredentialReviewQueue(
   cursor?: string,
@@ -95,6 +130,37 @@ export async function loadAdminCredentialReviewQueue(
   }
 }
 
+export async function loadAdminCredentialReviewHistory(
+  state: AdminCredentialHistoryState,
+  cursor?: string,
+  fetcher: typeof fetch = fetch,
+): Promise<LoadResult> {
+  if (
+    !ADMIN_CREDENTIAL_HISTORY_STATES.includes(state) ||
+    (cursor !== undefined && !uuid(cursor))
+  )
+    return { status: "UNAVAILABLE" };
+  const query = new URLSearchParams({ state, limit: "20" });
+  if (cursor !== undefined) query.set("cursor", cursor);
+  try {
+    const response = await fetcher(historyPath + "?" + query.toString(), {
+      cache: "no-store",
+      credentials: "same-origin",
+      headers: { accept: "application/json" },
+    });
+    if (response.status === 401) return { status: "AUTH_REQUIRED" };
+    if (response.status === 403) return { status: "ACCESS_DENIED" };
+    if (!response.ok) return { status: "UNAVAILABLE" };
+    const page = parseAdminCredentialReviewHistoryPage(
+      await response.json(),
+      state,
+    );
+    return page === null ? { status: "UNAVAILABLE" } : { page, status: "OK" };
+  } catch {
+    return { status: "UNAVAILABLE" };
+  }
+}
+
 export function parseAdminCredentialReviewPage(
   value: unknown,
 ): AdminCredentialReviewPage | null {
@@ -113,6 +179,48 @@ export function parseAdminCredentialReviewPage(
   return Object.freeze({
     items: Object.freeze(parsed),
     nextCursor: value.nextCursor,
+  });
+}
+
+export function parseAdminCredentialReviewHistoryPage(
+  value: unknown,
+  expectedState: AdminCredentialHistoryState,
+): AdminCredentialReviewHistoryPage | null {
+  if (
+    !ADMIN_CREDENTIAL_HISTORY_STATES.includes(expectedState) ||
+    !exactRecord(value, ["items", "nextCursor"]) ||
+    !Array.isArray(value.items) ||
+    value.items.length > 50 ||
+    !(value.nextCursor === null || uuid(value.nextCursor))
+  )
+    return null;
+  const items = value.items.map((item) =>
+    parseHistoryItem(item, expectedState),
+  );
+  if (items.some((item) => item === null)) return null;
+  const parsed = items as AdminCredentialReviewHistoryItem[];
+  if (new Set(parsed.map(({ claimId }) => claimId)).size !== parsed.length)
+    return null;
+  return Object.freeze({
+    items: Object.freeze(parsed),
+    nextCursor: value.nextCursor,
+  });
+}
+
+export function appendAdminCredentialReviewPage(
+  current: AdminCredentialReviewListPage,
+  next: AdminCredentialReviewListPage,
+  view: AdminCredentialReviewView,
+): AdminCredentialReviewListPage | null {
+  const items = [...current.items, ...next.items];
+  if (
+    !items.every((item) => item.state === view) ||
+    new Set(items.map(({ claimId }) => claimId)).size !== items.length
+  )
+    return null;
+  return Object.freeze({
+    items: Object.freeze(items),
+    nextCursor: next.nextCursor,
   });
 }
 
@@ -204,23 +312,55 @@ export async function decideAdminCredentialClaim(
   }
 }
 
+export function credentialDecisionCommandId(
+  attempts: Map<string, string>,
+  claimId: string,
+  action: CredentialDecisionInput["action"],
+  generate: () => string = () => crypto.randomUUID(),
+): string {
+  const key = claimId + ":" + action;
+  const existing = attempts.get(key);
+  if (existing !== undefined) return existing;
+  const created = generate();
+  attempts.set(key, created);
+  return created;
+}
+
+export function settleCredentialDecisionAttempt(
+  attempts: Map<string, string>,
+  claimId: string,
+  action: CredentialDecisionInput["action"],
+  result: CredentialDecisionResult,
+): void {
+  if (result !== "UNAVAILABLE") attempts.delete(claimId + ":" + action);
+}
+
 export function AdminCredentialReviewWorkspace() {
-  const [page, setPage] = useState<AdminCredentialReviewPage | null>(null);
+  const [view, setView] = useState<AdminCredentialReviewView>("PENDING");
+  const [page, setPage] = useState<AdminCredentialReviewListPage | null>(null);
   const [status, setStatus] = useState<
     "LOADING" | "OK" | "AUTH_REQUIRED" | "ACCESS_DENIED" | "UNAVAILABLE"
   >("LOADING");
-  const [selected, setSelected] = useState<AdminCredentialReviewItem | null>(
-    null,
-  );
+  const [selected, setSelected] =
+    useState<AdminCredentialReviewListItem | null>(null);
   const [reasonCategory, setReasonCategory] =
     useState<CredentialRejectionCategory>("INSUFFICIENT_EVIDENCE");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const attempts = useRef(new Map<string, string>());
+  const loadVersion = useRef(0);
 
-  const load = useCallback(async () => {
-    const result = await loadAdminCredentialReviewQueue();
+  const load = useCallback(async (targetView: AdminCredentialReviewView) => {
+    const version = ++loadVersion.current;
+    setLoadingMore(false);
+    setStatus("LOADING");
+    const result =
+      targetView === "PENDING"
+        ? await loadAdminCredentialReviewQueue()
+        : await loadAdminCredentialReviewHistory(targetView);
+    if (version !== loadVersion.current) return;
     if (result.status === "OK") {
       setPage(result.page);
       setSelected((current) =>
@@ -240,11 +380,53 @@ export function AdminCredentialReviewWorkspace() {
   }, []);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    setPage(null);
+    setSelected(null);
+    setReason("");
+    setReasonCategory("INSUFFICIENT_EVIDENCE");
+    setMessage(null);
+    setLoadingMore(false);
+    void load(view);
+  }, [load, view]);
 
-  const decide = async (action: "approve" | "reject") => {
-    if (selected === null || selected.state !== "PENDING" || busy) return;
+  const loadMore = async () => {
+    if (page === null || page.nextCursor === null || loadingMore || busy)
+      return;
+    const version = loadVersion.current;
+    const cursor = page.nextCursor;
+    setLoadingMore(true);
+    const result =
+      view === "PENDING"
+        ? await loadAdminCredentialReviewQueue(cursor)
+        : await loadAdminCredentialReviewHistory(view, cursor);
+    if (version !== loadVersion.current) return;
+    if (result.status === "OK") {
+      const appended = appendAdminCredentialReviewPage(page, result.page, view);
+      if (appended === null)
+        setMessage("Ďalšiu stranu sa nepodarilo bezpečne pripojiť.");
+      else setPage(appended);
+    } else if (
+      result.status === "AUTH_REQUIRED" ||
+      result.status === "ACCESS_DENIED"
+    ) {
+      setPage(null);
+      setSelected(null);
+      setStatus(result.status);
+    } else {
+      setMessage("Ďalšiu stranu sa nepodarilo bezpečne načítať.");
+    }
+    setLoadingMore(false);
+  };
+
+  const decide = async (action: "approve" | "reject" | "revoke") => {
+    if (
+      selected === null ||
+      busy ||
+      (action === "revoke"
+        ? selected.state !== "APPROVED"
+        : selected.state !== "PENDING")
+    )
+      return;
     if (
       action === "approve" &&
       selected.evidenceRequirement === "REQUIRED" &&
@@ -254,13 +436,19 @@ export function AdminCredentialReviewWorkspace() {
       return;
     }
     const normalizedReason = reason.trim().replace(/\s+/gu, " ");
-    if (action === "reject" && !safeReviewReason(normalizedReason)) {
-      setMessage("Pri zamietnutí zadajte bezpečný a zrozumiteľný dôvod.");
+    if (action !== "approve" && !safeReviewReason(normalizedReason)) {
+      setMessage(
+        action === "revoke"
+          ? "Pri odobratí zadajte bezpečný a zrozumiteľný dôvod."
+          : "Pri zamietnutí zadajte bezpečný a zrozumiteľný dôvod.",
+      );
       return;
     }
-    const attemptKey = selected.claimId + ":" + action;
-    const commandId = attempts.current.get(attemptKey) ?? crypto.randomUUID();
-    attempts.current.set(attemptKey, commandId);
+    const commandId = credentialDecisionCommandId(
+      attempts.current,
+      selected.claimId,
+      action,
+    );
     setBusy(true);
     setMessage(null);
     const result = await decideAdminCredentialClaim({
@@ -268,213 +456,344 @@ export function AdminCredentialReviewWorkspace() {
       claimId: selected.claimId,
       commandId,
       expectedRevision: selected.revision,
-      ...(action === "reject"
+      ...(action !== "approve"
         ? { reason: normalizedReason, reasonCategory }
         : {}),
     });
-    if (result !== "UNAVAILABLE") attempts.current.delete(attemptKey);
+    settleCredentialDecisionAttempt(
+      attempts.current,
+      selected.claimId,
+      action,
+      result,
+    );
     if (result === "OK") {
       setReason("");
       setMessage(
         action === "approve"
           ? "Doklad bol schválený. Až teraz je overený."
-          : "Tvrdenie o doklade bolo zamietnuté.",
+          : action === "reject"
+            ? "Tvrdenie o doklade bolo zamietnuté."
+            : "Overenie dokladu bolo odobraté.",
       );
-      await load();
+      await load(view);
     } else {
       setMessage(decisionMessage(result));
     }
     setBusy(false);
   };
 
-  if (status === "LOADING")
-    return <p role="status">Načítavam doklady na kontrolu…</p>;
-  if (status !== "OK")
-    return (
-      <section className="admin-panel">
-        <p className="admin-kicker">Kontrola dokladov</p>
-        <h2>Fronta nie je dostupná</h2>
-        <p role="alert">
-          {status === "AUTH_REQUIRED"
-            ? "Privilegovaná relácia vypršala. Prihláste sa a dokončite MFA."
-            : status === "ACCESS_DENIED"
-              ? "Relácia nemá oprávnenie admin.credentials.review."
-              : "Dáta sa nepodarilo bezpečne načítať."}
-        </p>
-      </section>
-    );
-  if (page === null || page.items.length === 0)
-    return (
-      <section className="admin-panel">
-        <p className="admin-kicker">Kontrola dokladov</p>
-        <h2>Žiadne doklady nečakajú</h2>
-        <p role="status">Fronta dokladov na schválenie je prázdna.</p>
-      </section>
-    );
+  const views = Object.freeze([
+    ["PENDING", "Čakajúce"],
+    ["APPROVED", "Schválené"],
+    ["REJECTED", "Zamietnuté"],
+    ["REVOKED", "Odobraté"],
+  ] as const);
 
   return (
     <section className="admin-panel admin-credential-review">
       <p className="admin-kicker">Kontrola dokladov</p>
-      <h2>Doklady čakajúce na rozhodnutie</h2>
-      <p>
-        Čakajúce tvrdenia nie sú overené. Schválenie je možné iba po kontrole
-        relevantného oprávnenia a jeho súkromných dôkazov.
-      </p>
-      <div className="admin-profile-review-layout">
-        <ul
-          className="admin-profile-review-queue"
-          aria-label="Čakajúce doklady"
-        >
-          {page.items.map((item) => (
-            <li key={item.claimId}>
-              <button
-                aria-current={
-                  selected?.claimId === item.claimId ? "true" : undefined
-                }
-                type="button"
-                onClick={() => {
-                  setSelected(item);
-                  setMessage(null);
-                }}
-              >
-                <strong>{profileName(item)}</strong>
-                <span>{item.profession.label}</span>
-                <span>{item.credentialTypeCode}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-        {selected === null ? null : (
-          <article className="admin-profile-review-detail">
-            <h3>{profileName(selected)}</h3>
-            {selected.profile.secondaryName === null ? null : (
-              <p>{selected.profile.secondaryName}</p>
-            )}
-            <p className="profile-authoring-warning" role="status">
-              {isVerifiedCredentialState(selected.state)
-                ? "Overený doklad."
-                : "Čaká na kontrolu — nie je overený."}
-            </p>
-            <dl>
-              <div>
-                <dt>Profil</dt>
-                <dd>
-                  {selected.profile.profileType === "COMPANY"
-                    ? "Firma"
-                    : "Fyzická osoba"}
-                </dd>
-              </div>
-              <div>
-                <dt>Profesia</dt>
-                <dd>
-                  {selected.profession.label} ({selected.profession.code})
-                </dd>
-              </div>
-              <div>
-                <dt>Typ dokladu</dt>
-                <dd>{selected.credentialTypeCode}</dd>
-              </div>
-              <div>
-                <dt>Dôkaz</dt>
-                <dd>
-                  {selected.evidenceRequirement === "REQUIRED"
-                    ? "Povinný"
-                    : "Voliteľný"}
-                </dd>
-              </div>
-              <div>
-                <dt>Platnosť do</dt>
-                <dd>{formatExpiry(selected.expiresOn)}</dd>
-              </div>
-              <div>
-                <dt>Podané</dt>
-                <dd>{new Date(selected.createdAt).toLocaleString("sk-SK")}</dd>
-              </div>
-            </dl>
-            <h4>Súkromné dôkazy</h4>
-            {selected.evidence.length === 0 ? (
-              <p>Nie je priložený žiadny dôkaz.</p>
-            ) : (
-              <ul className="admin-credential-evidence">
-                {selected.evidence.map((evidence, index) => {
-                  const href = adminCredentialEvidenceHref(
-                    selected.claimId,
-                    evidence.assetId,
-                  );
-                  return (
-                    <li key={evidence.assetId}>
-                      {href === null ? null : (
-                        <a href={href} rel="noreferrer" target="_blank">
-                          Otvoriť{" "}
-                          {evidence.mediaKind === "DOCUMENT"
-                            ? "dokument"
-                            : "fotografiu"}{" "}
-                          {index + 1}
-                        </a>
-                      )}
-                      <span>
-                        Priložené{" "}
-                        {new Date(evidence.attachedAt).toLocaleString("sk-SK")}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-            <label htmlFor="credential-rejection-category">
-              Kategória zamietnutia
-            </label>
-            <select
-              id="credential-rejection-category"
-              value={reasonCategory}
-              onChange={(event) =>
-                setReasonCategory(
-                  event.target.value as CredentialRejectionCategory,
-                )
-              }
+      <h2>Doklady a história rozhodnutí</h2>
+      <nav
+        aria-label="Pohľady kontroly dokladov"
+        className="admin-credential-review-tabs"
+      >
+        {views.map(([state, label]) => (
+          <button
+            aria-pressed={view === state}
+            disabled={busy}
+            key={state}
+            type="button"
+            onClick={() => setView(state)}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+      {status === "LOADING" ? (
+        <p role="status">Načítavam doklady na kontrolu…</p>
+      ) : status !== "OK" ? (
+        <div>
+          <h3>Pohľad nie je dostupný</h3>
+          <p role="alert">
+            {status === "AUTH_REQUIRED"
+              ? "Privilegovaná relácia vypršala. Prihláste sa a dokončite MFA."
+              : status === "ACCESS_DENIED"
+                ? "Relácia nemá oprávnenie admin.credentials.review."
+                : "Dáta sa nepodarilo bezpečne načítať."}
+          </p>
+        </div>
+      ) : page === null || page.items.length === 0 ? (
+        <p role="status">{emptyViewMessage(view)}</p>
+      ) : (
+        <div className="admin-profile-review-layout">
+          <div>
+            <ul
+              className="admin-profile-review-queue"
+              aria-label={viewQueueLabel(view)}
             >
-              {CREDENTIAL_REJECTION_CATEGORIES.map((category) => (
-                <option key={category} value={category}>
-                  {reasonCategoryLabel(category)}
-                </option>
+              {page.items.map((item) => (
+                <li key={item.claimId}>
+                  <button
+                    aria-current={
+                      selected?.claimId === item.claimId ? "true" : undefined
+                    }
+                    type="button"
+                    onClick={() => {
+                      setSelected(item);
+                      setReason("");
+                      setReasonCategory("INSUFFICIENT_EVIDENCE");
+                      setMessage(null);
+                    }}
+                  >
+                    <strong>{profileName(item)}</strong>
+                    <span>{item.profession.label}</span>
+                    <span>{item.credentialTypeCode}</span>
+                  </button>
+                </li>
               ))}
-            </select>
-            <label htmlFor="credential-rejection-reason">
-              Dôvod zamietnutia pre remeselníka
-            </label>
-            <textarea
-              id="credential-rejection-reason"
-              maxLength={500}
-              onChange={(event) => setReason(event.target.value)}
-              rows={4}
-              value={reason}
+            </ul>
+            {page.nextCursor === null ? null : (
+              <button
+                className="admin-credential-review-load-more"
+                disabled={busy || loadingMore}
+                type="button"
+                onClick={() => void loadMore()}
+              >
+                {loadingMore ? "Načítavam…" : "Načítať ďalšie"}
+              </button>
+            )}
+          </div>
+          {selected === null ? null : (
+            <AdminCredentialReviewDetail
+              busy={busy}
+              item={selected}
+              message={message}
+              reason={reason}
+              reasonCategory={reasonCategory}
+              onDecision={(action) => void decide(action)}
+              onReasonChange={setReason}
+              onReasonCategoryChange={setReasonCategory}
             />
-            {message === null ? null : <p role="status">{message}</p>}
-            <div className="admin-profile-review-actions">
-              <button
-                disabled={
-                  busy ||
-                  (selected.evidenceRequirement === "REQUIRED" &&
-                    selected.evidence.length === 0)
-                }
-                type="button"
-                onClick={() => void decide("approve")}
-              >
-                Schváliť doklad
-              </button>
-              <button
-                disabled={busy || !safeReviewReason(reason.trim())}
-                type="button"
-                onClick={() => void decide("reject")}
-              >
-                Zamietnuť tvrdenie
-              </button>
-            </div>
-          </article>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </section>
   );
+}
+
+export function AdminCredentialReviewDetail({
+  busy,
+  item,
+  message,
+  onDecision,
+  onReasonCategoryChange,
+  onReasonChange,
+  reason,
+  reasonCategory,
+}: Readonly<{
+  busy: boolean;
+  item: AdminCredentialReviewListItem;
+  message: string | null;
+  onDecision: (action: "approve" | "reject" | "revoke") => void;
+  onReasonCategoryChange: (category: CredentialRejectionCategory) => void;
+  onReasonChange: (reason: string) => void;
+  reason: string;
+  reasonCategory: CredentialRejectionCategory;
+}>) {
+  const isPending = item.state === "PENDING";
+  const isApproved = item.state === "APPROVED";
+  const canOpenEvidence = isPending || isApproved;
+  const needsDecisionReason = isPending || isApproved;
+  return (
+    <article className="admin-profile-review-detail">
+      <h3>{profileName(item)}</h3>
+      {item.profile.secondaryName === null ? null : (
+        <p>{item.profile.secondaryName}</p>
+      )}
+      <p className="profile-authoring-warning" role="status">
+        {credentialStateMessage(item.state)}
+      </p>
+      <dl>
+        <div>
+          <dt>Profil</dt>
+          <dd>
+            {item.profile.profileType === "COMPANY" ? "Firma" : "Fyzická osoba"}
+          </dd>
+        </div>
+        <div>
+          <dt>Profesia</dt>
+          <dd>
+            {item.profession.label} ({item.profession.code})
+          </dd>
+        </div>
+        <div>
+          <dt>Typ dokladu</dt>
+          <dd>{item.credentialTypeCode}</dd>
+        </div>
+        <div>
+          <dt>Dôkaz</dt>
+          <dd>
+            {item.evidenceRequirement === "REQUIRED" ? "Povinný" : "Voliteľný"}
+          </dd>
+        </div>
+        <div>
+          <dt>Platnosť do</dt>
+          <dd>{formatExpiry(item.expiresOn)}</dd>
+        </div>
+        <div>
+          <dt>Podané</dt>
+          <dd>{new Date(item.createdAt).toLocaleString("sk-SK")}</dd>
+        </div>
+        {item.state === "PENDING" ? null : (
+          <div>
+            <dt>Rozhodnuté</dt>
+            <dd>{new Date(item.reviewedAt).toLocaleString("sk-SK")}</dd>
+          </div>
+        )}
+      </dl>
+      {item.state === "REJECTED" || item.state === "REVOKED" ? (
+        <div className="admin-credential-review-reason">
+          <h4>
+            {item.state === "REJECTED"
+              ? "Dôvod zamietnutia"
+              : "Dôvod odobratia"}
+          </h4>
+          <p>
+            {item.reviewReasonCategory === null
+              ? "Dôvod nie je dostupný"
+              : reasonCategoryLabel(item.reviewReasonCategory)}
+          </p>
+          <p>{item.reviewReason}</p>
+        </div>
+      ) : null}
+      <h4>Súkromné dôkazy</h4>
+      {item.evidence.length === 0 ? (
+        <p>Nie je priložený žiadny dôkaz.</p>
+      ) : canOpenEvidence ? (
+        <ul className="admin-credential-evidence">
+          {item.evidence.map((evidence, index) => {
+            const href = adminCredentialEvidenceHref(
+              item.claimId,
+              evidence.assetId,
+            );
+            return (
+              <li key={evidence.assetId}>
+                {href === null ? null : (
+                  <a href={href} rel="noreferrer" target="_blank">
+                    Otvoriť{" "}
+                    {evidence.mediaKind === "DOCUMENT"
+                      ? "dokument"
+                      : "fotografiu"}{" "}
+                    {index + 1}
+                  </a>
+                )}
+                <span>
+                  Priložené{" "}
+                  {new Date(evidence.attachedAt).toLocaleString("sk-SK")}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p>Dôkazy uzavretého rozhodnutia sa v tomto pohľade neotvárajú.</p>
+      )}
+      {needsDecisionReason ? (
+        <>
+          <label htmlFor="credential-rejection-category">
+            {isApproved ? "Kategória odobratia" : "Kategória zamietnutia"}
+          </label>
+          <select
+            id="credential-rejection-category"
+            value={reasonCategory}
+            onChange={(event) =>
+              onReasonCategoryChange(
+                event.target.value as CredentialRejectionCategory,
+              )
+            }
+          >
+            {CREDENTIAL_REJECTION_CATEGORIES.map((category) => (
+              <option key={category} value={category}>
+                {reasonCategoryLabel(category)}
+              </option>
+            ))}
+          </select>
+          <label htmlFor="credential-rejection-reason">
+            {isApproved
+              ? "Dôvod odobratia pre remeselníka"
+              : "Dôvod zamietnutia pre remeselníka"}
+          </label>
+          <textarea
+            id="credential-rejection-reason"
+            maxLength={500}
+            onChange={(event) => onReasonChange(event.target.value)}
+            rows={4}
+            value={reason}
+          />
+        </>
+      ) : null}
+      {message === null ? null : <p role="status">{message}</p>}
+      {isPending ? (
+        <div className="admin-profile-review-actions">
+          <button
+            disabled={
+              busy ||
+              (item.evidenceRequirement === "REQUIRED" &&
+                item.evidence.length === 0)
+            }
+            type="button"
+            onClick={() => onDecision("approve")}
+          >
+            Schváliť doklad
+          </button>
+          <button
+            disabled={busy || !safeReviewReason(reason.trim())}
+            type="button"
+            onClick={() => onDecision("reject")}
+          >
+            Zamietnuť tvrdenie
+          </button>
+        </div>
+      ) : isApproved ? (
+        <div className="admin-profile-review-actions">
+          <button
+            disabled={busy || !safeReviewReason(reason.trim())}
+            type="button"
+            onClick={() => onDecision("revoke")}
+          >
+            Odobrať overenie
+          </button>
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+function emptyViewMessage(view: AdminCredentialReviewView): string {
+  return {
+    APPROVED: "Nie sú dostupné žiadne schválené doklady.",
+    PENDING: "Fronta dokladov na schválenie je prázdna.",
+    REJECTED: "Nie sú dostupné žiadne zamietnuté doklady.",
+    REVOKED: "Nie sú dostupné žiadne odobraté overenia.",
+  }[view];
+}
+
+function viewQueueLabel(view: AdminCredentialReviewView): string {
+  return {
+    APPROVED: "Schválené doklady",
+    PENDING: "Čakajúce doklady",
+    REJECTED: "Zamietnuté doklady",
+    REVOKED: "Odobraté overenia",
+  }[view];
+}
+
+function credentialStateMessage(view: AdminCredentialReviewView): string {
+  return {
+    APPROVED: "Overený doklad.",
+    PENDING: "Čaká na kontrolu — nie je overený.",
+    REJECTED: "Zamietnutý doklad — nie je overený.",
+    REVOKED: "Overenie bolo odobraté — doklad nie je overený.",
+  }[view];
 }
 
 function parseReviewItem(value: unknown): AdminCredentialReviewItem | null {
@@ -513,6 +832,62 @@ function parseReviewItem(value: unknown): AdminCredentialReviewItem | null {
   )
     return null;
   return Object.freeze(value) as unknown as AdminCredentialReviewItem;
+}
+
+function parseHistoryItem(
+  value: unknown,
+  expectedState: AdminCredentialHistoryState,
+): AdminCredentialReviewHistoryItem | null {
+  if (
+    !exactRecord(value, [
+      "claimId",
+      "createdAt",
+      "credentialTypeCode",
+      "evidence",
+      "evidenceRequirement",
+      "expiresOn",
+      "profession",
+      "profile",
+      "reviewReasonCategory",
+      "reviewReason",
+      "reviewedAt",
+      "revision",
+      "state",
+      "updatedAt",
+    ]) ||
+    !uuid(value.claimId) ||
+    !iso(value.createdAt) ||
+    !credentialTypeCode(value.credentialTypeCode) ||
+    !Array.isArray(value.evidence) ||
+    !value.evidence.every(parseEvidence) ||
+    new Set(
+      (value.evidence as ReadonlyArray<{ readonly assetId: string }>).map(
+        ({ assetId }) => assetId,
+      ),
+    ).size !== value.evidence.length ||
+    (value.evidenceRequirement !== "REQUIRED" &&
+      value.evidenceRequirement !== "OPTIONAL") ||
+    !(value.expiresOn === null || calendarDate(value.expiresOn)) ||
+    !parseProfession(value.profession) ||
+    !parseProfile(value.profile) ||
+    !positiveRevision(value.revision) ||
+    value.state !== expectedState ||
+    !iso(value.reviewedAt) ||
+    !iso(value.updatedAt)
+  )
+    return null;
+  if (expectedState === "APPROVED") {
+    if (value.reviewReason !== null || value.reviewReasonCategory !== null)
+      return null;
+  } else if (
+    !safeReviewReason(value.reviewReason) ||
+    !CREDENTIAL_REJECTION_CATEGORIES.includes(
+      value.reviewReasonCategory as CredentialRejectionCategory,
+    )
+  ) {
+    return null;
+  }
+  return Object.freeze(value) as unknown as AdminCredentialReviewHistoryItem;
 }
 
 function parseEvidence(value: unknown): boolean {
@@ -580,7 +955,7 @@ function validDecisionResponse(
         );
 }
 
-function profileName(item: AdminCredentialReviewItem): string {
+function profileName(item: AdminCredentialReviewListItem): string {
   return (
     item.profile.primaryName ?? item.profile.secondaryName ?? "Profil bez názvu"
   );

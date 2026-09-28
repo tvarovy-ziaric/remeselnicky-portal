@@ -1781,6 +1781,51 @@ p {
   font: inherit;
 }
 
+.admin-credential-review-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-block: 1rem;
+}
+
+.admin-credential-review-tabs button {
+  padding: 0.55rem 0.8rem;
+  border: 1px solid #9eaa9d;
+  border-radius: 999px;
+  color: inherit;
+  background: #fff;
+  font: inherit;
+}
+
+.admin-credential-review-tabs button[aria-pressed="true"] {
+  border-color: #355b43;
+  background: #e4efe3;
+  font-weight: 700;
+}
+
+.admin-credential-review-load-more {
+  width: 100%;
+  margin-top: 0.75rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid #9eaa9d;
+  border-radius: 0.55rem;
+  color: inherit;
+  background: #fff;
+  font: inherit;
+}
+
+.admin-credential-review-reason {
+  margin-block: 1rem;
+  padding: 0.8rem;
+  border: 1px solid #d8d4c8;
+  border-radius: 0.55rem;
+  background: #f7f4ed;
+}
+
+.admin-credential-review-reason > :last-child {
+  margin-bottom: 0;
+}
+
 .admin-credential-evidence {
   display: grid;
   gap: 0.6rem;

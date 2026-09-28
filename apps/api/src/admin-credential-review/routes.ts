@@ -1,6 +1,7 @@
 import type { AdminAccessService } from "@portal/admin-auth";
 import {
   CredentialClaimIdempotencyError,
+  type AdminCredentialReviewHistoryItem,
   type AdminCredentialReviewItem,
   type CredentialReviewService,
 } from "@portal/db";
@@ -19,6 +20,7 @@ export const ADMIN_CREDENTIAL_REVIEW_PATHS = Object.freeze({
   approve: "/v1/admin/credential-claims/:claimId/approve",
   detail: "/v1/admin/credential-claims/:claimId/review",
   evidence: "/v1/admin/credential-claims/:claimId/evidence/:mediaAssetId",
+  history: "/v1/admin/credential-claims/review-history",
   queue: "/v1/admin/credential-claims/review-queue",
   reject: "/v1/admin/credential-claims/:claimId/reject",
   revoke: "/v1/admin/credential-claims/:claimId/revoke",
@@ -45,6 +47,14 @@ export interface AdminCredentialReviewRouteDependencies {
       readonly limit: number;
     }): Promise<{
       readonly items: readonly AdminCredentialReviewItem[];
+      readonly nextCursor: string | null;
+    }>;
+    listReviewed(input: {
+      readonly cursor?: string;
+      readonly limit: number;
+      readonly state: AdminCredentialReviewHistoryItem["state"];
+    }): Promise<{
+      readonly items: readonly AdminCredentialReviewHistoryItem[];
       readonly nextCursor: string | null;
     }>;
   };
@@ -110,6 +120,59 @@ export function registerAdminCredentialReviewRoutes(
         }
         return reply.code(200).send({
           items: page.items.map(serializeReview),
+          nextCursor: page.nextCursor,
+        });
+      } catch (error) {
+        return readError(reply, error);
+      }
+    },
+  );
+
+  app.get<{
+    Querystring: {
+      cursor?: string;
+      limit?: number;
+      state: AdminCredentialReviewHistoryItem["state"];
+    };
+  }>(
+    ADMIN_CREDENTIAL_REVIEW_PATHS.history,
+    {
+      config: readConfig,
+      onSend: noStore,
+      schema: {
+        querystring: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            cursor: { type: "string", pattern: uuid },
+            limit: { type: "integer", minimum: 1, maximum: 50 },
+            state: {
+              type: "string",
+              enum: ["APPROVED", "REJECTED", "REVOKED"],
+            },
+          },
+          required: ["state"],
+        },
+      },
+    },
+    async (request, reply) => {
+      const actorUserId = await requireAuthorized(request, reply, dependencies);
+      if (actorUserId === undefined) return;
+      try {
+        const page = await dependencies.reviews.listReviewed({
+          ...(request.query.cursor === undefined
+            ? {}
+            : { cursor: request.query.cursor }),
+          limit: request.query.limit ?? 20,
+          state: request.query.state,
+        });
+        if ((await authorizedActor(request, dependencies)) !== actorUserId) {
+          return reply.code(403).send({ code: "PRIVILEGED_ACCESS_DENIED" });
+        }
+        return reply.code(200).send({
+          items: page.items.map((item) =>
+            serializeHistory(item, request.query.state),
+          ),
           nextCursor: page.nextCursor,
         });
       } catch (error) {
@@ -368,7 +431,9 @@ async function isExactReviewEvidence(
   );
 }
 
-function serializeReview(item: AdminCredentialReviewItem) {
+function serializeReview(
+  item: AdminCredentialReviewItem | AdminCredentialReviewHistoryItem,
+) {
   return {
     claimId: item.claimId,
     createdAt: item.createdAt.toISOString(),
@@ -385,6 +450,20 @@ function serializeReview(item: AdminCredentialReviewItem) {
     revision: item.revision,
     state: item.state,
     updatedAt: item.updatedAt.toISOString(),
+  };
+}
+
+function serializeHistory(
+  item: AdminCredentialReviewHistoryItem,
+  expectedState: AdminCredentialReviewHistoryItem["state"],
+) {
+  if (item.state !== expectedState)
+    throw new Error("Credential-review history state mismatch.");
+  return {
+    ...serializeReview(item),
+    reviewReason: item.reviewReason,
+    reviewReasonCategory: item.reviewReasonCategory,
+    reviewedAt: item.reviewedAt.toISOString(),
   };
 }
 

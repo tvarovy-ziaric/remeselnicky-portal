@@ -38,6 +38,23 @@ export interface AdminCredentialReviewItem {
   readonly updatedAt: Date;
 }
 
+export interface AdminCredentialReviewHistoryItem extends Omit<
+  AdminCredentialReviewItem,
+  "state"
+> {
+  readonly reviewReason: string | null;
+  readonly reviewReasonCategory:
+    | "EXPIRED_OR_INVALID"
+    | "FALSE_IDENTITY"
+    | "FALSE_QUALIFICATION"
+    | "INSUFFICIENT_EVIDENCE"
+    | "MISLEADING_CLAIM"
+    | "OTHER"
+    | null;
+  readonly reviewedAt: Date;
+  readonly state: "APPROVED" | "REJECTED" | "REVOKED";
+}
+
 export interface AdminCredentialReviewRepository {
   findReviewable(claimId: string): Promise<AdminCredentialReviewItem | null>;
   listPending(input: {
@@ -45,6 +62,14 @@ export interface AdminCredentialReviewRepository {
     readonly limit: number;
   }): Promise<{
     readonly items: readonly AdminCredentialReviewItem[];
+    readonly nextCursor: string | null;
+  }>;
+  listReviewed(input: {
+    readonly cursor?: string;
+    readonly limit: number;
+    readonly state: AdminCredentialReviewHistoryItem["state"];
+  }): Promise<{
+    readonly items: readonly AdminCredentialReviewHistoryItem[];
     readonly nextCursor: string | null;
   }>;
 }
@@ -63,6 +88,9 @@ interface ReviewRow {
   readonly profileId: string;
   readonly profileType: string;
   readonly revision: number;
+  readonly reviewReason: string | null;
+  readonly reviewReasonCategory: string | null;
+  readonly reviewedAt: Date | null;
   readonly secondaryName: string | null;
   readonly state: string;
   readonly updatedAt: Date;
@@ -89,6 +117,25 @@ export function createAdminCredentialReviewRepository(
       const page = rows.slice(0, input.limit);
       return Object.freeze({
         items: Object.freeze(page.map(parseReviewRow)),
+        nextCursor:
+          rows.length > input.limit ? (page.at(-1)?.claimId ?? null) : null,
+      });
+    },
+    async listReviewed(input: {
+      readonly cursor?: string;
+      readonly limit: number;
+      readonly state: AdminCredentialReviewHistoryItem["state"];
+    }) {
+      assertPageInput(input);
+      assertReviewedState(input.state);
+      const rows = await selectReviewed(sql, {
+        cursor: input.cursor ?? null,
+        limit: input.limit + 1,
+        state: input.state,
+      });
+      const page = rows.slice(0, input.limit);
+      return Object.freeze({
+        items: Object.freeze(page.map(parseHistoryRow)),
         nextCursor:
           rows.length > input.limit ? (page.at(-1)?.claimId ?? null) : null,
       });
@@ -167,7 +214,9 @@ async function selectReviewable(
   return sql<ReviewRow[]>`
     SELECT claim.id AS "claimId", claim.credential_type_code AS "credentialTypeCode",
       claim.evidence_requirement AS "evidenceRequirement", claim.expires_on::text AS "expiresOn",
-      claim.state, claim.revision, claim.created_at AS "createdAt", claim.updated_at AS "updatedAt",
+      claim.state, claim.revision, claim.review_reason AS "reviewReason",
+      claim.review_reason_category AS "reviewReasonCategory", claim.reviewed_at AS "reviewedAt",
+      claim.created_at AS "createdAt", claim.updated_at AS "updatedAt",
       profile.id AS "profileId", profile.profile_type AS "profileType",
       NULLIF(CASE WHEN profile.profile_type = 'COMPANY' THEN profile.official_company_name
         ELSE COALESCE(profile.nickname, concat_ws(' ', profile.real_first_name, profile.real_last_name))
@@ -179,7 +228,7 @@ async function selectReviewable(
       taxonomy.label_sk AS "professionLabel", COALESCE(evidence.items, '[]'::jsonb) AS evidence
     FROM credential_claims claim
     JOIN craftsman_profiles profile ON profile.id = claim.craftsman_profile_id
-    JOIN users owner ON owner.id = profile.owner_user_id AND owner.account_state = 'ACTIVE'
+    JOIN users owner ON owner.id = profile.owner_user_id
     JOIN craftsman_professions profession ON profession.id = claim.craftsman_profession_id
     JOIN taxonomy_professions taxonomy ON taxonomy.release_id = profession.taxonomy_release_id
       AND taxonomy.profession_code = profession.profession_code
@@ -191,9 +240,52 @@ async function selectReviewable(
       FROM credential_claim_evidence item WHERE item.claim_id = claim.id
     ) evidence ON true
     WHERE claim.state IN ('PENDING', 'APPROVED')
+      AND (claim.state = 'APPROVED' OR owner.account_state = 'ACTIVE')
       AND (${exactClaimId}::uuid IS NULL OR claim.id = ${exactClaimId})
       AND (${exactClaimId}::uuid IS NOT NULL OR claim.state = 'PENDING')
       AND (${cursor}::uuid IS NULL OR claim.id > ${cursor})
+    ORDER BY claim.id
+    LIMIT ${input.limit}
+  `;
+}
+
+async function selectReviewed(
+  sql: Sql,
+  input: {
+    readonly cursor: string | null;
+    readonly limit: number;
+    readonly state: AdminCredentialReviewHistoryItem["state"];
+  },
+): Promise<ReviewRow[]> {
+  return sql<ReviewRow[]>`
+    SELECT claim.id AS "claimId", claim.credential_type_code AS "credentialTypeCode",
+      claim.evidence_requirement AS "evidenceRequirement", claim.expires_on::text AS "expiresOn",
+      claim.state, claim.revision, claim.review_reason AS "reviewReason",
+      claim.review_reason_category AS "reviewReasonCategory", claim.reviewed_at AS "reviewedAt",
+      claim.created_at AS "createdAt", claim.updated_at AS "updatedAt",
+      profile.id AS "profileId", profile.profile_type AS "profileType",
+      NULLIF(CASE WHEN profile.profile_type = 'COMPANY' THEN profile.official_company_name
+        ELSE COALESCE(profile.nickname, concat_ws(' ', profile.real_first_name, profile.real_last_name))
+      END, '') AS "primaryName",
+      NULLIF(CASE WHEN profile.profile_type = 'INDIVIDUAL' AND profile.nickname IS NOT NULL
+        THEN concat_ws(' ', profile.real_first_name, profile.real_last_name) ELSE NULL
+      END, '') AS "secondaryName",
+      profession.id AS "professionId", profession.profession_code AS "professionCode",
+      taxonomy.label_sk AS "professionLabel", COALESCE(evidence.items, '[]'::jsonb) AS evidence
+    FROM credential_claims claim
+    JOIN craftsman_profiles profile ON profile.id = claim.craftsman_profile_id
+    JOIN craftsman_professions profession ON profession.id = claim.craftsman_profession_id
+    JOIN taxonomy_professions taxonomy ON taxonomy.release_id = profession.taxonomy_release_id
+      AND taxonomy.profession_code = profession.profession_code
+    LEFT JOIN LATERAL (
+      SELECT jsonb_agg(jsonb_build_object(
+        'assetId', item.media_asset_id, 'attachedAt', item.attached_at,
+        'mediaKind', item.media_kind
+      ) ORDER BY item.attached_revision, item.media_asset_id) AS items
+      FROM credential_claim_evidence item WHERE item.claim_id = claim.id
+    ) evidence ON true
+    WHERE claim.state = ${input.state}
+      AND (${input.cursor}::uuid IS NULL OR claim.id > ${input.cursor})
     ORDER BY claim.id
     LIMIT ${input.limit}
   `;
@@ -249,6 +341,78 @@ function parseReviewRow(row: ReviewRow): AdminCredentialReviewItem {
   });
 }
 
+function parseHistoryRow(row: ReviewRow): AdminCredentialReviewHistoryItem {
+  const common = parseCommonRow(row);
+  if (
+    (row.state !== "APPROVED" &&
+      row.state !== "REJECTED" &&
+      row.state !== "REVOKED") ||
+    !(row.reviewedAt instanceof Date) ||
+    !Number.isFinite(row.reviewedAt.valueOf()) ||
+    (row.state === "APPROVED"
+      ? row.reviewReason !== null || row.reviewReasonCategory !== null
+      : !validReviewReason(row.reviewReason, row.reviewReasonCategory))
+  ) {
+    throw new Error("Invalid administrative credential-review history.");
+  }
+  return Object.freeze({
+    ...common,
+    reviewReason: row.reviewReason,
+    reviewReasonCategory:
+      row.reviewReasonCategory as AdminCredentialReviewHistoryItem["reviewReasonCategory"],
+    reviewedAt: new Date(row.reviewedAt),
+    state: row.state,
+  });
+}
+
+function parseCommonRow(row: ReviewRow) {
+  const evidence = parseEvidence(row.evidence);
+  if (
+    !uuid.test(row.claimId) ||
+    !uuid.test(row.profileId) ||
+    !uuid.test(row.professionId) ||
+    !credentialTypeCode.test(row.credentialTypeCode) ||
+    (row.evidenceRequirement !== "OPTIONAL" &&
+      row.evidenceRequirement !== "REQUIRED") ||
+    !Number.isSafeInteger(row.revision) ||
+    row.revision < 1 ||
+    !(row.createdAt instanceof Date) ||
+    !(row.updatedAt instanceof Date) ||
+    !Number.isFinite(row.createdAt.valueOf()) ||
+    !Number.isFinite(row.updatedAt.valueOf()) ||
+    (row.profileType !== "INDIVIDUAL" && row.profileType !== "COMPANY") ||
+    (row.primaryName !== null && row.primaryName.length === 0) ||
+    (row.secondaryName !== null && row.secondaryName.length === 0) ||
+    row.professionCode.length < 1 ||
+    row.professionCode.length > 64 ||
+    row.professionLabel.length < 1 ||
+    row.professionLabel.length > 120
+  ) {
+    throw new Error("Invalid administrative credential-review projection.");
+  }
+  return {
+    claimId: row.claimId,
+    createdAt: new Date(row.createdAt),
+    credentialTypeCode: row.credentialTypeCode,
+    evidence,
+    evidenceRequirement: row.evidenceRequirement,
+    expiresOn: row.expiresOn,
+    profession: Object.freeze({
+      code: row.professionCode,
+      id: row.professionId,
+      label: row.professionLabel,
+    }),
+    profile: Object.freeze({
+      id: row.profileId,
+      primaryName: row.primaryName,
+      profileType: row.profileType,
+      secondaryName: row.secondaryName,
+    }),
+    revision: row.revision,
+    updatedAt: new Date(row.updatedAt),
+  } as const;
+}
+
 function parseEvidence(value: unknown): readonly AdminCredentialEvidenceItem[] {
   if (!Array.isArray(value))
     throw new Error("Invalid credential-review evidence projection.");
@@ -290,6 +454,32 @@ function assertPageInput(input: {
     throw new TypeError("Credential-review limit must be between 1 and 50.");
   if (input.cursor !== undefined && !uuid.test(input.cursor))
     throw new TypeError("Credential-review cursor is invalid.");
+}
+
+function assertReviewedState(
+  state: AdminCredentialReviewHistoryItem["state"],
+): void {
+  if (state !== "APPROVED" && state !== "REJECTED" && state !== "REVOKED")
+    throw new TypeError("Credential-review history state is invalid.");
+}
+
+function validReviewReason(
+  reason: string | null,
+  category: string | null,
+): boolean {
+  return (
+    typeof reason === "string" &&
+    reason === reason.trim() &&
+    reason.length >= 8 &&
+    reason.length <= 500 &&
+    !/\p{Cc}/u.test(reason) &&
+    (category === "EXPIRED_OR_INVALID" ||
+      category === "FALSE_IDENTITY" ||
+      category === "FALSE_QUALIFICATION" ||
+      category === "INSUFFICIENT_EVIDENCE" ||
+      category === "MISLEADING_CLAIM" ||
+      category === "OTHER")
+  );
 }
 
 function deniedAccess(assetId: string) {

@@ -15,7 +15,10 @@ import type { Sql } from "postgres";
 import { expect } from "vitest";
 
 import { createAdminAccessRepository } from "../src/admin-auth-repository.js";
-import { createCredentialReviewerMediaAccessResolver } from "../src/admin-credential-review-repository.js";
+import {
+  createAdminCredentialReviewRepository,
+  createCredentialReviewerMediaAccessResolver,
+} from "../src/admin-credential-review-repository.js";
 import {
   createCredentialClaimRepository,
   createCredentialReviewService,
@@ -244,6 +247,18 @@ export async function runCredentialClaimIntegrationAssertions(
   expect(approved.claim).toMatchObject({ revision: 3, state: "APPROVED" });
   expect(approved.claim).not.toHaveProperty("payloadFingerprint");
   expect(approved.claim.evidence[0]).not.toHaveProperty("storageKey");
+  const adminReviews = createAdminCredentialReviewRepository(sql);
+  const approvedHistory = await adminReviews.listReviewed({
+    limit: 50,
+    state: "APPROVED",
+  });
+  expect(
+    approvedHistory.items.find((item) => item.claimId === claimId),
+  ).toMatchObject({
+    reviewReason: null,
+    reviewReasonCategory: null,
+    state: "APPROVED",
+  });
   await expect(
     repository.prepareEvidenceUpload({
       actorUserId: fixture.ownerId,
@@ -270,6 +285,17 @@ export async function runCredentialClaimIntegrationAssertions(
   ).resolves.toMatchObject({
     claim: { revision: 4, state: "REVOKED" },
     status: "APPLIED",
+  });
+  const revokedHistory = await adminReviews.listReviewed({
+    limit: 50,
+    state: "REVOKED",
+  });
+  expect(
+    revokedHistory.items.find((item) => item.claimId === claimId),
+  ).toMatchObject({
+    reviewReason: "Platnosť oprávnenia bola manuálne odvolaná.",
+    reviewReasonCategory: "EXPIRED_OR_INVALID",
+    state: "REVOKED",
   });
   await expect(
     reviewerAccess.resolvePrivateMediaAccess(reviewerSnapshot),

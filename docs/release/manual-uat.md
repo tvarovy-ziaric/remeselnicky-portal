@@ -312,13 +312,17 @@ or direct SQL state change is not acceptable evidence.
 3. Try to approve a required-evidence claim without current ready evidence.
    Confirm the action is blocked. Approve a valid synthetic claim, refresh the
    owner page and confirm only the resulting `APPROVED` state is labelled
-   verified.
+   verified. Open the admin `Schválené` view and confirm the same claim appears
+   with its decision time and an available revoke action.
 4. Reject another claim with a bounded category and user-facing reason. Retry
    the same ambiguous command and confirm it is deduplicated; retry with a
-   conflicting payload and confirm no second decision is created.
-5. Using an approved synthetic claim ID, execute the authorized revoke command
-   and confirm future verified presentation and reviewer evidence delivery are
-   denied while history remains intact.
+   conflicting payload and confirm no second decision is created. Confirm the
+   claim appears read-only under `Zamietnuté` with the exact category, reason
+   and decision time.
+5. From `Schválené`, revoke a synthetic claim with a bounded category and
+   user-facing reason. Confirm future verified presentation and reviewer
+   evidence delivery are denied, then confirm the claim appears read-only under
+   `Odobraté` while history remains intact.
 
 Expected: all decisions are explicit, revision-checked, idempotent and audited;
 evidence stays private and purpose-bound; a role/session/MFA revocation during

@@ -57,14 +57,19 @@ writes. A review decision and its minimized `PRIVILEGED_COMMAND` audit event
 commit atomically. The audit records actor, capability, server time and state
 diff, but no evidence content or authentication material.
 
-The queue order is deterministic (`created_at`, then claim ID). There is no
-automated verification or verdict path.
+The queue order is deterministic (`created_at`, then claim ID). Separate
+bounded history reads require an exact `APPROVED`, `REJECTED` or `REVOKED`
+filter, preserve the recorded decision time and reason, and never reinterpret
+a closed decision as pending. There is no automated verification or verdict
+path.
 
-The optional HTTP module exposes a bounded `PENDING` review queue, private
-detail/evidence delivery and explicit `APPROVE`, `REJECT` and `REVOKE`
-commands. All reads are private/no-store and all writes require CSRF. The
-runtime does not register these routes until the real admin-access/MFA adapter
-is supplied; the synthetic test stack does not gain an authorization bypass.
+The optional HTTP module exposes a bounded `PENDING` review queue, exact-state
+review history, private detail/evidence delivery and explicit `APPROVE`,
+`REJECT` and `REVOKE` commands. The admin UI exposes revoke only from the
+approved view; rejected and revoked records are read-only. All reads are
+private/no-store and all writes require CSRF. The runtime does not register
+these routes until the real admin-access/MFA adapter is supplied; the synthetic
+test stack does not gain an authorization bypass.
 
 ## Integration helper
 
@@ -72,4 +77,4 @@ is supplied; the synthetic test stack does not gain an authorization bypass.
 clean-migration PostgreSQL integration suite. It covers ownership, cross-owner
 and foreign-claim upload denial, READY/private evidence, required-evidence
 approval, CAS/idempotency, immutable history, capability/MFA denial, revoked
-evidence, and suspension/revocation races.
+evidence, reviewed-state projections, and suspension/revocation races.

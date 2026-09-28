@@ -74,6 +74,87 @@ describe("administrative credential-review repository", () => {
     );
   });
 
+  it("returns only the requested reviewed state with parsed review metadata and stable pagination", async () => {
+    const sql = scriptedSql([
+      [
+        reviewRow(firstClaimId, {
+          reviewReason:
+            "The submitted evidence cannot be independently verified.",
+          reviewReasonCategory: "INSUFFICIENT_EVIDENCE",
+          reviewedAt: new Date("2026-09-28T11:00:00.000Z"),
+          state: "REJECTED",
+        }),
+        reviewRow(secondClaimId, {
+          reviewReason:
+            "The submitted evidence cannot be independently verified.",
+          reviewReasonCategory: "INSUFFICIENT_EVIDENCE",
+          reviewedAt: new Date("2026-09-28T11:01:00.000Z"),
+          state: "REJECTED",
+        }),
+      ],
+    ]);
+
+    const page = await createAdminCredentialReviewRepository(sql).listReviewed({
+      cursor: secondClaimId,
+      limit: 1,
+      state: "REJECTED",
+    });
+
+    expect(page).toEqual({
+      items: [
+        expect.objectContaining({
+          claimId: firstClaimId,
+          reviewReason:
+            "The submitted evidence cannot be independently verified.",
+          reviewReasonCategory: "INSUFFICIENT_EVIDENCE",
+          reviewedAt: new Date("2026-09-28T11:00:00.000Z"),
+          state: "REJECTED",
+        }),
+      ],
+      nextCursor: firstClaimId,
+    });
+    expect(Object.isFrozen(page)).toBe(true);
+    expect(Object.isFrozen(page.items)).toBe(true);
+
+    const query = sql.queries.join("\n");
+    expect(query).toContain("claim.state =");
+    expect(query).toContain("claim.id >");
+    expect(query).toContain("ORDER BY claim.id");
+    expect(sql.values.flat()).toContain("REJECTED");
+    expect(sql.values.flat()).toContain(secondClaimId);
+    expect(JSON.stringify(page)).not.toMatch(
+      /ownerUserId|email|phone|password|session|mfa|storageKey|sha256|malware/iu,
+    );
+  });
+
+  it("rejects PENDING history filters and malformed review metadata before returning a page", async () => {
+    const invalidStateSql = scriptedSql([]);
+    await expect(
+      createAdminCredentialReviewRepository(invalidStateSql).listReviewed({
+        limit: 10,
+        state: "PENDING" as never,
+      }),
+    ).rejects.toBeInstanceOf(TypeError);
+    expect(invalidStateSql.queries).toEqual([]);
+
+    const malformedMetadataSql = scriptedSql([
+      [
+        reviewRow(firstClaimId, {
+          reviewReason: "Evidence is insufficient.",
+          reviewReasonCategory: null,
+          reviewedAt: new Date("2026-09-28T11:00:00.000Z"),
+          state: "REJECTED",
+        }),
+      ],
+    ]);
+    await expect(
+      createAdminCredentialReviewRepository(malformedMetadataSql).listReviewed({
+        limit: 10,
+        state: "REJECTED",
+      }),
+    ).rejects.toThrow(/review/i);
+  });
+
   it("returns an exact reviewable detail, including APPROVED, and uniform absence", async () => {
     const foundSql = scriptedSql([
       [reviewRow(firstClaimId, { state: "APPROVED" })],

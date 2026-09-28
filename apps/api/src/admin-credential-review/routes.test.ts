@@ -47,6 +47,10 @@ function fixture(input?: {
     items: [reviewItem()],
     nextCursor: null,
   });
+  const listReviewed = vi.fn().mockResolvedValue({
+    items: [reviewedItem("APPROVED")],
+    nextCursor: null,
+  });
   const findReviewable = vi.fn().mockResolvedValue(reviewItem());
   const review = vi.fn().mockResolvedValue(reviewResult("APPROVED"));
   const handleDownload = vi.fn().mockResolvedValue({
@@ -80,7 +84,7 @@ function fixture(input?: {
         ),
     },
     rateLimit: { max: 20, timeWindowMs: 60_000 },
-    reviews: { findReviewable, listPending },
+    reviews: { findReviewable, listPending, listReviewed },
   });
   return {
     app,
@@ -88,6 +92,7 @@ function fixture(input?: {
     findReviewable,
     handleDownload,
     listPending,
+    listReviewed,
     review,
   };
 }
@@ -161,6 +166,96 @@ describe("administrative credential review routes", () => {
     });
 
     expect(context.listPending).toHaveBeenCalledTimes(1);
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({ code: "PRIVILEGED_ACCESS_DENIED" });
+    expect(response.body).not.toContain(claimId);
+  });
+
+  it("lists an exact privacy-minimal reviewed-state page with pre/post recent-MFA checks", async () => {
+    const context = fixture();
+    const response = await context.app.inject({
+      method: "GET",
+      url: `${ADMIN_CREDENTIAL_REVIEW_PATHS.history}?state=APPROVED&cursor=${claimId}&limit=20`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("private, no-store");
+    expect(response.headers["x-robots-tag"]).toBe("noindex, nofollow");
+    expect(context.authorize).toHaveBeenCalledTimes(2);
+    expect(context.authorize).toHaveBeenNthCalledWith(1, {
+      capability: "admin.credentials.review",
+      requireRecentMfa: true,
+      sessionId,
+      userId: adminId,
+    });
+    expect(context.authorize).toHaveBeenNthCalledWith(2, {
+      capability: "admin.credentials.review",
+      requireRecentMfa: true,
+      sessionId,
+      userId: adminId,
+    });
+    expect(context.listReviewed).toHaveBeenCalledWith({
+      cursor: claimId,
+      limit: 20,
+      state: "APPROVED",
+    });
+    expect(response.json()).toEqual({
+      items: [serializedReviewedItem("APPROVED")],
+      nextCursor: null,
+    });
+    expect(JSON.stringify(response.json())).not.toMatch(
+      /email|phone|address|ownerUserId|session|mfa|audit/iu,
+    );
+  });
+
+  it("requires a bounded reviewed state, cursor, and limit", async () => {
+    for (const query of [
+      "",
+      "?state=PENDING",
+      "?state=UNKNOWN",
+      "?state=APPROVED&cursor=not-a-uuid",
+      "?state=APPROVED&limit=0",
+      "?state=APPROVED&limit=51",
+      "?state=APPROVED&limit=1.5",
+    ]) {
+      const context = fixture();
+      const response = await context.app.inject({
+        method: "GET",
+        url: `${ADMIN_CREDENTIAL_REVIEW_PATHS.history}${query}`,
+      });
+      expect(response.statusCode, query || "missing state").toBe(400);
+      expect(context.listReviewed).not.toHaveBeenCalled();
+    }
+  });
+
+  it("fails closed when history storage returns a state outside the requested partition", async () => {
+    const context = fixture();
+    context.listReviewed.mockResolvedValue({
+      items: [reviewedItem("REJECTED")],
+      nextCursor: null,
+    });
+    const response = await context.app.inject({
+      method: "GET",
+      url: `${ADMIN_CREDENTIAL_REVIEW_PATHS.history}?state=APPROVED`,
+    });
+
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toEqual({ code: "TEMPORARILY_UNAVAILABLE" });
+    expect(response.body).not.toContain(claimId);
+    expect(response.body).not.toContain("REJECTED");
+  });
+
+  it("withholds history when recent MFA is revoked after the repository read", async () => {
+    const context = fixture();
+    context.authorize
+      .mockResolvedValueOnce({ actor, status: "AUTHORIZED" })
+      .mockResolvedValueOnce({ status: "MFA_TOO_OLD" });
+    const response = await context.app.inject({
+      method: "GET",
+      url: `${ADMIN_CREDENTIAL_REVIEW_PATHS.history}?state=APPROVED`,
+    });
+
+    expect(context.listReviewed).toHaveBeenCalledTimes(1);
     expect(response.statusCode).toBe(403);
     expect(response.json()).toEqual({ code: "PRIVILEGED_ACCESS_DENIED" });
     expect(response.body).not.toContain(claimId);
@@ -478,6 +573,43 @@ function serializedReviewItem() {
     expiresOn: item.expiresOn,
     profession: item.profession,
     profile: item.profile,
+    revision: item.revision,
+    state: item.state,
+    updatedAt: item.updatedAt.toISOString(),
+  };
+}
+
+function reviewedItem(state: "APPROVED" | "REJECTED" | "REVOKED") {
+  const item = reviewItem();
+  return {
+    ...item,
+    reviewReason:
+      state === "APPROVED"
+        ? null
+        : "The submitted evidence cannot be independently verified.",
+    reviewReasonCategory: state === "APPROVED" ? null : "INSUFFICIENT_EVIDENCE",
+    reviewedAt: new Date("2026-09-28T15:00:00.000Z"),
+    state,
+  };
+}
+
+function serializedReviewedItem(state: "APPROVED" | "REJECTED" | "REVOKED") {
+  const item = reviewedItem(state);
+  return {
+    claimId: item.claimId,
+    createdAt: item.createdAt.toISOString(),
+    credentialTypeCode: item.credentialTypeCode,
+    evidence: item.evidence.map((evidence) => ({
+      ...evidence,
+      attachedAt: evidence.attachedAt.toISOString(),
+    })),
+    evidenceRequirement: item.evidenceRequirement,
+    expiresOn: item.expiresOn,
+    profession: item.profession,
+    profile: item.profile,
+    reviewReason: item.reviewReason,
+    reviewReasonCategory: item.reviewReasonCategory,
+    reviewedAt: item.reviewedAt.toISOString(),
     revision: item.revision,
     state: item.state,
     updatedAt: item.updatedAt.toISOString(),
