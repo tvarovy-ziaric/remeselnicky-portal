@@ -26,10 +26,8 @@ import {
   loadJobRequestTaxonomySuggestions,
   type JobRequestTaxonomySuggestion,
 } from "./job-request-taxonomy-client";
-import {
-  loadJobRequestMunicipalitySuggestions,
-  type JobRequestMunicipalitySuggestion,
-} from "./job-request-municipality-client";
+import { type JobRequestMunicipalitySuggestion } from "./job-request-municipality-client";
+import { MunicipalityAutocomplete } from "./municipality-autocomplete";
 
 const STEPS = Object.freeze([
   { key: "request.core", label: "Čo potrebujete" },
@@ -666,6 +664,7 @@ function renderStep(
               }))
             }
             selectedCode={values.municipalityCode}
+            selectedLabel={values.municipalityLabel}
             onSelect={(suggestion) =>
               setValues((current) => ({
                 ...current,
@@ -979,81 +978,36 @@ function MunicipalityPicker({
   onClear,
   onSelect,
   selectedCode,
+  selectedLabel,
 }: {
   readonly onClear: () => void;
   readonly onSelect: (suggestion: JobRequestMunicipalitySuggestion) => void;
   readonly selectedCode: string;
+  readonly selectedLabel: string;
 }) {
-  const [query, setQuery] = useState(selectedCode);
-  const [suggestions, setSuggestions] = useState<
-    readonly JobRequestMunicipalitySuggestion[]
-  >([]);
+  const [query, setQuery] = useState(selectedLabel || selectedCode);
   useEffect(() => {
     if (selectedCode !== "") {
-      setQuery((current) => current || selectedCode);
+      setQuery((current) => current || selectedLabel || selectedCode);
     }
-  }, [selectedCode]);
-  useEffect(() => {
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => {
-      void loadJobRequestMunicipalitySuggestions(
-        query,
-        fetch,
-        controller.signal,
-      ).then(setSuggestions);
-    }, 180);
-    return () => {
-      window.clearTimeout(timer);
-      controller.abort();
-    };
-  }, [query]);
+  }, [selectedCode, selectedLabel]);
   return (
     <div className="profession-picker">
-      <label>
-        Obec
-        <input
-          aria-describedby="municipality-help"
-          autoComplete="address-level2"
-          maxLength={80}
-          onChange={(event) => {
-            onClear();
-            setQuery(event.target.value);
-            setSuggestions([]);
-          }}
-          placeholder="Začnite písať názov obce"
-          required
-          value={query}
-        />
-      </label>
-      <p className="field-help" id="municipality-help">
-        Presnú adresu nemusíte uviesť. Na odoslanie stačí obec.
-      </p>
-      {suggestions.length > 0 ? (
-        <ul className="profession-suggestions">
-          {suggestions.map((suggestion) => (
-            <li key={suggestion.code}>
-              <button
-                onClick={() => {
-                  onSelect(suggestion);
-                  setQuery(suggestion.name);
-                  setSuggestions([]);
-                }}
-                type="button"
-              >
-                {suggestion.name}
-                <small>
-                  {suggestion.districtName}, {suggestion.regionName}
-                </small>
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      {selectedCode === "" ? (
-        <p className="selection-state">Zatiaľ nie je vybraná žiadna obec.</p>
-      ) : (
-        <p className="selection-state">Vybraná obec: {query}</p>
-      )}
+      <MunicipalityAutocomplete
+        id="job-request-municipality"
+        onChange={(value) => {
+          onClear();
+          setQuery(value);
+        }}
+        onSelect={(suggestion) => {
+          onSelect(suggestion);
+          setQuery(suggestion.name);
+        }}
+        required
+        selectedCode={selectedCode}
+        selectedLabel={selectedLabel}
+        value={query}
+      />
     </div>
   );
 }

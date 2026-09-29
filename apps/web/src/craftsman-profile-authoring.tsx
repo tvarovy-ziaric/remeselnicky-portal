@@ -30,10 +30,8 @@ import {
   type DeclaredLevel,
   type ReadinessRequirement,
 } from "./craftsman-profile-authoring-client";
-import {
-  loadJobRequestMunicipalitySuggestions,
-  type JobRequestMunicipalitySuggestion,
-} from "./job-request-municipality-client";
+import { type JobRequestMunicipalitySuggestion } from "./job-request-municipality-client";
+import { MunicipalityAutocomplete } from "./municipality-autocomplete";
 import {
   loadJobRequestTaxonomySuggestions,
   type JobRequestTaxonomySuggestion,
@@ -729,28 +727,9 @@ function ServiceAreaForm({
   const [query, setQuery] = useState("");
   const [selected, setSelected] =
     useState<JobRequestMunicipalitySuggestion | null>(null);
-  const [suggestions, setSuggestions] = useState<
-    readonly JobRequestMunicipalitySuggestion[]
-  >([]);
   const [radius, setRadius] = useState(
     String(aggregate.serviceArea?.normalRadiusKm ?? 25),
   );
-  useEffect(() => {
-    if (query.trim().length < 2 || selected !== null) {
-      setSuggestions([]);
-      return;
-    }
-    let active = true;
-    const timer = setTimeout(() => {
-      void loadJobRequestMunicipalitySuggestions(query).then((items) => {
-        if (active) setSuggestions(items);
-      });
-    }, 250);
-    return () => {
-      active = false;
-      clearTimeout(timer);
-    };
-  }, [query, selected]);
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const municipalityCode =
@@ -782,31 +761,24 @@ function ServiceAreaForm({
         {aggregate.serviceArea?.baseMunicipalityCode ? (
           <StatusBadge tone="success">Východisková obec je uložená</StatusBadge>
         ) : null}
-        <FormField label="Východisková obec">
-          <Input
-            autoComplete="off"
-            id="municipality-query"
-            maxLength={80}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              setSelected(null);
-            }}
-            placeholder={
-              aggregate.serviceArea?.baseMunicipalityCode
-                ? "Vyhľadať inú obec"
-                : "Začnite písať obec"
-            }
-            value={query}
-          />
-        </FormField>
-        <SuggestionList
-          items={suggestions}
-          label={(item) => item.name + ", okres " + item.districtName}
+        <MunicipalityAutocomplete
+          id="municipality-query"
+          onChange={(value) => {
+            setQuery(value);
+            setSelected(null);
+          }}
           onSelect={(suggestion) => {
             setSelected(suggestion);
-            setQuery(suggestion.name + ", okres " + suggestion.districtName);
-            setSuggestions([]);
+            setQuery(suggestion.name);
           }}
+          selectedCode={
+            selected?.code ??
+            (query === ""
+              ? (aggregate.serviceArea?.baseMunicipalityCode ?? "")
+              : "")
+          }
+          selectedLabel={selected?.name}
+          value={query}
         />
         <FormField
           description="Jednoduchý pracovný okruh, nie prísľub dostupnosti."

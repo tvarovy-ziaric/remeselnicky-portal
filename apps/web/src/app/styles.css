@@ -653,6 +653,34 @@ section {
   background: #edf3ed;
 }
 
+.profession-suggestions button.is-active {
+  box-shadow: inset 4px 0 0 #355b43;
+  background: #edf3ed;
+}
+
+.location-autocomplete {
+  position: relative;
+}
+
+.location-autocomplete > label {
+  display: block;
+}
+
+.location-autocomplete > input {
+  width: 100%;
+}
+
+.location-autocomplete__active-marker {
+  display: block;
+  color: #355b43;
+  font-size: 0.75rem;
+  font-weight: 750;
+}
+
+.location-autocomplete__status--error {
+  color: #8b2b20;
+}
+
 .selection-state {
   margin: 0.55rem 0 0;
   color: #55705f;
@@ -2009,7 +2037,8 @@ p {
   font-weight: 750;
 }
 
-.public-search-form__field > input {
+.public-search-form__field > input,
+.public-search-form__field .location-autocomplete > input {
   width: 100%;
   min-height: 2.75rem;
   padding: 0.72rem 0.8rem;
@@ -2072,6 +2101,11 @@ p {
 
 .profession-suggestions button:hover,
 .profession-suggestions button:focus-visible {
+  background: #e5f1ec;
+}
+
+.profession-suggestions button.is-active {
+  box-shadow: inset 4px 0 0 var(--color-primary);
   background: #e5f1ec;
 }
 

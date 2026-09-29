@@ -27,7 +27,8 @@ export function registerMunicipalityAutocompleteRoutes(
       typeof request.query.q !== "string" ||
       request.query.q.length < 2 ||
       request.query.q.length > 80 ||
-      /[\r\n\p{Cc}]/u.test(request.query.q)
+      /[\r\n\p{Cc}]/u.test(request.query.q) ||
+      !isValidMunicipalityQuery(request.query.q)
     ) {
       return reply.code(400).send({ code: "INVALID_MUNICIPALITY_QUERY" });
     }
@@ -46,4 +47,12 @@ export function registerMunicipalityAutocompleteRoutes(
         .send({ code: "MUNICIPALITY_AUTOCOMPLETE_UNAVAILABLE" });
     }
   });
+}
+
+function isValidMunicipalityQuery(query: string): boolean {
+  const trimmed = query.trim();
+  if (/^[0-9\s]+$/u.test(trimmed)) {
+    return /^[0-9]{3,5}$/u.test(trimmed.replaceAll(/\s/gu, ""));
+  }
+  return !/\p{N}/u.test(trimmed);
 }

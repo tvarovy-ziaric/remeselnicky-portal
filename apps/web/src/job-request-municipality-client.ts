@@ -2,16 +2,41 @@ export interface JobRequestMunicipalitySuggestion {
   readonly code: string;
   readonly districtName: string;
   readonly name: string;
+  readonly postalCodes: readonly string[];
   readonly regionName: string;
+}
+
+export type JobRequestMunicipalitySuggestionResult =
+  | {
+      readonly status: "OK";
+      readonly suggestions: readonly JobRequestMunicipalitySuggestion[];
+    }
+  | {
+      readonly status: "ZERO";
+      readonly suggestions: readonly JobRequestMunicipalitySuggestion[];
+    }
+  | {
+      readonly status: "ERROR";
+      readonly suggestions: readonly JobRequestMunicipalitySuggestion[];
+    };
+
+export function isMunicipalityQueryEligible(query: string): boolean {
+  const normalized = query.trim();
+  if (normalized.length > 80) return false;
+  const compactPostalCode = normalized.replaceAll(" ", "");
+  if (/^\d+$/u.test(compactPostalCode)) {
+    return compactPostalCode.length >= 3 && compactPostalCode.length <= 5;
+  }
+  return normalized.length >= 2;
 }
 
 export async function loadJobRequestMunicipalitySuggestions(
   query: string,
   fetcher: typeof fetch = fetch,
   signal?: AbortSignal,
-): Promise<readonly JobRequestMunicipalitySuggestion[]> {
+): Promise<JobRequestMunicipalitySuggestionResult> {
   const normalized = query.trim();
-  if (normalized.length < 2 || normalized.length > 80) return [];
+  if (!isMunicipalityQueryEligible(normalized)) return zeroResult();
   try {
     const url = new URL(
       "/v1/public/municipalities/suggestions",
@@ -24,21 +49,34 @@ export async function loadJobRequestMunicipalitySuggestions(
       headers: { accept: "application/json" },
       ...(signal === undefined ? {} : { signal }),
     });
-    if (!response.ok) return [];
+    if (!response.ok) return errorResult();
     const body: unknown = await response.json();
     if (
       !record(body) ||
       !Array.isArray(body["suggestions"]) ||
       body["suggestions"].length > 10
     )
-      return [];
+      return errorResult();
     const suggestions = body["suggestions"].map(parseSuggestion);
-    return suggestions.some((suggestion) => suggestion === null)
-      ? []
-      : Object.freeze(suggestions as JobRequestMunicipalitySuggestion[]);
+    if (suggestions.some((suggestion) => suggestion === null)) {
+      return errorResult();
+    }
+    if (suggestions.length === 0) return zeroResult();
+    return Object.freeze({
+      status: "OK",
+      suggestions: Object.freeze(
+        suggestions as JobRequestMunicipalitySuggestion[],
+      ),
+    });
   } catch {
-    return [];
+    return errorResult();
   }
+}
+
+export function formatPostalCode(postalCode: string): string {
+  return /^\d{5}$/u.test(postalCode)
+    ? `${postalCode.slice(0, 3)} ${postalCode.slice(3)}`
+    : postalCode;
 }
 
 function parseSuggestion(
@@ -49,15 +87,27 @@ function parseSuggestion(
     !code(value["code"]) ||
     !label(value["name"]) ||
     !label(value["districtName"]) ||
-    !label(value["regionName"])
+    !label(value["regionName"]) ||
+    !Array.isArray(value["postalCodes"]) ||
+    value["postalCodes"].length === 0 ||
+    value["postalCodes"].length > 100 ||
+    !value["postalCodes"].every(postalCode)
   )
     return null;
   return Object.freeze({
     code: value["code"],
     districtName: value["districtName"],
     name: value["name"],
+    postalCodes: Object.freeze([...value["postalCodes"]]),
     regionName: value["regionName"],
   });
+}
+
+function errorResult(): JobRequestMunicipalitySuggestionResult {
+  return Object.freeze({ status: "ERROR", suggestions: Object.freeze([]) });
+}
+function zeroResult(): JobRequestMunicipalitySuggestionResult {
+  return Object.freeze({ status: "ZERO", suggestions: Object.freeze([]) });
 }
 function code(value: unknown): value is string {
   return (
@@ -72,6 +122,9 @@ function label(value: unknown): value is string {
     value.length <= 120 &&
     !/[\r\n\p{Cc}]/u.test(value)
   );
+}
+function postalCode(value: unknown): value is string {
+  return typeof value === "string" && /^\d{5}$/u.test(value);
 }
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

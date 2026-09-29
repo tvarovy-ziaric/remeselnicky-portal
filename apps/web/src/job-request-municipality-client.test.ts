@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { loadJobRequestMunicipalitySuggestions } from "./job-request-municipality-client";
+import {
+  formatPostalCode,
+  isMunicipalityQueryEligible,
+  loadJobRequestMunicipalitySuggestions,
+} from "./job-request-municipality-client";
 
 describe("job request municipality suggestions", () => {
   it("parses only the coarse governed location allowlist", async () => {
@@ -12,6 +16,7 @@ describe("job request municipality suggestions", () => {
             districtName: "Bratislava I",
             latitude: 48.1,
             name: "Bratislava",
+            postalCodes: ["81101", "85101"],
             regionName: "Bratislavský kraj",
           },
         ],
@@ -19,17 +24,21 @@ describe("job request municipality suggestions", () => {
     );
     await expect(
       loadJobRequestMunicipalitySuggestions("Brat", fetcher),
-    ).resolves.toEqual([
-      {
-        code: "SK:BA:BRATISLAVA",
-        districtName: "Bratislava I",
-        name: "Bratislava",
-        regionName: "Bratislavský kraj",
-      },
-    ]);
+    ).resolves.toEqual({
+      status: "OK",
+      suggestions: [
+        {
+          code: "SK:BA:BRATISLAVA",
+          districtName: "Bratislava I",
+          name: "Bratislava",
+          postalCodes: ["81101", "85101"],
+          regionName: "Bratislavský kraj",
+        },
+      ],
+    });
   });
 
-  it("fails closed without a request for short input or corrupt rows", async () => {
+  it("distinguishes an invalid payload from a valid zero result", async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
       Response.json({
         suggestions: [
@@ -39,10 +48,48 @@ describe("job request municipality suggestions", () => {
     );
     await expect(
       loadJobRequestMunicipalitySuggestions("a", fetcher),
-    ).resolves.toEqual([]);
+    ).resolves.toEqual({ status: "ZERO", suggestions: [] });
     expect(fetcher).not.toHaveBeenCalled();
     await expect(
       loadJobRequestMunicipalitySuggestions("obec", fetcher),
-    ).resolves.toEqual([]);
+    ).resolves.toEqual({ status: "ERROR", suggestions: [] });
+  });
+
+  it("reports an unavailable service separately from no matches", async () => {
+    const unavailable = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response(null, { status: 503 }));
+    await expect(
+      loadJobRequestMunicipalitySuggestions("Prie", unavailable),
+    ).resolves.toEqual({ status: "ERROR", suggestions: [] });
+
+    const empty = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(Response.json({ suggestions: [] }));
+    await expect(
+      loadJobRequestMunicipalitySuggestions("Nenájdená", empty),
+    ).resolves.toEqual({ status: "ZERO", suggestions: [] });
+  });
+
+  it("starts postal lookup at three digits and preserves user input", async () => {
+    expect(isMunicipalityQueryEligible("97")).toBe(false);
+    expect(isMunicipalityQueryEligible("971")).toBe(true);
+    expect(isMunicipalityQueryEligible("97101")).toBe(true);
+    expect(isMunicipalityQueryEligible("971 01")).toBe(true);
+    expect(isMunicipalityQueryEligible("971012")).toBe(false);
+
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(Response.json({ suggestions: [] }));
+    await loadJobRequestMunicipalitySuggestions("971 01", fetcher);
+    expect(fetcher).toHaveBeenCalledWith(
+      "/v1/public/municipalities/suggestions?q=971+01",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+  });
+
+  it("formats canonical postal codes without converting them to numbers", () => {
+    expect(formatPostalCode("97101")).toBe("971 01");
+    expect(formatPostalCode("01001")).toBe("010 01");
   });
 });

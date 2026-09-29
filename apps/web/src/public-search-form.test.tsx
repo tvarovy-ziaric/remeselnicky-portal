@@ -17,9 +17,11 @@ describe("PublicSearchForm", () => {
     expect(html).not.toContain('name="municipalityCode"');
     expect(html).not.toContain('role="status"');
     expect(html).toContain('disabled=""');
-    expect(html).toContain("Obec (nepovinné)");
+    expect(html).toContain("Obec alebo PSČ");
     expect(html.match(/role="combobox"/gu)).toHaveLength(2);
-    expect(html).toContain("Presnú adresu nezverejňujeme");
+    expect(html).toContain(
+      "Vyhľadajte lokalitu podľa názvu obce alebo poštového smerovacieho čísla.",
+    );
   });
 
   it("preserves only the opaque Job identifier across profession searches", () => {
@@ -78,13 +80,20 @@ describe("PublicSearchForm", () => {
         status: "loading",
         items: [],
       }),
-    ).toBe("Hľadáme obce…");
+    ).toBe("Hľadám lokality…");
     expect(
       publicSearchMunicipalityMessage({
         query: "Nenájdená obec",
         status: "ready",
         items: [],
       }),
-    ).toContain("hľadajte bez lokality");
+    ).toBe("Lokalita ani PSČ sa nenašli.");
+    expect(
+      publicSearchMunicipalityMessage({
+        query: "Prie",
+        status: "error",
+        items: [],
+      }),
+    ).toBe("Návrhy lokalít sa momentálne nedajú načítať. Skúste to znova.");
   });
 });

@@ -16,6 +16,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint .",
+    "location:import": "pnpm build && node dist/slovakia-location-import-cli.js",
+    "location:validate": "pnpm build && node dist/slovakia-location-import-cli.js --validate-only",
     "migrate": "pnpm build && node dist/migrate-cli.js",
     "test": "vitest run",
     "test:integration": "vitest run test/migration.integration.test.ts",

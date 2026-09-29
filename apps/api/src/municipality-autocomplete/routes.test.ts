@@ -16,6 +16,7 @@ describe("municipality autocomplete route", () => {
             code: "SK:BA:BRATISLAVA",
             districtName: "Bratislava I",
             name: "Bratislava",
+            postalCodes: ["81101", "81102"],
             regionName: "Bratislavský kraj",
           },
         ]),
@@ -39,6 +40,7 @@ describe("municipality autocomplete route", () => {
           code: "SK:BA:BRATISLAVA",
           districtName: "Bratislava I",
           name: "Bratislava",
+          postalCodes: ["81101", "81102"],
           regionName: "Bratislavský kraj",
         },
       ],
@@ -58,6 +60,10 @@ describe("municipality autocomplete route", () => {
     for (const suffix of [
       "",
       "?q=a",
+      "?q=97",
+      "?q=971001",
+      "?q=971-01",
+      "?q=abc123",
       "?q=obec&q=ina",
       "?q=obec&debug=1",
       "?q=obec%0Aprivate",
@@ -72,6 +78,32 @@ describe("municipality autocomplete route", () => {
     await app.close();
     expect(suggest).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ["97101", "97101"],
+    ["971%2001", "971 01"],
+    ["971", "971"],
+    ["01001", "01001"],
+  ])(
+    "passes a valid postal query %s to the shared contract",
+    async (urlQuery, expected) => {
+      const suggest = vi.fn(() => Promise.resolve([]));
+      const app = Fastify({ logger: false });
+      registerMunicipalityAutocompleteRoutes(app, {
+        admission: { admit: vi.fn(() => Promise.resolve("ADMITTED" as const)) },
+        municipalities: { suggest },
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: `${MUNICIPALITY_AUTOCOMPLETE_PATH}?q=${urlQuery}`,
+      });
+
+      await app.close();
+      expect(response.statusCode).toBe(200);
+      expect(suggest).toHaveBeenCalledWith(expected);
+    },
+  );
 
   it("uses shared abuse admission before reading location data", async () => {
     const suggest = vi.fn(() => Promise.resolve([]));

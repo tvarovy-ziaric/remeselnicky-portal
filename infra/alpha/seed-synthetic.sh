@@ -21,5 +21,6 @@ unset seed_password SYNTHETIC_SEED_PASSWORD
 cd /app
 
 node packages/testing/dist/seed-cli.js
+LOCATION_REFERENCE_IMPORT=1 node packages/db/dist/slovakia-location-import-cli.js
 node packages/db/dist/alpha-synthetic-catalog-cli.js
 exec node packages/db/dist/alpha-synthetic-profiles-cli.js
