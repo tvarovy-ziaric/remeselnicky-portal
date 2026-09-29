@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import {
+import React, {
   type ChangeEvent,
   type FormEvent,
   useCallback,
@@ -9,6 +8,21 @@ import {
   useRef,
   useState,
 } from "react";
+
+import {
+  ActionLink,
+  Button,
+  Card,
+  EmptyState,
+  FormField,
+  Input,
+  Notice,
+  PageHeader,
+  SectionHeader,
+  Select,
+  Textarea,
+  TrustBadge,
+} from "./design-system";
 
 import {
   createCraftsmanPortfolioClient,
@@ -71,32 +85,41 @@ export function CraftsmanPortfolio({
     void load();
   }, [load]);
 
-  if (state === "LOADING") return <p>Načítavam vaše portfólio…</p>;
+  if (state === "LOADING")
+    return <p role="status">Načítavam vaše portfólio…</p>;
   if (state === "AUTH") {
     return (
-      <section className="profile-authoring-card">
-        <h1>Najprv sa prihláste</h1>
-        <p>Portfólio je súkromná časť účtu remeselníka.</p>
-        <Link href="/prihlasenie">Prejsť na prihlásenie</Link>
-      </section>
+      <EmptyState
+        action={<ActionLink href="/prihlasenie">Prihlásiť sa</ActionLink>}
+        description="Portfólio je súkromná časť účtu remeselníka."
+        title="Najprv sa prihláste"
+      />
     );
   }
   if (state === "EMPTY_PROFILE") {
     return (
-      <section className="profile-authoring-card">
-        <h1>Najprv vytvorte profil remeselníka</h1>
-        <Link href="/ucet/profil-remeselnika">Vytvoriť profil</Link>
-      </section>
+      <EmptyState
+        action={
+          <ActionLink href="/ucet/profil-remeselnika">
+            Vytvoriť profil
+          </ActionLink>
+        }
+        description="Realizácie sa ukladajú k vášmu profilu remeselníka."
+        title="Najprv vytvorte profil remeselníka"
+      />
     );
   }
   if (state === "ERROR" || aggregate === null) {
     return (
-      <section className="profile-authoring-card">
-        <h1>Portfólio sa nepodarilo načítať</h1>
-        <button type="button" onClick={() => void load()}>
-          Skúsiť znova
-        </button>
-      </section>
+      <EmptyState
+        action={
+          <Button onClick={() => void load()} type="button">
+            Skúsiť znova
+          </Button>
+        }
+        description="Vaše uložené realizácie sme teraz nevedeli bezpečne načítať."
+        title="Portfólio sa nepodarilo načítať"
+      />
     );
   }
 
@@ -104,16 +127,23 @@ export function CraftsmanPortfolio({
     (profession) => profession.state === "ACTIVE",
   );
   return (
-    <section className="profile-authoring" aria-labelledby="portfolio-title">
-      <p className="eyebrow">Portfólio remeselníka</p>
-      <h1 id="portfolio-title">Vaše realizácie</h1>
-      <p>
-        Projekty vytvorené na tejto stránke sú zatiaľ súkromné a označené ako
-        vlastné vyhlásenie — neoverené. Nejde o overenú realizáciu z platformy.
-      </p>
-      <p>
-        <Link href="/ucet/profil-remeselnika">Späť na profil remeselníka</Link>
-      </p>
+    <section className="profile-authoring">
+      <PageHeader
+        actions={
+          <ActionLink href="/ucet/profil-remeselnika" variant="secondary">
+            Späť na profil
+          </ActionLink>
+        }
+        eyebrow="Portfólio remeselníka"
+        lead={
+          <p>
+            Ukážte konkrétnu prácu, svoj prínos a bezpečne spracované
+            fotografie.
+          </p>
+        }
+        title="Vaše realizácie"
+      />
+      <PortfolioProvenanceNotice />
       {message === null ? null : <p role="status">{message}</p>}
       <CreateProjectForm
         client={client}
@@ -124,8 +154,15 @@ export function CraftsmanPortfolio({
         profileId={aggregate.profile.id}
         professions={professions}
       />
+      <SectionHeader
+        eyebrow={`${projects.length} ${projects.length === 1 ? "realizácia" : "realizácií"}`}
+        title="Uložené projekty"
+      />
       {projects.length === 0 ? (
-        <p>Zatiaľ nemáte uloženú realizáciu.</p>
+        <EmptyState
+          description="Začnite projektom, ktorý najlepšie ukazuje vašu prácu a konkrétny prínos."
+          title="Zatiaľ nemáte uloženú realizáciu"
+        />
       ) : (
         projects.map((project) => (
           <ProjectCard
@@ -202,75 +239,84 @@ function CreateProjectForm({
   }
 
   return (
-    <form
-      className="profile-authoring-card profile-authoring-form"
-      onSubmit={(event) => void submit(event)}
-    >
-      <h2>Pridať súkromnú realizáciu</h2>
-      <p className="profile-authoring-note">Vlastné vyhlásenie — neoverené</p>
-      <label htmlFor="portfolio-new-title">Názov projektu</label>
-      <input
-        id="portfolio-new-title"
-        maxLength={120}
-        minLength={2}
-        onChange={(event) => {
-          setTitle(event.target.value);
-          attempt.current = null;
-        }}
-        required
-        value={title}
-      />
-      <label htmlFor="portfolio-new-description">Krátky popis</label>
-      <textarea
-        id="portfolio-new-description"
-        maxLength={600}
-        minLength={10}
-        onChange={(event) => {
-          setDescription(event.target.value);
-          attempt.current = null;
-        }}
-        required
-        rows={4}
-        value={description}
-      />
-      <label htmlFor="portfolio-new-contribution">
-        Váš konkrétny prínos (voliteľné)
-      </label>
-      <textarea
-        id="portfolio-new-contribution"
-        maxLength={600}
-        onChange={(event) => {
-          setContribution(event.target.value);
-          attempt.current = null;
-        }}
-        rows={3}
-        value={contribution}
-      />
-      <fieldset>
-        <legend>Profesie použité na projekte</legend>
-        {professions.map((profession) => (
-          <label key={profession.id}>
-            <input
-              checked={selected.includes(profession.id)}
-              onChange={(event) => {
-                setSelected((current) =>
-                  event.target.checked
-                    ? [...current, profession.id]
-                    : current.filter((id) => id !== profession.id),
-                );
-                attempt.current = null;
-              }}
-              type="checkbox"
-            />{" "}
-            {profession.professionCode}
-          </label>
-        ))}
-      </fieldset>
-      {message === null ? null : <p role="alert">{message}</p>}
-      <button disabled={busy || professions.length === 0} type="submit">
-        {busy ? "Ukladám…" : "Vytvoriť súkromný projekt"}
-      </button>
-    </form>
+    <Card className="profile-authoring-card">
+      <form
+        className="profile-authoring-form"
+        onSubmit={(event) => void submit(event)}
+      >
+        <SectionHeader
+          eyebrow="Nová realizácia"
+          title="Pridať súkromný projekt"
+        />
+        <TrustBadge provenance="declared">Uvádza remeselník</TrustBadge>
+        <FormField label="Názov projektu">
+          <Input
+            id="portfolio-new-title"
+            maxLength={120}
+            minLength={2}
+            onChange={(event) => {
+              setTitle(event.target.value);
+              attempt.current = null;
+            }}
+            required
+            value={title}
+          />
+        </FormField>
+        <FormField label="Krátky popis">
+          <Textarea
+            id="portfolio-new-description"
+            maxLength={600}
+            minLength={10}
+            onChange={(event) => {
+              setDescription(event.target.value);
+              attempt.current = null;
+            }}
+            required
+            rows={4}
+            value={description}
+          />
+        </FormField>
+        <FormField
+          description="Pri tímovej práci stručne uveďte, za čo ste zodpovedali."
+          label="Váš konkrétny prínos (voliteľné)"
+        >
+          <Textarea
+            id="portfolio-new-contribution"
+            maxLength={600}
+            onChange={(event) => {
+              setContribution(event.target.value);
+              attempt.current = null;
+            }}
+            rows={3}
+            value={contribution}
+          />
+        </FormField>
+        <fieldset>
+          <legend>Profesie použité na projekte</legend>
+          {professions.map((profession) => (
+            <label key={profession.id}>
+              <input
+                checked={selected.includes(profession.id)}
+                onChange={(event) => {
+                  setSelected((current) =>
+                    event.target.checked
+                      ? [...current, profession.id]
+                      : current.filter((id) => id !== profession.id),
+                  );
+                  attempt.current = null;
+                }}
+                type="checkbox"
+              />{" "}
+              {humanizeCode(profession.professionCode)}
+            </label>
+          ))}
+        </fieldset>
+        {message === null ? null : <p role="alert">{message}</p>}
+        <Button disabled={busy || professions.length === 0} type="submit">
+          {busy ? "Ukladám…" : "Vytvoriť súkromný projekt"}
+        </Button>
+      </form>
+    </Card>
   );
 }
 
@@ -327,8 +373,8 @@ function ProjectCard({
     attempt.current = null;
   };
   return (
-    <article className="profile-authoring-card">
-      <p className="profile-authoring-badge">Vlastné vyhlásenie — neoverené</p>
+    <Card className="profile-authoring-card">
+      <TrustBadge provenance="declared">Uvádza remeselník</TrustBadge>
       <p className="profile-authoring-note">
         Súkromné · revízia {project.revision}
       </p>
@@ -337,7 +383,7 @@ function ProjectCard({
         onSubmit={(event) => void save(event)}
       >
         <label htmlFor={`portfolio-title-${project.id}`}>Názov projektu</label>
-        <input
+        <Input
           id={`portfolio-title-${project.id}`}
           maxLength={120}
           minLength={2}
@@ -351,7 +397,7 @@ function ProjectCard({
         <label htmlFor={`portfolio-description-${project.id}`}>
           Krátky popis
         </label>
-        <textarea
+        <Textarea
           id={`portfolio-description-${project.id}`}
           maxLength={600}
           minLength={10}
@@ -366,7 +412,7 @@ function ProjectCard({
         <label htmlFor={`portfolio-contribution-${project.id}`}>
           Váš konkrétny prínos
         </label>
-        <textarea
+        <Textarea
           id={`portfolio-contribution-${project.id}`}
           maxLength={600}
           onChange={(event) => {
@@ -392,17 +438,17 @@ function ProjectCard({
                 }}
                 type="checkbox"
               />{" "}
-              {profession.professionCode}
+              {humanizeCode(profession.professionCode)}
             </label>
           ))}
         </fieldset>
         {message === null ? null : <p role="status">{message}</p>}
-        <button disabled={busy} type="submit">
+        <Button disabled={busy} type="submit">
           {busy ? "Ukladám…" : "Uložiť projekt"}
-        </button>
+        </Button>
       </form>
       <ProjectPhotos client={client} profileId={profileId} project={project} />
-    </article>
+    </Card>
   );
 }
 
@@ -510,25 +556,30 @@ function ProjectPhotos({
     setMessage(null);
   }
 
+  const photoCount = photoSet?.photos.length ?? 0;
+  const photoLimitReached = photoCount >= 15;
+
   return (
     <section aria-labelledby={`portfolio-photos-${project.id}`}>
-      <h3 id={`portfolio-photos-${project.id}`}>Fotografie</h3>
-      <p className="profile-authoring-note">
-        Súbory zostávajú súkromné. Systém odstráni EXIF/GPS údaje a sprístupní
-        až bezpečne spracovanú verziu.
-      </p>
+      <SectionHeader
+        eyebrow={`${photoCount} z 15 fotografií`}
+        title="Fotografie"
+      />
+      <PortfolioPhotoPrivacyNotice />
       {photoSet?.photos.length ? (
         <ul className="profile-authoring-list">
           {photoSet.photos.map((photo) => (
             <li key={photo.attachmentId}>
-              <img
-                alt={`${project.title} — ${phaseLabel(photo.phase)}`}
-                height={Math.min(photo.canonicalHeight, 240)}
-                loading="lazy"
-                src={photo.downloadPath}
-                width={Math.min(photo.canonicalWidth, 360)}
-              />
-              <span>{phaseLabel(photo.phase)}</span>
+              <figure>
+                <img
+                  alt={`${project.title} — ${phaseLabel(photo.phase)}`}
+                  height={Math.min(photo.canonicalHeight, 240)}
+                  loading="lazy"
+                  src={photo.downloadPath}
+                  width={Math.min(photo.canonicalWidth, 360)}
+                />
+                <figcaption>{phaseLabel(photo.phase)}</figcaption>
+              </figure>
             </li>
           ))}
         </ul>
@@ -539,20 +590,27 @@ function ProjectPhotos({
         <label htmlFor={`portfolio-file-${project.id}`}>
           Vybrať fotografiu
         </label>
-        <input
+        <Input
           accept="image/jpeg,image/png,image/heic,image/heif"
-          disabled={busy || upload?.status === "PROCESSING"}
+          disabled={
+            busy || upload?.status === "PROCESSING" || photoLimitReached
+          }
           id={`portfolio-file-${project.id}`}
           onChange={chooseFile}
           type="file"
         />
-        <button
-          disabled={busy || file === null}
+        <Button
+          disabled={busy || file === null || photoLimitReached}
           onClick={() => void startUpload()}
           type="button"
         >
           Nahrať fotografiu
-        </button>
+        </Button>
+        {photoLimitReached ? (
+          <p role="status">
+            Dosiahli ste limit 15 fotografií pre jednu realizáciu.
+          </p>
+        ) : null}
         {upload?.status === "PROCESSING" ? (
           <p role="status">Spracúvam fotografiu…</p>
         ) : null}
@@ -564,7 +622,7 @@ function ProjectPhotos({
             <label htmlFor={`portfolio-phase-${project.id}`}>
               Fáza projektu
             </label>
-            <select
+            <Select
               id={`portfolio-phase-${project.id}`}
               onChange={(event) =>
                 setPhase(event.target.value as PortfolioPhotoPhase)
@@ -575,10 +633,10 @@ function ProjectPhotos({
               <option value="PROGRESS">Priebeh</option>
               <option value="AFTER">Po realizácii</option>
               <option value="OTHER">Iné</option>
-            </select>
-            <button disabled={busy} onClick={() => void attach()} type="button">
+            </Select>
+            <Button disabled={busy} onClick={() => void attach()} type="button">
               Pridať spracovanú fotografiu
-            </button>
+            </Button>
           </>
         ) : null}
         {message === null ? null : <p role="status">{message}</p>}
@@ -609,4 +667,36 @@ function phaseLabel(phase: PortfolioPhotoPhase): string {
   if (phase === "PROGRESS") return "Priebeh";
   if (phase === "AFTER") return "Po realizácii";
   return "Iné";
+}
+
+export function humanizeCode(code: string): string {
+  const segment = code.split(/[.:/]/u).at(-1) ?? code;
+  const words = segment.replace(/[_-]+/gu, " ").toLocaleLowerCase("sk-SK");
+  return words.length === 0
+    ? "Položka spravovaná platformou"
+    : `${words.charAt(0).toLocaleUpperCase("sk-SK")}${words.slice(1)}`;
+}
+
+export function PortfolioProvenanceNotice() {
+  return (
+    <Notice title="Súkromné a zatiaľ neoverené" tone="warning">
+      <p>
+        Projekty vytvorené na tejto stránke sú vlastné vyhlásenie. Nejde o
+        overenú realizáciu z platformy a fotografie sa týmto krokom
+        nezverejňujú.
+      </p>
+    </Notice>
+  );
+}
+
+export function PortfolioPhotoPrivacyNotice() {
+  return (
+    <Notice title="Súkromie fotografií">
+      <p>
+        Súbory zostávajú súkromné. Systém odstráni EXIF/GPS údaje a sprístupní
+        až bezpečne spracovanú verziu. Verejné použitie fotografie nehnuteľnosti
+        vyžaduje samostatný výslovný súhlas zákazníka.
+      </p>
+    </Notice>
+  );
 }

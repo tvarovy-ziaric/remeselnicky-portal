@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
 
 import { CraftsmanCredentials } from "../../../craftsman-credentials";
+import { AppShell, PageContainer } from "../../../design-system";
+import {
+  AuthenticatedHeader,
+  MobileBottomNavigation,
+} from "../../../site-shell";
 
 export const metadata: Metadata = {
   robots: { follow: false, index: false },
@@ -9,8 +14,16 @@ export const metadata: Metadata = {
 
 export default function CraftsmanCredentialsPage() {
   return (
-    <main className="page-shell">
-      <CraftsmanCredentials />
-    </main>
+    <AppShell>
+      <AuthenticatedHeader current="Profil a účet" />
+      <main className="site-main" id="main-content">
+        <section>
+          <PageContainer>
+            <CraftsmanCredentials />
+          </PageContainer>
+        </section>
+      </main>
+      <MobileBottomNavigation current="Profil a účet" />
+    </AppShell>
   );
 }

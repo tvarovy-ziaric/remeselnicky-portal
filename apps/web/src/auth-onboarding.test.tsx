@@ -3,13 +3,22 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { AccountVerification } from "./account-verification";
-import { takeEmailVerificationTokenFromFragment } from "./email-verification-result";
+import {
+  EmailVerificationResult,
+  takeEmailVerificationTokenFromFragment,
+} from "./email-verification-result";
 import { RegistrationForm } from "./registration-form";
 
 describe("auth onboarding UI", () => {
   it("renders accessible invitation registration without provider or secret fields", () => {
     const markup = renderToStaticMarkup(<RegistrationForm />);
-    expect(markup).toContain("Registrácia do Web Alpha");
+    expect(markup).toContain('href="#main-content"');
+    expect(markup).toContain('id="main-content"');
+    expect(markup).toContain("Vytvorte si účet");
+    expect(markup).toContain("Registrácia je len na pozvanie");
+    expect(markup).toContain(
+      "jeden účet pre zákaznícke aj remeselnícke aktivity",
+    );
     expect(markup).toContain('autoComplete="email"');
     expect(markup).toContain('autoComplete="new-password"');
     expect(markup).toContain('minLength="12"');
@@ -22,7 +31,16 @@ describe("auth onboarding UI", () => {
     const markup = renderToStaticMarkup(<AccountVerification />);
     expect(markup).toContain("Overenie účtu");
     expect(markup).toContain("Načítavam stav overenia");
-    expect(markup).not.toContain("/dopyt");
+    expect(markup).toContain("Stav účtu");
+    expect(markup).not.toContain("Pokračovať v dopyte");
+  });
+
+  it("presents email verification without exposing implementation states", () => {
+    const markup = renderToStaticMarkup(<EmailVerificationResult />);
+    expect(markup).toContain("Overenie e-mailu");
+    expect(markup).toContain("Kontrolujem odkaz");
+    expect(markup).toContain("jednorazový");
+    expect(markup).not.toMatch(/LOADING|INVALID|RATE_LIMITED|UNAVAILABLE/);
   });
 
   it("strips the fragment before returning a one-time email token", () => {

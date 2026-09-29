@@ -10,6 +10,18 @@ import React, {
 } from "react";
 
 import {
+  ActionLink,
+  Button,
+  Card,
+  FormField,
+  Input,
+  Notice,
+  PageHeader,
+  Select,
+  StatusBadge,
+  Textarea,
+} from "./design-system";
+import {
   createCraftsmanProfileAuthoringClient,
   type AuthoringMutationResult,
   type CraftsmanAuthoringAggregate,
@@ -128,9 +140,7 @@ export function CraftsmanProfileAuthoring({
       <section className="profile-authoring-state">
         <h1>Profil remeselníka</h1>
         <p>Na úpravu profilu sa najprv prihláste.</p>
-        <a className="primary-link" href="/prihlasenie">
-          Prihlásiť sa
-        </a>
+        <ActionLink href="/prihlasenie">Prihlásiť sa</ActionLink>
       </section>
     );
   if (state.kind === "ACCOUNT_NOT_ACTIVE")
@@ -138,7 +148,7 @@ export function CraftsmanProfileAuthoring({
       <section className="profile-authoring-state">
         <h1>Profil remeselníka</h1>
         <p>Profil bude dostupný po aktivácii a overení účtu.</p>
-        <a href="/overenie">Pokračovať na overenie účtu</a>
+        <ActionLink href="/overenie">Pokračovať na overenie účtu</ActionLink>
       </section>
     );
   if (state.kind === "UNAVAILABLE")
@@ -146,9 +156,9 @@ export function CraftsmanProfileAuthoring({
       <section className="profile-authoring-state">
         <h1>Profil remeselníka</h1>
         <p role="alert">Profil teraz nie je dostupný. Skúste to znova.</p>
-        <button type="button" onClick={() => void refresh()}>
+        <Button type="button" onClick={() => void refresh()}>
           Skúsiť znova
-        </button>
+        </Button>
       </section>
     );
   if (state.kind === "NOT_FOUND")
@@ -168,41 +178,129 @@ export function CraftsmanProfileAuthoring({
 
   const { aggregate } = state;
   return (
-    <section className="profile-authoring" aria-labelledby="profile-title">
-      <header className="profile-authoring-header">
-        <div>
-          <p className="eyebrow">Profil remeselníka</p>
-          <h1 id="profile-title">Pripravte profil na zverejnenie</h1>
+    <CraftsmanProfileWorkspace
+      aggregate={aggregate}
+      busy={busy}
+      message={message}
+      onAssignProfession={(input) =>
+        mutate(
+          "profession:" + input.professionCode + ":" + input.declaredLevel,
+          (commandId) => authoring.assignProfession({ ...input, commandId }),
+          "Profesia bola uložená.",
+        )
+      }
+      onSaveProfile={(input) =>
+        mutate(
+          null,
+          () => authoring.replaceProfile(input),
+          "Základné údaje boli uložené.",
+        )
+      }
+      onSaveServiceArea={(input) =>
+        mutate(
+          "service-area:" + input.expectedRevision,
+          (commandId) => authoring.replaceServiceArea({ ...input, commandId }),
+          "Oblasť pôsobenia bola uložená.",
+        )
+      }
+      onSubmit={() =>
+        mutate(
+          "publication-submit:" + (aggregate.publication?.revision ?? 0),
+          (commandId) =>
+            authoring.submitForReview({
+              commandId,
+              expectedRevision: aggregate.publication?.revision ?? 0,
+              profileId: aggregate.profile.id,
+            }),
+          "Profil bol odoslaný na kontrolu.",
+        )
+      }
+      onVisibility={(visibility) =>
+        mutate(
+          "publication-visibility:" +
+            (aggregate.publication?.revision ?? 0) +
+            ":" +
+            visibility,
+          (commandId) =>
+            authoring.setVisibility({
+              commandId,
+              expectedRevision: aggregate.publication?.revision ?? 0,
+              profileId: aggregate.profile.id,
+              visibility,
+            }),
+          visibility === "PUBLIC"
+            ? "Verejné zobrazenie profilu je zapnuté."
+            : "Profil je skrytý.",
+        )
+      }
+    />
+  );
+}
+
+type CreateInput = Parameters<
+  CraftsmanProfileAuthoringClient["createProfile"]
+>[0];
+type ReplaceInput = Parameters<
+  CraftsmanProfileAuthoringClient["replaceProfile"]
+>[0];
+type AssignProfessionInput = Omit<
+  Parameters<CraftsmanProfileAuthoringClient["assignProfession"]>[0],
+  "commandId"
+>;
+type ServiceAreaInput = Omit<
+  Parameters<CraftsmanProfileAuthoringClient["replaceServiceArea"]>[0],
+  "commandId"
+>;
+
+export function CraftsmanProfileWorkspace({
+  aggregate,
+  busy,
+  message,
+  onAssignProfession,
+  onSaveProfile,
+  onSaveServiceArea,
+  onSubmit,
+  onVisibility,
+}: {
+  readonly aggregate: CraftsmanAuthoringAggregate;
+  readonly busy: boolean;
+  readonly message: string | null;
+  readonly onAssignProfession: (
+    input: AssignProfessionInput,
+  ) => Promise<boolean>;
+  readonly onSaveProfile: (input: ReplaceInput) => Promise<boolean>;
+  readonly onSaveServiceArea: (input: ServiceAreaInput) => Promise<boolean>;
+  readonly onSubmit: () => Promise<boolean>;
+  readonly onVisibility: (visibility: "HIDDEN" | "PUBLIC") => Promise<boolean>;
+}) {
+  return (
+    <section className="profile-authoring" aria-label="Úprava profilu">
+      <PageHeader
+        actions={<PublicationBadge aggregate={aggregate} />}
+        eyebrow="Profil a účet"
+        lead={
           <p>
             Profil sa verejne zobrazí až po schválení administrátorom a po vašom
-            zapnutí viditeľnosti.
+            zapnutí viditeľnosti. Rozpracované údaje zostávajú súkromné.
           </p>
-        </div>
-        <PublicationBadge aggregate={aggregate} />
-      </header>
-      {message === null ? null : <p role="status">{message}</p>}
+        }
+        title="Pripravte profil na zverejnenie"
+      />
+      {message === null ? null : (
+        <Notice title="Stav úpravy" tone="trust">
+          <p role="status">{message}</p>
+        </Notice>
+      )}
       <ProfileDetailsForm
         aggregate={aggregate}
         busy={busy}
         key={aggregate.profile.id + ":" + aggregate.profile.revision}
-        onSave={(input) =>
-          mutate(
-            null,
-            () => authoring.replaceProfile(input),
-            "Základné údaje boli uložené.",
-          )
-        }
+        onSave={onSaveProfile}
       />
       <ProfessionForm
         aggregate={aggregate}
         busy={busy}
-        onAssign={(input) =>
-          mutate(
-            "profession:" + input.professionCode + ":" + input.declaredLevel,
-            (commandId) => authoring.assignProfession({ ...input, commandId }),
-            "Profesia bola uložená.",
-          )
-        }
+        onAssign={onAssignProfession}
       />
       <ServiceAreaForm
         aggregate={aggregate}
@@ -212,56 +310,17 @@ export function CraftsmanProfileAuthoring({
           ":area:" +
           (aggregate.serviceArea?.revision ?? 0)
         }
-        onSave={(input) =>
-          mutate(
-            "service-area:" + input.expectedRevision,
-            (commandId) =>
-              authoring.replaceServiceArea({ ...input, commandId }),
-            "Oblasť pôsobenia bola uložená.",
-          )
-        }
+        onSave={onSaveServiceArea}
       />
       <PublicationPanel
         aggregate={aggregate}
         busy={busy}
-        onSubmit={() =>
-          mutate(
-            "publication-submit:" + (aggregate.publication?.revision ?? 0),
-            (commandId) =>
-              authoring.submitForReview({
-                commandId,
-                expectedRevision: aggregate.publication?.revision ?? 0,
-                profileId: aggregate.profile.id,
-              }),
-            "Profil bol odoslaný na kontrolu.",
-          )
-        }
-        onVisibility={(visibility) =>
-          mutate(
-            "publication-visibility:" +
-              (aggregate.publication?.revision ?? 0) +
-              ":" +
-              visibility,
-            (commandId) =>
-              authoring.setVisibility({
-                commandId,
-                expectedRevision: aggregate.publication?.revision ?? 0,
-                profileId: aggregate.profile.id,
-                visibility,
-              }),
-            visibility === "PUBLIC"
-              ? "Verejné zobrazenie profilu je zapnuté."
-              : "Profil je skrytý.",
-          )
-        }
+        onSubmit={onSubmit}
+        onVisibility={onVisibility}
       />
     </section>
   );
 }
-
-type CreateInput = Parameters<
-  CraftsmanProfileAuthoringClient["createProfile"]
->[0];
 
 function CreateProfile({
   busy,
@@ -300,85 +359,96 @@ function CreateProfile({
     );
   };
   return (
-    <section
-      className="profile-authoring"
-      aria-labelledby="profile-create-title"
-    >
-      <p className="eyebrow">Profil remeselníka</p>
-      <h1 id="profile-create-title">Vytvorte si profesionálny profil</h1>
-      <p>
-        Začnite základnými údajmi. Profil nebude verejný bez kontroly a vášho
-        rozhodnutia.
-      </p>
-      <form className="profile-authoring-form" onSubmit={submit}>
-        <label htmlFor="profile-type">Typ profilu</label>
-        <select
-          id="profile-type"
-          onChange={(event) =>
-            setProfileType(event.target.value as CraftsmanProfileType)
-          }
-          value={profileType}
-        >
-          <option value="INDIVIDUAL">Fyzická osoba</option>
-          <option value="COMPANY">Firma</option>
-        </select>
-        {profileType === "INDIVIDUAL" ? (
-          <>
-            <TextInput
-              id="profile-first-name"
-              label="Meno"
-              onChange={setFirstName}
-              value={firstName}
+    <section className="profile-authoring" aria-label="Vytvorenie profilu">
+      <PageHeader
+        eyebrow="Profil a účet"
+        lead={
+          <p>
+            Začnite základnými údajmi. Profil zostane súkromný, kým neprejde
+            kontrolou administrátora a sami nezapnete jeho viditeľnosť.
+          </p>
+        }
+        title="Vytvorte si profil remeselníka"
+      />
+      <Card className="profile-authoring-card">
+        <form className="profile-authoring-form" onSubmit={submit}>
+          <FormField
+            description="Firma zostáva v alfe profilom jedného vlastníka účtu."
+            label="Typ profilu"
+          >
+            <Select
+              id="profile-type"
+              onChange={(event) =>
+                setProfileType(event.target.value as CraftsmanProfileType)
+              }
+              value={profileType}
+            >
+              <option value="INDIVIDUAL">Fyzická osoba</option>
+              <option value="COMPANY">Firma</option>
+            </Select>
+          </FormField>
+          {profileType === "INDIVIDUAL" ? (
+            <>
+              <TextInput
+                id="profile-first-name"
+                label="Meno"
+                onChange={setFirstName}
+                value={firstName}
+              />
+              <TextInput
+                id="profile-last-name"
+                label="Priezvisko"
+                onChange={setLastName}
+                value={lastName}
+              />
+              <TextInput
+                id="profile-nickname"
+                label="Prezývka (voliteľné)"
+                onChange={setNickname}
+                value={nickname}
+              />
+            </>
+          ) : (
+            <>
+              <TextInput
+                id="profile-company-name"
+                label="Názov firmy"
+                onChange={setCompanyName}
+                value={companyName}
+              />
+              <TextInput
+                id="profile-registration-number"
+                label="IČO"
+                onChange={setRegistrationNumber}
+                value={registrationNumber}
+              />
+            </>
+          )}
+          <FormField
+            description="Stručne opíšte druh práce, ktorému sa venujete."
+            label="O vašej práci"
+          >
+            <Textarea
+              id="profile-about"
+              maxLength={2_000}
+              onChange={(event) => setAbout(event.target.value)}
+              rows={6}
+              value={about}
             />
-            <TextInput
-              id="profile-last-name"
-              label="Priezvisko"
-              onChange={setLastName}
-              value={lastName}
-            />
-            <TextInput
-              id="profile-nickname"
-              label="Prezývka (voliteľné)"
-              onChange={setNickname}
-              value={nickname}
-            />
-          </>
-        ) : (
-          <>
-            <TextInput
-              id="profile-company-name"
-              label="Názov firmy"
-              onChange={setCompanyName}
-              value={companyName}
-            />
-            <TextInput
-              id="profile-registration-number"
-              label="IČO"
-              onChange={setRegistrationNumber}
-              value={registrationNumber}
-            />
-          </>
-        )}
-        <label htmlFor="profile-about">O vašej práci</label>
-        <textarea
-          id="profile-about"
-          maxLength={2_000}
-          onChange={(event) => setAbout(event.target.value)}
-          rows={6}
-          value={about}
-        />
-        {message === null ? null : <p role="status">{message}</p>}
-        <button disabled={busy} type="submit">
-          {busy ? "Vytváram profil…" : "Vytvoriť profil"}
-        </button>
-      </form>
+          </FormField>
+          {message === null ? null : (
+            <Notice title="Stav vytvorenia" tone="trust">
+              <p role="status">{message}</p>
+            </Notice>
+          )}
+          <Button disabled={busy} type="submit">
+            {busy ? "Vytváram profil…" : "Vytvoriť profil"}
+          </Button>
+        </form>
+      </Card>
     </section>
   );
 }
-
-type ReplaceInput = Parameters<
-  CraftsmanProfileAuthoringClient["replaceProfile"]
->[0];
 
 function ProfileDetailsForm({
   aggregate,
@@ -435,64 +505,70 @@ function ProfileDetailsForm({
     );
   };
   return (
-    <form
-      className="profile-authoring-card profile-authoring-form"
-      onSubmit={submit}
-    >
-      <h2>Základné údaje</h2>
-      {profile.profileType === "INDIVIDUAL" ? (
-        <>
-          <TextInput
-            id="details-first-name"
-            label="Meno"
-            onChange={setFirstName}
-            value={firstName}
+    <Card className="profile-authoring-card">
+      <form className="profile-authoring-form" onSubmit={submit}>
+        <h2>Základné údaje</h2>
+        {profile.profileType === "INDIVIDUAL" ? (
+          <>
+            <TextInput
+              id="details-first-name"
+              label="Meno"
+              onChange={setFirstName}
+              value={firstName}
+            />
+            <TextInput
+              id="details-last-name"
+              label="Priezvisko"
+              onChange={setLastName}
+              value={lastName}
+            />
+            <TextInput
+              id="details-nickname"
+              label="Prezývka"
+              onChange={setNickname}
+              value={nickname}
+            />
+          </>
+        ) : (
+          <>
+            <TextInput
+              id="details-company-name"
+              label="Názov firmy"
+              onChange={setCompanyName}
+              value={companyName}
+            />
+            <TextInput
+              id="details-registration-number"
+              label="IČO"
+              onChange={setRegistrationNumber}
+              value={registrationNumber}
+            />
+          </>
+        )}
+        <FormField
+          description="Toto predstavenie je povinnou súčasťou profilu pred kontrolou."
+          label="O vašej práci"
+        >
+          <Textarea
+            id="details-about"
+            maxLength={2_000}
+            onChange={(event) => setAbout(event.target.value)}
+            rows={6}
+            value={about}
           />
-          <TextInput
-            id="details-last-name"
-            label="Priezvisko"
-            onChange={setLastName}
-            value={lastName}
-          />
-          <TextInput
-            id="details-nickname"
-            label="Prezývka"
-            onChange={setNickname}
-            value={nickname}
-          />
-        </>
-      ) : (
-        <>
-          <TextInput
-            id="details-company-name"
-            label="Názov firmy"
-            onChange={setCompanyName}
-            value={companyName}
-          />
-          <TextInput
-            id="details-registration-number"
-            label="IČO"
-            onChange={setRegistrationNumber}
-            value={registrationNumber}
-          />
-        </>
-      )}
-      <label htmlFor="details-about">O vašej práci</label>
-      <textarea
-        id="details-about"
-        maxLength={2_000}
-        onChange={(event) => setAbout(event.target.value)}
-        rows={6}
-        value={about}
-      />
-      <p className="profile-authoring-note">
-        Overenie identity:{" "}
-        {profile.identityVerified ? "hotové" : "čaká na dokončenie"}
-      </p>
-      <button disabled={busy} type="submit">
-        Uložiť základné údaje
-      </button>
-    </form>
+        </FormField>
+        <div className="profile-authoring-note">
+          <StatusBadge tone={profile.identityVerified ? "success" : "warning"}>
+            {profile.identityVerified
+              ? "Identita overená"
+              : "Overenie identity nie je dokončené"}
+          </StatusBadge>
+        </div>
+        <Button disabled={busy} type="submit">
+          Uložiť základné údaje
+        </Button>
+      </form>
+    </Card>
   );
 }
 
@@ -553,64 +629,86 @@ function ProfessionForm({
     }
   };
   return (
-    <form
-      className="profile-authoring-card profile-authoring-form"
-      onSubmit={(event) => void submit(event)}
-    >
-      <h2>Profesia a skúsenosti</h2>
-      {aggregate.professions.length === 0 ? (
-        <p>Zatiaľ nemáte pridanú profesiu.</p>
-      ) : (
-        <ul className="profile-authoring-list">
-          {aggregate.professions.map((profession) => (
-            <li key={profession.id}>
-              <strong>{profession.professionCode}</strong> —{" "}
-              {levelLabel(profession.declaredLevel)} (
-              {profession.state === "ACTIVE" ? "aktívna" : "neaktívna"})
-            </li>
-          ))}
-        </ul>
-      )}
-      <label htmlFor="profession-query">Vyhľadať profesiu</label>
-      <input
-        autoComplete="off"
-        id="profession-query"
-        maxLength={120}
-        onChange={(event) => {
-          setQuery(event.target.value);
-          setSelected(null);
-          professionAttemptId.current = null;
-        }}
-        placeholder="Napríklad elektrikár"
-        value={query}
-      />
-      <SuggestionList
-        items={suggestions}
-        label={(item) => item.label}
-        onSelect={(suggestion) => {
-          setSelected(suggestion);
-          setQuery(suggestion.label);
-          setSuggestions([]);
-        }}
-      />
-      <label htmlFor="profession-level">Vaša deklarovaná úroveň</label>
-      <select
-        id="profession-level"
-        onChange={(event) => setLevel(event.target.value as DeclaredLevel)}
-        value={level}
+    <Card className="profile-authoring-card">
+      <form
+        className="profile-authoring-form"
+        onSubmit={(event) => void submit(event)}
       >
-        <option value="BEGINNER">Začiatočník</option>
-        <option value="ADVANCED">Pokročilý</option>
-        <option value="MASTER">Majster</option>
-      </select>
-      <p className="profile-authoring-note">
-        Ide o vaše vlastné vyhlásenie. Overená úroveň vzniká samostatne z
-        dokladov a histórie práce.
-      </p>
-      <button disabled={busy || selected === null} type="submit">
-        Pridať profesiu
-      </button>
-    </form>
+        <h2>Profesie a úroveň</h2>
+        <p>
+          Vami zvolená úroveň je vlastné vyhlásenie. Podpora dôkazmi sa
+          zobrazuje oddelene a vzniká iba z dokladov alebo histórie práce.
+        </p>
+        {aggregate.professions.length === 0 ? (
+          <p>Zatiaľ nemáte pridanú profesiu.</p>
+        ) : (
+          <ul className="profile-authoring-list" aria-label="Pridané profesie">
+            {aggregate.professions.map((profession, index) => (
+              <li key={profession.id}>
+                <strong>Profesia {index + 1}</strong>{" "}
+                <StatusBadge
+                  tone={profession.state === "ACTIVE" ? "success" : "default"}
+                >
+                  {profession.state === "ACTIVE" ? "Aktívna" : "Neaktívna"}
+                </StatusBadge>{" "}
+                <StatusBadge>
+                  ○ {levelLabel(profession.declaredLevel)} · uvádza remeselník
+                </StatusBadge>{" "}
+                {profession.evidenceSupportedLevel === null ? null : (
+                  <StatusBadge tone="trust">
+                    ◐ {levelLabel(profession.evidenceSupportedLevel)} ·
+                    podporené dôkazmi
+                  </StatusBadge>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+        <FormField
+          description="Vyberte profesiu zo zoznamu návrhov."
+          label="Vyhľadať profesiu"
+        >
+          <Input
+            autoComplete="off"
+            id="profession-query"
+            maxLength={120}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setSelected(null);
+              professionAttemptId.current = null;
+            }}
+            placeholder="Napríklad elektrikár"
+            value={query}
+          />
+        </FormField>
+        <SuggestionList
+          items={suggestions}
+          label={(item) => item.label}
+          onSelect={(suggestion) => {
+            setSelected(suggestion);
+            setQuery(suggestion.label);
+            setSuggestions([]);
+          }}
+        />
+        <FormField
+          description="Táto úroveň je označená ako údaj, ktorý uvádzate vy."
+          label="Vaša deklarovaná úroveň"
+        >
+          <Select
+            id="profession-level"
+            onChange={(event) => setLevel(event.target.value as DeclaredLevel)}
+            value={level}
+          >
+            <option value="BEGINNER">Začiatočník</option>
+            <option value="ADVANCED">Pokročilý</option>
+            <option value="MASTER">Majster</option>
+          </Select>
+        </FormField>
+        <Button disabled={busy || selected === null} type="submit">
+          Pridať profesiu
+        </Button>
+      </form>
+    </Card>
   );
 }
 
@@ -628,9 +726,7 @@ function ServiceAreaForm({
     profileId: string;
   }) => Promise<boolean>;
 }) {
-  const [query, setQuery] = useState(
-    aggregate.serviceArea?.baseMunicipalityCode ?? "",
-  );
+  const [query, setQuery] = useState("");
   const [selected, setSelected] =
     useState<JobRequestMunicipalitySuggestion | null>(null);
   const [suggestions, setSuggestions] = useState<
@@ -676,47 +772,62 @@ function ServiceAreaForm({
     });
   };
   return (
-    <form
-      className="profile-authoring-card profile-authoring-form"
-      onSubmit={submit}
-    >
-      <h2>Oblasť pôsobenia</h2>
-      <label htmlFor="municipality-query">Východisková obec</label>
-      <input
-        autoComplete="off"
-        id="municipality-query"
-        maxLength={80}
-        onChange={(event) => {
-          setQuery(event.target.value);
-          setSelected(null);
-        }}
-        placeholder="Začnite písať obec"
-        value={query}
-      />
-      <SuggestionList
-        items={suggestions}
-        label={(item) => item.name + ", okres " + item.districtName}
-        onSelect={(suggestion) => {
-          setSelected(suggestion);
-          setQuery(suggestion.name + ", okres " + suggestion.districtName);
-          setSuggestions([]);
-        }}
-      />
-      <label htmlFor="normal-radius">Bežný dojazd v kilometroch</label>
-      <input
-        id="normal-radius"
-        inputMode="numeric"
-        max={500}
-        min={1}
-        onChange={(event) => setRadius(event.target.value)}
-        required
-        type="number"
-        value={radius}
-      />
-      <button disabled={busy} type="submit">
-        Uložiť oblasť pôsobenia
-      </button>
-    </form>
+    <Card className="profile-authoring-card">
+      <form className="profile-authoring-form" onSubmit={submit}>
+        <h2>Oblasť pôsobenia</h2>
+        <p>
+          Verejný profil používa obec a bežný dojazd. Presnú domácu adresu tu
+          nezadávate ani nezverejňujeme.
+        </p>
+        {aggregate.serviceArea?.baseMunicipalityCode ? (
+          <StatusBadge tone="success">Východisková obec je uložená</StatusBadge>
+        ) : null}
+        <FormField label="Východisková obec">
+          <Input
+            autoComplete="off"
+            id="municipality-query"
+            maxLength={80}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setSelected(null);
+            }}
+            placeholder={
+              aggregate.serviceArea?.baseMunicipalityCode
+                ? "Vyhľadať inú obec"
+                : "Začnite písať obec"
+            }
+            value={query}
+          />
+        </FormField>
+        <SuggestionList
+          items={suggestions}
+          label={(item) => item.name + ", okres " + item.districtName}
+          onSelect={(suggestion) => {
+            setSelected(suggestion);
+            setQuery(suggestion.name + ", okres " + suggestion.districtName);
+            setSuggestions([]);
+          }}
+        />
+        <FormField
+          description="Jednoduchý pracovný okruh, nie prísľub dostupnosti."
+          label="Bežný dojazd v kilometroch"
+        >
+          <Input
+            id="normal-radius"
+            inputMode="numeric"
+            max={500}
+            min={1}
+            onChange={(event) => setRadius(event.target.value)}
+            required
+            type="number"
+            value={radius}
+          />
+        </FormField>
+        <Button disabled={busy} type="submit">
+          Uložiť oblasť pôsobenia
+        </Button>
+      </form>
+    </Card>
   );
 }
 
@@ -733,19 +844,28 @@ function PublicationPanel({
 }) {
   const publication = aggregate.publication;
   const missing = publication?.readiness.missing ?? deriveReadiness(aggregate);
+  const moderationAllowsVisibility =
+    publication === null || publication.moderationState === "ALLOWED";
   const canSubmit =
     missing.length === 0 &&
+    moderationAllowsVisibility &&
     (publication === null ||
       publication.reviewState === "DRAFT" ||
       publication.reviewState === "REJECTED");
   return (
-    <section className="profile-authoring-card">
-      <h2>Zverejnenie</h2>
+    <Card className="profile-authoring-card">
+      <p className="ui-eyebrow">Súkromný kontrolný zoznam</p>
+      <h2>Pripravenosť na kontrolu</h2>
       {missing.length === 0 ? (
-        <p>Profil spĺňa povinné minimum na kontrolu.</p>
+        <Notice tone="success" title="Povinné minimum je vyplnené">
+          <p>
+            Profil môžete odoslať administrátorovi. Odoslanie ho samo
+            nezverejní.
+          </p>
+        </Notice>
       ) : (
         <>
-          <p>Pred odoslaním dokončite:</p>
+          <p>Pred odoslaním na kontrolu dokončite:</p>
           <ul>
             {missing.map((requirement) => (
               <li key={requirement}>{readinessLabels[requirement]}</li>
@@ -755,20 +875,32 @@ function PublicationPanel({
       )}
       {publication?.rejection === null ||
       publication?.rejection === undefined ? null : (
-        <p className="profile-authoring-warning" role="alert">
-          Profil bol vrátený: {publication.rejection.userFacingReason}
-        </p>
+        <Notice title="Profil bol vrátený na úpravu" tone="warning">
+          <p role="alert">{publication.rejection.userFacingReason}</p>
+        </Notice>
       )}
       {canSubmit ? (
-        <button disabled={busy} type="button" onClick={() => void onSubmit()}>
+        <Button disabled={busy} type="button" onClick={() => void onSubmit()}>
           Odoslať profil na kontrolu
-        </button>
+        </Button>
       ) : null}
       {publication?.reviewState === "PENDING" ? (
-        <p>Profil čaká na kontrolu administrátorom.</p>
+        <Notice title="Kontrola prebieha" tone="trust">
+          <p>
+            Profil čaká na rozhodnutie administrátora. Dovtedy nie je verejný.
+          </p>
+        </Notice>
       ) : null}
-      {publication?.reviewState === "APPROVED" ? (
-        <button
+      {publication !== null && !moderationAllowsVisibility ? (
+        <Notice title="Viditeľnosť obmedzil administrátor" tone="warning">
+          <p>
+            Toto obmedzenie nemožno zmeniť prepínačom profilu. Údaje a história
+            zostávajú zachované.
+          </p>
+        </Notice>
+      ) : null}
+      {publication?.reviewState === "APPROVED" && moderationAllowsVisibility ? (
+        <Button
           disabled={busy}
           type="button"
           onClick={() =>
@@ -780,9 +912,9 @@ function PublicationPanel({
           {publication.ownerVisibility === "PUBLIC"
             ? "Skryť verejný profil"
             : "Zverejniť schválený profil"}
-        </button>
+        </Button>
       ) : null}
-    </section>
+    </Card>
   );
 }
 
@@ -792,19 +924,19 @@ function PublicationBadge({
   readonly aggregate: CraftsmanAuthoringAggregate;
 }) {
   const publication = aggregate.publication;
-  const label =
-    publication === null
-      ? "Rozpracovaný"
-      : publication.effectivelyPublic
-        ? "Verejný"
-        : publication.reviewState === "PENDING"
-          ? "Čaká na kontrolu"
-          : publication.reviewState === "APPROVED"
-            ? "Schválený, skrytý"
-            : publication.reviewState === "REJECTED"
-              ? "Vrátený na úpravu"
-              : "Rozpracovaný";
-  return <span className="profile-authoring-badge">{label}</span>;
+  if (publication === null)
+    return <StatusBadge>Rozpracovaný súkromný profil</StatusBadge>;
+  if (publication.moderationState !== "ALLOWED")
+    return <StatusBadge tone="warning">Skrytý administrátorom</StatusBadge>;
+  if (publication.effectivelyPublic)
+    return <StatusBadge tone="success">Verejný profil</StatusBadge>;
+  if (publication.reviewState === "PENDING")
+    return <StatusBadge tone="trust">Čaká na kontrolu</StatusBadge>;
+  if (publication.reviewState === "APPROVED")
+    return <StatusBadge tone="success">Schválený, zatiaľ skrytý</StatusBadge>;
+  if (publication.reviewState === "REJECTED")
+    return <StatusBadge tone="warning">Vrátený na úpravu</StatusBadge>;
+  return <StatusBadge>Rozpracovaný súkromný profil</StatusBadge>;
 }
 
 function TextInput({
@@ -819,15 +951,14 @@ function TextInput({
   readonly value: string;
 }) {
   return (
-    <>
-      <label htmlFor={id}>{label}</label>
-      <input
+    <FormField label={label}>
+      <Input
         id={id}
         maxLength={160}
         onChange={(event) => onChange(event.target.value)}
         value={value}
       />
-    </>
+    </FormField>
   );
 }
 
@@ -845,9 +976,9 @@ function SuggestionList<T extends { readonly code: string }>({
     <ul className="profile-authoring-suggestions">
       {items.map((item) => (
         <li key={item.code}>
-          <button type="button" onClick={() => onSelect(item)}>
+          <Button type="button" variant="quiet" onClick={() => onSelect(item)}>
             {label(item)}
-          </button>
+          </Button>
         </li>
       ))}
     </ul>

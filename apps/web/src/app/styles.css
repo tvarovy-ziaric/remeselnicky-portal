@@ -1260,6 +1260,306 @@ p {
   }
 }
 
+/* Design refresh — authentication and private craftsman workspace */
+.app-shell > .login-page {
+  flex: 1;
+  display: grid;
+  min-height: auto;
+  padding: clamp(2.5rem, 8vw, 7rem) var(--layout-gutter);
+  background:
+    radial-gradient(
+      circle at 15% 20%,
+      rgb(198 106 66 / 10%),
+      transparent 28rem
+    ),
+    radial-gradient(circle at 85% 80%, rgb(40 92 77 / 10%), transparent 30rem),
+    var(--color-background);
+}
+
+.auth-shell {
+  width: min(100%, 38rem);
+  padding: clamp(1.5rem, 5vw, 3rem);
+  border-color: color-mix(
+    in srgb,
+    var(--color-border) 82%,
+    var(--color-primary)
+  );
+  border-radius: var(--radius-xl);
+  box-shadow: 0 1.5rem 4rem rgb(32 37 35 / 10%);
+}
+
+.auth-shell > .page-header {
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.auth-shell .login-form {
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.auth-shell .login-form > .ui-button {
+  width: 100%;
+  margin-top: 0.25rem;
+}
+
+.auth-shell .checkbox-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 0.75rem;
+  padding: 0.85rem;
+  border-radius: var(--radius-md);
+  background: var(--color-soft-background);
+  color: var(--color-muted-text);
+  line-height: 1.45;
+}
+
+.auth-shell .checkbox-row input {
+  width: 1.15rem;
+  min-height: 1.15rem;
+  margin-top: 0.15rem;
+  accent-color: var(--color-primary);
+}
+
+.onboarding-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.onboarding-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.verification-list {
+  gap: 0.85rem;
+}
+
+.verification-list > .ui-card {
+  display: grid;
+  gap: 1rem;
+  padding: 1.15rem;
+  background: color-mix(
+    in srgb,
+    var(--color-surface) 86%,
+    var(--color-soft-background)
+  );
+  box-shadow: none;
+}
+
+.verification-list > .ui-card > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.verification-list h2,
+.verification-list p {
+  margin: 0;
+}
+
+.site-main > section:has(.profile-authoring) {
+  padding-block: clamp(2.5rem, 6vw, 5rem);
+}
+
+.profile-authoring,
+.profile-authoring-state {
+  width: min(100%, 64rem);
+}
+
+.profile-authoring {
+  gap: 1.25rem;
+}
+
+.profile-authoring > .page-header {
+  margin-bottom: 0.25rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.profile-authoring-card,
+.profile-authoring-state {
+  padding: clamp(1.25rem, 3vw, 2rem);
+  border-color: var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.profile-authoring-card {
+  display: grid;
+  gap: 1rem;
+}
+
+.profile-authoring-card > h2,
+.profile-authoring-card > p,
+.credential-card > h2 {
+  margin-block: 0;
+}
+
+.profile-authoring-form,
+.credential-form,
+.credential-upload-form {
+  gap: 1rem;
+}
+
+.profile-authoring-form > h2,
+.credential-form > h2 {
+  margin: 0 0 0.25rem;
+}
+
+.profile-authoring-form > .ui-button,
+.credential-form > .ui-button,
+.credential-upload-form > .ui-button {
+  justify-self: start;
+}
+
+.profile-authoring-note {
+  margin: 0;
+  color: var(--color-muted-text);
+  font-size: 0.9rem;
+}
+
+.profile-authoring-form fieldset {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-background);
+}
+
+.profile-authoring-form fieldset legend {
+  padding-inline: 0.35rem;
+  font-weight: 750;
+}
+
+.profile-authoring-form fieldset label {
+  display: flex;
+  align-items: start;
+  gap: 0.6rem;
+  color: var(--color-muted-text);
+}
+
+.profile-authoring-form fieldset input[type="checkbox"] {
+  width: 1.1rem;
+  min-height: 1.1rem;
+  margin-top: 0.15rem;
+  accent-color: var(--color-primary);
+}
+
+.profile-authoring-list {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+  margin: 0;
+}
+
+.profile-authoring-list > li {
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-background);
+}
+
+.profile-authoring-list figure {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0;
+}
+
+.profile-authoring-list img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-sm);
+  background: var(--color-soft-background);
+  object-fit: cover;
+}
+
+.profile-authoring-list figcaption,
+.credential-upload-list {
+  color: var(--color-muted-text);
+  font-size: 0.875rem;
+}
+
+.profile-authoring-suggestions {
+  z-index: 3;
+  margin-top: -0.5rem;
+  border-color: var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+}
+
+.credential-list {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 21rem), 1fr));
+}
+
+.credential-card {
+  align-content: start;
+  height: 100%;
+}
+
+.credential-upload-form {
+  margin-top: 0.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.credential-upload-list {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+@media (min-width: 48rem) {
+  .profile-authoring-form:has(> .ui-field:nth-of-type(2)) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .profile-authoring-form > h2,
+  .profile-authoring-form > p,
+  .profile-authoring-form > fieldset,
+  .profile-authoring-form > .ui-notice,
+  .profile-authoring-form > .ui-button,
+  .profile-authoring-form > .profile-authoring-note,
+  .profile-authoring-form > .profile-authoring-list,
+  .profile-authoring-form > .profile-authoring-suggestions {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 40rem) {
+  .auth-shell {
+    padding: 1.25rem;
+  }
+
+  .auth-shell .page-header h1 {
+    font-size: clamp(2rem, 12vw, 3rem);
+  }
+
+  .onboarding-links,
+  .verification-list > .ui-card > header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .onboarding-actions,
+  .onboarding-actions .ui-button,
+  .onboarding-actions .ui-action-link,
+  .profile-authoring .page-header__actions,
+  .profile-authoring .page-header__actions .ui-action-link {
+    width: 100%;
+  }
+}
+
 /* Public search layer. */
 .public-search-page {
   min-height: auto;

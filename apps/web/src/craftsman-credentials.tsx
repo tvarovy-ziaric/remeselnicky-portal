@@ -1,13 +1,27 @@
 "use client";
 
-import Link from "next/link";
-import {
+import React, {
   type FormEvent,
   useCallback,
   useEffect,
   useMemo,
   useState,
 } from "react";
+
+import {
+  ActionLink,
+  Button,
+  Card,
+  EmptyState,
+  FormField,
+  Input,
+  Notice,
+  PageHeader,
+  SectionHeader,
+  Select,
+  StatusBadge,
+  TrustBadge,
+} from "./design-system";
 
 import {
   createCraftsmanCredentialClient,
@@ -125,32 +139,40 @@ export function CraftsmanCredentials({
     return () => window.clearInterval(timer);
   }, [aggregate, claims, hasProcessing, refreshUploads]);
 
-  if (state === "LOADING") return <p>Načítavam vaše doklady…</p>;
+  if (state === "LOADING") return <p role="status">Načítavam vaše doklady…</p>;
   if (state === "AUTH") {
     return (
-      <section className="profile-authoring-card">
-        <h1>Najprv sa prihláste</h1>
-        <p>Doklady sú súkromná časť účtu remeselníka.</p>
-        <Link href="/prihlasenie">Prejsť na prihlásenie</Link>
-      </section>
+      <EmptyState
+        action={<ActionLink href="/prihlasenie">Prihlásiť sa</ActionLink>}
+        description="Doklady sú súkromná časť účtu remeselníka."
+        title="Najprv sa prihláste"
+      />
     );
   }
   if (state === "EMPTY_PROFILE") {
     return (
-      <section className="profile-authoring-card">
-        <h1>Najprv vytvorte profil remeselníka</h1>
-        <Link href="/ucet/profil-remeselnika">Vytvoriť profil</Link>
-      </section>
+      <EmptyState
+        action={
+          <ActionLink href="/ucet/profil-remeselnika">
+            Vytvoriť profil
+          </ActionLink>
+        }
+        description="Doklady a oprávnenia sa viažu na váš profil a aktívnu profesiu."
+        title="Najprv vytvorte profil remeselníka"
+      />
     );
   }
   if (state === "ERROR" || aggregate === null) {
     return (
-      <section className="profile-authoring-card">
-        <h1>Doklady sa nepodarilo načítať</h1>
-        <button type="button" onClick={() => void load()}>
-          Skúsiť znova
-        </button>
-      </section>
+      <EmptyState
+        action={
+          <Button onClick={() => void load()} type="button">
+            Skúsiť znova
+          </Button>
+        }
+        description="Súkromné údaje o dokladoch sme teraz nevedeli bezpečne načítať."
+        title="Doklady sa nepodarilo načítať"
+      />
     );
   }
 
@@ -158,19 +180,28 @@ export function CraftsmanCredentials({
     (profession) => profession.state === "ACTIVE",
   );
   return (
-    <section
-      className="profile-authoring credential-authoring"
-      aria-labelledby="credentials-title"
-    >
-      <p className="eyebrow">Súkromná kontrola kvalifikácie</p>
-      <h1 id="credentials-title">Doklady a oprávnenia</h1>
-      <p>
-        Vyberte iba typ, ktorý spravuje platforma. Nový doklad je súkromný a
-        čaká na manuálnu kontrolu administrátorom; dovtedy nie je overený.
-      </p>
-      <p>
-        <Link href="/ucet/profil-remeselnika">Späť na profil remeselníka</Link>
-      </p>
+    <section className="profile-authoring credential-authoring">
+      <PageHeader
+        actions={
+          <ActionLink href="/ucet/profil-remeselnika" variant="secondary">
+            Späť na profil
+          </ActionLink>
+        }
+        eyebrow="Súkromná kontrola kvalifikácie"
+        lead={
+          <p>
+            Nahrajte doklad k aktívnej profesii a sledujte stav manuálnej
+            kontroly.
+          </p>
+        }
+        title="Doklady a oprávnenia"
+      />
+      <Notice title="Podklad zostáva súkromný">
+        <p>
+          Samotný súbor dokladu je určený iba na oprávnenú kontrolu platformou.
+          Nový doklad nie je overený, kým ho administrátor neschváli.
+        </p>
+      </Notice>
       {message === null ? null : <p role="status">{message}</p>}
       <CreateCredentialForm
         client={client}
@@ -184,8 +215,15 @@ export function CraftsmanCredentials({
         professions={professions}
         types={types}
       />
+      <SectionHeader
+        eyebrow={`${claims.length} ${claims.length === 1 ? "doklad" : "dokladov"}`}
+        title="Stav vašich dokladov"
+      />
       {claims.length === 0 ? (
-        <p>Zatiaľ nemáte pridaný žiadny doklad.</p>
+        <EmptyState
+          description="Pridajte doklad iba vtedy, keď platforma ponúka jeho typ pre vašu profesiu."
+          title="Zatiaľ nemáte pridaný žiadny doklad"
+        />
       ) : (
         <div className="credential-list">
           {claims.map((claim) => (
@@ -272,60 +310,59 @@ function CreateCredentialForm({
   }
 
   return (
-    <form
-      className="profile-authoring-card credential-form"
-      onSubmit={(event) => void submit(event)}
-    >
-      <h2>Pridať doklad</h2>
-      <label>
-        Aktívna profesia
-        <select
-          required
-          value={professionId}
-          onChange={(event) => setProfessionId(event.target.value)}
-        >
-          <option value="">Vyberte profesiu</option>
-          {professions.map((profession) => (
-            <option key={profession.id} value={profession.id}>
-              {profession.professionCode}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Typ dokladu spravovaný platformou
-        <select
-          required
-          value={typeCode}
-          onChange={(event) => setTypeCode(event.target.value)}
-        >
-          <option value="">Vyberte typ dokladu</option>
-          {types.map((type) => (
-            <option key={type.code} value={type.code}>
-              {type.code} —{" "}
-              {type.evidenceRequirement === "REQUIRED"
-                ? "povinný podklad"
-                : "voliteľný podklad"}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Platnosť do (voliteľné)
-        <input
-          type="date"
-          value={expiresOn}
-          onChange={(event) => setExpiresOn(event.target.value)}
-        />
-      </label>
-      {notice === null ? null : <p role="alert">{notice}</p>}
-      <button
-        disabled={busy || professions.length === 0 || types.length === 0}
-        type="submit"
+    <Card className="profile-authoring-card">
+      <form
+        className="credential-form"
+        onSubmit={(event) => void submit(event)}
       >
-        {busy ? "Ukladám…" : "Pridať doklad na kontrolu"}
-      </button>
-    </form>
+        <SectionHeader eyebrow="Nový podklad" title="Pridať doklad" />
+        <FormField label="Aktívna profesia">
+          <Select
+            required
+            value={professionId}
+            onChange={(event) => setProfessionId(event.target.value)}
+          >
+            <option value="">Vyberte profesiu</option>
+            {professions.map((profession) => (
+              <option key={profession.id} value={profession.id}>
+                {humanizeCode(profession.professionCode)}
+              </option>
+            ))}
+          </Select>
+        </FormField>
+        <FormField label="Typ dokladu spravovaný platformou">
+          <Select
+            required
+            value={typeCode}
+            onChange={(event) => setTypeCode(event.target.value)}
+          >
+            <option value="">Vyberte typ dokladu</option>
+            {types.map((type) => (
+              <option key={type.code} value={type.code}>
+                {humanizeCode(type.code)} —{" "}
+                {type.evidenceRequirement === "REQUIRED"
+                  ? "povinný podklad"
+                  : "voliteľný podklad"}
+              </option>
+            ))}
+          </Select>
+        </FormField>
+        <FormField label="Platnosť do (voliteľné)">
+          <Input
+            type="date"
+            value={expiresOn}
+            onChange={(event) => setExpiresOn(event.target.value)}
+          />
+        </FormField>
+        {notice === null ? null : <p role="alert">{notice}</p>}
+        <Button
+          disabled={busy || professions.length === 0 || types.length === 0}
+          type="submit"
+        >
+          {busy ? "Ukladám…" : "Pridať doklad na kontrolu"}
+        </Button>
+      </form>
+    </Card>
   );
 }
 
@@ -390,23 +427,20 @@ function CredentialCard({
       );
   }
 
-  const status = credentialStatus(claim);
   return (
-    <article className="profile-authoring-card credential-card">
-      <p className="eyebrow">{professionCode}</p>
-      <h2>
-        <code>{claim.credentialTypeCode}</code>
-      </h2>
-      <p>
-        <strong>{status.title}</strong> {status.description}
-      </p>
+    <Card className="profile-authoring-card credential-card">
+      <p className="ui-eyebrow">{humanizeCode(professionCode)}</p>
+      <h2>{humanizeCode(claim.credentialTypeCode)}</h2>
+      <CredentialStatusPresentation state={claim.state} />
       <p>
         {claim.evidenceRequirement === "REQUIRED"
           ? "Povinný podklad"
           : "Voliteľný podklad"}
         {claim.expiresOn === null ? "" : ` · platnosť do ${claim.expiresOn}`}
       </p>
-      <p>Priložené podklady: {claim.evidence.length}</p>
+      <p>
+        Priložené súkromné podklady: <strong>{claim.evidence.length}</strong>
+      </p>
       {claim.reviewReason === null ? null : (
         <p>Dôvod kontroly: {claim.reviewReason}</p>
       )}
@@ -418,15 +452,15 @@ function CredentialCard({
           >
             <label>
               PDF alebo fotografia dokladu
-              <input
+              <Input
                 accept="application/pdf,image/jpeg,image/png,image/heic,image/heif"
                 onChange={(event) => setFile(event.target.files?.[0] ?? null)}
                 type="file"
               />
             </label>
-            <button disabled={busy || file === null} type="submit">
+            <Button disabled={busy || file === null} type="submit">
               Nahrať podklad
-            </button>
+            </Button>
           </form>
           <ul className="credential-upload-list">
             {availableUploads.map((item) => (
@@ -440,13 +474,14 @@ function CredentialCard({
                 {item.status === "READY" ? (
                   <>
                     Podklad je pripravený na priloženie.{" "}
-                    <button
+                    <Button
                       disabled={busy}
                       onClick={() => void attach(item)}
                       type="button"
+                      variant="secondary"
                     >
                       Priložiť ku kontrole
-                    </button>
+                    </Button>
                   </>
                 ) : null}
               </li>
@@ -455,7 +490,31 @@ function CredentialCard({
         </>
       )}
       {notice === null ? null : <p role="status">{notice}</p>}
-    </article>
+    </Card>
+  );
+}
+
+function credentialStatusTone(
+  state: OwnedCredentialClaim["state"],
+): "error" | "warning" {
+  return state === "PENDING" ? "warning" : "error";
+}
+
+export function CredentialStatusPresentation({
+  state,
+}: Readonly<{ state: OwnedCredentialClaim["state"] }>) {
+  const status = credentialStatus({ state });
+  return (
+    <>
+      {state === "APPROVED" ? (
+        <TrustBadge provenance="verified">Overený doklad</TrustBadge>
+      ) : (
+        <StatusBadge tone={credentialStatusTone(state)}>
+          {status.title}
+        </StatusBadge>
+      )}
+      <p>{status.description}</p>
+    </>
   );
 }
 
@@ -483,4 +542,12 @@ export function credentialStatus(claim: Pick<OwnedCredentialClaim, "state">) {
           "Doklad čaká na kontrolu administrátorom. Zatiaľ nie je overený.",
       };
   }
+}
+
+export function humanizeCode(code: string): string {
+  const segment = code.split(/[.:/]/u).at(-1) ?? code;
+  const words = segment.replace(/[_-]+/gu, " ").toLocaleLowerCase("sk-SK");
+  return words.length === 0
+    ? "Položka spravovaná platformou"
+    : `${words.charAt(0).toLocaleUpperCase("sk-SK")}${words.slice(1)}`;
 }

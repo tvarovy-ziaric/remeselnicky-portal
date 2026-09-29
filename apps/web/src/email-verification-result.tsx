@@ -6,6 +6,8 @@ import {
   createAuthOnboardingClient,
   type AuthOnboardingClient,
 } from "./auth-onboarding-client";
+import { AuthPageShell } from "./auth-page-shell";
+import { ActionLink, Notice, StatusBadge } from "./design-system";
 
 type ResultState =
   "INVALID" | "LOADING" | "RATE_LIMITED" | "SUCCESS" | "UNAVAILABLE";
@@ -93,19 +95,53 @@ export function EmailVerificationResult({
             : "Overenie teraz nie je dostupné. Skúste to znova neskôr.";
 
   return (
-    <main className="login-page">
-      <section className="login-shell">
-        <p className="eyebrow">Web Alpha</p>
-        <h1>Overenie e-mailu</h1>
+    <AuthPageShell
+      eyebrow="Bezpečný účet"
+      lead="Overovací odkaz je jednorazový. Po spracovaní ho odstránime z adresy stránky."
+      title="Overenie e-mailu"
+    >
+      <Notice
+        title={
+          state === "SUCCESS"
+            ? "E-mail je overený"
+            : state === "LOADING"
+              ? "Kontrolujem odkaz"
+              : "Odkaz sa nepodarilo overiť"
+        }
+        tone={
+          state === "SUCCESS"
+            ? "success"
+            : state === "LOADING"
+              ? "trust"
+              : "error"
+        }
+      >
+        <StatusBadge
+          tone={
+            state === "SUCCESS"
+              ? "success"
+              : state === "LOADING"
+                ? "trust"
+                : "error"
+          }
+        >
+          {state === "SUCCESS"
+            ? "Hotovo"
+            : state === "LOADING"
+              ? "Prebieha overenie"
+              : "Vyžaduje pozornosť"}
+        </StatusBadge>
         <p aria-live="polite" role={state === "INVALID" ? "alert" : undefined}>
           {text}
         </p>
-        {state === "SUCCESS" ? (
-          <a href={authenticated ? "/overenie" : "/prihlasenie"}>
+      </Notice>
+      {state === "SUCCESS" ? (
+        <div className="onboarding-actions">
+          <ActionLink href={authenticated ? "/overenie" : "/prihlasenie"}>
             {authenticated ? "Pokračovať v overení účtu" : "Prihlásiť sa"}
-          </a>
-        ) : null}
-      </section>
-    </main>
+          </ActionLink>
+        </div>
+      ) : null}
+    </AuthPageShell>
   );
 }

@@ -17,11 +17,19 @@ const session = {
 } as const satisfies AuthOnboardingSession;
 
 describe("login form", () => {
-  it("offers invitation registration and safe autocomplete", () => {
+  it("offers a clear, accessible continuation without losing draft context", () => {
     const markup = renderToStaticMarkup(<LoginForm />);
+    expect(markup).toContain('href="#main-content"');
+    expect(markup).toContain('id="main-content"');
+    expect(markup).toContain("Vitajte späť");
+    expect(markup).toContain("Rozpracovaný dopyt zostane zachovaný.");
     expect(markup).toContain('autoComplete="username"');
     expect(markup).toContain('autoComplete="current-password"');
     expect(markup).toContain('href="/registracia"');
+    expect(markup).toContain("Zaregistrovať sa s pozvánkou");
+    expect(markup).not.toMatch(
+      /AUTHENTICATED|INVALID_CREDENTIALS|RATE_LIMITED/,
+    );
   });
 
   it("routes incomplete verification to onboarding", () => {

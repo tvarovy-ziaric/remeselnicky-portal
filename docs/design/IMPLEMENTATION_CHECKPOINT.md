@@ -36,8 +36,8 @@ different facts.
 2. **DONE** — search results and public craftsman profile.
 3. **DONE** — request wizard and authentication hand-off.
 4. **DONE** — dashboard, quote comparison and central job cockpit.
-5. **ACTIVE** — authentication/onboarding and craftsman profile, portfolio and credentials.
-6. Secondary transactional, account, moderation and admin screens.
+5. **DONE** — authentication/onboarding and craftsman profile, portfolio and credentials.
+6. **ACTIVE** — secondary transactional, account, moderation and admin screens.
 7. Responsive/accessibility/visual consistency pass and release checks.
 
 Each layer is complete only after focused component tests plus web typecheck,
@@ -113,3 +113,21 @@ the backend explicitly supplies a stronger provenance.
   back to job context instead of advertising a nonexistent global inbox.
 - Integrated web verification passed: 76 test files / 381 tests, TypeScript,
   ESLint, formatting, import boundaries and the optimized Next.js build.
+
+## Completed layer 5 evidence
+
+- Authentication and onboarding now share the public application shell, explain
+  the invitation-only boundary and preserve the existing draft return target.
+  E-mail and phone verification expose a readable two-step journey without
+  changing one-time-token, OTP or server authorization rules.
+- The private craftsman profile has a clear publication state, private readiness
+  checklist and separate self-declared versus evidence-supported profession
+  levels. Initial publication remains subject to administrator approval and a
+  moderation override cannot be bypassed by the profile owner.
+- Portfolio authoring is image-first, keeps the fifteen-photo limit visible and
+  labels every self-created project as declared by the craftsman. Consent and
+  EXIF/GPS privacy handling are explained without claiming a stronger provenance.
+- Credential evidence remains private. Only an approved credential is presented
+  as platform-verified; pending, rejected and revoked states stay distinct.
+- Integrated web verification passed: 79 test files / 391 tests, TypeScript,
+  ESLint, formatting and the optimized Next.js build.
