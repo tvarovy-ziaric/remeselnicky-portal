@@ -23,7 +23,7 @@ export function proficiencyLabel(level: string): string {
       ADVANCED: "pokročilá úroveň",
       BEGINNER: "začiatočnícka úroveň",
       MASTER: "majstrovská úroveň",
-    }[level] ?? level
+    }[level] ?? "neuvedená úroveň"
   );
 }
 
@@ -36,7 +36,7 @@ export function priceModeLabel(mode: string): string {
       OTHER: "orientačne",
       PER_SQUARE_METER: "za m²",
       PER_UNIT: "za jednotku",
-    }[mode] ?? mode
+    }[mode] ?? "orientačne"
   );
 }
 
@@ -57,7 +57,9 @@ export function formatIndicativeEurRange(
 }
 
 export function portfolioDurationUnitLabel(unit: string): string {
-  return { DAYS: "dní", MONTHS: "mesiacov", WEEKS: "týždňov" }[unit] ?? unit;
+  return (
+    { DAYS: "dní", MONTHS: "mesiacov", WEEKS: "týždňov" }[unit] ?? "obdobie"
+  );
 }
 
 export function portfolioPhotoPhaseLabel(phase: string): string {
@@ -67,7 +69,7 @@ export function portfolioPhotoPhaseLabel(phase: string): string {
       BEFORE: "pred realizáciou",
       OTHER: "ďalší záber",
       PROGRESS: "priebeh realizácie",
-    }[phase] ?? phase
+    }[phase] ?? "fotografia realizácie"
   );
 }
 

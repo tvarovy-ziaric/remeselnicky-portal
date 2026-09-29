@@ -1,13 +1,16 @@
 # Remeselnícky portál — Design culture v1
 
 ## Positioning
+
 Remeselnícky portál má pôsobiť ako moderný, dôveryhodný a ergonomický marketplace pre remeslá. Dizajn nemá pripomínať lacný inzertný web ani korporátny enterprise systém. Má spájať:
+
 - poctivé remeslo,
 - poriadok a dôveru,
 - jednoduchosť orientácie,
 - lokálnosť a ľudskosť.
 
 ## Core principles
+
 1. **Jasný ďalší krok** — používateľ má vždy vidieť, čo má urobiť teraz.
 2. **UI neukazuje databázové entity** — ukazuje prirodzený proces: Dopyt → Ponuky → Zákazka → Dokončenie → Hodnotenie.
 3. **Dôvera je viditeľná** — verified, evidence-supported a self-declared údaje musia byť vizuálne odlíšené.
@@ -15,6 +18,7 @@ Remeselnícky portál má pôsobiť ako moderný, dôveryhodný a ergonomický m
 5. **Remeselná téma bez gýču** — decentné technické/ dielenské detaily, nie klišé stavebných webov.
 
 ## Visual direction
+
 - Warm neutral backgrounds
 - White cards with subtle borders and mild shadow
 - Graphite text
@@ -26,20 +30,26 @@ Remeselnícky portál má pôsobiť ako moderný, dôveryhodný a ergonomický m
 - Spacious layout and readable typography
 
 ## Primary user mental models
+
 ### Customer
+
 Potrebujem niečo opraviť / postaviť → vyplním dopyt → vyberiem remeselníkov → porovnám ponuky → zvolím jednu → sledujem priebeh → potvrdím dokončenie → ohodnotím.
 
 ### Craftsman
+
 Som remeselník → dostanem pozvánku → rozhodnem sa → pošlem ponuku → po prijatí riadim zákazku → nahrávam priebeh → dokončím → získam hodnotenie.
 
 ## Navigation architecture
+
 ### Public
+
 - Remeselníci
 - Ako to funguje
 - Vytvoriť dopyt
 - Prihlásiť sa
 
 ### Authenticated core
+
 - Prehľad
 - Dopyty
 - Zákazky
@@ -47,6 +57,7 @@ Som remeselník → dostanem pozvánku → rozhodnem sa → pošlem ponuku → p
 - Profil / Účet
 
 ## UI patterns
+
 - Wizard for request creation
 - Card-based search results with trust facts
 - Profile tabs: Prehľad / Realizácie / Hodnotenia / Odbornosť
@@ -55,16 +66,19 @@ Som remeselník → dostanem pozvánku → rozhodnem sa → pošlem ponuku → p
 - Sticky CTA on mobile for primary action
 
 ## Trust language
+
 - `✓ Overené platformou`
 - `◐ Podporené dôkazmi`
 - `○ Uvádza remeselník`
 
 ## Content tone
+
 - Human, direct, practical, calm
 - Avoid jargon and legalese in core flow
 - Always explain consequence of the next action
 
 ## Accessibility & ergonomics
+
 - Strong contrast
 - Large tap targets
 - Clear labels

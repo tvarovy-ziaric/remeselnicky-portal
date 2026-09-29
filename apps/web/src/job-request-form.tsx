@@ -14,6 +14,8 @@ import React, {
   useState,
 } from "react";
 
+import { Stepper } from "./design-system";
+
 import {
   createJobRequestDraftClient,
   type JobRequestDraftClient,
@@ -63,9 +65,11 @@ interface EditorValues {
     | "ADVICE_NEEDED"
     | "COMBINATION";
   municipalityCode: string;
+  municipalityLabel: string;
   documentMediaAssetIds: readonly string[];
   photoMediaAssetIds: readonly string[];
   primaryProfessionCode: string;
+  primaryProfessionLabel: string;
   skillCodes: readonly string[];
   siteInspection: "" | "LIKELY" | "MAYBE" | "UNKNOWN";
   specializationCode: string;
@@ -73,6 +77,95 @@ interface EditorValues {
   textClarification: string;
   timingMode: "" | "AS_SOON_AS_POSSIBLE" | "SPECIFIC_PERIOD" | "FLEXIBLE";
   title: string;
+}
+
+export interface JobRequestReviewSummary {
+  readonly attachments: string;
+  readonly budget: string;
+  readonly municipality: string;
+  readonly profession: string;
+  readonly timing: string;
+  readonly work: string;
+}
+
+export function buildJobRequestReviewSummary(input: {
+  readonly attachmentCount: number;
+  readonly budgetMode: unknown;
+  readonly description: string;
+  readonly municipalityCode: string;
+  readonly municipalityLabel: string;
+  readonly primaryProfessionCode: string;
+  readonly primaryProfessionLabel: string;
+  readonly timingMode: unknown;
+}): JobRequestReviewSummary {
+  const attachmentCount =
+    Number.isSafeInteger(input.attachmentCount) && input.attachmentCount >= 0
+      ? input.attachmentCount
+      : 0;
+  return Object.freeze({
+    attachments: `${attachmentCount} pripojených`,
+    budget: reviewEnumLabel(input.budgetMode, {
+      RANGE: "Rozpätie",
+      UNKNOWN: "Neviem, chcem naceniť",
+      UP_TO: "Najviac do určitej sumy",
+    }),
+    municipality: managedSelectionLabel({
+      code: input.municipalityCode,
+      emptyLabel: "Chýba obec",
+      label: input.municipalityLabel,
+      selectedLabel: "Vybraná obec",
+    }),
+    profession: managedSelectionLabel({
+      code: input.primaryProfessionCode,
+      emptyLabel: "Chýba profesia",
+      label: input.primaryProfessionLabel,
+      selectedLabel: "Vybraná spravovaná služba",
+    }),
+    timing: reviewEnumLabel(input.timingMode, {
+      AS_SOON_AS_POSSIBLE: "Čo najskôr",
+      FLEXIBLE: "Som flexibilný/á",
+      SPECIFIC_PERIOD: "Konkrétny dátum alebo obdobie",
+    }),
+    work: input.description || "Chýba opis",
+  });
+}
+
+export function jobRequestAutosaveMessage(input: {
+  readonly dirty: boolean;
+  readonly hasDraft: boolean;
+  readonly lastConfirmedSaveAt: number | null;
+  readonly saving: boolean;
+}): string {
+  if (input.saving) return "Ukladám zmeny…";
+  const confirmed =
+    input.lastConfirmedSaveAt === null
+      ? null
+      : `Posledné uloženie potvrdené o ${new Intl.DateTimeFormat("sk-SK", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }).format(new Date(input.lastConfirmedSaveAt))}.`;
+  if (input.dirty) {
+    return confirmed === null
+      ? "Zmeny ešte nie sú uložené."
+      : `Zmeny ešte nie sú uložené. ${confirmed}`;
+  }
+  if (confirmed !== null) return confirmed;
+  return input.hasDraft
+    ? "Uložený koncept bol obnovený."
+    : "Zmeny sa uložia automaticky po úprave.";
+}
+
+export async function persistBeforeStepBack(input: {
+  readonly currentStep: number;
+  readonly move: (step: number) => void;
+  readonly save: () => Promise<boolean>;
+}): Promise<boolean> {
+  if (!Number.isSafeInteger(input.currentStep) || input.currentStep <= 0) {
+    return false;
+  }
+  if (!(await input.save())) return false;
+  input.move(input.currentStep - 1);
+  return true;
 }
 
 export function JobRequestForm({
@@ -91,12 +184,16 @@ export function JobRequestForm({
   const [step, setStep] = useState(0);
   const [reviewing, setReviewing] = useState(false);
   const [notice, setNotice] = useState("");
+  const [lastConfirmedSaveAt, setLastConfirmedSaveAt] = useState<number | null>(
+    null,
+  );
   const [mediaBusy, setMediaBusy] = useState(false);
   const [mediaStatuses, setMediaStatuses] = useState<
     readonly JobRequestMediaStatus[]
   >([]);
   const savedFingerprints = useRef(new Map<string, string>());
   const blockedAutosaveFingerprint = useRef<string | null>(null);
+  const saveInFlight = useRef<Promise<boolean> | null>(null);
   const hasProcessingMedia = mediaStatuses.some(
     (item) => item.status === "PROCESSING",
   );
@@ -125,7 +222,7 @@ export function JobRequestForm({
     };
   }, [client]);
 
-  const saveCurrent = useCallback(async (): Promise<boolean> => {
+  const performSaveCurrent = useCallback(async (): Promise<boolean> => {
     if (status !== "READY" || csrfToken === "") return false;
     let section: JobRequestContentSection;
     try {
@@ -163,9 +260,38 @@ export function JobRequestForm({
     savedFingerprints.current.set(section.key, section.canonicalPayload);
     blockedAutosaveFingerprint.current = null;
     setStatus("READY");
-    setNotice("Uložené");
+    setLastConfirmedSaveAt(Date.now());
     return true;
   }, [client, csrfToken, draft, status, step, values]);
+
+  const saveCurrent = useCallback((): Promise<boolean> => {
+    if (saveInFlight.current !== null) {
+      let requestedSection: JobRequestContentSection;
+      try {
+        requestedSection = sectionFromValues(
+          STEPS[step]?.key ?? "request.core",
+          values,
+        );
+      } catch {
+        return Promise.resolve(false);
+      }
+      return saveInFlight.current.then(
+        (saved) =>
+          saved &&
+          savedFingerprints.current.get(requestedSection.key) ===
+            requestedSection.canonicalPayload,
+      );
+    }
+    const pending = (async () => {
+      try {
+        return await performSaveCurrent();
+      } finally {
+        saveInFlight.current = null;
+      }
+    })();
+    saveInFlight.current = pending;
+    return pending;
+  }, [performSaveCurrent, step, values]);
 
   useEffect(() => {
     if (status !== "READY" || reviewing) return;
@@ -278,6 +404,18 @@ export function JobRequestForm({
     else setStep((current) => current + 1);
   };
 
+  const returnToPreviousStep = async () => {
+    const currentStep = step;
+    await persistBeforeStepBack({
+      currentStep,
+      move: (previousStep) =>
+        setStep((renderedStep) =>
+          renderedStep === currentStep ? previousStep : renderedStep,
+        ),
+      save: saveCurrent,
+    });
+  };
+
   const activate = async () => {
     if (draft === null || status !== "READY") return;
     setStatus("SAVING");
@@ -348,8 +486,21 @@ export function JobRequestForm({
       />
     );
 
+  const currentSectionDirty = isCurrentSectionDirty({
+    draft,
+    savedFingerprints: savedFingerprints.current,
+    step,
+    values,
+  });
+  const autosaveMessage = jobRequestAutosaveMessage({
+    dirty: !reviewing && currentSectionDirty,
+    hasDraft: draft !== null,
+    lastConfirmedSaveAt,
+    saving: status === "SAVING",
+  });
+
   return (
-    <main className="job-request-page">
+    <main className="job-request-page" id="main-content">
       <section
         className="job-request-shell"
         aria-labelledby="job-request-title"
@@ -364,17 +515,10 @@ export function JobRequestForm({
         {!reviewing ? (
           <>
             <nav aria-label="Postup vytvorenia dopytu">
-              <ol className="job-request-progress">
-                {STEPS.map((item, index) => (
-                  <li
-                    aria-current={index === step ? "step" : undefined}
-                    key={item.key}
-                  >
-                    <span>{index + 1}</span>
-                    {item.label}
-                  </li>
-                ))}
-              </ol>
+              <Stepper
+                current={step + 1}
+                steps={STEPS.map(({ label }) => label)}
+              />
             </nav>
             <div className="job-request-fields">
               {renderStep(
@@ -389,7 +533,7 @@ export function JobRequestForm({
             <div className="job-request-actions">
               <button
                 disabled={step === 0 || status === "SAVING"}
-                onClick={() => setStep((current) => Math.max(0, current - 1))}
+                onClick={() => void returnToPreviousStep()}
                 type="button"
               >
                 Späť
@@ -420,8 +564,13 @@ export function JobRequestForm({
           />
         )}
         <p aria-live="polite" className="job-request-notice">
-          {notice}
+          {autosaveMessage}
         </p>
+        {notice === "" ? null : (
+          <p aria-live="polite" className="job-request-notice">
+            {notice}
+          </p>
+        )}
       </section>
     </main>
   );
@@ -467,6 +616,7 @@ function renderStep(
               setValues((current) => ({
                 ...current,
                 primaryProfessionCode: "",
+                primaryProfessionLabel: "",
                 skillCodes: [],
                 specializationCode: "",
               }))
@@ -479,6 +629,8 @@ function renderStep(
                   suggestion.kind === "PROFESSION"
                     ? suggestion.code
                     : (suggestion.professionCodes[0] ?? ""),
+                primaryProfessionLabel:
+                  suggestion.kind === "PROFESSION" ? suggestion.label : "",
                 skillCodes:
                   suggestion.kind === "SKILL"
                     ? [suggestion.code]
@@ -510,6 +662,7 @@ function renderStep(
               setValues((current) => ({
                 ...current,
                 municipalityCode: "",
+                municipalityLabel: "",
               }))
             }
             selectedCode={values.municipalityCode}
@@ -517,6 +670,7 @@ function renderStep(
               setValues((current) => ({
                 ...current,
                 municipalityCode: suggestion.code,
+                municipalityLabel: suggestion.name,
               }))
             }
           />
@@ -915,37 +1069,44 @@ function Review({
   readonly onSubmit: () => void;
   readonly disabled: boolean;
 }) {
+  const summary = buildJobRequestReviewSummary({
+    attachmentCount:
+      values.photoMediaAssetIds.length + values.documentMediaAssetIds.length,
+    budgetMode: values.budgetMode,
+    description: values.description,
+    municipalityCode: values.municipalityCode,
+    municipalityLabel: values.municipalityLabel,
+    primaryProfessionCode: values.primaryProfessionCode,
+    primaryProfessionLabel: values.primaryProfessionLabel,
+    timingMode: values.timingMode,
+  });
   return (
     <div className="job-request-review">
       <h2>Skontrolujte dopyt</h2>
-      <ReviewRow
-        label="Práca"
-        value={values.description || "Chýba opis"}
-        onEdit={() => onEdit(0)}
-      />
+      <ReviewRow label="Práca" value={summary.work} onEdit={() => onEdit(0)} />
       <ReviewRow
         label="Profesia"
-        value={values.primaryProfessionCode || "Chýba profesia"}
+        value={summary.profession}
         onEdit={() => onEdit(0)}
       />
       <ReviewRow
         label="Obec"
-        value={values.municipalityCode || "Chýba obec"}
+        value={summary.municipality}
         onEdit={() => onEdit(1)}
       />
       <ReviewRow
         label="Termín"
-        value={values.timingMode || "Neuvedený"}
+        value={summary.timing}
         onEdit={() => onEdit(2)}
       />
       <ReviewRow
         label="Rozpočet"
-        value={values.budgetMode || "Neuvedený"}
+        value={summary.budget}
         onEdit={() => onEdit(3)}
       />
       <ReviewRow
         label="Prílohy"
-        value={`${values.photoMediaAssetIds.length + values.documentMediaAssetIds.length} pripojených`}
+        value={summary.attachments}
         onEdit={() => onEdit(5)}
       />
       <p className="privacy-note">
@@ -1007,7 +1168,7 @@ function FormMessage({
   readonly text: string;
 }) {
   return (
-    <main className="job-request-page">
+    <main className="job-request-page" id="main-content">
       <section className="job-request-shell">
         <p className="eyebrow">Dopyt</p>
         <h1>{title}</h1>
@@ -1148,7 +1309,9 @@ function valuesFromDraft(draft: JobRequestEditableDraft | null): EditorValues {
       "COMBINATION",
     ]),
     municipalityCode: stringValue(location?.["municipalityCode"]),
+    municipalityLabel: "",
     primaryProfessionCode: stringValue(core?.["primaryProfessionCode"]),
+    primaryProfessionLabel: "",
     photoMediaAssetIds: arrayOfStrings(media?.["photoMediaAssetIds"]),
     skillCodes: arrayOfStrings(core?.["skillCodes"]),
     siteInspection: enumValue(details?.["siteInspection"], [
@@ -1260,6 +1423,51 @@ function requirementLabel(value: string): string {
         : "povinné údaje";
 }
 
+function reviewEnumLabel(
+  value: unknown,
+  labels: Readonly<Record<string, string>>,
+): string {
+  return typeof value === "string" && Object.hasOwn(labels, value)
+    ? (labels[value] ?? "Neuvedené")
+    : "Neuvedené";
+}
+
+function managedSelectionLabel(input: {
+  readonly code: string;
+  readonly emptyLabel: string;
+  readonly label: string;
+  readonly selectedLabel: string;
+}): string {
+  if (input.code === "") return input.emptyLabel;
+  const label = input.label.trim();
+  return label !== "" && label !== input.code ? label : input.selectedLabel;
+}
+
+function isCurrentSectionDirty(input: {
+  readonly draft: JobRequestEditableDraft | null;
+  readonly savedFingerprints: ReadonlyMap<string, string>;
+  readonly step: number;
+  readonly values: EditorValues;
+}): boolean {
+  let section: JobRequestContentSection;
+  try {
+    section = sectionFromValues(
+      STEPS[input.step]?.key ?? "request.core",
+      input.values,
+    );
+  } catch {
+    return true;
+  }
+  if (
+    input.draft === null &&
+    section.key === "request.core" &&
+    !hasMeaningfulCoreInput(section)
+  ) {
+    return false;
+  }
+  return input.savedFingerprints.get(section.key) !== section.canonicalPayload;
+}
+
 function hasMeaningfulCoreInput(section: JobRequestContentSection): boolean {
   if (section.key !== "request.core") return false;
   const payload = section.payload as unknown as Record<string, unknown>;
@@ -1283,7 +1491,9 @@ const emptyValues: EditorValues = {
   exactAddress: "",
   materialResponsibility: "",
   municipalityCode: "",
+  municipalityLabel: "",
   primaryProfessionCode: "",
+  primaryProfessionLabel: "",
   photoMediaAssetIds: [],
   skillCodes: [],
   siteInspection: "",

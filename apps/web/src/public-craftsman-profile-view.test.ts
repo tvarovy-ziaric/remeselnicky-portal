@@ -7,6 +7,7 @@ import {
   portfolioDurationUnitLabel,
   portfolioPhotoPhaseLabel,
   priceModeLabel,
+  proficiencyLabel,
   publicProfileMetadata,
   publicPortfolioMediaPath,
 } from "./public-craftsman-profile-view";
@@ -33,6 +34,15 @@ describe("public craftsman profile view", () => {
     expect(
       publicPortfolioMediaPath("84000000-0000-4000-8000-000000000003"),
     ).toBe("/v1/public/media/84000000-0000-4000-8000-000000000003");
+  });
+
+  it("uses neutral labels instead of exposing unknown internal codes", () => {
+    expect(proficiencyLabel("FUTURE_LEVEL")).toBe("neuvedená úroveň");
+    expect(priceModeLabel("FUTURE_PRICE_MODE")).toBe("orientačne");
+    expect(portfolioDurationUnitLabel("FUTURE_UNIT")).toBe("obdobie");
+    expect(portfolioPhotoPhaseLabel("FUTURE_PHASE")).toBe(
+      "fotografia realizácie",
+    );
   });
 });
 

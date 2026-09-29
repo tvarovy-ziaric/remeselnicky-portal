@@ -17,9 +17,51 @@ describe("public search cards web boundary", () => {
     );
     expect(html).toContain('aria-label="Výsledky vyhľadávania"');
     expect(html).toContain("Majster Ján");
-    expect(html).toContain("Prečo sa zhoduje");
+    expect(html).toContain("Prečo sa hodí");
+    expect(html).toContain("Zobraziť profil");
+    expect(html).toContain(`/remeselnici/${profileId}`);
+    expect(html).toContain("Uvedené remeselníkom:");
     expect(html).not.toMatch(/Hodnotenie|Overené realizácie|email|telefón/iu);
     expect(html).not.toContain("Pozvať k zákazke");
+  });
+
+  it("renders only factual trust provenance and labels the portfolio image neutrally", () => {
+    const html = renderToStaticMarkup(
+      <PublicSearchCardList
+        cards={[
+          {
+            ...card(),
+            badges: [
+              {
+                kind: "EVIDENCE_SUPPORTED_PROFESSION",
+                label: "Odborná úroveň podporená dôkazmi",
+              },
+              {
+                kind: "VERIFIED_CREDENTIAL",
+                label: "Profesijné oprávnenie overené",
+              },
+              {
+                kind: "VERIFIED_PORTFOLIO",
+                label: "Portfólio podporené overenou realizáciou",
+              },
+            ],
+            rating: { reviewCount: 12, score: 4.8 },
+            representativePortfolioImage: {
+              mediaAssetId: "99000000-0000-4000-8000-000000000002",
+            },
+            verifiedWorkCount: 3,
+          },
+        ]}
+      />,
+    );
+
+    expect(html).toContain("Podložené dokladom:");
+    expect(html).toContain("Overené platformou:");
+    expect(html).toContain("Hodnotenie 4.8 z 5 (12)");
+    expect(html).toContain("Overené realizácie: 3");
+    expect(html).toContain("Ukážka z profilu – Majster Ján");
+    expect(html).toContain("<figcaption>Ukážka z profilu</figcaption>");
+    expect(html).not.toMatch(/overená fotografia|overený obrázok/iu);
   });
 
   it("renders invitation selection only in an explicit request context", () => {
@@ -116,6 +158,50 @@ describe("public search cards web boundary", () => {
           {
             ...card(),
             identity: { primaryName: "Majster", secondaryName: null },
+          },
+        ],
+        nextCursor: null,
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      loadResponse({
+        items: [
+          {
+            ...card(),
+            badges: [{ kind: "TRUST_ME", label: "Neznámy odznak" }],
+          },
+        ],
+        nextCursor: null,
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      loadResponse({
+        items: [
+          {
+            ...card(),
+            whyMatched: [{ kind: "SECRET_SCORE", text: "Skryté poradie" }],
+          },
+        ],
+        nextCursor: null,
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      loadResponse({
+        items: [
+          {
+            ...card(),
+            rating: { reviewCount: 0, score: 4.9 },
+          },
+        ],
+        nextCursor: null,
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      loadResponse({
+        items: [
+          {
+            ...card(),
+            rating: { reviewCount: 2, score: null },
           },
         ],
         nextCursor: null,

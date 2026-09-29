@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   PublicSearchForm,
   publicSearchLookupMessage,
+  publicSearchMunicipalityMessage,
 } from "./public-search-form";
 
 describe("PublicSearchForm", () => {
@@ -13,8 +14,12 @@ describe("PublicSearchForm", () => {
 
     expect(html).toContain("Začnite písať a vyberte návrh zo zoznamu.");
     expect(html).not.toContain('name="professionCode"');
+    expect(html).not.toContain('name="municipalityCode"');
     expect(html).not.toContain('role="status"');
     expect(html).toContain('disabled=""');
+    expect(html).toContain("Obec (nepovinné)");
+    expect(html.match(/role="combobox"/gu)).toHaveLength(2);
+    expect(html).toContain("Presnú adresu nezverejňujeme");
   });
 
   it("preserves only the opaque Job identifier across profession searches", () => {
@@ -23,7 +28,7 @@ describe("PublicSearchForm", () => {
     );
     expect(html).toContain('name="jobId"');
     expect(html).toContain('value="99000000-0000-4000-8000-000000000020"');
-    expect(html).not.toMatch(/jobRequestId|customer|address|contact/iu);
+    expect(html).not.toMatch(/jobRequestId|customer|exactAddress|contact/iu);
     const ambiguous = renderToStaticMarkup(
       <PublicSearchForm
         jobId="99000000-0000-4000-8000-000000000020"
@@ -63,5 +68,23 @@ describe("PublicSearchForm", () => {
         ],
       }),
     ).toBeNull();
+  });
+
+  it("describes optional municipality lookup without exposing an address", () => {
+    expect(publicSearchMunicipalityMessage(null)).toBeNull();
+    expect(
+      publicSearchMunicipalityMessage({
+        query: "Trn",
+        status: "loading",
+        items: [],
+      }),
+    ).toBe("Hľadáme obce…");
+    expect(
+      publicSearchMunicipalityMessage({
+        query: "Nenájdená obec",
+        status: "ready",
+        items: [],
+      }),
+    ).toContain("hľadajte bez lokality");
   });
 });

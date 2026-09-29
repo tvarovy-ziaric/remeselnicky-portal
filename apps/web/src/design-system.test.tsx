@@ -7,6 +7,8 @@ import {
   Button,
   FormField,
   Input,
+  ProfileHero,
+  SearchResultCard,
   TrustBadge,
 } from "./design-system";
 
@@ -57,5 +59,24 @@ describe("shared design-system primitives", () => {
     expect(markup).toContain('name="email"');
     expect(markup).toContain("Použite adresu");
     expect(markup).toContain("E-mail nie je platný");
+  });
+
+  it("keeps discovery cards and profile heroes semantic", () => {
+    const markup = renderToStaticMarkup(
+      <>
+        <SearchResultCard
+          facts={<span>Bratislava</span>}
+          profileHref="/remeselnici/profile-1"
+          title="Poctivý remeselník"
+        />
+        <ProfileHero eyebrow="Verejný profil" title="Poctivý remeselník" />
+      </>,
+    );
+
+    expect(markup).toContain("search-result-card--without-media");
+    expect(markup).toContain('href="/remeselnici/profile-1"');
+    expect(markup).toContain("Zobraziť profil");
+    expect(markup).toContain("profile-hero");
+    expect(markup).toContain("<h1>Poctivý remeselník</h1>");
   });
 });

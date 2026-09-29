@@ -1,6 +1,10 @@
 import { cache } from "react";
 
-import type { PublicSearchCardViewModel } from "./public-search-card-view";
+import type {
+  PublicSearchCardBadgeKind,
+  PublicSearchCardReasonKind,
+  PublicSearchCardViewModel,
+} from "./public-search-card-view";
 
 export interface PublicSearchCardPageViewModel {
   readonly items: readonly PublicSearchCardViewModel[];
@@ -16,6 +20,22 @@ const PUBLIC_SEARCH_PAGE_MAX_ITEMS = 50;
 const PUBLIC_SEARCH_CARD_MAX_PROFESSIONS = 20;
 const PUBLIC_SEARCH_CARD_MAX_BADGES = 5;
 const PUBLIC_SEARCH_CARD_MAX_REASONS = 5;
+const PUBLIC_SEARCH_CARD_BADGE_KINDS = new Set<PublicSearchCardBadgeKind>([
+  "EVIDENCE_SUPPORTED_PROFESSION",
+  "EVIDENCE_SUPPORTED_SKILL",
+  "EVIDENCE_SUPPORTED_SPECIALIZATION",
+  "VERIFIED_CREDENTIAL",
+  "VERIFIED_PORTFOLIO",
+]);
+const PUBLIC_SEARCH_CARD_REASON_KINDS = new Set<PublicSearchCardReasonKind>([
+  "AVAILABILITY",
+  "EVIDENCE_TRUST",
+  "GEO",
+  "PROFESSION",
+  "REQUIRED_QUALIFICATION",
+  "SKILL",
+  "SPECIALIZATION",
+]);
 
 export function createPublicSearchCardLoader(dependencies: LoaderDependencies) {
   const origin = internalApiOrigin(dependencies.apiOrigin);
@@ -86,8 +106,7 @@ function parseCard(value: unknown): PublicSearchCardViewModel | null {
       (!integer(location["approximateDistanceKm"]) ||
         location["approximateDistanceKm"] > 20_040)) ||
     !record(rating) ||
-    !integer(rating["reviewCount"]) ||
-    (rating["score"] !== null && !score(rating["score"])) ||
+    !ratingAggregate(rating["score"], rating["reviewCount"]) ||
     !integer(value["verifiedWorkCount"]) ||
     !Array.isArray(value["professions"]) ||
     value["professions"].length < 1 ||
@@ -105,10 +124,10 @@ function parseCard(value: unknown): PublicSearchCardViewModel | null {
     return null;
   }
   const professions = value["professions"].map(labelItem);
-  const badges = value["badges"].map(labelItem);
+  const badges = value["badges"].map(badgeItem);
   const reasons = value["whyMatched"].map((item) =>
-    record(item) && text(item["text"])
-      ? { kind: String(item["kind"]), text: item["text"] }
+    record(item) && reasonKind(item["kind"]) && text(item["text"])
+      ? { kind: item["kind"], text: item["text"] }
       : null,
   );
   if (
@@ -140,8 +159,8 @@ function parseCard(value: unknown): PublicSearchCardViewModel | null {
     professions: professions as PublicSearchCardViewModel["professions"],
     profileId: value["profileId"],
     rating: {
-      reviewCount: rating["reviewCount"],
-      score: rating["score"],
+      reviewCount: rating["reviewCount"] as number,
+      score: rating["score"] as number | null,
     },
     representativePortfolioImage:
       image === null ? null : { mediaAssetId: image["mediaAssetId"] as string },
@@ -154,6 +173,26 @@ function labelItem(value: unknown) {
   return record(value) && text(value["label"])
     ? { kind: String(value["kind"] ?? value["code"]), label: value["label"] }
     : null;
+}
+
+function badgeItem(value: unknown) {
+  return record(value) && badgeKind(value["kind"]) && text(value["label"])
+    ? { kind: value["kind"], label: value["label"] }
+    : null;
+}
+
+function badgeKind(value: unknown): value is PublicSearchCardBadgeKind {
+  return (
+    typeof value === "string" &&
+    PUBLIC_SEARCH_CARD_BADGE_KINDS.has(value as PublicSearchCardBadgeKind)
+  );
+}
+
+function reasonKind(value: unknown): value is PublicSearchCardReasonKind {
+  return (
+    typeof value === "string" &&
+    PUBLIC_SEARCH_CARD_REASON_KINDS.has(value as PublicSearchCardReasonKind)
+  );
 }
 
 function text(value: unknown): value is string {
@@ -175,8 +214,16 @@ function text(value: unknown): value is string {
 function integer(value: unknown): value is number {
   return Number.isSafeInteger(value) && (value as number) >= 0;
 }
-function score(value: unknown): value is number {
-  return typeof value === "number" && value >= 0 && value <= 5;
+function ratingAggregate(score: unknown, reviewCount: unknown): boolean {
+  return (
+    integer(reviewCount) &&
+    ((reviewCount === 0 && score === null) ||
+      (reviewCount > 0 &&
+        typeof score === "number" &&
+        Number.isFinite(score) &&
+        score >= 1 &&
+        score <= 5))
+  );
 }
 function uuid(value: unknown): value is string {
   return (

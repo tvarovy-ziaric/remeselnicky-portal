@@ -321,3 +321,90 @@ export function NextActionCard({
     </Card>
   );
 }
+
+export function SearchResultCard({
+  actions,
+  badges,
+  facts,
+  media,
+  profileHref,
+  reasons,
+  summary,
+  title,
+}: Readonly<{
+  actions?: ReactNode;
+  badges?: ReactNode;
+  facts: ReactNode;
+  media?: ReactNode;
+  profileHref: string;
+  reasons?: ReactNode;
+  summary?: ReactNode;
+  title: string;
+}>) {
+  return (
+    <Card
+      className={classes(
+        "search-result-card",
+        !media && "search-result-card--without-media",
+      )}
+    >
+      {media ? <div className="search-result-card__media">{media}</div> : null}
+      <div className="search-result-card__body">
+        <div className="search-result-card__heading">
+          <div>
+            <h2>
+              <a href={profileHref}>{title}</a>
+            </h2>
+            {summary ? (
+              <div className="search-result-card__summary">{summary}</div>
+            ) : null}
+          </div>
+          {badges ? (
+            <div className="search-result-card__badges">{badges}</div>
+          ) : null}
+        </div>
+        <div className="search-result-card__facts">{facts}</div>
+        {reasons ? (
+          <div className="search-result-card__reasons">{reasons}</div>
+        ) : null}
+        <div className="search-result-card__actions">
+          <ActionLink href={profileHref}>Zobraziť profil</ActionLink>
+          {actions}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+export function ProfileHero({
+  actions,
+  description,
+  eyebrow,
+  facts,
+  subtitle,
+  title,
+}: Readonly<{
+  actions?: ReactNode;
+  description?: ReactNode;
+  eyebrow: string;
+  facts?: ReactNode;
+  subtitle?: ReactNode;
+  title: string;
+}>) {
+  return (
+    <header className="profile-hero">
+      <div className="profile-hero__content">
+        <p className="ui-eyebrow">{eyebrow}</p>
+        <h1>{title}</h1>
+        {subtitle ? (
+          <div className="profile-hero__subtitle">{subtitle}</div>
+        ) : null}
+        {description ? (
+          <div className="profile-hero__description">{description}</div>
+        ) : null}
+        {facts ? <div className="profile-hero__facts">{facts}</div> : null}
+      </div>
+      {actions ? <div className="profile-hero__actions">{actions}</div> : null}
+    </header>
+  );
+}

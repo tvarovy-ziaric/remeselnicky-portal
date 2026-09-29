@@ -27,11 +27,11 @@
   },
   "typography": {
     "fontSans": ["Inter", "Manrope", "system-ui", "sans-serif"],
-    "h1": {"size": 40, "weight": 700, "lineHeight": 1.1},
-    "h2": {"size": 28, "weight": 700, "lineHeight": 1.2},
-    "h3": {"size": 22, "weight": 600, "lineHeight": 1.25},
-    "body": {"size": 16, "weight": 400, "lineHeight": 1.5},
-    "small": {"size": 14, "weight": 400, "lineHeight": 1.45}
+    "h1": { "size": 40, "weight": 700, "lineHeight": 1.1 },
+    "h2": { "size": 28, "weight": 700, "lineHeight": 1.2 },
+    "h3": { "size": 22, "weight": 600, "lineHeight": 1.25 },
+    "body": { "size": 16, "weight": 400, "lineHeight": 1.5 },
+    "small": { "size": 14, "weight": 400, "lineHeight": 1.45 }
   },
   "layout": {
     "maxContentWidth": 1200,
@@ -40,8 +40,8 @@
     "cardPadding": 24
   },
   "badges": {
-    "verified": {"background": "#E5F1EC", "text": "#285C4D"},
-    "evidence": {"background": "#E7EFF5", "text": "#356F8A"},
-    "declared": {"background": "#F0ECE5", "text": "#5E6864"}
+    "verified": { "background": "#E5F1EC", "text": "#285C4D" },
+    "evidence": { "background": "#E7EFF5", "text": "#356F8A" },
+    "declared": { "background": "#F0ECE5", "text": "#5E6864" }
   }
 }

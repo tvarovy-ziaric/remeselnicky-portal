@@ -33,9 +33,9 @@ different facts.
 ## Delivery layers
 
 1. **DONE** — tokens, shared primitives, public shell/navigation and home page.
-2. **ACTIVE** — search results and public craftsman profile.
-3. Request wizard and authentication hand-off.
-4. Dashboard, quote comparison and central job cockpit.
+2. **DONE** — search results and public craftsman profile.
+3. **DONE** — request wizard and authentication hand-off.
+4. **ACTIVE** — dashboard, quote comparison and central job cockpit.
 5. Authentication/onboarding and craftsman profile, portfolio and credentials.
 6. Secondary transactional, account, moderation and admin screens.
 7. Responsive/accessibility/visual consistency pass and release checks.
@@ -81,3 +81,19 @@ when a real route consumes them; placeholder capability is not shipped.
 Layer 2 will reuse the safe existing public projections. It will not broaden the
 public DTOs or infer verification: profile portfolio remains self-declared unless
 the backend explicitly supplies a stronger provenance.
+
+## Completed layers 2-3 evidence
+
+- Search now has an optional governed municipality selector, explicit profile
+  actions, provenance-aware cards and cursor pagination that preserves only
+  allowlisted filters and an unambiguous request/job context.
+- Search DTO parsing rejects unknown badge/reason kinds and incoherent rating
+  aggregates. Missing facts stay absent; profile images remain neutrally labelled.
+- Public profiles use a real hero, section navigation and image-first portfolio.
+  Portfolio is always marked self-declared, public contact data stays absent and
+  unknown internal codes fall back to neutral human text.
+- The request wizard keeps the existing six-step server-draft flow. Going back
+  waits for confirmation of the exact current payload; autosave reports only
+  confirmed persistence and review rows no longer expose managed codes/enums.
+- Integrated web verification passed: 73 test files / 372 tests, TypeScript,
+  ESLint, formatting, import boundaries and the optimized Next.js build.
