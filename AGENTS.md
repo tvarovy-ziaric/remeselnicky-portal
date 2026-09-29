@@ -21,6 +21,15 @@ The script reconstructs the canonical Markdown from the hash-verified source bun
 
 If code conflicts with a locked Dxx rule, the locked rule wins unless a human explicitly approves a product change.
 
+## UI/UX source of truth
+- `docs/design/DESIGN_CULTURE.md`
+- `docs/design/UX_GUIDELINES.md`
+- `docs/design/design-tokens.json`
+
+The reference boards under `docs/design/` are directional concepts, not
+pixel-perfect product specifications. Do not copy demo metrics, ratings, names
+or capabilities that the application does not actually provide.
+
 ## Required startup sequence
 At the start of every substantial run:
 1. Read this file.
