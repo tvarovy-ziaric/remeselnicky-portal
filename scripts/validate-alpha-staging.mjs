@@ -106,6 +106,12 @@ assert.match(
   /\$next = "\$baseRevision\$worktreeMarker-\$stamp-\$nonce"/u,
 );
 assert.match(alphaScript, /Set-Release \$previous/u);
+assert.match(alphaScript, /function Remove-ObsoleteApplicationImages/u);
+assert.match(
+  alphaScript,
+  /Remove-ObsoleteApplicationImages -ProtectedReleases @\(\$next, \$previous\)/u,
+);
+assert.doesNotMatch(alphaScript, /docker image prune[^\r\n]*--all/u);
 for (const dockerfile of appDockerfiles) {
   assert.match(
     dockerfile,

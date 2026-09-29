@@ -36,6 +36,42 @@ function Build-IfMissing([string]$Service, [string]$Image) {
   }
 }
 
+function Remove-ObsoleteApplicationImages([string[]]$ProtectedReleases) {
+  $protected = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+  foreach ($release in $ProtectedReleases) {
+    if (-not [string]::IsNullOrWhiteSpace($release)) {
+      [void]$protected.Add($release)
+    }
+  }
+
+  $repositories = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+  foreach ($service in @("api", "worker", "web")) {
+    [void]$repositories.Add("remeselnicky-alpha-$service")
+  }
+
+  $rows = @(& docker image ls --format '{{.Repository}}|{{.Tag}}')
+  if ($LASTEXITCODE -ne 0) { throw "Cannot list alpha application images for retention." }
+
+  $obsolete = @($rows | ForEach-Object {
+    $parts = $_ -split '\|', 2
+    if ($parts.Count -eq 2 -and
+        $repositories.Contains($parts[0]) -and
+        $parts[1] -ne '<none>' -and
+        -not $protected.Contains($parts[1])) {
+      "$($parts[0]):$($parts[1])"
+    }
+  } | Sort-Object -Unique)
+
+  foreach ($image in $obsolete) {
+    & docker image rm $image
+    if ($LASTEXITCODE -ne 0) {
+      throw "Cannot remove obsolete alpha image $image."
+    }
+  }
+
+  Write-Host "Alpha image retention removed $($obsolete.Count) obsolete image reference(s); current and rollback releases are preserved."
+}
+
 function Assert-Initialized {
   if (-not (Test-Path -LiteralPath $environment) -or -not (Test-Path -LiteralPath (Join-Path $state "secrets\session_secret"))) {
     throw "Run Alpha.ps1 -Action init first."
@@ -162,6 +198,7 @@ switch ($Action) {
       Set-Release $previous
       throw
     }
+    Remove-ObsoleteApplicationImages -ProtectedReleases @($next, $previous)
     break
   }
   "rollback" {
