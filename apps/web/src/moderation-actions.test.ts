@@ -1,6 +1,8 @@
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { parseActions } from "./moderation-actions";
+import { ModerationBoundaryNotice, parseActions } from "./moderation-actions";
 
 const action = {
   actionId: "aa230000-0000-4000-8000-000000000005",
@@ -18,6 +20,15 @@ const action = {
 };
 
 describe("moderation action projection", () => {
+  it("keeps appeals history-preserving and separate from commercial disputes", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(ModerationBoundaryNotice),
+    );
+    expect(html).toContain("Odvolanie opatrenie automaticky neruší");
+    expect(html).toContain("bežný spor o cenu alebo kvalitu práce");
+    expect(html).toContain("sporného prípadu");
+  });
+
   it("accepts only the privacy-minimal user-facing action shape", () => {
     expect(parseActions({ items: [action] })).toEqual([action]);
     expect(parseActions({ items: [{ ...action, active: "yes" }] })).toBeNull();

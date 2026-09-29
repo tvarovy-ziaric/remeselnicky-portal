@@ -8,6 +8,7 @@ import {
   parseParticipationHistoryPage,
   participationCapabilityHref,
   ParticipantHistory,
+  ParticipationHistoryView,
 } from "./participant-history";
 
 const participantId = "9d400000-0000-4000-8000-000000000011";
@@ -171,5 +172,24 @@ describe("own Job participation history", () => {
         leaveParticipation({ fetch: fetcher, participantId, commandId }),
       ).resolves.toBe("UNAVAILABLE");
     }
+  });
+
+  it("renders human lifecycle context and no internal profession code", () => {
+    const html = renderToStaticMarkup(
+      <ParticipationHistoryView
+        busyId={null}
+        error={null}
+        loadingMore={false}
+        notice={null}
+        onLeave={() => undefined}
+        onMore={() => undefined}
+        page={{ items: [item as never], nextCursor: null }}
+      />,
+    );
+    expect(html).toContain("Potvrdená účasť");
+    expect(html).toContain("Práce prebiehajú");
+    expect(html).toContain("Ukončiť moju účasť");
+    expect(html).not.toContain("PROF:ELECTRICIAN");
+    expect(html).not.toContain("IN_PROGRESS");
   });
 });

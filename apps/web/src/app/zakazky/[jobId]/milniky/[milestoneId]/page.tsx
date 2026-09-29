@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { AuthenticatedPageShell } from "../../../../../authenticated-page-shell";
 import { JobMilestoneDetail } from "../../../../../job-milestones";
 
 const uuid =
@@ -21,8 +22,8 @@ export default async function JobMilestonePage({
   const { jobId, milestoneId } = await params;
   if (!uuid.test(jobId) || !uuid.test(milestoneId)) notFound();
   return (
-    <main className="invitation-page">
+    <AuthenticatedPageShell current="Zákazky">
       <JobMilestoneDetail jobId={jobId} milestoneId={milestoneId} />
-    </main>
+    </AuthenticatedPageShell>
   );
 }

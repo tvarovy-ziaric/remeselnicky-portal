@@ -3,6 +3,16 @@
 import React, { useEffect, useRef, useState } from "react";
 
 import {
+  Button,
+  Card,
+  EmptyState,
+  FormField,
+  Input,
+  Notice,
+  Select,
+  StatusBadge,
+} from "./design-system";
+import {
   loadJobRequestTaxonomySuggestions,
   type JobRequestTaxonomySuggestion,
 } from "./job-request-taxonomy-client";
@@ -337,9 +347,9 @@ export async function confirmCapability(input: {
 
 function claimLabel(claim: CapabilityClaim): string {
   return claim.kind === "PROFESSION"
-    ? `Profesia ${claim.professionCode}`
+    ? "Profesia z katalógu"
     : claim.kind === "CANONICAL_SKILL"
-      ? `Zručnosť ${claim.skillCode}`
+      ? "Zručnosť z katalógu"
       : `Zručnosť ${claim.customSkillText}`;
 }
 
@@ -356,35 +366,44 @@ export function CapabilityClaimList({
     <ul className="participant-invitation-list">
       {page.items.map((claim) => (
         <li key={claim.claimId}>
-          <strong>{claimLabel(claim)}</strong>
-          <p>
-            {claim.status === "CONFIRMED"
-              ? "Potvrdená činnosť na tejto zákazke"
-              : "Návrh čaká na potvrdenie druhej strany – zatiaľ nejde o overený dôkaz."}
-          </p>
-          <p>
-            Navrhnuté:{" "}
-            <time dateTime={claim.proposedAt}>
-              {new Date(claim.proposedAt).toLocaleString("sk-SK")}
-            </time>
-          </p>
-          {claim.confirmedAt && (
+          <Card>
+            <StatusBadge
+              tone={claim.status === "CONFIRMED" ? "trust" : "warning"}
+            >
+              {claim.status === "CONFIRMED"
+                ? "◐ Potvrdené druhou stranou"
+                : "○ Návrh čaká na potvrdenie"}
+            </StatusBadge>
+            <h3>{claimLabel(claim)}</h3>
             <p>
-              Potvrdené:{" "}
-              <time dateTime={claim.confirmedAt}>
-                {new Date(claim.confirmedAt).toLocaleString("sk-SK")}
+              {claim.status === "CONFIRMED"
+                ? "Potvrdenie dokladá vykonanú činnosť na tejto zákazke; samo nemení úroveň odbornosti."
+                : "Zatiaľ ide iba o návrh, nie o overený dôkaz vykonanej práce."}
+            </p>
+            <p>
+              Navrhnuté:{" "}
+              <time dateTime={claim.proposedAt}>
+                {new Date(claim.proposedAt).toLocaleString("sk-SK")}
               </time>
             </p>
-          )}
-          {claim.canConfirm && (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => onConfirm(claim.claimId)}
-            >
-              Potvrdiť vykonanú činnosť
-            </button>
-          )}
+            {claim.confirmedAt && (
+              <p>
+                Potvrdené:{" "}
+                <time dateTime={claim.confirmedAt}>
+                  {new Date(claim.confirmedAt).toLocaleString("sk-SK")}
+                </time>
+              </p>
+            )}
+            {claim.canConfirm && (
+              <Button
+                type="button"
+                disabled={busy}
+                onClick={() => onConfirm(claim.claimId)}
+              >
+                Potvrdiť vykonanú činnosť
+              </Button>
+            )}
+          </Card>
         </li>
       ))}
     </ul>
@@ -602,34 +621,44 @@ export function ParticipantCapabilities({
     );
   return (
     <section aria-label="Profesie a zručnosti na zákazke">
-      <p>
-        Potvrdenie platí pre činnosť na tejto zákazke. Neudeľuje automaticky
-        vyššiu úroveň odbornosti.
-      </p>
-      {message && <p role="status">{message}</p>}
-      {error && <p role="alert">{error}</p>}
+      <Notice title="Čo sa tu potvrdzuje" tone="trust">
+        <p>
+          Potvrdenie platí len pre činnosť na tejto zákazke. Neudeľuje
+          automaticky vyššiu úroveň odbornosti.
+        </p>
+      </Notice>
+      {message && (
+        <Notice tone="success">
+          <p role="status">{message}</p>
+        </Notice>
+      )}
+      {error && (
+        <Notice tone="error">
+          <p role="alert">{error}</p>
+        </Notice>
+      )}
       {page.canPropose && (
-        <div className="job-roster-role-controls">
+        <Card className="job-roster-role-controls">
           <h2>Navrhnúť vykonanú činnosť</h2>
-          <label htmlFor="capability-kind">Typ</label>
-          <select
-            id="capability-kind"
-            value={kind}
-            disabled={busy || !!proposalAttempt.current}
-            onChange={(event) => {
-              setKind(event.target.value as Kind);
-              setSelected(null);
-              setQuery("");
-            }}
-          >
-            <option value="PROFESSION">Profesia</option>
-            <option value="CANONICAL_SKILL">Zručnosť z katalógu</option>
-            <option value="CUSTOM_SKILL">Vlastná zručnosť</option>
-          </select>
+          <FormField label="Typ">
+            <Select
+              id="capability-kind"
+              value={kind}
+              disabled={busy || !!proposalAttempt.current}
+              onChange={(event) => {
+                setKind(event.target.value as Kind);
+                setSelected(null);
+                setQuery("");
+              }}
+            >
+              <option value="PROFESSION">Profesia</option>
+              <option value="CANONICAL_SKILL">Zručnosť z katalógu</option>
+              <option value="CUSTOM_SKILL">Vlastná zručnosť</option>
+            </Select>
+          </FormField>
           {kind === "CUSTOM_SKILL" ? (
-            <>
-              <label htmlFor="capability-custom">Zručnosť</label>
-              <input
+            <FormField label="Zručnosť">
+              <Input
                 id="capability-custom"
                 maxLength={160}
                 value={
@@ -640,40 +669,42 @@ export function ParticipantCapabilities({
                 disabled={busy || !!proposalAttempt.current}
                 onChange={(event) => setCustom(event.target.value)}
               />
-            </>
+            </FormField>
           ) : (
             <>
-              <label htmlFor="capability-search">
-                Vyhľadať {kind === "PROFESSION" ? "profesiu" : "zručnosť"}
-              </label>
-              <input
-                id="capability-search"
-                value={query}
-                disabled={busy || !!proposalAttempt.current}
-                onChange={(event) => {
-                  setQuery(event.target.value);
-                  setSelected(null);
-                }}
-              />
+              <FormField
+                label={`Vyhľadať ${kind === "PROFESSION" ? "profesiu" : "zručnosť"}`}
+              >
+                <Input
+                  id="capability-search"
+                  value={query}
+                  disabled={busy || !!proposalAttempt.current}
+                  onChange={(event) => {
+                    setQuery(event.target.value);
+                    setSelected(null);
+                  }}
+                />
+              </FormField>
               {selected && <p>Vybrané: {selected.label}</p>}
               {suggestions.length > 0 && (
                 <ul>
                   {suggestions.map((item) => (
                     <li key={item.code}>
-                      <button
+                      <Button
                         type="button"
+                        variant="quiet"
                         disabled={busy || !!proposalAttempt.current}
                         onClick={() => setSelected(item)}
                       >
                         {item.label}
-                      </button>
+                      </Button>
                     </li>
                   ))}
                 </ul>
               )}
             </>
           )}
-          <button
+          <Button
             type="button"
             disabled={
               busy ||
@@ -687,12 +718,19 @@ export function ParticipantCapabilities({
               : proposalAttempt.current
                 ? "Zopakovať uložený návrh"
                 : "Odoslať návrh druhej strane"}
-          </button>
-        </div>
+          </Button>
+        </Card>
       )}
       <h2>Záznamy</h2>
       {page.items.length === 0 ? (
-        <p>Zatiaľ tu nie sú navrhnuté činnosti.</p>
+        <EmptyState
+          description={
+            <p>
+              Návrhy profesií a zručností vykonaných na zákazke sa zobrazia tu.
+            </p>
+          }
+          title="Zatiaľ tu nie sú navrhnuté činnosti"
+        />
       ) : (
         <CapabilityClaimList
           page={page}
@@ -701,13 +739,14 @@ export function ParticipantCapabilities({
         />
       )}
       {page.nextCursor && (
-        <button
+        <Button
           type="button"
+          variant="secondary"
           disabled={busy || loadingMore}
           onClick={() => void more()}
         >
           {loadingMore ? "Načítavam…" : "Načítať ďalšie záznamy"}
-        </button>
+        </Button>
       )}
     </section>
   );

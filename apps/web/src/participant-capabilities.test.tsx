@@ -202,7 +202,9 @@ describe("Job participant capability evidence", () => {
         onConfirm={() => undefined}
       />,
     );
-    expect(own).toContain("zatiaľ nejde o overený dôkaz");
+    expect(own).toContain("nie o overený dôkaz vykonanej práce");
+    expect(own).toContain("Návrh čaká na potvrdenie");
+    expect(own).not.toContain("PROF:ELECTRICIAN");
     expect(own).not.toContain("Potvrdiť vykonanú činnosť");
     const lead = {
       ...page,

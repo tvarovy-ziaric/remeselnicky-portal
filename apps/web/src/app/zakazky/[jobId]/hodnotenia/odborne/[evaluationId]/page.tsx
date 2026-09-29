@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { AuthenticatedPageShell } from "../../../../../../authenticated-page-shell";
 import { ReceivedSupervisorEvaluationDetail } from "../../../../../../job-supervisor-evaluation";
 
 const uuid =
@@ -21,11 +22,11 @@ export default async function SupervisorEvaluationPage({
   const { jobId, evaluationId } = await params;
   if (!uuid.test(jobId) || !uuid.test(evaluationId)) notFound();
   return (
-    <main className="invitation-page">
+    <AuthenticatedPageShell current="Zákazky">
       <ReceivedSupervisorEvaluationDetail
         jobId={jobId}
         evaluationId={evaluationId}
       />
-    </main>
+    </AuthenticatedPageShell>
   );
 }

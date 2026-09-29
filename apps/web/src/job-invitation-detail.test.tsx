@@ -4,7 +4,9 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   conversationHrefForState,
+  type InvitationDetailView,
   JobInvitationDetail,
+  JobInvitationDetailContent,
   loadJobInvitationDetail,
   submitJobInvitationAction,
 } from "./job-invitation-detail";
@@ -128,6 +130,31 @@ describe("job invitation detail", () => {
         expectedRevision: 2,
       }),
     );
+  });
+
+  it("renders neutral closed-state context without raw taxonomy codes", () => {
+    const invitation = {
+      ...detailFixture(),
+      state: "NOT_SELECTED",
+    } as unknown as InvitationDetailView;
+    const html = renderToStaticMarkup(
+      <JobInvitationDetailContent
+        actions={[]}
+        conversationHref={conversationHrefForState(
+          invitation.id,
+          invitation.state,
+        )}
+        invitation={invitation}
+        onAction={() => undefined}
+        pending={false}
+      />,
+    );
+    expect(html).toContain("Toto pozvanie už nie je vo výbere");
+    expect(html).toContain("Čo zákazník potrebuje");
+    expect(html).toContain("Otvoriť súkromnú konverzáciu");
+    expect(html).not.toContain("NOT_SELECTED");
+    expect(html).not.toContain("PROF:ROOFER");
+    expect(html).not.toContain("SK0101528595");
   });
 });
 

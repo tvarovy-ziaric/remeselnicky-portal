@@ -6,6 +6,7 @@ import {
   loadJobParticipantDetail,
   parseJobParticipantDetail,
   ParticipantDetail,
+  ParticipantDetailView,
 } from "./participant-detail";
 
 const participantId = "9d400000-0000-4000-8000-000000000011";
@@ -111,5 +112,24 @@ describe("private Job participation detail", () => {
     await expect(
       loadJobParticipantDetail({ fetch: fetcher, participantId }),
     ).resolves.toEqual({ status: "AUTH_REQUIRED" });
+  });
+
+  it("renders state, context and next action without leaking taxonomy codes", () => {
+    const html = renderToStaticMarkup(
+      <ParticipantDetailView
+        busy={false}
+        context="INVITATION"
+        detail={detail as never}
+        error={null}
+        notice={null}
+        onDecide={() => undefined}
+        onLeave={() => undefined}
+      />,
+    );
+    expect(html).toContain("Čaká na vaše rozhodnutie");
+    expect(html).toContain("Zákazka je potvrdená");
+    expect(html).toContain("Rozhodnite o pozvaní");
+    expect(html).toContain("Prijať účasť");
+    expect(html).not.toContain("PROF:ALPHA_SYNTHETIC");
   });
 });

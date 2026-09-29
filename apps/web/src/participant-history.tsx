@@ -2,6 +2,15 @@
 
 import React, { useEffect, useRef, useState } from "react";
 
+import {
+  ActionLink,
+  Button,
+  Card,
+  EmptyState,
+  Notice,
+  StatusBadge,
+} from "./design-system";
+
 const uuid =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const isoDate = (value: unknown): value is string =>
@@ -211,9 +220,24 @@ export async function leaveParticipation(input: {
 
 const labels: Record<State, string> = {
   ACCEPTED: "Potvrdená účasť",
-  DECLINED: "Odmietnuté pozvanie",
+  DECLINED: "Pozvanie bolo odmietnuté",
   LEFT: "Účasť ste ukončili",
   REMOVED: "Účasť ukončil hlavný poskytovateľ",
+};
+
+const tones: Record<State, "default" | "success" | "warning" | "trust"> = {
+  ACCEPTED: "success",
+  DECLINED: "default",
+  LEFT: "default",
+  REMOVED: "default",
+};
+
+const jobStateLabels: Record<ParticipationHistoryItem["jobState"], string> = {
+  CONFIRMED: "Zákazka je potvrdená",
+  IN_PROGRESS: "Práce prebiehajú",
+  COMPLETION_REQUESTED: "Čaká sa na potvrdenie dokončenia",
+  COMPLETED: "Zákazka je dokončená",
+  CANCELLED: "Zákazka bola zrušená",
 };
 
 export function participationCapabilityHref(
@@ -315,72 +339,128 @@ export function ParticipantHistory() {
       </p>
     );
   return (
+    <ParticipationHistoryView
+      busyId={busyId}
+      error={error}
+      loadingMore={loadingMore}
+      notice={notice}
+      onLeave={(participantId) => void leave(participantId)}
+      onMore={() => void more()}
+      page={page}
+    />
+  );
+}
+
+export function ParticipationHistoryView({
+  busyId,
+  error,
+  loadingMore,
+  notice,
+  onLeave,
+  onMore,
+  page,
+}: {
+  readonly busyId: string | null;
+  readonly error: string | null;
+  readonly loadingMore: boolean;
+  readonly notice: string | null;
+  readonly onLeave: (participantId: string) => void;
+  readonly onMore: () => void;
+  readonly page: ParticipationHistoryPage;
+}) {
+  return (
     <section aria-label="Moja história účasti">
-      {notice && <p role="status">{notice}</p>}
-      {error && <p role="alert">{error}</p>}
-      {page.items.length === 0 && <p>Zatiaľ nemáte žiadnu históriu účasti.</p>}
+      {notice && (
+        <Notice tone="success">
+          <p role="status">{notice}</p>
+        </Notice>
+      )}
+      {error && (
+        <Notice tone="error">
+          <p role="alert">{error}</p>
+        </Notice>
+      )}
+      {page.items.length === 0 && (
+        <EmptyState
+          action={
+            <ActionLink href="/ucasti/pozvanky">Čakajúce pozvánky</ActionLink>
+          }
+          description={
+            <p>Prijaté, odmietnuté a ukončené účasti sa zobrazia tu.</p>
+          }
+          title="Zatiaľ nemáte históriu účasti"
+        />
+      )}
       <ul className="participant-invitation-list">
         {page.items.map((item) => (
           <li key={item.participantId}>
-            <h2>{labels[item.state]}</h2>
-            <p>Hlavný poskytovateľ: {item.providerDisplayName}</p>
-            <p>
-              Obec: {item.municipalityName} · Profesia:{" "}
-              {item.primaryProfessionCode}
-            </p>
-            <p>
-              Pozvaný/á:{" "}
-              <time dateTime={item.invitedAt}>
-                {new Date(item.invitedAt).toLocaleString("sk-SK")}
-              </time>
-            </p>
-            {item.acceptedAt && (
+            <Card>
+              <StatusBadge tone={tones[item.state]}>
+                {labels[item.state]}
+              </StatusBadge>{" "}
+              <StatusBadge tone="trust">
+                {jobStateLabels[item.jobState]}
+              </StatusBadge>
+              <h2>Účasť na zákazke</h2>
+              <p>Hlavný poskytovateľ: {item.providerDisplayName}</p>
+              <p>Obec zákazky: {item.municipalityName}</p>
               <p>
-                Prijaté:{" "}
-                <time dateTime={item.acceptedAt}>
-                  {new Date(item.acceptedAt).toLocaleString("sk-SK")}
+                Pozvanie prišlo:{" "}
+                <time dateTime={item.invitedAt}>
+                  {new Date(item.invitedAt).toLocaleString("sk-SK")}
                 </time>
               </p>
-            )}
-            {item.leftAt && (
-              <p>
-                Ukončené:{" "}
-                <time dateTime={item.leftAt}>
-                  {new Date(item.leftAt).toLocaleString("sk-SK")}
-                </time>
-              </p>
-            )}
-            {participationCapabilityHref(item) && (
-              <p>
-                <a href={participationCapabilityHref(item) ?? undefined}>
-                  Profesie a zručnosti na zákazke
-                </a>
-              </p>
-            )}
-            {item.state === "ACCEPTED" &&
-              (item.jobState === "CONFIRMED" ||
-                item.jobState === "IN_PROGRESS") && (
-                <button
-                  disabled={busyId !== null}
-                  onClick={() => void leave(item.participantId)}
-                  type="button"
-                >
-                  {busyId === item.participantId
-                    ? "Ukončujem…"
-                    : "Ukončiť moju účasť"}
-                </button>
+              {item.acceptedAt && (
+                <p>
+                  Prijaté:{" "}
+                  <time dateTime={item.acceptedAt}>
+                    {new Date(item.acceptedAt).toLocaleString("sk-SK")}
+                  </time>
+                </p>
               )}
+              {item.leftAt && (
+                <p>
+                  Ukončené:{" "}
+                  <time dateTime={item.leftAt}>
+                    {new Date(item.leftAt).toLocaleString("sk-SK")}
+                  </time>
+                </p>
+              )}
+              {participationCapabilityHref(item) && (
+                <ActionLink
+                  href={participationCapabilityHref(item) ?? "#"}
+                  variant="secondary"
+                >
+                  Profesie a zručnosti na zákazke
+                </ActionLink>
+              )}
+              {item.state === "ACCEPTED" &&
+                (item.jobState === "CONFIRMED" ||
+                  item.jobState === "IN_PROGRESS") && (
+                  <Button
+                    disabled={busyId !== null}
+                    onClick={() => onLeave(item.participantId)}
+                    type="button"
+                    variant="destructive"
+                  >
+                    {busyId === item.participantId
+                      ? "Ukončujem…"
+                      : "Ukončiť moju účasť"}
+                  </Button>
+                )}
+            </Card>
           </li>
         ))}
       </ul>
       {page.nextCursor && (
-        <button
+        <Button
           disabled={loadingMore || busyId !== null}
-          onClick={() => void more()}
+          onClick={onMore}
           type="button"
+          variant="secondary"
         >
           {loadingMore ? "Načítavam…" : "Načítať ďalšiu históriu"}
-        </button>
+        </Button>
       )}
     </section>
   );

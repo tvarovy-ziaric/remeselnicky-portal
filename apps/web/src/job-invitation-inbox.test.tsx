@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   JobInvitationInbox,
+  JobInvitationInboxView,
   loadJobInvitationInbox,
 } from "./job-invitation-inbox";
 
@@ -63,5 +64,28 @@ describe("job invitation inbox", () => {
     await expect(loadJobInvitationInbox({ fetch: fetcher })).resolves.toEqual({
       status: "UNAVAILABLE",
     });
+  });
+
+  it("renders human state, context and a clear next action without raw state", () => {
+    const html = renderToStaticMarkup(
+      <JobInvitationInboxView
+        items={[
+          {
+            changedAt: "2026-09-15T08:00:00.000Z",
+            counterpartDisplayName: "Majster Test",
+            expiresAt: "2026-09-22T08:00:00.000Z",
+            id: invitationId,
+            perspective: "CUSTOMER",
+            requestTitle: "Oprava strechy",
+            revision: 2,
+            state: "NOT_SELECTED",
+          },
+        ]}
+      />,
+    );
+    expect(html).toContain('class="ui-card"');
+    expect(html).toContain("Toto pozvanie už nie je vo výbere");
+    expect(html).toContain("Otvoriť pozvanie");
+    expect(html).not.toContain("NOT_SELECTED");
   });
 });

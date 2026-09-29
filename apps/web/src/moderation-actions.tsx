@@ -1,6 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import React, { useCallback, useEffect, useState, type FormEvent } from "react";
+
+import {
+  Button,
+  Card,
+  EmptyState,
+  FormField,
+  Notice,
+  PageHeader,
+  StatusBadge,
+  Textarea,
+} from "./design-system";
 
 interface ModerationActionView {
   readonly actionId: string;
@@ -92,23 +103,36 @@ export function ModerationActions() {
   if (state.status === "ERROR")
     return <p aria-live="polite">Opatrenia teraz nie sú dostupné.</p>;
   return (
-    <section aria-labelledby="moderation-actions-title">
-      <p className="eyebrow">Bezpečnosť účtu</p>
-      <h1 id="moderation-actions-title">Moderovanie a odvolania</h1>
-      <p>
-        Tu vidíte opatrenia, ktoré sa týkajú vášho účtu alebo obsahu. Odvolanie
-        nemení opatrenie automaticky; tím ho samostatne preskúma.
-      </p>
+    <section className="moderation-account">
+      <PageHeader
+        eyebrow="Bezpečnosť účtu"
+        lead={
+          <p>
+            Tu vidíte opatrenia, ktoré sa týkajú vášho účtu alebo obsahu, a ich
+            zachovanú históriu.
+          </p>
+        }
+        title="Moderovanie a odvolania"
+      />
+      <ModerationBoundaryNotice />
       {notice ? <p role="status">{notice}</p> : null}
       {state.items.length === 0 ? (
-        <p>Nemáte žiadne moderátorské opatrenie.</p>
+        <EmptyState
+          description="Na vašom účte ani obsahu neevidujeme moderátorské opatrenie."
+          title="Žiadne aktívne opatrenia"
+        />
       ) : (
-        <ol className="admin-list">
+        <ol className="moderation-action-list">
           {state.items.map((item) => (
             <li key={item.actionId}>
-              <article>
-                <p className="eyebrow">{item.policyCategory}</p>
+              <Card className="moderation-action-card">
+                <p className="ui-eyebrow">
+                  {policyCategoryLabel(item.policyCategory)}
+                </p>
                 <h2>{actionLabel(item.action)}</h2>
+                <StatusBadge tone={item.active ? "warning" : "default"}>
+                  {item.active ? "Aktívne" : "Ukončené"}
+                </StatusBadge>
                 <p>{item.userFacingReason}</p>
                 <dl>
                   <dt>Rozsah</dt>
@@ -129,41 +153,48 @@ export function ModerationActions() {
                 {item.appealId ? (
                   <p>Odvolanie: {appealLabel(item.appealState)}</p>
                 ) : (
-                  <button
+                  <Button
                     type="button"
                     onClick={() => setSelected(item.actionId)}
+                    variant="secondary"
                   >
                     Požiadať o opätovné posúdenie
-                  </button>
+                  </Button>
                 )}
-              </article>
+              </Card>
             </li>
           ))}
         </ol>
       )}
       {selected ? (
-        <form onSubmit={(event) => void submitAppeal(event)}>
-          <label htmlFor="moderation-appeal-explanation">
-            Vysvetlenie alebo nové skutočnosti
-          </label>
-          <textarea
-            id="moderation-appeal-explanation"
-            maxLength={4_000}
-            required
-            value={explanation}
-            onChange={(event) => setExplanation(event.target.value)}
-          />
-          <button disabled={pending} type="submit">
-            {pending ? "Odosielam…" : "Odoslať odvolanie"}
-          </button>
-          <button
-            disabled={pending}
-            type="button"
-            onClick={() => setSelected(null)}
-          >
-            Zrušiť
-          </button>
-        </form>
+        <Card className="moderation-appeal-card">
+          <form onSubmit={(event) => void submitAppeal(event)}>
+            <h2>Žiadosť o opätovné posúdenie</h2>
+            <FormField
+              description="Uveďte nové skutočnosti alebo vysvetlenie. Pôvodné opatrenie a história zostanú zachované."
+              label="Vysvetlenie alebo nové skutočnosti"
+            >
+              <Textarea
+                id="moderation-appeal-explanation"
+                maxLength={4_000}
+                required
+                value={explanation}
+                onChange={(event) => setExplanation(event.target.value)}
+              />
+            </FormField>
+            <Button disabled={pending} type="submit">
+              {pending ? "Odosielam…" : "Odoslať odvolanie"}
+            </Button>
+            <Button
+              disabled={pending}
+              type="button"
+              onClick={() => setSelected(null)}
+              variant="quiet"
+            >
+              Zrušiť
+            </Button>
+          </form>
+        </Card>
       ) : null}
     </section>
   );
@@ -234,7 +265,31 @@ function scopeLabel(value: string): string {
       QUOTING: "ponuky",
       REVIEWS: "hodnotenia",
       ACCOUNT: "účet",
-    }[value] ?? value
+    }[value] ?? "iný rozsah"
+  );
+}
+
+function policyCategoryLabel(value: string): string {
+  return (
+    {
+      HARASSMENT_ABUSE: "Obťažovanie alebo zneužitie",
+      IMPERSONATION_MISREPRESENTATION: "Vydávanie sa za inú osobu",
+      INAPPROPRIATE_CONTENT: "Nevhodný obsah",
+      PERSONAL_DATA_PRIVACY: "Súkromie a osobné údaje",
+      SPAM_SCAM: "Spam alebo podvod",
+    }[value] ?? "Pravidlá platformy"
+  );
+}
+
+export function ModerationBoundaryNotice() {
+  return (
+    <Notice title="Opätovné posúdenie zachováva históriu">
+      <p>
+        Odvolanie opatrenie automaticky neruší. Tím ho samostatne preskúma;
+        bežný spor o cenu alebo kvalitu práce patrí do procesu sporného prípadu,
+        nie do moderovania.
+      </p>
+    </Notice>
   );
 }
 function appealLabel(value: string | null): string {

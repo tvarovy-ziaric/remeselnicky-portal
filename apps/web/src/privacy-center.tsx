@@ -1,6 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
+
+import {
+  Button,
+  Card,
+  EmptyState,
+  FormField,
+  Notice,
+  Select,
+  StatusBadge,
+} from "./design-system";
 
 const requestTypes = [
   "ACCESS",
@@ -117,110 +127,163 @@ export function PrivacyCenter() {
     }
   }
 
+  const closureRequestUnavailable =
+    requestType === "ACCOUNT_CLOSURE" &&
+    state.status === "READY" &&
+    !state.readiness.canRequestClosure;
+
   return (
-    <section aria-labelledby="privacy-title" className="privacy-center">
-      <p className="eyebrow">Účet</p>
-      <h1 id="privacy-title">Súkromie a moje údaje</h1>
-      <p>
-        Požiadajte o prístup, opravu, výmaz, obmedzenie, prenos údajov,
-        namietanie alebo zatvorenie účtu. Žiadosti preveruje oprávnený správca;
-        samotné odoslanie nič automaticky nemaže.
-      </p>
+    <div className="privacy-center">
+      <Notice title="Žiadosť spustí kontrolovaný proces" tone="trust">
+        <p>
+          Odoslanie žiadosti samo osebe nič okamžite nemaže ani nemení.
+          Oprávnený správca najprv overí identitu a rozsah žiadosti.
+        </p>
+      </Notice>
 
-      <div className="privacy-request-form">
-        <label htmlFor="privacy-request-type">Typ žiadosti</label>
-        <select
-          id="privacy-request-type"
-          value={requestType}
-          onChange={(event) =>
-            setRequestType(event.target.value as RequestType)
-          }
-        >
-          {requestTypes.map((type) => (
-            <option key={type} value={type}>
-              {requestTypeLabel(type)}
-            </option>
-          ))}
-        </select>
-        {requestType === "ACCOUNT_CLOSURE" ? (
-          <div className="privacy-warning">
-            <strong>Zatvorenie účtu je kontrolovaný proces.</strong>
-            <span>
-              Verejné zobrazenie a prístup sa po overení deaktivujú ako prvé.
-              Zdieľaná obchodná história sa nemaže kaskádovo; každá kategória
-              údajov sa posúdi na výmaz, anonymizáciu alebo odôvodnené
-              uchovanie.
-            </span>
-            {state.status === "READY" &&
-            state.readiness.executionBlockedByOpenObligations ? (
-              <span role="status">
-                Vykonanie je momentálne blokované aktívnou zákazkou alebo
-                otvoreným sporom. Žiadosť môžete odoslať už teraz.
-              </span>
-            ) : null}
+      <div className="privacy-center__layout">
+        <Card className="privacy-request-card privacy-request-form">
+          <h2>Nová žiadosť</h2>
+          <FormField
+            description="Vyberte, čo chcete vyriešiť. Stav potom uvidíte v histórii."
+            label="Typ žiadosti"
+          >
+            <Select
+              id="privacy-request-type"
+              value={requestType}
+              onChange={(event) =>
+                setRequestType(event.target.value as RequestType)
+              }
+            >
+              {requestTypes.map((type) => (
+                <option key={type} value={type}>
+                  {requestTypeLabel(type)}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+          {requestType === "ACCOUNT_CLOSURE" ? (
+            <Notice
+              title="Zatvorenie účtu nie je okamžitý výmaz"
+              tone="warning"
+            >
+              <p>
+                Po overení sa samostatne posúdi deaktivácia účtu, anonymizácia
+                alebo výmaz údajov. Zdieľaná história zákaziek sa nemaže
+                kaskádovo.
+              </p>
+              {state.status === "READY" &&
+              state.readiness.executionBlockedByOpenObligations ? (
+                <p role="status">
+                  Vykonanie je momentálne blokované aktívnou zákazkou alebo
+                  otvoreným sporom. Žiadosť môžete odoslať už teraz a záväzky
+                  dokončiť v existujúcom pracovnom postupe.
+                </p>
+              ) : null}
+              {closureRequestUnavailable ? (
+                <p role="status">
+                  Novú žiadosť o zatvorenie účtu momentálne nemožno odoslať.
+                </p>
+              ) : null}
+            </Notice>
+          ) : null}
+          <div className="privacy-request-card__actions">
+            <Button
+              disabled={
+                submitting ||
+                state.status === "LOADING" ||
+                closureRequestUnavailable
+              }
+              type="button"
+              onClick={() => void submitRequest()}
+            >
+              {submitting ? "Odosielam…" : "Odoslať žiadosť"}
+            </Button>
           </div>
-        ) : null}
-        <button
-          disabled={submitting || state.status === "LOADING"}
-          type="button"
-          onClick={() => void submitRequest()}
-        >
-          {submitting ? "Odosielam…" : "Odoslať žiadosť"}
-        </button>
-      </div>
+        </Card>
 
-      {notice ? <p role="status">{notice}</p> : null}
-      {state.status === "LOADING" ? (
-        <p aria-live="polite">Načítavam žiadosti…</p>
-      ) : null}
-      {state.status === "ERROR" ? (
-        <p aria-live="polite">Súkromné žiadosti teraz nie sú dostupné.</p>
-      ) : null}
-      {state.status === "READY" ? (
-        <section
-          className="privacy-request-history"
-          aria-labelledby="history-title"
+        <div
+          aria-labelledby="privacy-history-title"
+          className="privacy-history privacy-request-history"
+          role="region"
         >
-          <h2 id="history-title">Moje žiadosti</h2>
-          {state.items.length === 0 ? (
-            <p>Zatiaľ nemáte žiadnu žiadosť.</p>
-          ) : (
-            <ol>
+          <h2 id="privacy-history-title">Moje žiadosti</h2>
+          {notice ? (
+            <Notice title="Aktualizácia žiadosti" tone="trust">
+              <p role="status">{notice}</p>
+            </Notice>
+          ) : null}
+          {state.status === "LOADING" ? (
+            <Notice title="Načítavam históriu" tone="trust">
+              <p aria-live="polite">Načítavam žiadosti…</p>
+            </Notice>
+          ) : null}
+          {state.status === "ERROR" ? (
+            <Notice title="História nie je dostupná" tone="error">
+              <p aria-live="polite">
+                Súkromné žiadosti teraz nie sú dostupné. Skúste stránku obnoviť.
+              </p>
+            </Notice>
+          ) : null}
+          {state.status === "READY" && state.items.length === 0 ? (
+            <EmptyState
+              description="Po odoslaní sa tu zobrazí stav spracovania."
+              title="Zatiaľ bez žiadostí"
+            />
+          ) : null}
+          {state.status === "READY" && state.items.length > 0 ? (
+            <ol className="privacy-history__list">
               {state.items.map((item) => (
                 <li key={item.caseId}>
-                  <strong>{requestTypeLabel(item.requestType)}</strong>
-                  <span>{requestStateLabel(item.state)}</span>
-                  <small>
-                    Prijaté{" "}
-                    <time dateTime={item.receivedAt}>
-                      {new Date(item.receivedAt).toLocaleString("sk-SK")}
-                    </time>
-                  </small>
-                  {item.deadlineAt === null ? null : (
-                    <small>
-                      Termín:{" "}
-                      {new Date(item.deadlineAt).toLocaleDateString("sk-SK")}
-                    </small>
-                  )}
-                  {privacyExportHref(item) === null ? null : (
-                    <>
-                      <a download href={privacyExportHref(item) ?? undefined}>
-                        Stiahnuť základný JSON export
-                      </a>
-                      <small>
-                        Základný export obsahuje údaje viazané iba na vás.
-                        Zdieľané obchodné záznamy a súbory doplní správca po
-                        kontrole práv ostatných osôb.
-                      </small>
-                    </>
-                  )}
+                  <Card className="privacy-history-card">
+                    <header className="privacy-history-card__header">
+                      <h3>{requestTypeLabel(item.requestType)}</h3>
+                      <StatusBadge tone={requestStateTone(item.state)}>
+                        {requestStateLabel(item.state)}
+                      </StatusBadge>
+                    </header>
+                    <div className="privacy-history-card__meta">
+                      <p>
+                        Prijaté{" "}
+                        <time dateTime={item.receivedAt}>
+                          {new Date(item.receivedAt).toLocaleString("sk-SK")}
+                        </time>
+                      </p>
+                      {item.deadlineAt === null ? null : (
+                        <p>
+                          Očakávaný termín:{" "}
+                          <time dateTime={item.deadlineAt}>
+                            {new Date(item.deadlineAt).toLocaleDateString(
+                              "sk-SK",
+                            )}
+                          </time>
+                        </p>
+                      )}
+                    </div>
+                    {privacyExportHref(item) === null ? null : (
+                      <div className="privacy-history-card__export">
+                        <a
+                          className="ui-button ui-button--secondary"
+                          download
+                          href={privacyExportHref(item) ?? undefined}
+                        >
+                          Stiahnuť základný JSON export
+                        </a>
+                        <p>
+                          Základný export obsahuje údaje viazané iba na vás.
+                          Zdieľané obchodné záznamy a súbory doplní správca po
+                          kontrole práv ostatných osôb.
+                        </p>
+                      </div>
+                    )}
+                  </Card>
                 </li>
               ))}
             </ol>
-          )}
-        </section>
-      ) : null}
-    </section>
+          ) : null}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -319,6 +382,19 @@ function requestStateLabel(value: RequestState): string {
     REJECTED: "Ukončená bez vykonania",
     VERIFIED: "Identita overená",
   }[value];
+}
+function requestStateTone(
+  value: RequestState,
+): "default" | "error" | "success" | "trust" | "warning" {
+  return value === "COMPLETED"
+    ? "success"
+    : value === "REJECTED"
+      ? "error"
+      : value === "ACTION_REQUIRED"
+        ? "warning"
+        : value === "VERIFIED" || value === "IN_REVIEW"
+          ? "trust"
+          : "default";
 }
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

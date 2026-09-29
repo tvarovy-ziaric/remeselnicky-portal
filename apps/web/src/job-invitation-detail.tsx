@@ -3,6 +3,15 @@
 import React, { useEffect, useRef, useState } from "react";
 
 import {
+  ActionLink,
+  Button,
+  Card,
+  NextActionCard,
+  Notice,
+  PageHeader,
+  StatusBadge,
+} from "./design-system";
+import {
   observeActualVisibility,
   recordQuoteComparisonObservation,
 } from "./quote-comparison";
@@ -182,29 +191,57 @@ export function JobInvitationDetail({
   }
 
   return (
-    <article className="invitation-detail" ref={invitationElement}>
-      <header>
-        <p className="eyebrow">Pozvanie k zákazke</p>
-        <h1>{invitation.request.title}</h1>
-        <p>
-          {invitation.counterpartDisplayName} · {stateLabel(invitation.state)}
-        </p>
-      </header>
+    <JobInvitationDetailContent
+      actions={actions}
+      conversationHref={conversationHref}
+      invitation={invitation}
+      invitationRef={invitationElement}
+      onAction={(action) => void run(action)}
+      pending={pending}
+    />
+  );
+}
+
+export function JobInvitationDetailContent({
+  actions,
+  conversationHref,
+  invitation,
+  invitationRef,
+  onAction,
+  pending,
+}: {
+  readonly actions: readonly Action[];
+  readonly conversationHref: string | null;
+  readonly invitation: InvitationDetailView;
+  readonly invitationRef?: React.Ref<HTMLElement>;
+  readonly onAction: (action: Action) => void;
+  readonly pending: boolean;
+}) {
+  const state = statePresentation(invitation.state);
+  return (
+    <article className="invitation-detail" ref={invitationRef}>
+      <PageHeader
+        actions={<StatusBadge tone={state.tone}>{state.label}</StatusBadge>}
+        eyebrow="Pozvanie k zákazke"
+        lead={<p>{invitation.counterpartDisplayName}</p>}
+        title={invitation.request.title}
+      />
       {invitation.displayedRequestContentRevision ===
       invitation.requestContentRevision ? null : (
-        <p role="status">
-          Zobrazuje sa aktualizovaná verzia dopytu č.{" "}
-          {invitation.displayedRequestVisibleVersion}.
-        </p>
+        <Notice title="Aktualizovaná verzia dopytu" tone="trust">
+          <p role="status">
+            Zobrazuje sa verzia č. {invitation.displayedRequestVisibleVersion}.
+          </p>
+        </Notice>
       )}
-      <section aria-labelledby="invitation-description">
+      <Card aria-labelledby="invitation-description">
         <h2 id="invitation-description">Čo zákazník potrebuje</h2>
         <p>{invitation.request.description}</p>
         <dl>
           <dt>Profesia</dt>
-          <dd>{invitation.request.primaryProfessionCode}</dd>
+          <dd>Vybraná v dopyte</dd>
           <dt>Obec</dt>
-          <dd>{invitation.request.municipalityCode}</dd>
+          <dd>Uvedená v súkromnom pozvaní</dd>
           <dt>Približná vzdialenosť</dt>
           <dd>
             {invitation.request.approximateDistanceKm === null
@@ -229,25 +266,43 @@ export function JobInvitationDetail({
             ? "Zákazník zatiaľ nemá overené hodnotenie."
             : `Hodnotenie zákazníka: ${invitation.customerTrust.rating.toFixed(1)} z 5 (${invitation.customerTrust.reviewCount})`}
         </p>
-      </section>
+      </Card>
       {actions.length === 0 ? null : (
-        <div className="invitation-actions">
-          {actions.map((action) => (
-            <button
-              disabled={pending}
-              key={action}
-              onClick={() => void run(action)}
-              type="button"
-            >
-              {actionLabel(action)}
-            </button>
-          ))}
-        </div>
+        <NextActionCard
+          action={
+            <div className="invitation-actions">
+              {actions.map((action) => (
+                <Button
+                  disabled={pending}
+                  key={action}
+                  onClick={() => onAction(action)}
+                  type="button"
+                  variant={
+                    action === "ENGAGE"
+                      ? "primary"
+                      : action === "DECLINE" || action === "STOP_CONSIDERING"
+                        ? "quiet"
+                        : "secondary"
+                  }
+                >
+                  {actionLabel(action)}
+                </Button>
+              ))}
+            </div>
+          }
+          description={
+            <p>
+              Rozhodnutie sa uloží k tomuto pozvaniu. Potvrdenie záujmu ešte
+              nevytvára zákazku.
+            </p>
+          }
+          title="Rozhodnite o pozvaní"
+        />
       )}
       {conversationHref === null ? null : (
-        <p>
-          <a href={conversationHref}>Otvoriť súkromnú konverzáciu</a>
-        </p>
+        <ActionLink href={conversationHref} variant="secondary">
+          Otvoriť súkromnú konverzáciu
+        </ActionLink>
       )}
       {pending ? <p aria-live="polite">Ukladám rozhodnutie…</p> : null}
     </article>
@@ -508,15 +563,24 @@ function availableActions(
   return [];
 }
 
-function stateLabel(state: InvitationState): string {
+function statePresentation(state: InvitationState): {
+  readonly label: string;
+  readonly tone: "default" | "success" | "warning" | "trust";
+} {
   return {
-    DECLINED: "odmietnuté",
-    ENGAGED: "záujem potvrdený",
-    EXPIRED: "platnosť vypršala",
-    NOT_SELECTED: "ďalej sa neposudzuje",
-    PENDING: "čaká na rozhodnutie",
-    WITHDRAWN: "stiahnuté",
-  }[state];
+    DECLINED: { label: "Pozvanie bolo odmietnuté", tone: "default" },
+    ENGAGED: { label: "Záujem potvrdený", tone: "success" },
+    EXPIRED: { label: "Platnosť vypršala", tone: "default" },
+    NOT_SELECTED: {
+      label: "Toto pozvanie už nie je vo výbere",
+      tone: "default",
+    },
+    PENDING: { label: "Čaká na rozhodnutie", tone: "warning" },
+    WITHDRAWN: { label: "Pozvanie bolo stiahnuté", tone: "default" },
+  }[state] as {
+    readonly label: string;
+    readonly tone: "default" | "success" | "warning" | "trust";
+  };
 }
 
 function actionLabel(action: Action): string {

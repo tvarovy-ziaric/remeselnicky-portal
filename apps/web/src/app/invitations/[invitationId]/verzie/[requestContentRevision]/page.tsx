@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import React from "react";
 
+import { AppShell, PageContainer } from "../../../../../design-system";
 import { JobInvitationDetail } from "../../../../../job-invitation-detail";
+import {
+  AuthenticatedHeader,
+  MobileBottomNavigation,
+} from "../../../../../site-shell";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -31,11 +37,19 @@ export default async function InvitationVersionPage({
     notFound();
   }
   return (
-    <main className="invitation-page">
-      <JobInvitationDetail
-        invitationId={invitationId}
-        requestContentRevision={requestContentRevision}
-      />
-    </main>
+    <AppShell>
+      <AuthenticatedHeader current="Dopyty" />
+      <main className="site-main" id="main-content">
+        <section>
+          <PageContainer>
+            <JobInvitationDetail
+              invitationId={invitationId}
+              requestContentRevision={requestContentRevision}
+            />
+          </PageContainer>
+        </section>
+      </main>
+      <MobileBottomNavigation current="Dopyty" />
+    </AppShell>
   );
 }

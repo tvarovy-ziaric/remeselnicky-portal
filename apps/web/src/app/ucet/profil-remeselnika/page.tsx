@@ -21,7 +21,7 @@ export const metadata: Metadata = {
 export default function CraftsmanProfilePage() {
   return (
     <AppShell>
-      <AuthenticatedHeader />
+      <AuthenticatedHeader current="Profil a účet" />
       <main className="site-main" id="main-content">
         <section>
           <PageContainer>

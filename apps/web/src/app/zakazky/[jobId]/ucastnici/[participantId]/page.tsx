@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { AuthenticatedPageShell } from "../../../../../authenticated-page-shell";
 import { ParticipantDetail } from "../../../../../participant-detail";
 
 const uuid =
@@ -21,7 +22,7 @@ export default async function JobParticipantPage({
   const { jobId, participantId } = await params;
   if (!uuid.test(jobId) || !uuid.test(participantId)) notFound();
   return (
-    <main className="invitation-page">
+    <AuthenticatedPageShell current="Zákazky">
       <section className="invitation-detail">
         <p className="eyebrow">Súkromný záznam zákazky</p>
         <h1>Účastník zákazky</h1>
@@ -31,6 +32,6 @@ export default async function JobParticipantPage({
           context="JOB_PARTY"
         />
       </section>
-    </main>
+    </AuthenticatedPageShell>
   );
 }

@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import React from "react";
 
+import { AppShell, PageContainer, PageHeader } from "../../../../design-system";
 import { ParticipantDetail } from "../../../../participant-detail";
+import {
+  AuthenticatedHeader,
+  MobileBottomNavigation,
+} from "../../../../site-shell";
 
 const uuid =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -21,12 +27,24 @@ export default async function ParticipantHistoryDetailPage({
   const { participantId } = await params;
   if (!uuid.test(participantId)) notFound();
   return (
-    <main className="invitation-page">
-      <section className="invitation-detail">
-        <p className="eyebrow">Súkromný záznam</p>
-        <h1>História účasti</h1>
-        <ParticipantDetail participantId={participantId} context="HISTORY" />
-      </section>
-    </main>
+    <AppShell>
+      <AuthenticatedHeader current="Zákazky" />
+      <main className="site-main" id="main-content">
+        <section>
+          <PageContainer>
+            <PageHeader
+              eyebrow="Súkromný záznam"
+              lead={<p>Priebeh a výsledok účasti na zákazke.</p>}
+              title="História účasti"
+            />
+            <ParticipantDetail
+              participantId={participantId}
+              context="HISTORY"
+            />
+          </PageContainer>
+        </section>
+      </main>
+      <MobileBottomNavigation current="Zákazky" />
+    </AppShell>
   );
 }

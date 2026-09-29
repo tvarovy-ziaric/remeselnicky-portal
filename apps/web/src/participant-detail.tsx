@@ -3,6 +3,14 @@
 import React, { useEffect, useRef, useState } from "react";
 
 import {
+  ActionLink,
+  Button,
+  Card,
+  NextActionCard,
+  Notice,
+  StatusBadge,
+} from "./design-system";
+import {
   getParticipantDecisionCommand,
   sendParticipantDecision,
   type ParticipantDecision,
@@ -194,6 +202,25 @@ const stateLabels: Record<JobParticipantDetail["state"], string> = {
   REMOVED: "Účasť ukončil hlavný poskytovateľ",
 };
 
+const stateTones: Record<
+  JobParticipantDetail["state"],
+  "default" | "success" | "warning" | "trust"
+> = {
+  INVITED: "warning",
+  ACCEPTED: "success",
+  DECLINED: "default",
+  LEFT: "default",
+  REMOVED: "default",
+};
+
+const jobStateLabels: Record<JobParticipantDetail["jobState"], string> = {
+  CONFIRMED: "Zákazka je potvrdená",
+  IN_PROGRESS: "Práce prebiehajú",
+  COMPLETION_REQUESTED: "Čaká sa na potvrdenie dokončenia",
+  COMPLETED: "Zákazka je dokončená",
+  CANCELLED: "Zákazka bola zrušená",
+};
+
 export function ParticipantDetail({
   participantId,
   context,
@@ -316,7 +343,7 @@ export function ParticipantDetail({
     return (
       <p role="alert">
         Na zobrazenie účasti sa prihláste.{" "}
-        <a href="/prihlasenie">Prihlásiť sa</a>
+        <ActionLink href="/prihlasenie">Prihlásiť sa</ActionLink>
       </p>
     );
   if (status !== "OK" || detail === null)
@@ -328,42 +355,74 @@ export function ParticipantDetail({
       </p>
     );
   return (
+    <ParticipantDetailView
+      busy={busy}
+      context={context}
+      detail={detail}
+      error={error}
+      notice={notice}
+      onDecide={(decision) => void decide(decision)}
+      onLeave={() => void leave()}
+    />
+  );
+}
+
+export function ParticipantDetailView({
+  busy,
+  context,
+  detail,
+  error,
+  notice,
+  onDecide,
+  onLeave,
+}: {
+  readonly busy: boolean;
+  readonly context: "INVITATION" | "HISTORY" | "JOB_PARTY";
+  readonly detail: JobParticipantDetail;
+  readonly error: string | null;
+  readonly notice: string | null;
+  readonly onDecide: (decision: ParticipantDecision) => void;
+  readonly onLeave: () => void;
+}) {
+  return (
     <section aria-label="Detail účasti">
-      <h2>{stateLabels[detail.state]}</h2>
-      <p>Účastník: {detail.participantDisplayName}</p>
-      <p>Hlavný poskytovateľ: {detail.providerDisplayName}</p>
-      <p>
-        Obec: {detail.municipalityName} · Profesia zákazky:{" "}
-        {detail.primaryProfessionCode}
-      </p>
-      <p>
-        Pozvanie:{" "}
-        <time dateTime={detail.invitedAt}>
-          {new Date(detail.invitedAt).toLocaleString("sk-SK")}
-        </time>
-      </p>
-      {detail.acceptedAt && (
+      <Card>
+        <StatusBadge tone={stateTones[detail.state]}>
+          {stateLabels[detail.state]}
+        </StatusBadge>{" "}
+        <StatusBadge tone="trust">
+          {jobStateLabels[detail.jobState]}
+        </StatusBadge>
+        <h2>Kontext účasti</h2>
+        <p>Účastník: {detail.participantDisplayName}</p>
+        <p>Hlavný poskytovateľ: {detail.providerDisplayName}</p>
+        <p>Obec zákazky: {detail.municipalityName}</p>
         <p>
-          Prijaté:{" "}
-          <time dateTime={detail.acceptedAt}>
-            {new Date(detail.acceptedAt).toLocaleString("sk-SK")}
+          Pozvanie prišlo:{" "}
+          <time dateTime={detail.invitedAt}>
+            {new Date(detail.invitedAt).toLocaleString("sk-SK")}
           </time>
         </p>
-      )}
-      {detail.leftAt && (
-        <p>
-          Ukončené:{" "}
-          <time dateTime={detail.leftAt}>
-            {new Date(detail.leftAt).toLocaleString("sk-SK")}
-          </time>
-        </p>
-      )}
-      {detail.jobState === "CANCELLED" && <p>Zákazka bola zrušená.</p>}
-      {detail.verifiedCompletedWork && (
-        <div>
+        {detail.acceptedAt && (
           <p>
-            Overená účasť na dokončenej zákazke. Nie je to hodnotenie kvality.
+            Prijaté:{" "}
+            <time dateTime={detail.acceptedAt}>
+              {new Date(detail.acceptedAt).toLocaleString("sk-SK")}
+            </time>
           </p>
+        )}
+        {detail.leftAt && (
+          <p>
+            Ukončené:{" "}
+            <time dateTime={detail.leftAt}>
+              {new Date(detail.leftAt).toLocaleString("sk-SK")}
+            </time>
+          </p>
+        )}
+      </Card>
+      {detail.verifiedCompletedWork && (
+        <Notice title="◐ Overená účasť na dokončenej zákazke" tone="trust">
+          <p>Ide o potvrdenie účasti, nie o hodnotenie kvality práce.</p>
           <p>
             Overené roly:{" "}
             {detail.verifiedRoles
@@ -371,37 +430,72 @@ export function ParticipantDetail({
               .join(", ")}
           </p>
           {detail.verifiedProfessionCodes.length > 0 && (
-            <p>Overené profesie: {detail.verifiedProfessionCodes.join(", ")}</p>
+            <p>Profesijná činnosť na tejto zákazke bola potvrdená.</p>
           )}
-        </div>
+        </Notice>
       )}
       {detail.jobState === "COMPLETED" && !detail.verifiedCompletedWork && (
-        <p>Táto účasť sa nepočíta ako overená práca na dokončenej zákazke.</p>
+        <Notice tone="warning">
+          <p>Táto účasť sa nepočíta ako overená práca na zákazke.</p>
+        </Notice>
       )}
-      {notice && <p role="status">{notice}</p>}
-      {error && <p role="alert">{error}</p>}
+      {notice && (
+        <Notice tone="success">
+          <p role="status">{notice}</p>
+        </Notice>
+      )}
+      {error && (
+        <Notice tone="error">
+          <p role="alert">{error}</p>
+        </Notice>
+      )}
       {context === "INVITATION" && detail.canDecide && (
-        <div className="participant-invitation-actions">
-          <button
-            disabled={busy}
-            onClick={() => void decide("ACCEPT")}
-            type="button"
-          >
-            Prijať účasť
-          </button>
-          <button
-            disabled={busy}
-            onClick={() => void decide("DECLINE")}
-            type="button"
-          >
-            Odmietnuť
-          </button>
-        </div>
+        <NextActionCard
+          action={
+            <div className="participant-invitation-actions">
+              <Button
+                disabled={busy}
+                onClick={() => onDecide("ACCEPT")}
+                type="button"
+              >
+                Prijať účasť
+              </Button>
+              <Button
+                disabled={busy}
+                onClick={() => onDecide("DECLINE")}
+                type="button"
+                variant="quiet"
+              >
+                Odmietnuť pozvanie
+              </Button>
+            </div>
+          }
+          description={
+            <p>
+              Prijatím vznikne potvrdený záznam vašej účasti. Odmietnutie
+              nevytvorí pracovnú účasť.
+            </p>
+          }
+          title="Rozhodnite o pozvaní"
+        />
       )}
       {context === "HISTORY" && detail.canLeave && (
-        <button disabled={busy} onClick={() => void leave()} type="button">
-          Ukončiť moju účasť
-        </button>
+        <NextActionCard
+          action={
+            <Button
+              disabled={busy}
+              onClick={onLeave}
+              type="button"
+              variant="destructive"
+            >
+              Ukončiť moju účasť
+            </Button>
+          }
+          description={
+            <p>Ukončenie sa zachová v histórii a nevymaže doterajší záznam.</p>
+          }
+          title="Potrebujete ukončiť účasť?"
+        />
       )}
       {detail.viewerRole === "PARTICIPANT" &&
         detail.state === "ACCEPTED" &&
@@ -421,16 +515,17 @@ export function ParticipantDetail({
           </>
         )}
       {context === "JOB_PARTY" && (
-        <p>
-          <a href={`/zakazky/${detail.jobId}`}>Späť na zákazku</a>
-        </p>
+        <ActionLink href={`/zakazky/${detail.jobId}`} variant="secondary">
+          Späť na zákazku
+        </ActionLink>
       )}
       {context === "INVITATION" && detail.state !== "INVITED" && (
-        <p>
-          <a href={`/ucasti/historia/${detail.participantId}`}>
-            Zobraziť záznam v histórii účasti
-          </a>
-        </p>
+        <ActionLink
+          href={`/ucasti/historia/${detail.participantId}`}
+          variant="secondary"
+        >
+          Zobraziť záznam v histórii účasti
+        </ActionLink>
       )}
     </section>
   );

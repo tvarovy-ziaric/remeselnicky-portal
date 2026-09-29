@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { AuthenticatedPageShell } from "../../../../../../../authenticated-page-shell";
 import { JobChangeRevisionDetail } from "../../../../../../../change-orders";
 
 const uuid =
@@ -20,12 +21,12 @@ export default async function ChangeRevisionPage({
   if (![jobId, changeOrderId, revisionId].every((value) => uuid.test(value)))
     notFound();
   return (
-    <main className="invitation-page">
+    <AuthenticatedPageShell current="Zákazky">
       <JobChangeRevisionDetail
         jobId={jobId}
         changeOrderId={changeOrderId}
         revisionId={revisionId}
       />
-    </main>
+    </AuthenticatedPageShell>
   );
 }

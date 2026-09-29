@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { AuthenticatedPageShell } from "../../../../authenticated-page-shell";
 import { ConversationEntry } from "../../../../conversation-entry";
 
 export const dynamic = "force-dynamic";
@@ -24,8 +25,8 @@ export default async function ConversationByInvitationPage({
     notFound();
   }
   return (
-    <main className="invitation-page">
+    <AuthenticatedPageShell current="Správy">
       <ConversationEntry invitationId={invitationId} />
-    </main>
+    </AuthenticatedPageShell>
   );
 }

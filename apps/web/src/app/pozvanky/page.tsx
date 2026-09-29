@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
+import React from "react";
 
+import { AppShell, PageContainer, PageHeader } from "../../design-system";
 import { JobInvitationInbox } from "../../job-invitation-inbox";
+import { AuthenticatedHeader, MobileBottomNavigation } from "../../site-shell";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -11,12 +14,21 @@ export const metadata: Metadata = {
 
 export default function InvitationsPage() {
   return (
-    <main className="invitation-page">
-      <section className="invitation-detail">
-        <p className="eyebrow">Súkromný prehľad</p>
-        <h1>Moje pozvania</h1>
-        <JobInvitationInbox />
-      </section>
-    </main>
+    <AppShell>
+      <AuthenticatedHeader current="Dopyty" />
+      <main className="site-main" id="main-content">
+        <section>
+          <PageContainer>
+            <PageHeader
+              eyebrow="Súkromný prehľad"
+              lead={<p>Pozvania k dopytom a ich aktuálny stav.</p>}
+              title="Moje pozvania"
+            />
+            <JobInvitationInbox />
+          </PageContainer>
+        </section>
+      </main>
+      <MobileBottomNavigation current="Dopyty" />
+    </AppShell>
   );
 }

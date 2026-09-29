@@ -1,6 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
+
+import {
+  Button,
+  Card,
+  Input,
+  Notice,
+  PageHeader,
+  StatusBadge,
+  Textarea,
+} from "./design-system";
 
 interface ReportItem {
   readonly reportId: string;
@@ -216,17 +226,26 @@ export function AdminModerationWorkspace() {
   }
 
   return (
-    <section className="admin-panel" aria-labelledby="admin-moderation-title">
-      <p className="admin-kicker">Manuálne posúdenie</p>
-      <h2 id="admin-moderation-title">Hlásenia a odvolania</h2>
-      <p>
-        Počet hlásení nie je verdikt. Každé rozhodnutie vyžaduje dôvod, verziu
-        pravidiel a recent MFA.
-      </p>
+    <section className="admin-panel admin-moderation-workspace">
+      <PageHeader
+        eyebrow="Manuálne posúdenie"
+        lead={
+          <p>
+            Každé rozhodnutie vyžaduje dôvod, verziu pravidiel a recent MFA.
+          </p>
+        }
+        title="Hlásenia a odvolania"
+      />
+      <Notice title="Hlásenie je signál, nie verdikt" tone="warning">
+        <p>
+          Rozhodujte podľa obsahu a kontextu. Moderovanie zachováva históriu a
+          nenahrádza riešenie bežného obchodného sporu.
+        </p>
+      </Notice>
       {notice ? <p role="status">{notice}</p> : null}
       <label>
         Dôvod citlivého prístupu
-        <input
+        <Input
           value={accessReason}
           onChange={(event) => setAccessReason(event.target.value)}
         />
@@ -237,13 +256,18 @@ export function AdminModerationWorkspace() {
           <ul className="admin-list">
             {reports.map((item) => (
               <li key={item.reportId}>
-                <button
+                <Button
                   disabled={busy}
                   type="button"
                   onClick={() => void accessReport(item)}
+                  variant="quiet"
                 >
-                  {item.reason} · {item.targetType} · {item.state}
-                </button>
+                  {reportReasonLabel(item.reason)} ·{" "}
+                  {targetTypeLabel(item.targetType)}{" "}
+                  <StatusBadge tone="warning">
+                    {reportStateLabel(item.state)}
+                  </StatusBadge>
+                </Button>
               </li>
             ))}
           </ul>
@@ -253,20 +277,22 @@ export function AdminModerationWorkspace() {
           <ul className="admin-list">
             {appeals.map((item) => (
               <li key={item.appealId}>
-                <button
+                <Button
                   disabled={busy}
                   type="button"
                   onClick={() => void accessAppeal(item)}
+                  variant="quiet"
                 >
-                  {item.action} · {item.state}
-                </button>
+                  {moderationActionLabel(item.action)} ·{" "}
+                  {appealStateLabel(item.state)}
+                </Button>
               </li>
             ))}
           </ul>
         </section>
       </div>
       {detail || appeal ? (
-        <section className="admin-panel">
+        <Card className="admin-decision-card">
           <h3>{detail ? "Rozhodnutie o hlásení" : "Rozhodnutie o odvolaní"}</h3>
           {detail ? (
             <p>{detail.details ?? "Bez doplňujúceho textu."}</p>
@@ -275,91 +301,91 @@ export function AdminModerationWorkspace() {
           )}
           <label>
             Interný auditný dôvod
-            <input
+            <Input
               value={commandReason}
               onChange={(event) => setCommandReason(event.target.value)}
             />
           </label>
           <label>
             Kategória pravidla
-            <input
+            <Input
               value={policyCategory}
               onChange={(event) => setPolicyCategory(event.target.value)}
             />
           </label>
           <label>
             Kód pravidla
-            <input
+            <Input
               value={policyReasonCode}
               onChange={(event) => setPolicyReasonCode(event.target.value)}
             />
           </label>
           <label>
             Verzia pravidiel
-            <input
+            <Input
               value={policyVersion}
               onChange={(event) => setPolicyVersion(event.target.value)}
             />
           </label>
           <label>
             Bezpečné vysvetlenie pre používateľa
-            <textarea
+            <Textarea
               value={userFacingReason}
               onChange={(event) => setUserFacingReason(event.target.value)}
             />
           </label>
           {detail?.state === "OPEN" ? (
-            <button
+            <Button
               disabled={busy}
               onClick={() => void workflow("start-review")}
             >
               Začať preverovanie
-            </button>
+            </Button>
           ) : null}
           {detail?.state === "UNDER_REVIEW" ? (
             <>
-              <button disabled={busy} onClick={() => void noViolation()}>
+              <Button disabled={busy} onClick={() => void noViolation()}>
                 Bez porušenia
-              </button>
+              </Button>
               <label>
                 ID dotknutého používateľa
-                <input
+                <Input
                   value={subjectUserId}
                   onChange={(event) => setSubjectUserId(event.target.value)}
                 />
               </label>
-              <button disabled={busy} onClick={() => void hideContent()}>
+              <Button disabled={busy} onClick={() => void hideContent()}>
                 Skryť obsah
-              </button>
+              </Button>
             </>
           ) : null}
           {detail && ["ACTIONED", "NO_VIOLATION"].includes(detail.state) ? (
-            <button disabled={busy} onClick={() => void workflow("close")}>
+            <Button disabled={busy} onClick={() => void workflow("close")}>
               Uzavrieť
-            </button>
+            </Button>
           ) : null}
           {detail?.state === "CLOSED" ? (
-            <button disabled={busy} onClick={() => void workflow("reopen")}>
+            <Button disabled={busy} onClick={() => void workflow("reopen")}>
               Znovu otvoriť
-            </button>
+            </Button>
           ) : null}
           {appeal?.state === "OPEN" ? (
             <>
-              <button
+              <Button
                 disabled={busy}
                 onClick={() => void decideAppeal("uphold")}
               >
                 Potvrdiť opatrenie
-              </button>
-              <button
+              </Button>
+              <Button
                 disabled={busy}
                 onClick={() => void decideAppeal("reverse")}
               >
                 Zrušiť opatrenie
-              </button>
+              </Button>
             </>
           ) : null}
-        </section>
+        </Card>
       ) : null}
     </section>
   );
@@ -454,4 +480,63 @@ function uuid(value: unknown): value is string {
 }
 function date(value: unknown): value is string {
   return typeof value === "string" && Number.isFinite(Date.parse(value));
+}
+
+function reportStateLabel(state: ReportItem["state"]): string {
+  return {
+    ACTIONED: "Opatrenie vykonané",
+    CLOSED: "Uzavreté",
+    NO_VIOLATION: "Bez porušenia",
+    OPEN: "Otvorené",
+    UNDER_REVIEW: "Preveruje sa",
+  }[state];
+}
+
+function appealStateLabel(state: AppealItem["state"]): string {
+  return {
+    OPEN: "Čaká na posúdenie",
+    REDUCED: "Opatrenie zmiernené",
+    REVERSED: "Opatrenie zrušené",
+    UPHELD: "Opatrenie potvrdené",
+  }[state];
+}
+
+function targetTypeLabel(value: string): string {
+  return (
+    {
+      ACCOUNT: "Účet",
+      CONVERSATION: "Konverzácia",
+      CRAFTSMAN_PROFILE: "Profil remeselníka",
+      JOB_REQUEST: "Dopyt",
+      MEDIA_ASSET: "Fotografia alebo dokument",
+      MESSAGE: "Správa",
+      PORTFOLIO_PROJECT: "Realizácia",
+      REVIEW: "Hodnotenie",
+    }[value] ?? "Obsah platformy"
+  );
+}
+
+function reportReasonLabel(value: string): string {
+  return (
+    {
+      HARASSMENT_ABUSE: "Obťažovanie alebo zneužitie",
+      INAPPROPRIATE_CONTENT: "Nevhodný obsah",
+      OTHER: "Iný podnet",
+      PERSONAL_DATA_PRIVACY: "Súkromie a osobné údaje",
+      SPAM_SCAM: "Spam alebo podvod",
+    }[value] ?? "Podnet na preverenie"
+  );
+}
+
+function moderationActionLabel(value: string): string {
+  return (
+    {
+      APPLY_FEATURE_RESTRICTION: "Obmedzenie funkcie",
+      APPLY_INDEFINITE_SUSPENSION: "Pozastavenie účtu",
+      APPLY_TEMPORARY_SUSPENSION: "Dočasné obmedzenie",
+      APPLY_WARNING: "Upozornenie",
+      EXCLUDE_REVIEW_EVIDENCE: "Vylúčenie hodnotenia",
+      HIDE_CONTENT: "Skrytie obsahu",
+    }[value] ?? "Moderátorské opatrenie"
+  );
 }

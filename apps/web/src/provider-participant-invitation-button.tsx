@@ -2,6 +2,8 @@
 
 import React, { useRef, useState } from "react";
 
+import { Button, Notice } from "./design-system";
+
 const uuid =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const isoDate = (value: unknown): value is string =>
@@ -114,7 +116,7 @@ export function ProviderParticipantInvitationButton({
   };
   return (
     <div className="participant-invitation-action">
-      <button
+      <Button
         disabled={status === "PENDING" || status === "SENT"}
         onClick={() => void send()}
         type="button"
@@ -124,23 +126,29 @@ export function ProviderParticipantInvitationButton({
           : status === "SENT"
             ? "Pozvanie odoslané"
             : "Pozvať na zákazku"}
-      </button>
+      </Button>
       {status === "SENT" && (
-        <p role="status">
-          Pozvanie čaká na prijatie. Overená účasť vznikne až po výslovnom
-          potvrdení pozvaným remeselníkom.
-        </p>
+        <Notice tone="trust">
+          <p role="status">
+            Pozvanie čaká na prijatie. Overená účasť vznikne až po výslovnom
+            potvrdení pozvaným remeselníkom.
+          </p>
+        </Notice>
       )}
       {status === "AUTH_REQUIRED" && (
-        <p role="alert">
-          Platnosť prihlásenia vypršala. Prihláste sa a skúste to znova.
-        </p>
+        <Notice tone="error">
+          <p role="alert">
+            Platnosť prihlásenia vypršala. Prihláste sa a skúste to znova.
+          </p>
+        </Notice>
       )}
       {status === "UNAVAILABLE" && (
-        <p role="alert">
-          Výsledok pozvania sa nepodarilo overiť. Skúste to znova alebo obnovte
-          stránku.
-        </p>
+        <Notice tone="error">
+          <p role="alert">
+            Výsledok pozvania sa nepodarilo overiť. Skúste to znova alebo
+            obnovte stránku.
+          </p>
+        </Notice>
       )}
     </div>
   );

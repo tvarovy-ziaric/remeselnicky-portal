@@ -2,7 +2,9 @@
 
 import React, { useEffect, useState } from "react";
 
-interface InvitationListView {
+import { ActionLink, Card, EmptyState, StatusBadge } from "./design-system";
+
+export interface InvitationListView {
   readonly changedAt: string;
   readonly counterpartDisplayName: string;
   readonly expiresAt: string;
@@ -39,23 +41,50 @@ export function JobInvitationInbox() {
     );
   }
   if (result.items.length === 0) {
-    return <p aria-live="polite">Zatiaľ nemáte žiadne pozvania.</p>;
+    return <JobInvitationInboxView items={[]} />;
   }
+  return <JobInvitationInboxView items={result.items} />;
+}
+
+export function JobInvitationInboxView({
+  items,
+}: {
+  readonly items: readonly InvitationListView[];
+}) {
+  if (items.length === 0)
+    return (
+      <EmptyState
+        description={
+          <p>Nové pozvania k dopytom sa zobrazia na tomto mieste.</p>
+        }
+        title="Zatiaľ nemáte žiadne pozvania"
+      />
+    );
   return (
-    <ul className="invitation-inbox">
-      {result.items.map((item) => (
-        <li key={item.id}>
-          <a href={`/invitations/${encodeURIComponent(item.id)}`}>
-            <strong>{item.requestTitle}</strong>
-            <span>{item.counterpartDisplayName}</span>
-            <span>{invitationStateLabel(item.state)}</span>
-            <small>
-              Posledná aktivita:{" "}
-              {new Date(item.changedAt).toLocaleDateString("sk-SK")}
-            </small>
-          </a>
-        </li>
-      ))}
+    <ul className="participant-invitation-list" aria-label="Pozvania">
+      {items.map((item) => {
+        const presentation = invitationStatePresentation(item.state);
+        return (
+          <li key={item.id}>
+            <Card>
+              <StatusBadge tone={presentation.tone}>
+                {presentation.label}
+              </StatusBadge>
+              <h2>{item.requestTitle}</h2>
+              <p>{item.counterpartDisplayName}</p>
+              <p>
+                Posledná aktivita:{" "}
+                <time dateTime={item.changedAt}>
+                  {new Date(item.changedAt).toLocaleDateString("sk-SK")}
+                </time>
+              </p>
+              <ActionLink href={`/invitations/${encodeURIComponent(item.id)}`}>
+                Otvoriť pozvanie
+              </ActionLink>
+            </Card>
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -151,18 +180,30 @@ function parseItem(value: unknown): InvitationListView | null {
   };
 }
 
-function invitationStateLabel(state: string): string {
+function invitationStatePresentation(state: string): {
+  readonly label: string;
+  readonly tone: "default" | "success" | "warning" | "trust";
+} {
   return (
     (
       {
-        DECLINED: "Odmietnuté",
-        ENGAGED: "Záujem potvrdený",
-        EXPIRED: "Platnosť vypršala",
-        NOT_SELECTED: "Ďalej sa neposudzuje",
-        PENDING: "Čaká na rozhodnutie",
-        WITHDRAWN: "Stiahnuté",
-      } as Record<string, string>
-    )[state] ?? "Neznámy stav"
+        DECLINED: { label: "Pozvanie bolo odmietnuté", tone: "default" },
+        ENGAGED: { label: "Záujem potvrdený", tone: "success" },
+        EXPIRED: { label: "Platnosť vypršala", tone: "default" },
+        NOT_SELECTED: {
+          label: "Toto pozvanie už nie je vo výbere",
+          tone: "default",
+        },
+        PENDING: { label: "Čaká na rozhodnutie", tone: "warning" },
+        WITHDRAWN: { label: "Pozvanie bolo stiahnuté", tone: "default" },
+      } as const satisfies Record<
+        string,
+        {
+          readonly label: string;
+          readonly tone: "default" | "success" | "warning" | "trust";
+        }
+      >
+    )[state] ?? { label: "Stav nie je dostupný", tone: "default" }
   );
 }
 

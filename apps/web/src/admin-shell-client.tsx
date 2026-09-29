@@ -3,6 +3,15 @@
 import { useEffect, useState } from "react";
 
 import {
+  ActionLink,
+  Card,
+  EmptyState,
+  Notice,
+  PageHeader,
+  StatusBadge,
+} from "./design-system";
+
+import {
   ADMIN_MODULE_PRESENTATION,
   type AdminConsoleModule,
   type AdminSessionView,
@@ -12,7 +21,6 @@ import {
 } from "./admin-shell-model";
 import { AdminDisputeWorkspace, AdminJobOperations } from "./admin-operations";
 import { AdminModerationWorkspace } from "./admin-moderation";
-import { AdminAnalyticsDashboard } from "./admin-analytics-dashboard";
 import { AdminProfileReviewWorkspace } from "./admin-profile-review";
 import { AdminCredentialReviewWorkspace } from "./admin-credential-review";
 import { AdminMfaEntry } from "./admin-mfa-client";
@@ -54,11 +62,11 @@ export function AdminShellClient({
       <header className="admin-header">
         <div>
           <p className="admin-kicker">Interná prevádzka</p>
-          <h1>Remeselnícky portál</h1>
+          <strong>Remeselnícky portál</strong>
         </div>
         <div className="admin-session" aria-label="Privilegovaná relácia">
-          <span>{state.session.roles.join(" + ")}</span>
-          <small>MFA relácia aktívna</small>
+          <span>{state.session.roles.map(adminRoleLabel).join(" + ")}</span>
+          <StatusBadge tone="trust">MFA relácia aktívna</StatusBadge>
         </div>
       </header>
       <div className="admin-workspace">
@@ -80,22 +88,13 @@ export function AdminShellClient({
             </a>
           ))}
         </nav>
-        <main className="admin-main">
+        <main className="admin-main" id="main-content">
           {selected === undefined ? (
-            <section
-              className="admin-panel"
-              aria-labelledby="admin-denied-title"
-            >
-              <p className="admin-kicker">Prístup odmietnutý</p>
-              <h2 id="admin-denied-title">Táto sekcia nie je dostupná</h2>
-              <p>
-                Oprávnenie overuje server. Skontrolujte odkaz alebo požiadajte
-                vlastníka systému o pridelenie potrebnej roly.
-              </p>
-              <a className="admin-primary-link" href="/admin">
-                Späť na prehľad
-              </a>
-            </section>
+            <EmptyState
+              action={<ActionLink href="/admin">Späť na prehľad</ActionLink>}
+              description="Oprávnenie overuje server. Skontrolujte odkaz alebo požiadajte vlastníka systému o pridelenie potrebnej roly."
+              title="Táto sekcia nie je dostupná"
+            />
           ) : selected.id === "disputes" ? (
             <AdminDisputeWorkspace />
           ) : selected.id === "jobs" ? (
@@ -107,7 +106,7 @@ export function AdminShellClient({
           ) : selected.id === "credentials" ? (
             <AdminCredentialReviewWorkspace />
           ) : selected.id === "dashboard" ? (
-            <AdminAnalyticsDashboard />
+            <AdminOperationsOverview modules={state.modules} />
           ) : (
             <AdminModulePlaceholder module={selected} />
           )}
@@ -117,21 +116,71 @@ export function AdminShellClient({
   );
 }
 
+export function AdminOperationsOverview({
+  modules,
+}: Readonly<{ modules: readonly AdminConsoleModule[] }>) {
+  const queues = modules.filter(
+    (module) => module.id !== "dashboard" && module.id !== "audit",
+  );
+  return (
+    <section className="admin-panel admin-queue-overview">
+      <PageHeader
+        eyebrow="Interná prevádzka"
+        lead={
+          <p>
+            Vyberte konkrétnu frontu. Každý detail a každá akcia sa znovu
+            autorizujú na serveri.
+          </p>
+        }
+        title="Prevádzkové fronty"
+      />
+      <Notice title="Rozhodujte podľa dôkazov">
+        <p>
+          Hlásenie je signál, nie verdikt. Moderovanie, obchodné spory a
+          výnimočné zásahy do zákaziek zostávajú oddelené auditované procesy.
+        </p>
+      </Notice>
+      <div className="admin-queue-grid">
+        {queues.length === 0 ? (
+          <EmptyState
+            description="Aktuálna rola nemá pridelenú žiadnu prevádzkovú frontu. Oprávnenia určuje server."
+            title="Žiadna dostupná fronta"
+          />
+        ) : (
+          queues.map((module) => (
+            <Card className="admin-queue-card" key={module.id}>
+              <p className="ui-eyebrow">Prevádzková fronta</p>
+              <h2>{module.label}</h2>
+              <p>{module.description}</p>
+              <ActionLink href={`/admin/${module.id}`}>
+                Otvoriť frontu
+              </ActionLink>
+            </Card>
+          ))
+        )}
+      </div>
+    </section>
+  );
+}
+
+function adminRoleLabel(role: AdminSessionView["roles"][number]): string {
+  return role === "SUPER_ADMIN" ? "Vlastník administrácie" : "Administrátor";
+}
+
 function AdminModulePlaceholder({
   module,
 }: Readonly<{ module: AdminConsoleModule }>) {
   return (
-    <section className="admin-panel" aria-labelledby="admin-module-title">
-      <p className="admin-kicker">Prevádzková fronta</p>
-      <h2 id="admin-module-title">{module.label}</h2>
-      <p>{module.description}</p>
-      <div className="admin-empty-state" role="status">
-        <strong>Modul je pripravený na bezpečné napojenie.</strong>
-        <span>
-          Dáta a akcie pribudnú v príslušnom doménovom tickete. Každá požiadavka
-          bude znovu autorizovaná backendom.
-        </span>
-      </div>
+    <section className="admin-panel">
+      <PageHeader
+        eyebrow="Prevádzková fronta"
+        lead={<p>{module.description}</p>}
+        title={module.label}
+      />
+      <EmptyState
+        description="Dáta a akcie pribudnú v príslušnom doménovom tickete. Každá požiadavka bude znovu autorizovaná backendom."
+        title="Modul je pripravený na bezpečné napojenie"
+      />
     </section>
   );
 }
@@ -141,7 +190,7 @@ export function LockedAdminState({
 }: Readonly<{
   status: Exclude<AdminShellState["status"], "AUTHORIZED">;
 }>) {
-  const copy =
+  const copy: readonly [string, string] =
     status === "LOADING"
       ? ["Overujem prístup", "Kontrolujeme aktívnu MFA reláciu."]
       : status === "AUTHENTICATION_REQUIRED"
@@ -161,19 +210,19 @@ export function LockedAdminState({
                 "Prístup sa nepodarilo bezpečne overiť. Skúste to neskôr.",
               ];
   return (
-    <main className="admin-locked">
-      <section aria-live="polite" aria-labelledby="admin-state-title">
-        <p className="admin-kicker">Interná administrácia</p>
-        <h1 id="admin-state-title">{copy[0]}</h1>
-        <p>{copy[1]}</p>
+    <main className="admin-locked" id="main-content">
+      <Card aria-live="polite">
+        <PageHeader
+          eyebrow="Interná administrácia"
+          lead={<p>{copy[1]}</p>}
+          title={copy[0]}
+        />
         {status === "AUTHENTICATION_REQUIRED" ? (
-          <a className="admin-primary-link" href="/prihlasenie">
-            Prejsť na prihlásenie
-          </a>
+          <ActionLink href="/prihlasenie">Prejsť na prihlásenie</ActionLink>
         ) : status === "MFA_REQUIRED" ? (
           <AdminMfaEntry />
         ) : null}
-      </section>
+      </Card>
     </main>
   );
 }

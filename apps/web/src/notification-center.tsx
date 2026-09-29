@@ -1,6 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
+
+import {
+  ActionLink,
+  Button,
+  Card,
+  EmptyState,
+  Input,
+  Notice,
+  StatusBadge,
+} from "./design-system";
 
 type Filter = "ALL" | "UNREAD";
 interface NotificationItem {
@@ -89,129 +99,188 @@ export function NotificationCenter() {
   }
 
   return (
-    <section
-      aria-labelledby="notification-title"
-      className="notification-center"
-    >
-      <p className="eyebrow">Účet</p>
-      <h1 id="notification-title">Upozornenia</h1>
-      <p>
-        Tu nájdete bezpečné odkazy na dôležité udalosti. Otvorenie upozornenia
-        nikdy nepotvrdzuje obchodný krok.
-      </p>
-      <div aria-label="Filter upozornení" className="notification-filters">
-        <button
+    <div className="notification-center">
+      <Notice title="Toto je váš hlavný prehľad upozornení" tone="trust">
+        <p>
+          Upozornenia odkazujú na aktuálny kontext. Otvorenie ani označenie ako
+          prečítané nikdy nepotvrdzuje ponuku, zmenu či iný obchodný krok.
+        </p>
+      </Notice>
+      <div
+        aria-label="Filter upozornení"
+        className="notification-center__toolbar notification-filters"
+        role="group"
+      >
+        <Button
           aria-pressed={filter === "ALL"}
-          type="button"
           onClick={() => setFilter("ALL")}
+          type="button"
+          variant={filter === "ALL" ? "primary" : "quiet"}
         >
           Všetky
-        </button>
-        <button
+        </Button>
+        <Button
           aria-pressed={filter === "UNREAD"}
-          type="button"
           onClick={() => setFilter("UNREAD")}
+          type="button"
+          variant={filter === "UNREAD" ? "primary" : "quiet"}
         >
           Neprečítané
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
           onClick={() => void mutate("/v1/me/notifications/read-all")}
+          variant="secondary"
         >
           Označiť všetky ako prečítané
-        </button>
+        </Button>
       </div>
-      {notice ? <p role="status">{notice}</p> : null}
-      {state.status === "LOADING" ? (
-        <p aria-live="polite">Načítavam upozornenia…</p>
+      {notice ? (
+        <Notice title="Nastavenie sa neuložilo" tone="error">
+          <p role="status">{notice}</p>
+        </Notice>
       ) : null}
-      {state.status === "ERROR" ? (
-        <p aria-live="polite">Upozornenia teraz nie sú dostupné.</p>
-      ) : null}
-      {state.status === "READY" && state.items.length === 0 ? (
-        <p>Nemáte žiadne upozornenia v tomto filtri.</p>
-      ) : null}
-      {state.status === "READY" && state.items.length > 0 ? (
-        <ol className="notification-list">
-          {state.items.map((item) => (
-            <li
-              key={item.id}
-              className={item.readAt === null ? "notification-unread" : ""}
-            >
-              <article>
-                <p className="eyebrow">
-                  {categoryLabel(item.category)} ·{" "}
-                  {priorityLabel(item.priority)}
-                </p>
-                <h2>{item.title}</h2>
-                <p>{item.body}</p>
-                <p>
-                  <span>{entityLabel(item.context.entityType)}</span>
-                  {" · "}
-                  <time dateTime={item.createdAt}>
-                    {new Date(item.createdAt).toLocaleString("sk-SK")}
-                  </time>
-                </p>
-                <div className="notification-actions">
-                  <a href={item.context.path}>Otvoriť detail</a>
-                  {item.readAt === null ? (
-                    <button
+      <div
+        aria-labelledby="notification-inbox-title"
+        className="notification-center__content"
+        role="region"
+      >
+        <h2 className="visually-hidden" id="notification-inbox-title">
+          Doručené upozornenia
+        </h2>
+        {state.status === "LOADING" ? (
+          <Notice title="Načítavam inbox" tone="trust">
+            <p aria-live="polite">Načítavam upozornenia…</p>
+          </Notice>
+        ) : null}
+        {state.status === "ERROR" ? (
+          <Notice title="Inbox nie je dostupný" tone="error">
+            <p aria-live="polite">
+              Upozornenia teraz nie sú dostupné. Skúste stránku obnoviť.
+            </p>
+          </Notice>
+        ) : null}
+        {state.status === "READY" && state.items.length === 0 ? (
+          <EmptyState
+            description={
+              filter === "UNREAD"
+                ? "Všetky upozornenia máte prečítané."
+                : "Keď nastane udalosť súvisiaca s vaším účtom alebo zákazkou, zobrazí sa tu."
+            }
+            title={
+              filter === "UNREAD"
+                ? "Žiadne neprečítané upozornenia"
+                : "Zatiaľ bez upozornení"
+            }
+          />
+        ) : null}
+        {state.status === "READY" && state.items.length > 0 ? (
+          <ol className="notification-list">
+            {state.items.map((item) => (
+              <li key={item.id}>
+                <Card
+                  className={`notification-card${
+                    item.readAt === null
+                      ? " notification-card--unread notification-unread"
+                      : ""
+                  }`}
+                >
+                  <header className="notification-card__header">
+                    <div>
+                      <p className="ui-eyebrow">
+                        {categoryLabel(item.category)}
+                      </p>
+                      <h2>{item.title}</h2>
+                    </div>
+                    <div className="notification-card__badges">
+                      {item.readAt === null ? (
+                        <StatusBadge tone="trust">Neprečítané</StatusBadge>
+                      ) : null}
+                      <StatusBadge tone={priorityTone(item.priority)}>
+                        {priorityLabel(item.priority)}
+                      </StatusBadge>
+                    </div>
+                  </header>
+                  <p>{item.body}</p>
+                  <p className="notification-card__meta">
+                    <span>{entityLabel(item.context.entityType)}</span>
+                    {" · "}
+                    <time dateTime={item.createdAt}>
+                      {new Date(item.createdAt).toLocaleString("sk-SK")}
+                    </time>
+                  </p>
+                  <div className="notification-card__actions notification-actions">
+                    <ActionLink href={item.context.path}>
+                      Otvoriť súvisiaci detail
+                    </ActionLink>
+                    {item.readAt === null ? (
+                      <Button
+                        type="button"
+                        onClick={() =>
+                          void mutate(
+                            `/v1/me/notifications/${encodeURIComponent(item.id)}/read`,
+                          )
+                        }
+                        variant="secondary"
+                      >
+                        Označiť ako prečítané
+                      </Button>
+                    ) : null}
+                    <Button
                       type="button"
                       onClick={() =>
                         void mutate(
-                          `/v1/me/notifications/${encodeURIComponent(item.id)}/read`,
+                          `/v1/me/notifications/${encodeURIComponent(item.id)}/archive`,
                         )
                       }
+                      variant="quiet"
                     >
-                      Označiť ako prečítané
-                    </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={() =>
-                      void mutate(
-                        `/v1/me/notifications/${encodeURIComponent(item.id)}/archive`,
-                      )
-                    }
-                  >
-                    Skryť
-                  </button>
-                </div>
-              </article>
-            </li>
-          ))}
-        </ol>
-      ) : null}
-      <section
-        aria-labelledby="notification-preferences-title"
-        className="notification-preferences"
-      >
-        <h2 id="notification-preferences-title">E-mailové nastavenia</h2>
+                      Skryť z prehľadu
+                    </Button>
+                  </div>
+                </Card>
+              </li>
+            ))}
+          </ol>
+        ) : null}
+      </div>
+      <Card className="notification-preferences">
+        <h2>E-mailové nastavenia</h2>
         <p>
-          In-app upozornenia zostávajú zapnuté. Povinné transakčné a
-          bezpečnostné e-maily môžu nastavenie kategórie prekryť.
+          Upozornenia v portáli zostávajú zapnuté. Môžete upraviť bežné e-maily
+          podľa kategórie, no povinné transakčné a bezpečnostné správy sa
+          doručia aj pri vypnutej kategórii.
         </p>
-        {preferences.map((preference) => (
-          <label key={preference.category}>
-            <input
-              type="checkbox"
-              checked={preference.emailEnabled}
-              onChange={(event) =>
-                void mutate(
-                  `/v1/me/notifications/preferences/${preference.category}`,
-                  "PUT",
-                  { emailEnabled: event.target.checked },
-                )
-              }
-            />
-            {categoryLabel(preference.category)} e-mailom
-            {preference.requiredEmailMayOverride
-              ? " (povinné udalosti sa doručia vždy)"
-              : ""}
-          </label>
-        ))}
-      </section>
-    </section>
+        <div className="notification-preferences__list">
+          {preferences.map((preference) => (
+            <label
+              className="notification-preferences__option"
+              key={preference.category}
+            >
+              <Input
+                checked={preference.emailEnabled}
+                type="checkbox"
+                onChange={(event) =>
+                  void mutate(
+                    `/v1/me/notifications/preferences/${preference.category}`,
+                    "PUT",
+                    { emailEnabled: event.target.checked },
+                  )
+                }
+              />
+              <span>
+                <strong>{categoryLabel(preference.category)} e-mailom</strong>
+                {preference.requiredEmailMayOverride ? (
+                  <StatusBadge tone="warning">
+                    Povinné udalosti ostanú zapnuté
+                  </StatusBadge>
+                ) : null}
+              </span>
+            </label>
+          ))}
+        </div>
+      </Card>
+    </div>
   );
 }
 
@@ -223,6 +292,17 @@ export function parseNotificationItems(
   for (const item of value.items) {
     if (
       !record(item) ||
+      !exactKeys(item, [
+        "body",
+        "category",
+        "context",
+        "createdAt",
+        "id",
+        "priority",
+        "readAt",
+        "title",
+        "type",
+      ]) ||
       !uuid(item.id) ||
       typeof item.type !== "string" ||
       typeof item.category !== "string" ||
@@ -232,6 +312,7 @@ export function parseNotificationItems(
       !date(item.createdAt) ||
       !(item.readAt === null || date(item.readAt)) ||
       !record(item.context) ||
+      !exactKeys(item.context, ["entityId", "entityType", "path"]) ||
       typeof item.context.entityType !== "string" ||
       typeof item.context.entityId !== "string" ||
       typeof item.context.path !== "string" ||
@@ -248,6 +329,11 @@ export function parsePreferences(value: unknown): readonly Preference[] | null {
   for (const preference of value.preferences) {
     if (
       !record(preference) ||
+      !exactKeys(preference, [
+        "category",
+        "emailEnabled",
+        "requiredEmailMayOverride",
+      ]) ||
       typeof preference.category !== "string" ||
       typeof preference.emailEnabled !== "boolean" ||
       typeof preference.requiredEmailMayOverride !== "boolean"
@@ -280,9 +366,18 @@ function categoryLabel(value: string): string {
   );
 }
 function priorityLabel(value: NotificationItem["priority"]): string {
-  return { INFO: "informácia", IMPORTANT: "dôležité", CRITICAL: "kritické" }[
+  return { INFO: "Informácia", IMPORTANT: "Dôležité", CRITICAL: "Kritické" }[
     value
   ];
+}
+function priorityTone(
+  value: NotificationItem["priority"],
+): "default" | "error" | "warning" {
+  return value === "CRITICAL"
+    ? "error"
+    : value === "IMPORTANT"
+      ? "warning"
+      : "default";
 }
 function entityLabel(value: string): string {
   return (
@@ -306,6 +401,14 @@ function entityLabel(value: string): string {
 }
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function exactKeys(value: Record<string, unknown>, keys: readonly string[]) {
+  const actual = Object.keys(value).sort();
+  const expected = [...keys].sort();
+  return (
+    actual.length === expected.length &&
+    actual.every((key, index) => key === expected[index])
+  );
 }
 function uuid(value: unknown): value is string {
   return (

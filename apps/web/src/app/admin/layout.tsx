@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
+import { AppShell } from "../../design-system";
+
 export const metadata: Metadata = {
   robots: {
     follow: false,
@@ -13,5 +15,5 @@ export const metadata: Metadata = {
 export default function AdminLayout({
   children,
 }: Readonly<{ children: ReactNode }>) {
-  return children;
+  return <AppShell>{children}</AppShell>;
 }

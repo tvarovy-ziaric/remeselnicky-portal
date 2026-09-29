@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { AuthenticatedPageShell } from "../../../../../authenticated-page-shell";
 import { JobOperationDetail } from "../../../../../job-operation-detail";
 
 const uuid =
@@ -21,8 +22,8 @@ export default async function JobProgressPage({
   const { jobId, updateId } = await params;
   if (!uuid.test(jobId) || !uuid.test(updateId)) notFound();
   return (
-    <main className="invitation-page">
+    <AuthenticatedPageShell current="Zákazky">
       <JobOperationDetail jobId={jobId} itemId={updateId} kind="progress" />
-    </main>
+    </AuthenticatedPageShell>
   );
 }

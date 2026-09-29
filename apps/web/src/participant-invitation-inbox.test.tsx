@@ -7,6 +7,7 @@ import {
   loadParticipantInvitationPage,
   parseParticipantInvitationPage,
   ParticipantInvitationInbox,
+  ParticipantInvitationInboxView,
   sendParticipantDecision,
 } from "./participant-invitation-inbox";
 
@@ -269,5 +270,25 @@ describe("participant invitation inbox", () => {
       }),
     ).resolves.toEqual({ status: "UNAVAILABLE" });
     expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders invitation context and explicit next actions without taxonomy codes", () => {
+    const html = renderToStaticMarkup(
+      <ParticipantInvitationInboxView
+        error={null}
+        loadingMore={false}
+        notice={null}
+        onDecide={() => undefined}
+        onMore={() => undefined}
+        page={{ items: [item], nextCursor: null }}
+        pendingId={null}
+        retryDecisions={new Map()}
+      />,
+    );
+    expect(html).toContain("Čaká na rozhodnutie");
+    expect(html).toContain("Prijať účasť");
+    expect(html).toContain("Odmietnuť pozvanie");
+    expect(html).toContain(`/ucasti/pozvanky/${participantId}`);
+    expect(html).not.toContain("PROF:ELECTRICIAN");
   });
 });

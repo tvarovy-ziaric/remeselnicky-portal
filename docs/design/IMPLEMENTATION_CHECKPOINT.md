@@ -37,8 +37,8 @@ different facts.
 3. **DONE** — request wizard and authentication hand-off.
 4. **DONE** — dashboard, quote comparison and central job cockpit.
 5. **DONE** — authentication/onboarding and craftsman profile, portfolio and credentials.
-6. **ACTIVE** — secondary transactional, account, moderation and admin screens.
-7. Responsive/accessibility/visual consistency pass and release checks.
+6. **DONE** — secondary transactional, account, moderation and admin screens.
+7. **DONE** — responsive/accessibility/visual consistency pass and release checks.
 
 Each layer is complete only after focused component tests plus web typecheck,
 lint and build pass. Repository-wide checks remain the final gate.
@@ -131,3 +131,40 @@ the backend explicitly supplies a stronger provenance.
   as platform-verified; pending, rejected and revoked states stay distinct.
 - Integrated web verification passed: 79 test files / 391 tests, TypeScript,
   ESLint, formatting and the optimized Next.js build.
+
+## Completed layer 6 evidence
+
+- Notification and privacy centers now use the shared authenticated shell,
+  human-readable state labels and clear workflow boundaries. Reading a
+  notification is not presented as a business approval, critical delivery
+  cannot be silently disabled and account closure is not described as a
+  destructive cascade delete.
+- Invitation and participation inboxes, details, history and capability flows
+  now expose context, provenance and a neutral next action while preserving
+  competition privacy, command idempotency and server-side state guards.
+- Deep private routes for conversations, quote acceptance, Job milestones,
+  progress, issues, participants, evaluations and Change-order revisions share
+  the authenticated application shell and retain non-indexable metadata.
+- Admin screens prioritize capability-gated operational queues over vanity
+  analytics. Moderation reports remain signals rather than verdicts; sensitive
+  actions preserve explicit reason, audit and history boundaries.
+- Integrated web verification passed: 82 test files / 403 tests, TypeScript and
+  ESLint. The optimized build is repeated in the final layer together with the
+  repository-wide release checks.
+
+## Completed layer 7 evidence
+
+- Every private route now exposes a consistent main landmark and application
+  shell; active desktop/mobile navigation is marked semantically. Duplicate
+  notification utilities were removed and private routes remain non-indexable.
+- Focus, reduced-motion, readable status/provenance text, empty/error/loading
+  states and narrow-layout rules are part of the shared system rather than
+  isolated page fixes.
+- Desktop and exact 390 px mobile renders were inspected for the home, public
+  search, sign-in and invitation-only registration journeys. The full home page
+  preserves hierarchy and action clarity without horizontal overflow.
+- The complete repository `pnpm check` passed: formatting, TypeScript for all 24
+  packages, ESLint/import boundaries, unit/integration/security/recovery/release
+  checks and every production build. Web results remain 82 test files / 403
+  tests; repository E2E scenarios that require the explicit external runtime
+  gate remained skipped by their existing configuration.

@@ -2,6 +2,15 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
+import {
+  Button,
+  Card,
+  EmptyState,
+  Notice,
+  PageHeader,
+  Textarea,
+} from "./design-system";
+
 export interface AdminProfileReviewItem {
   readonly about: string | null;
   readonly baseMunicipality: Readonly<{
@@ -242,8 +251,10 @@ export function AdminProfileReviewWorkspace() {
   if (status !== "OK")
     return (
       <section className="admin-panel">
-        <p className="admin-kicker">Kontrola profilov</p>
-        <h2>Fronta nie je dostupná</h2>
+        <PageHeader
+          eyebrow="Kontrola profilov"
+          title="Fronta nie je dostupná"
+        />
         <p role="alert">
           {status === "AUTH_REQUIRED"
             ? "Privilegovaná relácia vypršala. Prihláste sa a dokončite MFA."
@@ -256,16 +267,26 @@ export function AdminProfileReviewWorkspace() {
   if (page === null || page.items.length === 0)
     return (
       <section className="admin-panel">
-        <p className="admin-kicker">Kontrola profilov</p>
-        <h2>Žiadne profily nečakajú</h2>
-        <p role="status">Fronta profilov na schválenie je prázdna.</p>
+        <EmptyState
+          description="Fronta profilov na schválenie je prázdna."
+          title="Žiadne profily nečakajú"
+        />
       </section>
     );
 
   return (
     <section className="admin-panel admin-profile-review">
-      <p className="admin-kicker">Kontrola profilov</p>
-      <h2>Profily čakajúce na rozhodnutie</h2>
+      <PageHeader
+        eyebrow="Kontrola profilov"
+        lead={<p>Schválenie prvého zverejnenia je explicitné a auditované.</p>}
+        title="Profily čakajúce na rozhodnutie"
+      />
+      <Notice title="Úpravy má primárne vykonať vlastník profilu">
+        <p>
+          Administrátor profil schváli alebo vráti s konkrétnym dôvodom; nemení
+          vlastníctvo ani údaje cez všeobecný editor.
+        </p>
+      </Notice>
       <div className="admin-profile-review-layout">
         <ul
           className="admin-profile-review-queue"
@@ -273,7 +294,7 @@ export function AdminProfileReviewWorkspace() {
         >
           {page.items.map((item) => (
             <li key={item.profileId}>
-              <button
+              <Button
                 aria-current={
                   selected?.profileId === item.profileId ? "true" : undefined
                 }
@@ -287,12 +308,12 @@ export function AdminProfileReviewWorkspace() {
                 <span>
                   {new Date(item.submittedAt).toLocaleString("sk-SK")}
                 </span>
-              </button>
+              </Button>
             </li>
           ))}
         </ul>
         {selected === null ? null : (
-          <article className="admin-profile-review-detail">
+          <Card className="admin-profile-review-detail">
             <h3>{selected.identity.primaryName ?? "Bez názvu"}</h3>
             {selected.identity.secondaryName === null ? null : (
               <p>{selected.identity.secondaryName}</p>
@@ -319,7 +340,8 @@ export function AdminProfileReviewWorkspace() {
               <ul>
                 {selected.professions.map((profession) => (
                   <li key={profession.code}>
-                    {profession.label} — {profession.declaredLevel}
+                    {profession.label} —{" "}
+                    {declaredLevelLabel(profession.declaredLevel)}
                   </li>
                 ))}
               </ul>
@@ -327,13 +349,13 @@ export function AdminProfileReviewWorkspace() {
             {selected.readiness.isReady ? null : (
               <p className="profile-authoring-warning" role="alert">
                 Profil už nespĺňa povinné minimum:{" "}
-                {selected.readiness.missing.join(", ")}
+                {selected.readiness.missing.map(readinessLabel).join(", ")}
               </p>
             )}
             <label htmlFor="profile-rejection-reason">
               Dôvod vrátenia pre remeselníka
             </label>
-            <textarea
+            <Textarea
               id="profile-rejection-reason"
               maxLength={500}
               onChange={(event) => setRejectReason(event.target.value)}
@@ -342,22 +364,22 @@ export function AdminProfileReviewWorkspace() {
             />
             {message === null ? null : <p role="status">{message}</p>}
             <div className="admin-profile-review-actions">
-              <button
+              <Button
                 disabled={busy || !selected.readiness.isReady}
                 type="button"
                 onClick={() => void decide("approve")}
               >
                 Schváliť profil
-              </button>
-              <button
+              </Button>
+              <Button
                 disabled={busy || rejectReason.trim().length < 8}
                 type="button"
                 onClick={() => void decide("reject")}
               >
                 Vrátiť na úpravu
-              </button>
+              </Button>
             </div>
-          </article>
+          </Card>
         )}
       </div>
     </section>
@@ -477,6 +499,28 @@ function uuid(value: unknown): value is string {
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(
       value,
     )
+  );
+}
+
+function declaredLevelLabel(
+  value: AdminProfileReviewItem["professions"][number]["declaredLevel"],
+): string {
+  return {
+    ADVANCED: "Pokročilý",
+    BEGINNER: "Začiatočník",
+    MASTER: "Majster",
+  }[value];
+}
+
+function readinessLabel(value: string): string {
+  return (
+    {
+      ABOUT: "predstavenie",
+      ACTIVE_PROFESSION_WITH_DECLARED_LEVEL: "profesia a úroveň",
+      BASE_MUNICIPALITY: "základná obec",
+      NORMAL_RADIUS: "bežný dojazd",
+      VALID_IDENTITY: "identita",
+    }[value] ?? "povinný údaj"
   );
 }
 function boundedText(value: unknown, max: number): value is string {

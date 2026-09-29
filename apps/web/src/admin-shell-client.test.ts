@@ -2,7 +2,11 @@ import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { loadAdminShell, LockedAdminState } from "./admin-shell-client";
+import {
+  AdminOperationsOverview,
+  loadAdminShell,
+  LockedAdminState,
+} from "./admin-shell-client";
 
 const session = {
   capabilities: ["admin.access", "admin.sensitive.read"],
@@ -27,6 +31,30 @@ const modules = {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("admin shell loader", () => {
+  it("prioritizes authorized operational queues over analytics", () => {
+    vi.stubGlobal("React", React);
+    const markup = renderToStaticMarkup(
+      React.createElement(AdminOperationsOverview, {
+        modules: [
+          {
+            description: "Fronta hlásení.",
+            id: "reports",
+            label: "Hlásenia",
+          },
+          {
+            description: "Agregovaný prehľad.",
+            id: "dashboard",
+            label: "Prehľad",
+          },
+        ],
+      }),
+    );
+    expect(markup).toContain("Prevádzkové fronty");
+    expect(markup).toContain('href="/admin/reports"');
+    expect(markup).toContain("Hlásenie je signál, nie verdikt");
+    expect(markup).not.toContain("Agregovaný prehľad");
+  });
+
   it("routes a missing base login to sign-in without offering MFA", () => {
     vi.stubGlobal("React", React);
     const markup = renderToStaticMarkup(

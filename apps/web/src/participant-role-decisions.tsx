@@ -2,6 +2,15 @@
 
 import React, { useEffect, useRef, useState } from "react";
 
+import {
+  Button,
+  Card,
+  FormField,
+  Notice,
+  StatusBadge,
+  Textarea,
+} from "./design-system";
+
 const uuid =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const isoDate = (value: unknown): value is string =>
@@ -286,16 +295,26 @@ export function ParticipantRoleDecisions({
   return (
     <section aria-label="Potvrdenie rolí na zákazke">
       <h3>Roly na zákazke</h3>
-      <p>
-        Pridelená rola nie je overenou pracovnou históriou, kým ju nepotvrdíte a
-        zákazka sa nedokončí.
-      </p>
+      <Notice title="Rola zatiaľ nie je overenou históriou" tone="trust">
+        <p>
+          Pridelená rola sa stane overenou pracovnou históriou až po vašom
+          potvrdení a dokončení zákazky.
+        </p>
+      </Notice>
       {status === "LOADING" && <p role="status">Načítavam roly…</p>}
       {status === "UNAVAILABLE" && (
         <p role="alert">Roly sa teraz nepodarilo načítať.</p>
       )}
-      {notice && <p role="status">{notice}</p>}
-      {error && <p role="alert">{error}</p>}
+      {notice && (
+        <Notice tone="success">
+          <p role="status">{notice}</p>
+        </Notice>
+      )}
+      {error && (
+        <Notice tone="error">
+          <p role="alert">{error}</p>
+        </Notice>
+      )}
       {page?.items.length === 0 && (
         <p>Nemáte žiadne roly čakajúce na rozhodnutie.</p>
       )}
@@ -303,43 +322,49 @@ export function ParticipantRoleDecisions({
         <ul className="participant-invitation-list">
           {page.items.map((item) => (
             <li key={item.assignmentEventId}>
-              <strong>{roleLabels[item.role]}</strong>
-              <p>
-                Pridelené:{" "}
-                <time dateTime={item.assignedAt}>
-                  {new Date(item.assignedAt).toLocaleString("sk-SK")}
-                </time>
-              </p>
-              <button
-                disabled={busyId !== null}
-                onClick={() => void decide(item.assignmentEventId, "CONFIRM")}
-                type="button"
-              >
-                Potvrdiť rolu
-              </button>
-              <label>
-                Čo treba opraviť?
-                <textarea
-                  maxLength={500}
-                  minLength={8}
-                  onChange={(event) =>
-                    setReasonById((current) => ({
-                      ...current,
-                      [item.assignmentEventId]: event.target.value,
-                    }))
+              <Card>
+                <StatusBadge tone="warning">Čaká na potvrdenie</StatusBadge>
+                <h4>{roleLabels[item.role]}</h4>
+                <p>
+                  Pridelené:{" "}
+                  <time dateTime={item.assignedAt}>
+                    {new Date(item.assignedAt).toLocaleString("sk-SK")}
+                  </time>
+                </p>
+                <Button
+                  disabled={busyId !== null}
+                  onClick={() => void decide(item.assignmentEventId, "CONFIRM")}
+                  type="button"
+                >
+                  Potvrdiť rolu
+                </Button>
+                <FormField
+                  description="Žiadosť o opravu rolu nepotvrdí."
+                  label="Čo treba opraviť?"
+                >
+                  <Textarea
+                    maxLength={500}
+                    minLength={8}
+                    onChange={(event) =>
+                      setReasonById((current) => ({
+                        ...current,
+                        [item.assignmentEventId]: event.target.value,
+                      }))
+                    }
+                    value={reasonById[item.assignmentEventId] ?? ""}
+                  />
+                </FormField>
+                <Button
+                  disabled={busyId !== null}
+                  onClick={() =>
+                    void decide(item.assignmentEventId, "REQUEST_CORRECTION")
                   }
-                  value={reasonById[item.assignmentEventId] ?? ""}
-                />
-              </label>
-              <button
-                disabled={busyId !== null}
-                onClick={() =>
-                  void decide(item.assignmentEventId, "REQUEST_CORRECTION")
-                }
-                type="button"
-              >
-                Požiadať o opravu
-              </button>
+                  type="button"
+                  variant="secondary"
+                >
+                  Požiadať o opravu
+                </Button>
+              </Card>
             </li>
           ))}
         </ul>

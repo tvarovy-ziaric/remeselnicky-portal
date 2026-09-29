@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { AuthenticatedPageShell } from "../../../../../../authenticated-page-shell";
 import { QuoteAcceptanceRecap } from "../../../../../../quote-acceptance-recap";
 
 export const dynamic = "force-dynamic";
@@ -21,8 +22,8 @@ export default async function QuoteAcceptanceRecapPage({
   const { jobRequestId, quoteId } = await params;
   if (!uuid.test(jobRequestId) || !uuid.test(quoteId)) notFound();
   return (
-    <main className="invitation-page">
+    <AuthenticatedPageShell current="Dopyty">
       <QuoteAcceptanceRecap jobRequestId={jobRequestId} quoteId={quoteId} />
-    </main>
+    </AuthenticatedPageShell>
   );
 }

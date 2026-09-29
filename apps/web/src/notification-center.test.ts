@@ -56,6 +56,21 @@ describe("notification center response validation", () => {
     };
     expect(parseNotificationItems({ items: [base] })).toBeNull();
     expect(
+      parseNotificationItems({
+        items: [
+          {
+            ...base,
+            context: {
+              entityId: "a0000000-0000-4000-8000-000000000002",
+              entityType: "JOB",
+              path: "/zakazky/a0000000-0000-4000-8000-000000000002",
+            },
+            customerEmail: "must-not-be-projected@example.test",
+          },
+        ],
+      }),
+    ).toBeNull();
+    expect(
       parsePreferences({
         preferences: [
           {

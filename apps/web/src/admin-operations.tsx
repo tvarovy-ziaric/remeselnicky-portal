@@ -9,6 +9,7 @@ import React, {
   type ReactNode,
 } from "react";
 
+import { Notice, PageHeader } from "./design-system";
 import {
   ADMIN_DISPUTE_STATES,
   accessAdminDispute,
@@ -126,16 +127,18 @@ export function AdminDisputeWorkspace() {
   }
 
   return (
-    <section
-      className="admin-panel admin-operations"
-      aria-labelledby="admin-disputes-title"
-    >
-      <p className="admin-kicker">Auditovaná prevádzková fronta</p>
-      <h2 id="admin-disputes-title">Sporné prípady</h2>
-      <p>
-        Každý prístup ku komunikácii vyžaduje dôvod. Výsledok je iba prevádzkové
-        riešenie platformy; nemení zmluvu, peniaze ani právne nároky strán.
-      </p>
+    <section className="admin-panel admin-operations">
+      <PageHeader
+        eyebrow="Auditovaná prevádzková fronta"
+        lead={<p>Každý prístup ku komunikácii vyžaduje konkrétny dôvod.</p>}
+        title="Sporné prípady"
+      />
+      <Notice title="Prevádzkové riešenie, nie právny verdikt">
+        <p>
+          Výsledok nemení zmluvu, peniaze ani právne nároky strán a neprepisuje
+          históriu zákazky.
+        </p>
+      </Notice>
       <div className="admin-toolbar">
         <label>
           Stav
@@ -649,16 +652,23 @@ function Action({
 
 export function AdminJobOperations() {
   return (
-    <section
-      className="admin-panel admin-operations"
-      aria-labelledby="admin-jobs-title"
-    >
-      <p className="admin-kicker">Citlivé výnimočné príkazy</p>
-      <h2 id="admin-jobs-title">Zákazky</h2>
-      <p>
-        Nie je tu generické nastavenie stavu. Každá oprava je samostatný,
-        nedeliteľný a auditovaný príkaz s očakávaným aktuálnym stavom.
-      </p>
+    <section className="admin-panel admin-operations">
+      <PageHeader
+        eyebrow="Citlivé výnimočné príkazy"
+        lead={
+          <p>
+            Každá oprava je samostatný, nedeliteľný a auditovaný príkaz s
+            očakávaným aktuálnym stavom.
+          </p>
+        }
+        title="Zákazky"
+      />
+      <Notice title="Bez generického prepínania stavu" tone="warning">
+        <p>
+          Nie je tu generické nastavenie stavu. Výnimočná akcia zachová
+          predchádzajúci stav a vytvorí auditnú stopu.
+        </p>
+      </Notice>
       <div className="admin-action-grid">
         <AdminJobCorrectionForm kind="COMPLETE" />
         <AdminJobCorrectionForm kind="CANCEL" />

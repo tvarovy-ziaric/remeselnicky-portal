@@ -2,6 +2,15 @@
 
 import React, { useEffect, useRef, useState } from "react";
 
+import {
+  ActionLink,
+  Button,
+  Card,
+  EmptyState,
+  Notice,
+  StatusBadge,
+} from "./design-system";
+
 const uuid =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const isoDate = (value: unknown): value is string =>
@@ -330,70 +339,137 @@ export function ParticipantInvitationInbox() {
       </p>
     );
   return (
+    <ParticipantInvitationInboxView
+      error={error}
+      loadingMore={loadingMore}
+      notice={notice}
+      onDecide={(participantId, decision) =>
+        void decide(participantId, decision)
+      }
+      onMore={() => void more()}
+      page={page}
+      pendingId={pendingId}
+      retryDecisions={retry.current}
+    />
+  );
+}
+
+export function ParticipantInvitationInboxView({
+  error,
+  loadingMore,
+  notice,
+  onDecide,
+  onMore,
+  page,
+  pendingId,
+  retryDecisions,
+}: {
+  readonly error: string | null;
+  readonly loadingMore: boolean;
+  readonly notice: string | null;
+  readonly onDecide: (
+    participantId: string,
+    decision: ParticipantDecision,
+  ) => void;
+  readonly onMore: () => void;
+  readonly page: ParticipantInvitationPage;
+  readonly pendingId: string | null;
+  readonly retryDecisions: ReadonlyMap<
+    string,
+    { readonly decision: ParticipantDecision; readonly commandId: string }
+  >;
+}) {
+  return (
     <section aria-label="Pozvánky na účasť">
-      <p>
-        Pozvánka sama osebe nie je potvrdenou účasťou. Až keď ju výslovne
-        prijmete, vznikne záznam o vašej účasti na zákazke.
-      </p>
-      {notice && <p role="status">{notice}</p>}
-      {error && <p role="alert">{error}</p>}
+      <Notice title="Pozvanie ešte nie je potvrdená účasť" tone="trust">
+        <p>
+          Záznam o účasti vznikne až po vašom výslovnom prijatí. Odmietnutie sa
+          neutrálne uloží ako rozhodnutie o pozvaní.
+        </p>
+      </Notice>
+      {notice && (
+        <Notice tone="success">
+          <p role="status">{notice}</p>
+        </Notice>
+      )}
+      {error && (
+        <Notice tone="error">
+          <p role="alert">{error}</p>
+        </Notice>
+      )}
       {page.items.length === 0 && (
-        <p>Zatiaľ nemáte žiadne čakajúce pozvánky na účasť.</p>
+        <EmptyState
+          action={
+            <ActionLink href="/ucasti/historia" variant="secondary">
+              Zobraziť históriu účasti
+            </ActionLink>
+          }
+          description={<p>Nové pozvánky na účasť sa zobrazia tu.</p>}
+          title="Nemáte čakajúce pozvánky"
+        />
       )}
       <ul className="participant-invitation-list">
         {page.items.map((item) => (
           <li key={item.participantId}>
-            <h2>Účasť na zákazke</h2>
-            <p>Hlavný poskytovateľ: {item.providerDisplayName}</p>
-            <p>
-              Obec: {item.municipalityName} · Profesia:{" "}
-              {item.primaryProfessionCode}
-            </p>
-            <p>
-              Pozvaný/á:{" "}
-              <time dateTime={item.invitedAt}>
-                {new Date(item.invitedAt).toLocaleString("sk-SK")}
-              </time>
-            </p>
-            <div className="participant-invitation-actions">
-              <button
-                disabled={
-                  pendingId !== null ||
-                  (retry.current.get(item.participantId) !== undefined &&
-                    retry.current.get(item.participantId)?.decision !==
-                      "ACCEPT")
-                }
-                onClick={() => void decide(item.participantId, "ACCEPT")}
-                type="button"
-              >
-                {pendingId === item.participantId
-                  ? "Ukladám rozhodnutie…"
-                  : "Prijať účasť"}
-              </button>
-              <button
-                disabled={
-                  pendingId !== null ||
-                  (retry.current.get(item.participantId) !== undefined &&
-                    retry.current.get(item.participantId)?.decision !==
-                      "DECLINE")
-                }
-                onClick={() => void decide(item.participantId, "DECLINE")}
-                type="button"
-              >
-                Odmietnuť
-              </button>
-            </div>
+            <Card>
+              <StatusBadge tone="warning">Čaká na rozhodnutie</StatusBadge>
+              <h2>Účasť na zákazke</h2>
+              <p>Hlavný poskytovateľ: {item.providerDisplayName}</p>
+              <p>Obec zákazky: {item.municipalityName}</p>
+              <p>
+                Pozvanie prišlo:{" "}
+                <time dateTime={item.invitedAt}>
+                  {new Date(item.invitedAt).toLocaleString("sk-SK")}
+                </time>
+              </p>
+              <div className="participant-invitation-actions">
+                <Button
+                  disabled={
+                    pendingId !== null ||
+                    (retryDecisions.get(item.participantId) !== undefined &&
+                      retryDecisions.get(item.participantId)?.decision !==
+                        "ACCEPT")
+                  }
+                  onClick={() => onDecide(item.participantId, "ACCEPT")}
+                  type="button"
+                >
+                  {pendingId === item.participantId
+                    ? "Ukladám rozhodnutie…"
+                    : "Prijať účasť"}
+                </Button>
+                <Button
+                  disabled={
+                    pendingId !== null ||
+                    (retryDecisions.get(item.participantId) !== undefined &&
+                      retryDecisions.get(item.participantId)?.decision !==
+                        "DECLINE")
+                  }
+                  onClick={() => onDecide(item.participantId, "DECLINE")}
+                  type="button"
+                  variant="quiet"
+                >
+                  Odmietnuť pozvanie
+                </Button>
+                <ActionLink
+                  href={`/ucasti/pozvanky/${item.participantId}`}
+                  variant="secondary"
+                >
+                  Zobraziť detail
+                </ActionLink>
+              </div>
+            </Card>
           </li>
         ))}
       </ul>
       {page.nextCursor && (
-        <button
+        <Button
           disabled={loadingMore || pendingId !== null}
-          onClick={() => void more()}
+          onClick={onMore}
           type="button"
+          variant="secondary"
         >
           {loadingMore ? "Načítavam…" : "Načítať ďalšie pozvánky"}
-        </button>
+        </Button>
       )}
     </section>
   );

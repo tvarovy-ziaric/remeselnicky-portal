@@ -2,6 +2,8 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
+import { Notice, PageHeader } from "./design-system";
+
 export const CREDENTIAL_REJECTION_CATEGORIES = Object.freeze([
   "INSUFFICIENT_EVIDENCE",
   "FALSE_QUALIFICATION",
@@ -491,8 +493,22 @@ export function AdminCredentialReviewWorkspace() {
 
   return (
     <section className="admin-panel admin-credential-review">
-      <p className="admin-kicker">Kontrola dokladov</p>
-      <h2>Doklady a história rozhodnutí</h2>
+      <PageHeader
+        eyebrow="Kontrola dokladov"
+        lead={
+          <p>
+            Podklad je súkromný. Každé schválenie, zamietnutie aj odobratie
+            zostáva v histórii.
+          </p>
+        }
+        title="Doklady a história rozhodnutí"
+      />
+      <Notice title="Čakajúci doklad nie je overený" tone="warning">
+        <p>
+          Schválenie je možné až po kontrole relevantného podkladu; pri
+          zamietnutí alebo odobratí je povinný konkrétny dôvod.
+        </p>
+      </Notice>
       <nav
         aria-label="Pohľady kontroly dokladov"
         className="admin-credential-review-tabs"
@@ -547,7 +563,9 @@ export function AdminCredentialReviewWorkspace() {
                   >
                     <strong>{profileName(item)}</strong>
                     <span>{item.profession.label}</span>
-                    <span>{item.credentialTypeCode}</span>
+                    <span>
+                      {humanizeCredentialType(item.credentialTypeCode)}
+                    </span>
                   </button>
                 </li>
               ))}
@@ -622,13 +640,11 @@ export function AdminCredentialReviewDetail({
         </div>
         <div>
           <dt>Profesia</dt>
-          <dd>
-            {item.profession.label} ({item.profession.code})
-          </dd>
+          <dd>{item.profession.label}</dd>
         </div>
         <div>
           <dt>Typ dokladu</dt>
-          <dd>{item.credentialTypeCode}</dd>
+          <dd>{humanizeCredentialType(item.credentialTypeCode)}</dd>
         </div>
         <div>
           <dt>Dôkaz</dt>
@@ -1061,6 +1077,14 @@ function credentialTypeCode(value: unknown): value is string {
     value.length <= 64 &&
     /^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/u.test(value)
   );
+}
+
+function humanizeCredentialType(value: string): string {
+  const segment = value.split(/[.:/]/u).at(-1) ?? value;
+  const words = segment.replace(/[_-]+/gu, " ").toLocaleLowerCase("sk-SK");
+  return words.length === 0
+    ? "Typ dokladu spravovaný platformou"
+    : `${words.charAt(0).toLocaleUpperCase("sk-SK")}${words.slice(1)}`;
 }
 
 function professionCode(value: unknown): value is string {
