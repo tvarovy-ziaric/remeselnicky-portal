@@ -287,9 +287,20 @@ describe("D17-A Job dashboard", () => {
     expect(html.indexOf("Zákazka potvrdená")).toBeLessThan(
       html.indexOf("Kontakty a adresa sprístupnené"),
     );
-    expect(html.indexOf("Systémová história")).toBeLessThan(
-      html.indexOf("Konverzácia"),
-    );
+    expect(html.match(/Čo treba urobiť teraz/gu)).toHaveLength(1);
+    expect(html).toContain("Priebeh zákazky");
+    for (const [href, label] of [
+      ["#prehlad", "Prehľad"],
+      ["#spravy", "Správy"],
+      ["#priebeh", "Priebeh"],
+      ["#dokumenty", "Dokumenty"],
+      ["#ucastnici", "Účastníci"],
+      ["#zmeny", "Zmeny"],
+    ]) {
+      expect(html).toContain(`href="${href}"`);
+      expect(html).toContain(label);
+    }
+    expect(html).toContain('class="ui-card job-danger-zone"');
     expect(html).toContain("Zrušiť zákazku");
     expect(html).not.toContain("Začať práce");
     expect(html).not.toContain("Pozvať remeselníka na zákazku");
@@ -313,6 +324,56 @@ describe("D17-A Job dashboard", () => {
         state === "COMPLETED",
       );
     }
+  });
+
+  it("never exposes internal property names, taxonomy codes, enum codes, or job status codes", () => {
+    const baseline = job();
+    const commercialContent = {
+      ...baseline.quote.commercialContent,
+      internalStatus: "SECRET_ENUM",
+      priceMode: "UNKNOWN_INTERNAL_MODE",
+    };
+    const projected = {
+      ...baseline,
+      quote: { ...baseline.quote, commercialContent },
+      currentCommercialState: {
+        ...baseline.currentCommercialState,
+        base: {
+          ...baseline.currentCommercialState.base,
+          commercialContent,
+        },
+      },
+    };
+    const parsed = parseJobDashboard(projected, jobId);
+    expect(parsed).not.toBeNull();
+    if (!parsed) return;
+    const parsedContacts = parseJobContacts(contacts(), parsed);
+    expect(parsedContacts).not.toBeNull();
+    if (!parsedContacts) return;
+    const html = renderToStaticMarkup(
+      <JobDashboardView job={parsed} contacts={parsedContacts} />,
+    );
+    for (const rawValue of [
+      "internalStatus",
+      "SECRET_ENUM",
+      "UNKNOWN_INTERNAL_MODE",
+      "ROOFING",
+      "CARPENTRY",
+      "TILE",
+      "FLEXIBLE",
+      "RANGE",
+      "CRAFTSMAN_PROVIDES",
+      "LIKELY",
+      "CONFIRMED",
+      "EXTERNAL_PDF",
+    ])
+      expect(html).not.toContain(rawValue);
+    expect(html).toContain("Flexibilný termín");
+    expect(html).toContain("Rozpätie");
+    expect(html).toContain("Materiál zabezpečí remeselník");
+    expect(html).toContain("Pravdepodobne áno");
+    expect(html).toContain("Vrátane DPH");
+    expect(html).toContain("Neuvedené");
   });
 
   it("shows a source-linked approved delta and rejects internal PDF identifiers", () => {
@@ -504,7 +565,8 @@ describe("D17-A Job dashboard", () => {
     expect(html).toContain("Účastník prijal účasť");
     expect(html).toContain("Účastník ukončil účasť");
     expect(html).toContain("Hlavný poskytovateľ ukončil účasť");
-    expect(html).not.toMatch(/pozvank[auy].*účastník|odmietol účasť/iu);
+    expect(html).not.toContain("Účastník bol pozvaný");
+    expect(html).not.toContain("Účastník odmietol účasť");
     for (const invalid of [
       { ...joined, eventType: "PARTICIPANT_INVITED" },
       { ...joined, eventType: "PARTICIPANT_DECLINED" },

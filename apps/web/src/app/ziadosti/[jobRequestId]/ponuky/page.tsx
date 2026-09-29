@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import React from "react";
 
+import { AppShell, PageContainer, PageHeader } from "../../../../design-system";
 import { QuoteComparisonEntry } from "../../../../quote-comparison";
+import {
+  AuthenticatedHeader,
+  MobileBottomNavigation,
+} from "../../../../site-shell";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -23,8 +29,19 @@ export default async function QuoteComparisonPage({
   )
     notFound();
   return (
-    <main className="invitation-page">
-      <QuoteComparisonEntry jobRequestId={jobRequestId} />
-    </main>
+    <AppShell>
+      <AuthenticatedHeader current="Dopyty" />
+      <main className="site-main quote-comparison-page" id="main-content">
+        <PageContainer>
+          <PageHeader
+            eyebrow="Ponuky k dopytu"
+            lead="Porovnajte rozsah, cenu, termín a podmienky. Portál neurčuje víťaza — výber zostáva na vás."
+            title="Porovnanie ponúk"
+          />
+          <QuoteComparisonEntry jobRequestId={jobRequestId} />
+        </PageContainer>
+      </main>
+      <MobileBottomNavigation current="Dopyty" />
+    </AppShell>
   );
 }

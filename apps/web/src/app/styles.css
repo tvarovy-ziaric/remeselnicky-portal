@@ -1456,6 +1456,54 @@ p {
   background: var(--color-background);
 }
 
+.authenticated-empty-page {
+  display: grid;
+  align-items: center;
+  padding-block: clamp(3rem, 8vw, 7rem);
+}
+
+.job-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: 1rem;
+  margin: 2rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.job-list__item {
+  min-width: 0;
+}
+
+.job-list-card {
+  display: grid;
+  align-content: start;
+  gap: 0.8rem;
+  height: 100%;
+}
+
+.job-list-card__heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.job-list-card h2 {
+  margin: 0;
+  font-size: 1.3rem;
+}
+
+.job-list-card p {
+  margin: 0;
+  color: var(--color-muted-text);
+}
+
+.job-list-card > .ui-button {
+  justify-self: start;
+  margin-top: auto;
+}
+
 .job-request-shell {
   width: min(100%, 58rem);
   border-color: var(--color-border);
@@ -2947,6 +2995,13 @@ textarea.ui-control {
   text-underline-offset: 0.25rem;
 }
 
+.site-nav a[aria-current="page"] {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-decoration-thickness: 0.15rem;
+  text-underline-offset: 0.35rem;
+}
+
 .site-header__actions,
 .site-header__utility {
   display: flex;
@@ -3394,6 +3449,19 @@ textarea.ui-control {
 }
 
 @media (max-width: 48rem) {
+  .site-header--authenticated .site-header__actions,
+  .site-header--authenticated .site-header__utility {
+    display: none;
+  }
+
+  .mobile-bottom-nav {
+    display: grid;
+  }
+
+  .app-shell:has(.site-header--authenticated) {
+    padding-bottom: calc(3.5rem + env(safe-area-inset-bottom));
+  }
+
   .site-header__inner {
     min-height: 4.25rem;
   }
@@ -3638,5 +3706,305 @@ textarea.ui-control {
   .profile-hero__actions .ui-button,
   .search-result-card__actions .ui-button {
     width: 100%;
+  }
+}
+
+/* Transactional comparison and central job cockpit. */
+.quote-comparison-page {
+  padding-block: clamp(3rem, 6vw, 5rem);
+}
+
+.quote-comparison-page .quote-comparison {
+  width: 100%;
+  margin: 2rem 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.quote-comparison__intro {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(14rem, 0.35fr);
+  align-items: end;
+  gap: 1rem 2rem;
+  margin-bottom: 1.5rem;
+}
+
+.quote-comparison__intro h2,
+.quote-comparison__intro p {
+  grid-column: 1;
+  margin: 0;
+}
+
+.quote-comparison__intro p {
+  color: var(--color-muted-text);
+}
+
+.quote-comparison__sort {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  display: grid;
+  gap: 0.4rem;
+  font-weight: 750;
+}
+
+.quote-comparison__selection {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  margin: 0 0 1.5rem;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.quote-comparison__selection legend {
+  padding-inline: 0.4rem;
+  font-weight: 750;
+}
+
+.quote-comparison__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 21rem), 1fr));
+  align-items: start;
+  gap: 1rem;
+}
+
+.quote-comparison-card-observer {
+  min-width: 0;
+  height: 100%;
+}
+
+.quote-comparison-card {
+  display: grid;
+  align-content: start;
+  gap: 1.15rem;
+  height: 100%;
+}
+
+.quote-comparison-card__header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.quote-comparison-card__header h3 {
+  margin: 0;
+  font-size: 1.45rem;
+}
+
+.quote-comparison-card__header p:not(.ui-eyebrow) {
+  margin: 0.35rem 0 0;
+  color: var(--color-muted-text);
+  font-size: 0.875rem;
+}
+
+.quote-comparison-card__trust {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.quote-comparison-card__warning {
+  margin: 0;
+  padding: 0.75rem;
+  border-left: 0.25rem solid var(--color-warning);
+  border-radius: var(--radius-sm);
+  background: #f7edd7;
+}
+
+.quote-comparison-card__facts,
+.quote-comparison-card__details dl {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+
+.quote-comparison-card__facts > div,
+.quote-comparison-card__details dl > div {
+  display: grid;
+  grid-template-columns: minmax(8rem, 0.7fr) minmax(0, 1fr);
+  gap: 0.75rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.quote-comparison-card dt {
+  color: var(--color-muted-text);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.quote-comparison-card dd {
+  margin: 0;
+  text-align: right;
+}
+
+.quote-comparison-card__scope {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.quote-comparison-card__scope > div {
+  padding: 0.75rem;
+  border-radius: var(--radius-md);
+  background: var(--color-background);
+}
+
+.quote-comparison-card__scope h4,
+.quote-comparison-card__scope p,
+.quote-comparison-card__scope ul {
+  margin-block: 0 0.5rem;
+}
+
+.quote-comparison-card__details {
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  padding-block: 0.8rem;
+}
+
+.quote-comparison-card__details summary {
+  color: var(--color-primary);
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.quote-comparison-card__snapshot-note {
+  margin: 0;
+  color: var(--color-muted-text);
+  font-size: 0.85rem;
+}
+
+.quote-comparison-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: auto;
+}
+
+.app-shell > .invitation-page:has(.job-dashboard) {
+  flex: 1;
+  display: block;
+  min-height: auto;
+  padding: clamp(2rem, 5vw, 4rem) 0 5rem;
+  background: var(--color-background);
+}
+
+.job-dashboard {
+  width: min(100%, var(--layout-max-width));
+  margin-inline: auto;
+  padding: 0 var(--layout-gutter);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.job-dashboard > .page-header {
+  margin-bottom: 1.5rem;
+}
+
+.job-dashboard > .job-lifecycle-card,
+.job-dashboard > .next-action-card {
+  margin-bottom: 1rem;
+}
+
+.job-dashboard > .ui-tabs {
+  position: sticky;
+  z-index: 10;
+  top: 0;
+  margin-top: 1.5rem;
+  padding-top: 0.25rem;
+  background: rgb(247 245 240 / 96%);
+  backdrop-filter: blur(12px);
+}
+
+.job-cockpit-section {
+  display: grid;
+  gap: 1rem;
+  padding: clamp(2.5rem, 5vw, 4rem) 0;
+  border-bottom: 1px solid var(--color-border);
+  scroll-margin-top: 4rem;
+}
+
+.job-cockpit-card h2,
+.job-lifecycle-card h2,
+.job-danger-zone h2 {
+  margin-top: 0;
+}
+
+.job-cockpit-card dl {
+  display: grid;
+  gap: 0;
+}
+
+.job-cockpit-card dl > div {
+  display: grid;
+  grid-template-columns: minmax(11rem, 0.4fr) minmax(0, 1fr);
+  gap: 1rem;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.job-cockpit-card dl dt {
+  color: var(--color-muted-text);
+  font-weight: 700;
+}
+
+.job-cockpit-card dl dd {
+  margin: 0;
+}
+
+.job-danger-zone {
+  margin-top: 2rem;
+  border-color: color-mix(in srgb, var(--color-error) 45%, white);
+  background: #fff9f7;
+}
+
+.job-danger-zone textarea {
+  display: block;
+  width: 100%;
+  min-height: 7rem;
+  margin: 0.45rem 0 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  resize: vertical;
+}
+
+@media (max-width: 48rem) {
+  .quote-comparison__intro,
+  .quote-comparison-card__scope {
+    grid-template-columns: 1fr;
+  }
+
+  .quote-comparison__sort {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .quote-comparison-card__header,
+  .quote-comparison-card__facts > div,
+  .quote-comparison-card__details dl > div,
+  .job-cockpit-card dl > div {
+    grid-template-columns: 1fr;
+  }
+
+  .quote-comparison-card dd {
+    text-align: left;
+  }
+
+  .quote-comparison-card__actions .ui-button {
+    width: 100%;
+  }
+
+  .job-dashboard > .ui-tabs {
+    margin-inline: calc(var(--layout-gutter) * -1);
+    padding-inline: var(--layout-gutter);
   }
 }

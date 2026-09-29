@@ -85,15 +85,68 @@ describe("customer Quote comparison", () => {
     const html = renderToStaticMarkup(
       <QuoteComparisonView comparison={fixture()} />,
     );
-    expect(html).toContain("Porovnanie ponúk");
+    const text = visibleText(html);
+    expect(html).toContain("Ponuky vedľa seba");
     expect(html).toContain("Neuvedené");
     expect(html).toContain("Otvoriť konverzáciu");
     expect(html).toContain("Vybrať túto ponuku");
+    expect(html).toContain("ui-card quote-comparison-card");
+    expect(html.match(/ui-button--primary/gu)).toHaveLength(1);
+    expect(text).toContain("Ponuka dodaná ako potvrdené PDF");
+    expect(text).toContain("Revízia ponuky 1");
+    expect(text).toContain("Pri potvrdení sa uloží presne táto revízia ponuky");
     expect(html).toContain(
       `/ziadosti/${jobRequestId}/ponuky/83000000-0000-4000-8000-000000000002/potvrdenie`,
     );
     expect(html).not.toMatch(
       /najlepšia ponuka|ownerUserId|storageKey|competitor/iu,
+    );
+    expect(text).not.toMatch(
+      /EXTERNAL_PDF|PLATFORM_STRUCTURED|VAT_INCLUDED|VAT_EXCLUDED|RANGE|RECEIVED|LOWEST_COMPARABLE_PRICE/u,
+    );
+    expect(text).not.toMatch(
+      /najlepšia ponuka|víťazná ponuka|odporúčaná ponuka/iu,
+    );
+  });
+
+  it("shows factual verification provenance without upgrading missing trust", () => {
+    const comparison = fixture();
+    const html = renderToStaticMarkup(
+      <QuoteComparisonView
+        comparison={{
+          ...comparison,
+          items: comparison.items.map((item) => ({
+            ...item,
+            provider: {
+              ...item.provider,
+              approvedCredentialCount: 2,
+              identityVerified: true,
+            },
+          })),
+        }}
+      />,
+    );
+
+    expect(html).toContain("Overené platformou:");
+    expect(html).toContain("Schválené oprávnenia: 2");
+    expect(html).not.toContain("Totožnosť zatiaľ neoverená");
+
+    const unverified = renderToStaticMarkup(
+      <QuoteComparisonView comparison={fixture()} />,
+    );
+    expect(unverified).toContain("Totožnosť zatiaľ neoverená");
+    expect(unverified).not.toContain("Overené platformou:");
+  });
+
+  it("uses a clear empty state without inventing demand or ranking", () => {
+    const comparison = fixture();
+    const html = renderToStaticMarkup(
+      <QuoteComparisonView comparison={{ ...comparison, items: [] }} />,
+    );
+
+    expect(html).toContain("Zatiaľ bez aktívnych ponúk");
+    expect(visibleText(html)).not.toMatch(
+      /najlepšia ponuka|víťazná ponuka|odporúčaná ponuka/iu,
     );
   });
 
@@ -139,8 +192,16 @@ describe("customer Quote comparison", () => {
     expect(html).toContain('role="alert"');
     expect(html).toContain("podstatne zmenila");
     expect(html).not.toContain("Vybrať túto ponuku");
+    expect(html).not.toContain("ui-button--primary");
   });
 });
+
+function visibleText(html: string): string {
+  return html
+    .replace(/<[^>]*>/gu, " ")
+    .replace(/\s+/gu, " ")
+    .trim();
+}
 
 function fixture() {
   return serializeQuoteComparison({

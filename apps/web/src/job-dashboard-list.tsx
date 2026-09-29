@@ -1,7 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import React, { useEffect, useState } from "react";
+
+import { ActionLink, Card, EmptyState, StatusBadge } from "./design-system";
 
 const uuid =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -21,6 +22,24 @@ export interface JobListItem {
 }
 export type JobListLoadResult =
   { status: "OK"; jobs: readonly JobListItem[] } | { status: "UNAVAILABLE" };
+
+const jobStatusPresentation = {
+  CONFIRMED: { label: "Potvrdená", tone: "trust" },
+  IN_PROGRESS: { label: "Práce prebiehajú", tone: "trust" },
+  COMPLETION_REQUESTED: {
+    label: "Čaká na potvrdenie dokončenia",
+    tone: "warning",
+  },
+  COMPLETED: { label: "Dokončená", tone: "success" },
+  CANCELLED: { label: "Zrušená", tone: "error" },
+} as const satisfies Record<
+  JobListItem["state"],
+  {
+    label: string;
+    tone: "default" | "success" | "warning" | "error" | "trust";
+  }
+>;
+
 const record = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
@@ -75,32 +94,51 @@ export async function loadJobList(
 }
 
 export function JobListView({ jobs }: { jobs: readonly JobListItem[] }) {
-  if (jobs.length === 0) return <p>Zatiaľ nemáte potvrdenú zákazku.</p>;
+  if (jobs.length === 0)
+    return (
+      <EmptyState
+        action={<ActionLink href="/dopyt">Vytvoriť dopyt</ActionLink>}
+        description={
+          <p>
+            Keď prijmete ponuku remeselníka, potvrdená zákazka sa zobrazí tu.
+          </p>
+        }
+        title="Zatiaľ nemáte potvrdenú zákazku"
+      />
+    );
+
   return (
-    <ul className="invitation-inbox">
-      {jobs.map((job) => (
-        <li key={job.id}>
-          <Link href={`/zakazky/${job.id}`}>
-            <strong>{job.requestTitle}</strong>
-            <span>Hlavný poskytovateľ: {job.providerDisplayName}</span>
-            <span>
-              Potvrdená {new Date(job.acceptedAt).toLocaleString("sk-SK")}
-            </span>
-            <span>
-              Stav:{" "}
-              {job.state === "CONFIRMED"
-                ? "Potvrdená"
-                : job.state === "IN_PROGRESS"
-                  ? "Prebieha"
-                  : job.state === "COMPLETION_REQUESTED"
-                    ? "Čaká na potvrdenie dokončenia"
-                    : job.state === "COMPLETED"
-                      ? "Dokončená"
-                      : "Zrušená"}
-            </span>
-          </Link>
-        </li>
-      ))}
+    <ul aria-label="Zákazky" className="job-list">
+      {jobs.map((job) => {
+        const status = jobStatusPresentation[job.state];
+        return (
+          <li className="job-list__item" key={job.id}>
+            <Card className="job-list-card">
+              <div className="job-list-card__heading">
+                <h2>{job.requestTitle}</h2>
+                <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
+              </div>
+              {job.role === "CUSTOMER" ? (
+                <p>Hlavný poskytovateľ: {job.providerDisplayName}</p>
+              ) : (
+                <p>Vaša rola: hlavný poskytovateľ</p>
+              )}
+              <p>
+                <time dateTime={job.acceptedAt}>
+                  Potvrdená{" "}
+                  {new Date(job.acceptedAt).toLocaleString("sk-SK", {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  })}
+                </time>
+              </p>
+              <ActionLink href={`/zakazky/${job.id}`}>
+                Otvoriť zákazku
+              </ActionLink>
+            </Card>
+          </li>
+        );
+      })}
     </ul>
   );
 }

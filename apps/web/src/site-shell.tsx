@@ -50,15 +50,20 @@ export function PublicHeader() {
 }
 
 export function AuthenticatedHeader({
+  current,
   utility,
-}: Readonly<{ utility?: ReactNode }>) {
+}: Readonly<{ current?: string; utility?: ReactNode }>) {
   return (
     <header className="site-header site-header--authenticated">
       <PageContainer className="site-header__inner">
         <Brand />
         <nav aria-label="Navigácia účtu" className="site-nav">
           {authenticatedLinks.map((link) => (
-            <a href={link.href} key={`${link.href}-${link.label}`}>
+            <a
+              aria-current={current === link.label ? "page" : undefined}
+              href={link.href}
+              key={`${link.href}-${link.label}`}
+            >
               {link.label}
             </a>
           ))}

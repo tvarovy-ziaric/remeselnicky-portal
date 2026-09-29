@@ -7,9 +7,17 @@ import {
   type QuoteComparisonCard,
   type QuoteComparisonSort,
 } from "@portal/domain";
-import Link from "next/link";
 import React from "react";
 import { useEffect, useRef, useState } from "react";
+
+import {
+  ActionLink,
+  Card,
+  EmptyState,
+  Select,
+  StatusBadge,
+  TrustBadge,
+} from "./design-system";
 
 const R3_ANALYTICS_OBSERVATION_PATH = "/v1/me/analytics/r3-observations";
 
@@ -147,9 +155,19 @@ export function QuoteComparisonEntry({
       active = false;
     };
   }, [jobRequestId, sort]);
-  if (result === null) return <p role="status">Načítavam ponuky…</p>;
+  if (result === null)
+    return (
+      <p role="status">
+        <StatusBadge>Načítavam ponuky…</StatusBadge>
+      </p>
+    );
   if (result.status !== "OK")
-    return <p role="alert">Porovnanie ponúk momentálne nie je dostupné.</p>;
+    return (
+      <div role="alert">
+        <StatusBadge tone="error">Porovnanie nie je dostupné</StatusBadge>
+        <p>Porovnanie ponúk sa momentálne nepodarilo načítať.</p>
+      </div>
+    );
   return (
     <QuoteComparisonView comparison={result.comparison} onSort={setSort} />
   );
@@ -191,16 +209,20 @@ export function QuoteComparisonView({
     });
   }, [comparison.jobRequestId]);
   return (
-    <section aria-labelledby="quote-comparison-title" ref={comparisonElement}>
-      <header>
-        <h1 id="quote-comparison-title">Porovnanie ponúk</h1>
+    <section
+      aria-labelledby="quote-comparison-title"
+      className="quote-comparison"
+      ref={comparisonElement}
+    >
+      <header className="quote-comparison__intro">
+        <h2 id="quote-comparison-title">Ponuky vedľa seba</h2>
         <p>
           Ponuky porovnávame neutrálne. Nevyberáme víťaza a dostupnosť termínu
           nie je rezervácia ani záruka.
         </p>
-        <label>
-          Zoradenie{" "}
-          <select
+        <label className="quote-comparison__sort">
+          <span>Zoradenie</span>
+          <Select
             value={comparison.sort}
             onChange={(event) =>
               onSort?.(event.target.value as QuoteComparisonSort)
@@ -210,19 +232,16 @@ export function QuoteComparisonView({
             <option value="LOWEST_COMPARABLE_PRICE">
               Najnižšia porovnateľná pevná cena
             </option>
-          </select>
+          </Select>
         </label>
       </header>
       {comparison.items.length > 3 ? (
-        <fieldset>
+        <fieldset className="quote-comparison__selection">
           <legend>Vyberte najviac 3 ponuky na porovnanie</legend>
           {comparison.items.map((item) => {
             const checked = selected.includes(item.quoteId);
             return (
-              <label
-                key={item.quoteId}
-                style={{ display: "inline-block", marginRight: "1rem" }}
-              >
+              <label key={item.quoteId}>
                 <input
                   type="checkbox"
                   checked={checked}
@@ -242,17 +261,12 @@ export function QuoteComparisonView({
         </fieldset>
       ) : null}
       {comparison.items.length === 0 ? (
-        <p>Zatiaľ nebola prijatá žiadna aktívna ponuka.</p>
+        <EmptyState
+          description="Keď remeselník odošle aktívnu ponuku, zobrazí sa tu v rovnakom porovnávacom formáte."
+          title="Zatiaľ bez aktívnych ponúk"
+        />
       ) : (
-        <div
-          style={{
-            display: "grid",
-            gap: "1rem",
-            gridTemplateColumns:
-              "repeat(auto-fit, minmax(min(100%, 18rem), 1fr))",
-            marginTop: "1rem",
-          }}
-        >
+        <div className="quote-comparison__grid">
           {visible.map((item) => (
             <QuoteCard
               jobRequestId={comparison.jobRequestId}
@@ -273,7 +287,7 @@ function QuoteCard({
   readonly item: QuoteComparisonCard;
   readonly jobRequestId: string;
 }) {
-  const cardElement = useRef<HTMLElement>(null);
+  const cardElement = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (cardElement.current === null) return;
     return observeActualVisibility(cardElement.current, () => {
@@ -286,131 +300,182 @@ function QuoteCard({
       });
     });
   }, [item.quoteId, item.quoteRevision, jobRequestId]);
+  const acceptancePath = `/ziadosti/${jobRequestId}/ponuky/${item.quoteId}/potvrdenie`;
   return (
-    <article
-      ref={cardElement}
-      style={{
-        border: "1px solid #d7d7d7",
-        borderRadius: "0.75rem",
-        padding: "1rem",
-      }}
-    >
-      <h2>{item.provider.displayName}</h2>
-      <p>
-        {item.provider.identityVerified
-          ? "Overená identita"
-          : "Identita neoverená"}{" "}
-        · Schválené oprávnenia: {item.provider.approvedCredentialCount}
-      </p>
-      {item.materiallyStale ? (
-        <p role="alert">
-          Požiadavka sa podstatne zmenila. Pred ďalším krokom musí remeselník
-          ponuku potvrdiť alebo poslať novú revíziu.
-        </p>
-      ) : null}
-      <dl>
-        <Fact label="Cena" value={price(item)} />
-        <Fact label="Režim ceny" value={priceMode(item.price.mode)} />
-        <Fact label="DPH" value={vat(item.price.vatStatus)} />
-        <Fact
-          label="Začiatok"
-          value={item.estimatedStartOn ?? QUOTE_COMPARISON_MISSING_LABEL}
-        />
-        <Fact
-          label="Trvanie"
-          value={
-            item.estimatedDurationDays === null
-              ? QUOTE_COMPARISON_MISSING_LABEL
-              : `${item.estimatedDurationDays} dní`
-          }
-        />
-        <Fact
-          label="Platnosť"
-          value={
-            item.validUntil === null
-              ? QUOTE_COMPARISON_MISSING_LABEL
-              : new Date(item.validUntil).toLocaleDateString("sk-SK")
-          }
-        />
-        <Fact label="Materiál" value={material(item.materialResponsibility)} />
-        <Fact
-          label="Doprava"
-          value={component(item.travelAmountCents, item.travelDescription)}
-        />
-        <Fact label="Záloha" value={deposit(item)} />
-        <Fact
-          label="Záruka"
-          value={item.warrantyInformation ?? QUOTE_COMPARISON_MISSING_LABEL}
-        />
-        <Fact label="Obhliadka" value={inspection(item)} />
-      </dl>
-      <h3>Zahrnutý rozsah</h3>
-      <Scope items={item.includedScope} />
-      <h3>Nezahrnutý rozsah</h3>
-      <Scope items={item.excludedScope} />
-      <details>
-        <summary>Podrobnosti ponuky</summary>
-        {item.details === null ? (
-          <p>Podrobnosti sú v potvrdenom PDF.</p>
-        ) : (
-          <>
-            <h3>{item.details.title}</h3>
-            <p>{item.details.summary}</p>
-            <Fact label="Cenový základ" value={item.details.priceBasis} />
-            <Fact
-              label="Práca"
-              value={component(
-                item.details.components.labor.amountCents,
-                item.details.components.labor.description,
-              )}
-            />
+    <div className="quote-comparison-card-observer" ref={cardElement}>
+      <Card className="quote-comparison-card">
+        <header className="quote-comparison-card__header">
+          <div>
+            <p className="ui-eyebrow">Ponuka od remeselníka</p>
+            <h3>{item.provider.displayName}</h3>
+            <p>
+              Revízia ponuky {item.quoteRevision} · prijatá{" "}
+              {formatDateTime(item.submittedAt)}
+            </p>
+            <p>{authoringMode(item.authoringMode)}</p>
+          </div>
+          <StatusBadge
+            tone={
+              item.materiallyStale
+                ? "warning"
+                : item.lifecycleAcceptanceEligible
+                  ? "success"
+                  : "default"
+            }
+          >
+            {item.materiallyStale
+              ? "Čaká na aktualizáciu"
+              : item.lifecycleAcceptanceEligible
+                ? "Pripravená na výber"
+                : "Momentálne nemožno vybrať"}
+          </StatusBadge>
+        </header>
+
+        <div className="quote-comparison-card__trust">
+          {item.provider.identityVerified ? (
+            <TrustBadge provenance="verified">Totožnosť</TrustBadge>
+          ) : (
+            <StatusBadge>Totožnosť zatiaľ neoverená</StatusBadge>
+          )}
+          {item.provider.approvedCredentialCount > 0 ? (
+            <TrustBadge provenance="verified">
+              Schválené oprávnenia: {item.provider.approvedCredentialCount}
+            </TrustBadge>
+          ) : (
+            <StatusBadge>Schválené oprávnenia: 0</StatusBadge>
+          )}
+        </div>
+
+        {item.materiallyStale ? (
+          <p className="quote-comparison-card__warning" role="alert">
+            Požiadavka sa podstatne zmenila. Pred ďalším krokom musí remeselník
+            ponuku potvrdiť alebo poslať novú revíziu.
+          </p>
+        ) : null}
+
+        <dl className="quote-comparison-card__facts">
+          <Fact label="Cena" value={price(item)} />
+          <Fact label="Typ ceny" value={priceMode(item.price.mode)} />
+          <Fact label="DPH" value={vat(item.price.vatStatus)} />
+          <Fact
+            label="Predpokladaný začiatok"
+            value={
+              item.estimatedStartOn === null
+                ? QUOTE_COMPARISON_MISSING_LABEL
+                : formatDate(item.estimatedStartOn)
+            }
+          />
+          <Fact
+            label="Odhadované trvanie"
+            value={
+              item.estimatedDurationDays === null
+                ? QUOTE_COMPARISON_MISSING_LABEL
+                : formatDurationDays(item.estimatedDurationDays)
+            }
+          />
+          <Fact
+            label="Ponuka platí do"
+            value={
+              item.validUntil === null
+                ? QUOTE_COMPARISON_MISSING_LABEL
+                : formatDate(item.validUntil)
+            }
+          />
+        </dl>
+
+        <div className="quote-comparison-card__scope">
+          <div aria-label="Zahrnutý rozsah">
+            <h4>Zahrnuté v ponuke</h4>
+            <Scope items={item.includedScope} />
+          </div>
+          <div aria-label="Nezahrnutý rozsah">
+            <h4>Nie je zahrnuté</h4>
+            <Scope items={item.excludedScope} />
+          </div>
+        </div>
+
+        <details className="quote-comparison-card__details">
+          <summary>Všetky podmienky ponuky</summary>
+          <dl>
             <Fact
               label="Materiál"
-              value={component(
-                item.details.components.material.amountCents,
-                item.details.components.material.description,
-              )}
+              value={material(item.materialResponsibility)}
             />
             <Fact
-              label="Ostatné"
-              value={component(
-                item.details.components.other.amountCents,
-                item.details.components.other.description,
-              )}
+              label="Doprava"
+              value={component(item.travelAmountCents, item.travelDescription)}
             />
+            <Fact label="Záloha" value={deposit(item)} />
             <Fact
-              label="Poznámka k zálohe"
-              value={
-                item.details.depositNotes ?? QUOTE_COMPARISON_MISSING_LABEL
-              }
+              label="Záruka"
+              value={item.warrantyInformation ?? QUOTE_COMPARISON_MISSING_LABEL}
             />
-            <Fact
-              label="Poznámka poskytovateľa"
-              value={
-                item.details.providerNotes ?? QUOTE_COMPARISON_MISSING_LABEL
-              }
-            />
-          </>
-        )}
-      </details>
-      {item.pdfDownloadPath === null ? null : (
-        <p>
-          <a href={item.pdfDownloadPath}>Otvoriť potvrdené PDF</a>
+            <Fact label="Obhliadka" value={inspection(item)} />
+          </dl>
+          {item.details === null ? (
+            <p>Podrobnosti tejto ponuky sú v potvrdenom PDF.</p>
+          ) : (
+            <div aria-label="Rozpis ponuky">
+              <h4>{item.details.title}</h4>
+              <p>{item.details.summary}</p>
+              <dl>
+                <Fact label="Cenový základ" value={item.details.priceBasis} />
+                <Fact
+                  label="Práca"
+                  value={component(
+                    item.details.components.labor.amountCents,
+                    item.details.components.labor.description,
+                  )}
+                />
+                <Fact
+                  label="Materiál"
+                  value={component(
+                    item.details.components.material.amountCents,
+                    item.details.components.material.description,
+                  )}
+                />
+                <Fact
+                  label="Ostatné"
+                  value={component(
+                    item.details.components.other.amountCents,
+                    item.details.components.other.description,
+                  )}
+                />
+                <Fact
+                  label="Poznámka k zálohe"
+                  value={
+                    item.details.depositNotes ?? QUOTE_COMPARISON_MISSING_LABEL
+                  }
+                />
+                <Fact
+                  label="Poznámka remeselníka"
+                  value={
+                    item.details.providerNotes ?? QUOTE_COMPARISON_MISSING_LABEL
+                  }
+                />
+              </dl>
+            </div>
+          )}
+        </details>
+
+        <p className="quote-comparison-card__snapshot-note">
+          Pri potvrdení sa uloží presne táto revízia ponuky.
         </p>
-      )}
-      <p>
-        <Link href={item.conversationPath}>Otvoriť konverzáciu</Link>
-      </p>
-      {item.lifecycleAcceptanceEligible ? (
-        <p>
-          <Link
-            href={`/ziadosti/${jobRequestId}/ponuky/${item.quoteId}/potvrdenie`}
-          >
-            Vybrať túto ponuku
-          </Link>
-        </p>
-      ) : null}
-    </article>
+        <div className="quote-comparison-card__actions">
+          {item.pdfDownloadPath === null ? null : (
+            <ActionLink href={item.pdfDownloadPath} variant="quiet">
+              Otvoriť potvrdené PDF
+            </ActionLink>
+          )}
+          <ActionLink href={item.conversationPath} variant="quiet">
+            Otvoriť konverzáciu
+          </ActionLink>
+          {item.lifecycleAcceptanceEligible ? (
+            <ActionLink href={acceptancePath}>Vybrať túto ponuku</ActionLink>
+          ) : null}
+        </div>
+      </Card>
+    </div>
   );
 }
 
@@ -495,4 +560,36 @@ function inspection(item: QuoteComparisonCard) {
     : item.conditionalOnInspection
       ? `Podmienené obhliadkou${item.inspectionConditions === null ? "" : ` · ${item.inspectionConditions}`}`
       : "Nie je podmienené obhliadkou";
+}
+
+function authoringMode(mode: QuoteComparisonCard["authoringMode"]): string {
+  return mode === "PLATFORM_STRUCTURED"
+    ? "Ponuka vyplnená v portáli"
+    : "Ponuka dodaná ako potvrdené PDF";
+}
+
+function formatDate(value: string): string {
+  return new Intl.DateTimeFormat("sk-SK", {
+    day: "numeric",
+    month: "long",
+    timeZone: "UTC",
+    year: "numeric",
+  }).format(new Date(value));
+}
+
+function formatDateTime(value: string): string {
+  return new Intl.DateTimeFormat("sk-SK", {
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "long",
+    timeZone: "UTC",
+    year: "numeric",
+  }).format(new Date(value));
+}
+
+function formatDurationDays(value: number): string {
+  if (value === 1) return "1 deň";
+  if (value >= 2 && value <= 4) return `${value} dni`;
+  return `${value} dní`;
 }

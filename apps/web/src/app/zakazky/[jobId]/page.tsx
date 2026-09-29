@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { AppShell } from "../../../design-system";
 import { JobDashboard } from "../../../job-dashboard";
+import {
+  AuthenticatedHeader,
+  MobileBottomNavigation,
+} from "../../../site-shell";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -23,8 +28,12 @@ export default async function JobPage({
   )
     notFound();
   return (
-    <main className="invitation-page">
-      <JobDashboard jobId={jobId} />
-    </main>
+    <AppShell>
+      <AuthenticatedHeader current="Zákazky" />
+      <main className="invitation-page" id="main-content">
+        <JobDashboard jobId={jobId} />
+      </main>
+      <MobileBottomNavigation current="Zákazky" />
+    </AppShell>
   );
 }

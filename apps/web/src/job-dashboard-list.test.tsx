@@ -2,7 +2,12 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { JobListView, loadJobList, parseJobList } from "./job-dashboard-list";
+import {
+  type JobListItem,
+  JobListView,
+  loadJobList,
+  parseJobList,
+} from "./job-dashboard-list";
 
 const jobId = "94000000-0000-4000-8000-000000000001";
 const item = {
@@ -12,7 +17,7 @@ const item = {
   role: "CUSTOMER",
   providerDisplayName: "Majster A",
   requestTitle: "Strecha",
-};
+} satisfies JobListItem;
 
 describe("private Job list", () => {
   it("loads the owned-job endpoint without mutations", async () => {
@@ -41,15 +46,49 @@ describe("private Job list", () => {
     const html = renderToStaticMarkup(<JobListView jobs={jobs} />);
     expect(html).toContain(`/zakazky/${jobId}`);
     expect(html).toContain("Strecha");
-    for (const [state, label] of [
+    expect(html).toContain("Otvoriť zákazku");
+  });
+
+  it("renders a safe empty state with the request CTA", () => {
+    const html = renderToStaticMarkup(<JobListView jobs={[]} />);
+    expect(html).toContain('class="empty-state"');
+    expect(html).toContain("Zatiaľ nemáte potvrdenú zákazku");
+    expect(html).toContain('href="/dopyt"');
+    expect(html).toContain("Vytvoriť dopyt");
+  });
+
+  it("maps every status to human copy without leaking raw enums", () => {
+    const states = [
+      ["CONFIRMED", "Potvrdená"],
+      ["IN_PROGRESS", "Práce prebiehajú"],
       ["COMPLETION_REQUESTED", "Čaká na potvrdenie dokončenia"],
       ["COMPLETED", "Dokončená"],
-    ] as const) {
-      const completed = parseJobList({ jobs: [{ ...item, state }] });
-      expect(completed).not.toBeNull();
-      expect(renderToStaticMarkup(<JobListView jobs={completed!} />)).toContain(
-        label,
-      );
+      ["CANCELLED", "Zrušená"],
+    ] as const;
+    const jobs = parseJobList({
+      jobs: states.map(([state], index) => ({
+        ...item,
+        id: `94000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+        state,
+      })),
+    });
+    expect(jobs).not.toBeNull();
+    const html = renderToStaticMarkup(<JobListView jobs={jobs!} />);
+    for (const [state, label] of states) {
+      expect(html).toContain(label);
+      expect(html).not.toContain(state);
     }
+  });
+
+  it("shows a counterpart only when the DTO establishes one", () => {
+    const customerMarkup = renderToStaticMarkup(<JobListView jobs={[item]} />);
+    expect(customerMarkup).toContain("Hlavný poskytovateľ: Majster A");
+
+    const providerMarkup = renderToStaticMarkup(
+      <JobListView jobs={[{ ...item, role: "PRIMARY_PROVIDER" }]} />,
+    );
+    expect(providerMarkup).toContain("Vaša rola: hlavný poskytovateľ");
+    expect(providerMarkup).not.toContain("Zákazník:");
+    expect(providerMarkup).not.toContain("Hlavný poskytovateľ: Majster A");
   });
 });

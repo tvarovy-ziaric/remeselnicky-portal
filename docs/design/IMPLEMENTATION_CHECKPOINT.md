@@ -35,8 +35,8 @@ different facts.
 1. **DONE** — tokens, shared primitives, public shell/navigation and home page.
 2. **DONE** — search results and public craftsman profile.
 3. **DONE** — request wizard and authentication hand-off.
-4. **ACTIVE** — dashboard, quote comparison and central job cockpit.
-5. Authentication/onboarding and craftsman profile, portfolio and credentials.
+4. **DONE** — dashboard, quote comparison and central job cockpit.
+5. **ACTIVE** — authentication/onboarding and craftsman profile, portfolio and credentials.
 6. Secondary transactional, account, moderation and admin screens.
 7. Responsive/accessibility/visual consistency pass and release checks.
 
@@ -96,4 +96,20 @@ the backend explicitly supplies a stronger provenance.
   waits for confirmation of the exact current payload; autosave reports only
   confirmed persistence and review rows no longer expose managed codes/enums.
 - Integrated web verification passed: 73 test files / 372 tests, TypeScript,
+  ESLint, formatting, import boundaries and the optimized Next.js build.
+
+## Completed layer 4 evidence
+
+- The authenticated job list now exposes truthful human status labels, a safe
+  counterpart summary, a clear next action and an honest empty state without
+  inventing customer identity or operational facts.
+- Quote comparison keeps immutable revisions, scope, terms, validity and real
+  trust provenance visible. It does not manufacture a recommended winner and
+  exposes an acceptance action only when the backend marks it eligible.
+- The central job cockpit combines the lifecycle tracker, one state-aware next
+  action, messages, progress, documents, participants and changes without
+  weakening existing command guards, idempotency or server authorization.
+- Authenticated navigation now has a real conversations entry that directs users
+  back to job context instead of advertising a nonexistent global inbox.
+- Integrated web verification passed: 76 test files / 381 tests, TypeScript,
   ESLint, formatting, import boundaries and the optimized Next.js build.
