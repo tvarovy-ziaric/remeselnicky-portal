@@ -1,6 +1,68 @@
 # UI/UX implementation checkpoint
 
-Updated: 2026-09-29
+Updated: 2026-09-30
+
+## Approved visual handoff implementation
+
+Status: **DONE for the supplied handoff and synthetic Quick Alpha**
+
+The hash-verified package under `docs/design/handoff/` is the approved visual
+source of truth for this pass. `MANIFEST.sha256` was verified before any asset
+or component work. It refines visual composition without changing D01-D30,
+authorization, privacy, trust provenance or backend behavior.
+
+### Baseline audit
+
+| Primary screen | Current implementation                                                                                                              | Required correction                                                                                                                                         |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Home           | Product-safe copy and journeys exist, but the hero is oversized and uses a CSS-drawn workshop plus a fake lettermark.               | Match the compact split hero and two journey cards, exact locked logo and four-step strip; keep truthful Alpha copy and no invented metrics.                |
+| Search         | Governed filters and real result data work, but hierarchy, media ratio, actions and trust treatment differ from the board.          | Apply the compact filter/results composition, locked icons, card hierarchy and evidence-safe trust display.                                                 |
+| Public profile | Real public projection and image-first portfolio work, but the hero has no media rail and the information hierarchy is too generic. | Recompose hero, facts, tabs and portfolio around the supplied profile board without exposing new data.                                                      |
+| Job cockpit    | All domain actions exist, but the tracker is vertical and the overview is a long single column.                                     | Add the four-stage horizontal tracker and a three-column overview with the state-aware next action first; preserve every command guard and history section. |
+
+### Asset and content boundaries
+
+- Copy only the locked SVG logo and icons from the handoff into the web public
+  asset directory.
+- Reference-board photographs and crops remain reference-only and are never
+  shipped. There is currently no approved production workshop photograph in the
+  repository, so the hero must keep a neutral visual treatment until such an
+  asset is supplied; it must not fabricate a photo or reuse the board crop.
+- Inter and Source Serif 4 are loaded through Next.js' self-hosting font
+  mechanism. No browser request is made to Google at runtime.
+- Screenshots and comparison artifacts stay under ignored local artifact paths
+  and must not contain secrets or production data.
+
+### Verification still required before DONE
+
+- focused component tests plus web TypeScript, ESLint and production build;
+- desktop 1440x900 and mobile 390x844 screenshots for home, search, profile and
+  job cockpit;
+- at least one visual correction pass per primary screen;
+- Quick Alpha browser smoke through the existing session gate, using synthetic
+  fixtures only.
+
+### Completion evidence
+
+- The locked logo and thirteen handoff SVG icons were copied byte-for-byte and
+  their SHA-256 digests match the supplied assets. Reference photography was
+  not shipped.
+- The home, search, public profile and Job cockpit compositions are implemented
+  with Inter/Source Serif 4, the approved tokens and preserved product truth.
+- Web verification passed: 83 test files / 413 tests, TypeScript, ESLint and an
+  optimized Next.js production build.
+- The worktree release was deployed to the healthy synthetic Quick Alpha. A
+  headless Chromium pass captured 1440x900 and 390x844 viewport screenshots for
+  all four primary screens and verified the public and authenticated routes.
+- The mandatory correction pass fixed inherited profile width/padding,
+  tightened the desktop home hero so both journey cards enter the first view,
+  and made the four-stage mobile Job tracker legible. The repeated browser
+  smoke passed after redeployment.
+- The only intentional fidelity gap is photographic: every supplied raster is
+  explicitly reference-only and no approved production workshop photograph
+  exists. The production hero therefore uses the exact brand mark and approved
+  palette in a neutral workshop treatment rather than misusing a reference crop
+  or importing an unapproved image.
 
 ## Source of truth and boundaries
 

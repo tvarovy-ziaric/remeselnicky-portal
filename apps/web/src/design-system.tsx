@@ -156,6 +156,20 @@ export function TrustBadge({
       className={classes("trust-badge", `trust-badge--${provenance}`)}
       title={labels[provenance]}
     >
+      <img
+        alt=""
+        aria-hidden="true"
+        className="trust-badge__icon"
+        height="16"
+        src={
+          provenance === "verified"
+            ? "/icons/shield-check.svg"
+            : provenance === "evidence"
+              ? "/icons/file.svg"
+              : "/icons/check.svg"
+        }
+        width="16"
+      />
       <span className="visually-hidden">{labels[provenance]}: </span>
       {children}
     </span>

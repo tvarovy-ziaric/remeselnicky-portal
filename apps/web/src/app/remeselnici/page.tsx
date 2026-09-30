@@ -43,48 +43,73 @@ export default async function CraftsmanSearchPage({
         <PageContainer className="public-search-shell">
           <PageHeader
             eyebrow="Výber remeselníka"
-            lead="Vyhľadávajte podľa práce, ktorú potrebujete. Pri každom výsledku ukazujeme iba dostupné fakty a ich pôvod."
+            lead="Vyberte si remeselníka podľa práce a lokality. Pri každom výsledku ukazujeme iba dostupné fakty a ich pôvod."
             title={
               jobId
                 ? "Remeselníci pre vašu zákazku"
-                : "Vyhľadávanie remeselníkov"
+                : "Nájdite remeselníka pre svoju prácu"
             }
           />
-          <PublicSearchForm
-            {...(jobRequestId === undefined ? {} : { jobRequestId })}
-            {...(jobId === undefined ? {} : { jobId })}
-          />
-          {typeof professionCode !== "string" ? (
-            <p>Vyberte profesiu alebo službu a spustite vyhľadávanie.</p>
-          ) : page === null ? (
-            <p>Výsledky sa teraz nedajú načítať. Skúste to znova neskôr.</p>
-          ) : (
-            <CustomerShortlistProvider>
-              <PublicSearchCardList
-                cards={page.items}
-                {...(jobRequestId === undefined ? {} : { jobRequestId })}
-                {...(jobId === undefined ? {} : { jobId })}
-              />
-              {page.nextCursor === null ? null : (
-                <nav
-                  aria-label="Stránkovanie výsledkov"
-                  className="public-search-pagination"
-                >
-                  <ActionLink
-                    href={publicSearchNextPageHref({
-                      nextCursor: page.nextCursor,
-                      searchParameters,
-                      ...(jobRequestId === undefined ? {} : { jobRequestId }),
-                      ...(jobId === undefined ? {} : { jobId }),
-                    })}
-                    variant="secondary"
+          <section
+            aria-label="Filtre vyhľadávania"
+            className="public-search-page__filters"
+          >
+            <PublicSearchForm
+              {...(jobRequestId === undefined ? {} : { jobRequestId })}
+              {...(jobId === undefined ? {} : { jobId })}
+            />
+          </section>
+          <section
+            aria-labelledby="public-search-results-title"
+            className="public-search-page__results"
+          >
+            <header className="public-search-results-header">
+              <div>
+                <h2 id="public-search-results-title">Výsledky vyhľadávania</h2>
+                {page === null ? null : (
+                  <p>
+                    Zobrazené na tejto stránke:{" "}
+                    <strong>{page.items.length}</strong>
+                  </p>
+                )}
+              </div>
+            </header>
+            {typeof professionCode !== "string" ? (
+              <p className="public-search-page__empty">
+                Vyberte profesiu alebo službu a spustite vyhľadávanie.
+              </p>
+            ) : page === null ? (
+              <p className="public-search-page__empty">
+                Výsledky sa teraz nedajú načítať. Skúste to znova neskôr.
+              </p>
+            ) : (
+              <CustomerShortlistProvider>
+                <PublicSearchCardList
+                  cards={page.items}
+                  {...(jobRequestId === undefined ? {} : { jobRequestId })}
+                  {...(jobId === undefined ? {} : { jobId })}
+                />
+                {page.nextCursor === null ? null : (
+                  <nav
+                    aria-label="Stránkovanie výsledkov"
+                    className="public-search-pagination"
                   >
-                    Ďalšie výsledky
-                  </ActionLink>
-                </nav>
-              )}
-            </CustomerShortlistProvider>
-          )}
+                    <ActionLink
+                      href={publicSearchNextPageHref({
+                        nextCursor: page.nextCursor,
+                        searchParameters,
+                        ...(jobRequestId === undefined ? {} : { jobRequestId }),
+                        ...(jobId === undefined ? {} : { jobId }),
+                      })}
+                      variant="secondary"
+                    >
+                      Ďalšie výsledky
+                    </ActionLink>
+                  </nav>
+                )}
+              </CustomerShortlistProvider>
+            )}
+          </section>
         </PageContainer>
       </main>
       <SiteFooter />

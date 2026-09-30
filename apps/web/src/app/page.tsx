@@ -27,10 +27,6 @@ const customerSteps = [
     title: "Potvrdíte dohodu",
     text: "Zákazka vznikne až po vašom výbere a potvrdení konkrétnej ponuky.",
   },
-  {
-    title: "Máte priebeh na jednom mieste",
-    text: "Dohoda, zmeny, míľniky a ďalší krok zostanú spolu počas celej zákazky.",
-  },
 ] as const;
 
 export default function HomePage() {
@@ -39,32 +35,31 @@ export default function HomePage() {
       <PublicHeader />
       <main className="site-main home-page" id="main-content">
         <section className="home-hero" aria-labelledby="home-title">
-          <PageContainer className="home-hero__layout">
-            <div className="home-hero__content">
-              <p className="ui-eyebrow">Dohoda bez zbytočného chaosu</p>
-              <h1 id="home-title">
-                Nájdite remeselníka a majte zákazku pod kontrolou.
-              </h1>
-              <p className="home-hero__lead">
-                Od prvého dopytu po dokončenú prácu. Jasné ponuky, dohoda na
-                jednom mieste a dôveryhodné informácie s uvedeným pôvodom.
-              </p>
-              <div className="home-hero__actions">
-                <ActionLink href="/dopyt">Potrebujem remeselníka</ActionLink>
-                <ActionLink href="/prihlasenie" variant="secondary">
-                  Som remeselník
-                </ActionLink>
+          <PageContainer>
+            <div className="home-hero__surface">
+              <div className="home-hero__content">
+                <p className="ui-eyebrow">Remeselníci pre vašu zákazku</p>
+                <h1 id="home-title">
+                  Nájdite overeného remeselníka pre svoju zákazku
+                </h1>
+                <p className="home-hero__lead">
+                  Vyhľadajte remeselníka alebo jednoducho opíšte, čo
+                  potrebujete. Ponuky, dohoda aj priebeh zákazky zostanú na
+                  jednom mieste.
+                </p>
+                <p className="home-hero__note">
+                  Profily remeselníkov sú verejné. Na odoslanie dopytu sa
+                  prihlásite; prístup remeselníkov do alfy je na pozvánku.
+                </p>
               </div>
-              <p className="home-hero__note">
-                Profily remeselníkov sú verejné. Na odoslanie dopytu sa
-                prihlásite; prístup remeselníkov do alfy je na pozvánku.
-              </p>
-            </div>
-            <div className="home-hero__workshop" aria-hidden="true">
-              <div className="home-hero__beam" />
-              <div className="home-hero__tool home-hero__tool--one" />
-              <div className="home-hero__tool home-hero__tool--two" />
-              <div className="home-hero__stamp">R</div>
+              <div className="home-hero__visual" aria-hidden="true">
+                <img
+                  alt=""
+                  height="96"
+                  src="/brand/logo-symbol.svg"
+                  width="96"
+                />
+              </div>
             </div>
           </PageContainer>
         </section>
@@ -72,19 +67,24 @@ export default function HomePage() {
         <section className="home-paths" aria-labelledby="paths-title">
           <PageContainer>
             <SectionHeader
-              eyebrow="Dve jednoduché cesty"
-              title="Začnite podľa toho, čo práve riešite"
+              eyebrow="Vyberte si cestu"
+              title="Ako chcete začať?"
             />
             <h2 className="visually-hidden" id="paths-title">
               Cesta zákazníka a remeselníka
             </h2>
             <div className="home-path-grid">
               <Card className="home-path-card home-path-card--customer">
-                <span className="home-path-card__number" aria-hidden="true">
-                  01
-                </span>
-                <p className="ui-eyebrow">Pre zákazníka</p>
-                <h3>Potrebujem urobiť prácu</h3>
+                <img
+                  alt=""
+                  aria-hidden="true"
+                  className="home-path-card__icon"
+                  height="30"
+                  src="/icons/search.svg"
+                  width="30"
+                />
+                <p className="ui-eyebrow">Hľadám remeselníka</p>
+                <h3>Nájdite pomoc pre svoju zákazku</h3>
                 <p>
                   Vytvorte dopyt alebo si najprv prezrite remeselníkov podľa
                   služby a lokality. Koho oslovíte, zostáva na vás.
@@ -97,11 +97,16 @@ export default function HomePage() {
                 </div>
               </Card>
               <Card className="home-path-card home-path-card--craftsman">
-                <span className="home-path-card__number" aria-hidden="true">
-                  02
-                </span>
-                <p className="ui-eyebrow">Pre remeselníka</p>
-                <h3>Chcem spravovať svoj profil a zákazky</h3>
+                <img
+                  alt=""
+                  aria-hidden="true"
+                  className="home-path-card__icon"
+                  height="30"
+                  src="/icons/users.svg"
+                  width="30"
+                />
+                <p className="ui-eyebrow">Som remeselník</p>
+                <h3>Spravujte profil aj zákazky</h3>
                 <p>
                   Prihláste sa účtom s pozvánkou. Profil, ponuky, správy a
                   dohodnuté zákazky nájdete po prihlásení na jednom mieste.
@@ -124,10 +129,10 @@ export default function HomePage() {
           <PageContainer>
             <SectionHeader
               eyebrow="Ako to funguje"
-              title="Od potreby k hotovej práci v piatich krokoch"
+              title="Od potreby k dohode v štyroch krokoch"
             />
             <h2 className="visually-hidden" id="process-title">
-              Ako funguje dopyt a zákazka
+              Ako funguje dopyt a dohoda
             </h2>
             <ol className="home-process__steps">
               {customerSteps.map((step, index) => (

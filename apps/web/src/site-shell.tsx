@@ -1,6 +1,7 @@
 import React, { type ReactNode } from "react";
 
 import { ActionLink, PageContainer } from "./design-system";
+import { NotificationBadge } from "./notification-badge";
 
 const publicLinks = [
   { href: "/remeselnici", label: "Remeselníci" },
@@ -18,10 +19,15 @@ const authenticatedLinks = [
 export function Brand() {
   return (
     <a aria-label="Remeselnícky portál – domov" className="site-brand" href="/">
-      <span aria-hidden="true" className="site-brand__mark">
-        R
-      </span>
-      <span>Remeselnícky portál</span>
+      <img
+        alt=""
+        aria-hidden="true"
+        className="site-brand__mark"
+        height="40"
+        src="/brand/logo-symbol.svg"
+        width="40"
+      />
+      <span className="site-brand__wordmark">Remeselnícky portál</span>
     </a>
   );
 }
@@ -68,7 +74,10 @@ export function AuthenticatedHeader({
             </a>
           ))}
         </nav>
-        {utility ? <div className="site-header__utility">{utility}</div> : null}
+        <div className="site-header__utility">
+          <NotificationBadge />
+          {utility}
+        </div>
       </PageContainer>
     </header>
   );

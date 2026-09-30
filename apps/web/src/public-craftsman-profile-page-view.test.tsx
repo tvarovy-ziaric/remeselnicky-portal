@@ -22,6 +22,10 @@ describe("public craftsman profile page view", () => {
     expect(html).toContain('href="/dopyt"');
     expect(html).toContain("Načítavam výber");
     expect(html).toContain("Overená identita");
+    expect(html).toContain("public-profile-hero--without-portrait");
+    expect(html).toContain("profile-trust-fact-row");
+    expect(html).toContain('src="/icons/star.svg"');
+    expect(html).toContain('src="/icons/location.svg"');
     expect(html).toContain("4.8 z 5");
     expect(html).toContain("12");
     expect(html).toContain("3");
@@ -29,6 +33,7 @@ describe("public craftsman profile page view", () => {
     expect(html).not.toContain("email@example.test");
     expect(html).not.toContain("+421");
     expect(html).not.toContain("Presná adresa");
+    expect(html).not.toContain("profile-portrait-reference.webp");
   });
 
   it("renders portfolio photos image-first and marks every project as declared", () => {

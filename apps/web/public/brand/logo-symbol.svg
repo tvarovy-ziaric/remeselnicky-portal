@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Remeselnícky portál — symbol</title>
+  <g fill="none" stroke="#B9653E" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M14 50 50 14"/>
+    <path d="M15 14 50 49"/>
+    <path d="M10 20 20 10 27 17 17 27Z" fill="#B9653E" stroke="none"/>
+    <path d="M42 11 53 22"/>
+    <path d="M9 43 21 55"/>
+    <path d="M43 55 55 43"/>
+  </g>
+</svg>

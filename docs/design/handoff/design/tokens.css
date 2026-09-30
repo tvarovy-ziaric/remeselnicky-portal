@@ -1,0 +1,141 @@
+:root {
+  /* COLOR LOCK — values derived from the approved ChatGPT design boards. */
+  --rp-bg-main: #F7F5F0;
+  --rp-bg-soft: #EEE8DD;
+  --rp-surface: #FFFFFF;
+  --rp-text-primary: #202523;
+  --rp-text-secondary: #5E6864;
+  --rp-text-tertiary: #7A817E;
+  --rp-primary: #285C4D;
+  --rp-primary-hover: #224E42;
+  --rp-primary-soft: #E6EFEA;
+  --rp-accent: #C66A42;
+  --rp-brand-symbol: #B06A45;
+  --rp-trust: #356F8A;
+  --rp-trust-soft: #E7EFF5;
+  --rp-success: #2F7A52;
+  --rp-success-soft: #E5F1EC;
+  --rp-warning: #B4832E;
+  --rp-warning-soft: #F3EBDD;
+  --rp-error: #B34A3C;
+  --rp-error-soft: #F6E6E2;
+  --rp-border-soft: #D8D3C8;
+  --rp-border-faint: #E8E3D9;
+  --rp-overlay: rgba(32, 37, 35, 0.46);
+
+  /* TYPOGRAPHY LOCK. Source Serif 4 is a technical approximation of the
+     serif display face visible in the approved raster reference. Inter is
+     explicitly named on the design-system board. Do not bundle font files. */
+  --rp-font-display: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --rp-font-ui: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  --rp-display-xl-size: 52px;
+  --rp-display-xl-line: 1.04;
+  --rp-display-xl-weight: 700;
+  --rp-display-xl-letter: -0.025em;
+
+  --rp-h1-size: 40px;
+  --rp-h1-line: 1.10;
+  --rp-h1-weight: 700;
+  --rp-h1-letter: -0.02em;
+
+  --rp-h2-size: 28px;
+  --rp-h2-line: 1.18;
+  --rp-h2-weight: 700;
+  --rp-h2-letter: -0.015em;
+
+  --rp-h3-size: 21px;
+  --rp-h3-line: 1.25;
+  --rp-h3-weight: 650;
+  --rp-h3-letter: -0.01em;
+
+  --rp-body-size: 16px;
+  --rp-body-line: 1.50;
+  --rp-body-weight: 400;
+
+  --rp-body-sm-size: 14px;
+  --rp-body-sm-line: 1.42;
+  --rp-label-size: 13px;
+  --rp-label-line: 1.25;
+  --rp-label-weight: 600;
+  --rp-nav-size: 13px;
+  --rp-nav-line: 1.20;
+  --rp-nav-weight: 500;
+  --rp-button-size: 14px;
+  --rp-button-line: 1.20;
+  --rp-button-weight: 650;
+
+  /* GEOMETRY LOCK */
+  --rp-page-max: 1200px;
+  --rp-page-pad-desktop: 24px;
+  --rp-page-pad-tablet: 20px;
+  --rp-page-pad-mobile: 16px;
+  --rp-header-height: 72px;
+
+  --rp-space-2: 2px;
+  --rp-space-4: 4px;
+  --rp-space-6: 6px;
+  --rp-space-8: 8px;
+  --rp-space-10: 10px;
+  --rp-space-12: 12px;
+  --rp-space-14: 14px;
+  --rp-space-16: 16px;
+  --rp-space-18: 18px;
+  --rp-space-20: 20px;
+  --rp-space-24: 24px;
+  --rp-space-28: 28px;
+  --rp-space-32: 32px;
+  --rp-space-36: 36px;
+  --rp-space-40: 40px;
+  --rp-space-48: 48px;
+  --rp-space-56: 56px;
+  --rp-space-64: 64px;
+  --rp-space-72: 72px;
+
+  --rp-radius-sm: 8px;
+  --rp-radius-md: 12px;
+  --rp-radius-lg: 18px;
+  --rp-radius-xl: 21px;
+  --rp-radius-pill: 999px;
+
+  --rp-shadow-card: 0 8px 24px rgba(32, 37, 35, 0.08);
+  --rp-shadow-raised: 0 14px 40px rgba(32, 37, 35, 0.11);
+  --rp-shadow-focus: 0 0 0 3px rgba(53, 111, 138, 0.24);
+
+  --rp-control-h: 44px;
+  --rp-control-h-compact: 38px;
+  --rp-button-h: 44px;
+  --rp-button-h-lg: 50px;
+  --rp-icon-sm: 16px;
+  --rp-icon-md: 20px;
+  --rp-icon-lg: 24px;
+
+  /* Screen-level composition constants derived from the approved mockup. */
+  --rp-hero-min-h: 430px;
+  --rp-hero-copy-max: 560px;
+  --rp-search-card-min: 310px;
+  --rp-profile-avatar: 176px;
+  --rp-job-action-column: 260px;
+}
+
+@media (max-width: 1023px) {
+  :root {
+    --rp-display-xl-size: 44px;
+    --rp-h1-size: 36px;
+    --rp-page-pad-desktop: var(--rp-page-pad-tablet);
+  }
+}
+
+@media (max-width: 639px) {
+  :root {
+    --rp-display-xl-size: 36px;
+    --rp-display-xl-line: 1.08;
+    --rp-h1-size: 32px;
+    --rp-h2-size: 25px;
+    --rp-h3-size: 20px;
+    --rp-body-size: 16px;
+    --rp-header-height: 64px;
+    --rp-hero-min-h: auto;
+    --rp-profile-avatar: 112px;
+  }
+}

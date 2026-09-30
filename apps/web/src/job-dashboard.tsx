@@ -20,6 +20,7 @@ import {
   NextActionCard,
   PageHeader,
   StatusBadge,
+  Stepper,
   Tabs,
   Timeline,
 } from "./design-system";
@@ -782,23 +783,27 @@ export function JobDashboardView({
 
   return (
     <article className="job-dashboard">
-      <PageHeader
-        eyebrow="Zákazka"
-        lead={
-          <>
-            <StatusBadge tone={state.tone}>{state.label}</StatusBadge>
-            <p>
-              Potvrdená {new Date(job.acceptedAt).toLocaleString("sk-SK")} ·
-              Zákazník: {job.customerDisplayName} · Hlavný poskytovateľ:{" "}
-              {job.providerDisplayName}
-            </p>
-          </>
-        }
-        title={job.request.title}
-      />
+      <div className="job-cockpit-heading">
+        <span aria-hidden="true" className="job-cockpit-heading__icon">
+          <img alt="" height="24" src="/icons/home.svg" width="24" />
+        </span>
+        <PageHeader
+          eyebrow="Zákazka"
+          lead={
+            <>
+              <StatusBadge tone={state.tone}>{state.label}</StatusBadge>
+              <p>
+                Potvrdená {new Date(job.acceptedAt).toLocaleString("sk-SK")} ·
+                Zákazník: {job.customerDisplayName} · Hlavný poskytovateľ:{" "}
+                {job.providerDisplayName}
+              </p>
+            </>
+          }
+          title={job.request.title}
+        />
+      </div>
 
       <JobLifecycleTracker job={job} />
-      <JobNextAction job={job} />
 
       <Tabs
         items={[
@@ -813,49 +818,59 @@ export function JobDashboardView({
       />
 
       <div className="job-cockpit-section" id="prehlad">
-        <Card className="job-cockpit-card">
-          <h2>Dohodnutý rozsah · iba na čítanie</h2>
-          <p>{job.request.description}</p>
-          <p>Obec zákazky je uložená v prijatom zadaní.</p>
-          <h3>Podrobnosti prijatého zadania</h3>
-          <SnapshotValue value={job.request.scopeDetails} />
-          <p>
-            Verzia zadania: {job.request.visibleVersion}, revízia obsahu:{" "}
-            {job.request.contentRevision}
-          </p>
-        </Card>
+        <div className="job-cockpit-overview-grid">
+          <JobNextAction job={job} />
+          <JobQuickActions job={job} />
+          <JobTimelineSummary timeline={timeline} />
+        </div>
 
-        <Card className="job-cockpit-card">
-          <h2>Kontakty a miesto výkonu</h2>
-          <ContactDetails title="Zákazník" contact={contacts.customer} />
-          <ContactDetails
-            title="Hlavný poskytovateľ"
-            contact={contacts.provider}
-          />
-          <p>
-            Presná adresa:{" "}
-            {contacts.workLocation.exactAddress ?? "Nie je uvedená"}
-          </p>
-          {contacts.workLocation.textClarification ? (
-            <p>Spresnenie miesta: {contacts.workLocation.textClarification}</p>
-          ) : null}
-          {contacts.workLocation.mapPin ? (
+        <div className="job-cockpit-details">
+          <Card className="job-cockpit-card">
+            <h2>Dohodnutý rozsah · iba na čítanie</h2>
+            <p>{job.request.description}</p>
+            <p>Obec zákazky je uložená v prijatom zadaní.</p>
+            <h3>Podrobnosti prijatého zadania</h3>
+            <SnapshotValue value={job.request.scopeDetails} />
             <p>
-              Súradnice: {contacts.workLocation.mapPin.latitude},{" "}
-              {contacts.workLocation.mapPin.longitude}
+              Verzia zadania: {job.request.visibleVersion}, revízia obsahu:{" "}
+              {job.request.contentRevision}
             </p>
-          ) : null}
-        </Card>
+          </Card>
 
-        <JobCompletion jobId={job.id} role={job.role} jobState={job.state} />
-        {job.state === "COMPLETED" ? <JobMainReview jobId={job.id} /> : null}
-        {job.state === "COMPLETED" && job.role === "CUSTOMER" ? (
-          <JobContextReview jobId={job.id} />
-        ) : null}
-        {job.state === "COMPLETED" && job.role === "PRIMARY_PROVIDER" ? (
-          <JobSupervisorEvaluations jobId={job.id} />
-        ) : null}
-        <JobDisputes jobId={job.id} />
+          <Card className="job-cockpit-card">
+            <h2>Kontakty a miesto výkonu</h2>
+            <ContactDetails title="Zákazník" contact={contacts.customer} />
+            <ContactDetails
+              title="Hlavný poskytovateľ"
+              contact={contacts.provider}
+            />
+            <p>
+              Presná adresa:{" "}
+              {contacts.workLocation.exactAddress ?? "Nie je uvedená"}
+            </p>
+            {contacts.workLocation.textClarification ? (
+              <p>
+                Spresnenie miesta: {contacts.workLocation.textClarification}
+              </p>
+            ) : null}
+            {contacts.workLocation.mapPin ? (
+              <p>
+                Súradnice: {contacts.workLocation.mapPin.latitude},{" "}
+                {contacts.workLocation.mapPin.longitude}
+              </p>
+            ) : null}
+          </Card>
+
+          <JobCompletion jobId={job.id} role={job.role} jobState={job.state} />
+          {job.state === "COMPLETED" ? <JobMainReview jobId={job.id} /> : null}
+          {job.state === "COMPLETED" && job.role === "CUSTOMER" ? (
+            <JobContextReview jobId={job.id} />
+          ) : null}
+          {job.state === "COMPLETED" && job.role === "PRIMARY_PROVIDER" ? (
+            <JobSupervisorEvaluations jobId={job.id} />
+          ) : null}
+          <JobDisputes jobId={job.id} />
+        </div>
       </div>
 
       <div className="job-cockpit-section" id="spravy">
@@ -1015,52 +1030,89 @@ export function JobDashboardView({
 }
 
 function JobLifecycleTracker({ job }: { job: JobDashboardData }) {
-  const confirmed = job.timeline.find(
-    (event) => event.eventType === "JOB_CONFIRMED",
-  );
   const started = job.timeline.find(
     (event) => event.eventType === "JOB_STARTED",
   );
-  const cancelled = job.timeline.find(
-    (event) => event.eventType === "JOB_CANCELLED",
-  );
-  const items = [
-    {
-      label: "Zákazka potvrdená",
-      time:
-        confirmed === undefined
-          ? new Date(job.acceptedAt).toLocaleString("sk-SK")
-          : new Date(confirmed.occurredAt).toLocaleString("sk-SK"),
-    },
-    ...(started === undefined
-      ? []
-      : [
-          {
-            label: "Práce sa začali",
-            time: new Date(started.occurredAt).toLocaleString("sk-SK"),
-          },
-        ]),
-    ...(job.state === "COMPLETION_REQUESTED"
-      ? [{ label: "Dokončenie čaká na potvrdenie" }]
-      : []),
-    ...(job.state === "COMPLETED" ? [{ label: "Zákazka dokončená" }] : []),
-    ...(cancelled === undefined
-      ? []
-      : [
-          {
-            description:
-              cancelled.reason === null
-                ? undefined
-                : `Dôvod: ${cancelled.reason}`,
-            label: "Zákazka zrušená",
-            time: new Date(cancelled.occurredAt).toLocaleString("sk-SK"),
-          },
-        ]),
-  ];
+  const current =
+    job.state === "COMPLETED"
+      ? 4
+      : job.state === "COMPLETION_REQUESTED"
+        ? 3
+        : job.state === "IN_PROGRESS" || started !== undefined
+          ? 2
+          : 1;
   return (
     <Card className="job-lifecycle-card">
-      <h2>Priebeh zákazky</h2>
-      <Timeline items={items} />
+      <h2 className="visually-hidden">Priebeh zákazky</h2>
+      <Stepper
+        current={current}
+        steps={["Potvrdená", "Prebieha", "Odovzdanie", "Dokončená"]}
+      />
+    </Card>
+  );
+}
+
+function JobQuickActions({ job }: { job: JobDashboardData }) {
+  return (
+    <Card className="job-quick-actions">
+      <h2>Rýchle akcie</h2>
+      <nav aria-label="Rýchle akcie zákazky">
+        <ActionLink
+          className="job-quick-action"
+          href={`/konverzacie/pozvanka/${job.winningInvitationId}`}
+        >
+          <img alt="" aria-hidden="true" src="/icons/message.svg" />
+          Napísať správu
+        </ActionLink>
+        <ActionLink
+          className="job-quick-action"
+          href="#dokumenty"
+          variant="secondary"
+        >
+          <img alt="" aria-hidden="true" src="/icons/file.svg" />
+          Pridať dokumentáciu
+        </ActionLink>
+        <ActionLink
+          className="job-quick-action"
+          href="#zmeny"
+          variant="secondary"
+        >
+          <img alt="" aria-hidden="true" src="/icons/change.svg" />
+          Otvoriť zmeny
+        </ActionLink>
+        <ActionLink
+          className="job-quick-action"
+          href="#ucastnici"
+          variant="secondary"
+        >
+          <img alt="" aria-hidden="true" src="/icons/users.svg" />
+          Zobraziť účastníkov
+        </ActionLink>
+      </nav>
+    </Card>
+  );
+}
+
+function JobTimelineSummary({
+  timeline,
+}: {
+  timeline: ReadonlyArray<JobDashboardData["timeline"][number]>;
+}) {
+  const latest = timeline.slice(-5);
+  return (
+    <Card className="job-timeline-summary">
+      <header>
+        <h2>Časová os</h2>
+        <a href="#priebeh">Zobraziť všetko</a>
+      </header>
+      <Timeline
+        items={latest.map((event) => ({
+          description:
+            event.reason === null ? undefined : `Dôvod: ${event.reason}`,
+          label: timelineEventLabel(event.eventType),
+          time: new Date(event.occurredAt).toLocaleString("sk-SK"),
+        }))}
+      />
     </Card>
   );
 }

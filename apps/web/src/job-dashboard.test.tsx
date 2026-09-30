@@ -289,6 +289,25 @@ describe("D17-A Job dashboard", () => {
     );
     expect(html.match(/Čo treba urobiť teraz/gu)).toHaveLength(1);
     expect(html).toContain("Priebeh zákazky");
+    expect(html).toContain("job-cockpit-overview-grid");
+    expect(html).toContain("Rýchle akcie");
+    expect(html).toContain("Časová os");
+    expect(html).toContain("Potvrdená");
+    expect(html).toContain("Prebieha");
+    expect(html).toContain("Odovzdanie");
+    expect(html).toContain("Dokončená");
+    expect(html).toContain('src="/icons/home.svg"');
+    expect(html).toContain('src="/icons/message.svg"');
+    expect(html).toContain('src="/icons/file.svg"');
+    expect(html).toContain('src="/icons/change.svg"');
+    expect(html).toContain('src="/icons/users.svg"');
+    expect(html).toContain(`href="/konverzacie/pozvanka/${invitationId}"`);
+    expect(html.indexOf("Čo treba urobiť teraz")).toBeLessThan(
+      html.indexOf("Rýchle akcie"),
+    );
+    expect(html.indexOf("Rýchle akcie")).toBeLessThan(
+      html.indexOf("Časová os"),
+    );
     for (const [href, label] of [
       ["#prehlad", "Prehľad"],
       ["#spravy", "Správy"],

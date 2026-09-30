@@ -19,7 +19,9 @@ describe("public search pagination", () => {
     expect(html).toContain('href="#main-content"');
     expect(html).toContain('id="main-content"');
     expect(html).toContain('aria-label="Hlavná navigácia"');
-    expect(html).toContain("Vyhľadávanie remeselníkov");
+    expect(html).toContain("Nájdite remeselníka pre svoju prácu");
+    expect(html).toContain('aria-label="Filtre vyhľadávania"');
+    expect(html).toContain('id="public-search-results-title"');
     expect(html).toContain("Jednoduchšie hľadanie remeselníkov");
   });
 

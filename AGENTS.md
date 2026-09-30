@@ -25,6 +25,9 @@ If code conflicts with a locked Dxx rule, the locked rule wins unless a human ex
 - `docs/design/DESIGN_CULTURE.md`
 - `docs/design/UX_GUIDELINES.md`
 - `docs/design/design-tokens.json`
+- `docs/design/handoff/` — approved visual handoff; `CODEX_PROMPT.md`,
+  `DESIGN_SYSTEM.md`, component specifications, locked assets and reference
+  boards are authoritative for visual composition and fidelity.
 
 The reference boards under `docs/design/` are directional concepts, not
 pixel-perfect product specifications. Do not copy demo metrics, ratings, names

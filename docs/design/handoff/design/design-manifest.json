@@ -1,0 +1,67 @@
+{
+  "name": "Remeselnicky portal approved ChatGPT design handoff",
+  "version": "1.0.0",
+  "sourceOfTruth": {
+    "primary": "../reference/reference-desktop-board.png",
+    "system": "../reference/reference-design-system.png",
+    "pageReferences": [
+      "../reference/reference-homepage-above-fold.png",
+      "../reference/reference-search-above-fold.png",
+      "../reference/reference-profile-above-fold.png",
+      "../reference/reference-job-above-fold.png"
+    ]
+  },
+  "fonts": {
+    "ui": {
+      "family": "Inter",
+      "status": "explicitly shown on the approved design-system board"
+    },
+    "display": {
+      "family": "Source Serif 4",
+      "fallback": "Georgia, Times New Roman, serif",
+      "status": "technical approximation of the serif display face visible in the approved raster UI reference"
+    }
+  },
+  "colors": {
+    "backgroundMain": "#F7F5F0",
+    "backgroundSoft": "#EEE8DD",
+    "surface": "#FFFFFF",
+    "textPrimary": "#202523",
+    "textSecondary": "#5E6864",
+    "primary": "#285C4D",
+    "primaryHover": "#224E42",
+    "accent": "#C66A42",
+    "brandSymbol": "#B06A45",
+    "trust": "#356F8A",
+    "success": "#2F7A52",
+    "warning": "#B4832E",
+    "error": "#B34A3C",
+    "borderSoft": "#D8D3C8",
+    "borderFaint": "#E8E3D9"
+  },
+  "layout": {
+    "pageMaxWidthPx": 1200,
+    "desktopHorizontalPaddingPx": 24,
+    "tabletHorizontalPaddingPx": 20,
+    "mobileHorizontalPaddingPx": 16,
+    "headerHeightPx": 72,
+    "desktopBreakpointsPx": {
+      "mobileMax": 639,
+      "tabletMax": 1023,
+      "desktopMin": 1024
+    }
+  },
+  "radiiPx": {
+    "small": 8,
+    "medium": 12,
+    "large": 18,
+    "hero": 21
+  },
+  "visualLocks": {
+    "assets": true,
+    "colors": true,
+    "typography": true,
+    "geometry": true,
+    "doNotRedesign": true
+  }
+}

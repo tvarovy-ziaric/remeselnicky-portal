@@ -17,7 +17,7 @@ describe("public search cards web boundary", () => {
     );
     expect(html).toContain('aria-label="Výsledky vyhľadávania"');
     expect(html).toContain("Majster Ján");
-    expect(html).toContain("Prečo sa hodí");
+    expect(html).toContain("Prečo sa hodí?");
     expect(html).toContain("Zobraziť profil");
     expect(html).toContain(`/remeselnici/${profileId}`);
     expect(html).toContain("Uvedené remeselníkom:");
@@ -57,8 +57,12 @@ describe("public search cards web boundary", () => {
 
     expect(html).toContain("Podložené dokladom:");
     expect(html).toContain("Overené platformou:");
-    expect(html).toContain("Hodnotenie 4.8 z 5 (12)");
+    expect(html).toContain('src="/icons/star.svg"');
+    expect(html).toContain("4.8 z 5");
+    expect(html).toContain("(12 hodnotení)");
     expect(html).toContain("Overené realizácie: 3");
+    expect(html).toContain('src="/icons/location.svg"');
+    expect(html).toContain("search-result-card__secondary-actions");
     expect(html).toContain("Ukážka z profilu – Majster Ján");
     expect(html).toContain("<figcaption>Ukážka z profilu</figcaption>");
     expect(html).not.toMatch(/overená fotografia|overený obrázok/iu);

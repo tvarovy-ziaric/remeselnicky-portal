@@ -8,14 +8,14 @@ describe("public home page", () => {
   it("shows both primary journeys with truthful destinations", () => {
     const markup = renderToStaticMarkup(<HomePage />);
 
-    expect(markup).toContain("Potrebujem remeselníka");
+    expect(markup).toContain("Hľadám remeselníka");
     expect(markup).toContain('href="/dopyt"');
     expect(markup).toContain("Som remeselník");
     expect(markup).toContain('href="/prihlasenie"');
     expect(markup).toContain("prístup remeselníkov do alfy je na pozvánku");
   });
 
-  it("explains the five-step customer journey", () => {
+  it("explains the approved four-step customer journey", () => {
     const markup = renderToStaticMarkup(<HomePage />);
 
     for (const title of [
@@ -23,7 +23,6 @@ describe("public home page", () => {
       "Vyberiete si remeselníkov",
       "Porovnáte ponuky",
       "Potvrdíte dohodu",
-      "Máte priebeh na jednom mieste",
     ]) {
       expect(markup).toContain(title);
     }

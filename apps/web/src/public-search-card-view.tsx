@@ -62,10 +62,10 @@ export function PublicSearchCardList({
   return (
     <ol aria-label="Výsledky vyhľadávania" className="public-search-results">
       {cards.map((card) => (
-        <li key={card.profileId}>
+        <li className="public-search-results__item" key={card.profileId}>
           <SearchResultCard
             actions={
-              <>
+              <div className="search-result-card__secondary-actions">
                 <CustomerShortlistToggle craftsmanProfileId={card.profileId} />
                 {jobRequestId === undefined || jobId !== undefined ? null : (
                   <CustomerInvitationButton
@@ -83,28 +83,11 @@ export function PublicSearchCardList({
                     profileType={card.identity.profileType}
                   />
                 )}
-              </>
+              </div>
             }
             badges={
-              card.rating.score === null &&
-              card.verifiedWorkCount === 0 &&
               card.badges.length === 0 ? null : (
-                <ul aria-label="Dôveryhodnosť a podklady">
-                  {card.rating.score === null ? null : (
-                    <li>
-                      <TrustBadge provenance="verified">
-                        Hodnotenie {card.rating.score.toFixed(1)} z 5 (
-                        {card.rating.reviewCount})
-                      </TrustBadge>
-                    </li>
-                  )}
-                  {card.verifiedWorkCount === 0 ? null : (
-                    <li>
-                      <TrustBadge provenance="verified">
-                        Overené realizácie: {card.verifiedWorkCount}
-                      </TrustBadge>
-                    </li>
-                  )}
+                <ul aria-label="Podklady profilu">
                   {card.badges.map((badge) => (
                     <li key={badge.kind}>
                       <TrustBadge provenance={badgeProvenance(badge.kind)}>
@@ -116,30 +99,72 @@ export function PublicSearchCardList({
               )
             }
             facts={
-              <>
-                <TrustBadge provenance="declared">
-                  {card.professions.map(({ label }) => label).join(", ")}
-                </TrustBadge>
-                <span>
-                  {card.location.municipalityName}
-                  {card.location.approximateDistanceKm === null
-                    ? ""
-                    : ` · približne ${card.location.approximateDistanceKm} km`}
-                </span>
-                <span>
-                  {card.availability === "INDICATIVELY_AVAILABLE"
-                    ? "Orientačne dostupný"
-                    : "Dostupnosť si dohodnite"}
-                </span>
-              </>
+              <div className="search-result-card__fact-stack">
+                {card.professions.length === 0 ? null : (
+                  <div className="search-result-card__services">
+                    <TrustBadge provenance="declared">
+                      {card.professions.map(({ label }) => label).join(", ")}
+                    </TrustBadge>
+                  </div>
+                )}
+                <div className="search-result-card__metadata">
+                  {card.rating.score === null ? null : (
+                    <span className="search-result-card__rating">
+                      <img
+                        alt=""
+                        aria-hidden="true"
+                        height="18"
+                        src="/icons/star.svg"
+                        width="18"
+                      />
+                      <strong>{card.rating.score.toFixed(1)} z 5</strong>
+                      <span>({card.rating.reviewCount} hodnotení)</span>
+                    </span>
+                  )}
+                  <span className="search-result-card__location">
+                    <img
+                      alt=""
+                      aria-hidden="true"
+                      height="18"
+                      src="/icons/location.svg"
+                      width="18"
+                    />
+                    {card.location.municipalityName}
+                    {card.location.approximateDistanceKm === null
+                      ? ""
+                      : ` · približne ${card.location.approximateDistanceKm} km`}
+                  </span>
+                </div>
+                <div className="search-result-card__trust-facts">
+                  {card.verifiedWorkCount === 0 ? null : (
+                    <span>
+                      <img
+                        alt=""
+                        aria-hidden="true"
+                        height="18"
+                        src="/icons/shield-check.svg"
+                        width="18"
+                      />
+                      Overené realizácie: {card.verifiedWorkCount}
+                    </span>
+                  )}
+                  <span className="search-result-card__availability">
+                    {card.availability === "INDICATIVELY_AVAILABLE"
+                      ? "Orientačne dostupný"
+                      : "Dostupnosť si dohodnite"}
+                  </span>
+                </div>
+              </div>
             }
             media={
               card.representativePortfolioImage === null ? null : (
-                <figure className="search-result-card__figure">
+                <figure className="search-result-card__figure search-result-card__portfolio-preview">
                   <img
                     alt={`Ukážka z profilu – ${card.identity.primaryName}`}
+                    height="160"
                     loading="lazy"
                     src={`/v1/public/media/${card.representativePortfolioImage.mediaAssetId}`}
+                    width="160"
                   />
                   <figcaption>Ukážka z profilu</figcaption>
                 </figure>
@@ -148,7 +173,7 @@ export function PublicSearchCardList({
             profileHref={`/remeselnici/${card.profileId}`}
             reasons={
               <>
-                <h3>Prečo sa hodí</h3>
+                <h3>Prečo sa hodí?</h3>
                 <ul>
                   {card.whyMatched.map((reason) => (
                     <li key={reason.kind}>{reason.text}</li>
