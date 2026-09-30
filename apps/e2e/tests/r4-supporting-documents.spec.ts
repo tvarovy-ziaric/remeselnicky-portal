@@ -312,7 +312,6 @@ async function authenticated(
 
 function accessHeaders(): Readonly<{
   extraHTTPHeaders?: Record<string, string>;
-  httpCredentials?: { username: string; password: string; origin: string };
 }> {
   const clientId = process.env.STAGING_E2E_CF_ACCESS_CLIENT_ID;
   const clientSecret = process.env.STAGING_E2E_CF_ACCESS_CLIENT_SECRET;
@@ -321,17 +320,6 @@ function accessHeaders(): Readonly<{
       extraHTTPHeaders: {
         "CF-Access-Client-Id": clientId,
         "CF-Access-Client-Secret": clientSecret,
-      },
-    };
-  }
-  const username = process.env.STAGING_E2E_BASIC_AUTH_USERNAME;
-  const password = process.env.STAGING_E2E_BASIC_AUTH_PASSWORD;
-  if (username !== undefined && password !== undefined) {
-    return {
-      httpCredentials: {
-        origin: required("STAGING_E2E_BASE_URL"),
-        password,
-        username,
       },
     };
   }

@@ -24,18 +24,10 @@ const fixture = JSON.parse(
 if (!/^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/u.test(fixture.baseURL)) {
   throw new Error("Only the isolated Quick Tunnel fixture is supported.");
 }
-const gate = (
-  await readFile(new URL(".alpha/secrets/quick_gate_password", root), "utf8")
-).trim();
 const browser = await chromium.launch({ headless: true });
 try {
   const context = await browser.newContext({
     baseURL: fixture.baseURL,
-    httpCredentials: {
-      origin: fixture.baseURL,
-      username: "alpha",
-      password: gate,
-    },
     storageState: fileURLToPath(new URL(".alpha/r3-e2e-auth-104.json", root)),
   });
   try {

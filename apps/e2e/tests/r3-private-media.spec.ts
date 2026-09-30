@@ -9,6 +9,8 @@ import {
   type BrowserContext,
 } from "@playwright/test";
 
+import { enterAlphaGateContext } from "./support/alpha-gate.js";
+
 const enabled = process.env.STAGING_E2E_ENABLED === "true";
 const requiredNames = [
   "STAGING_E2E_BASE_URL",
@@ -76,6 +78,7 @@ test("keeps clean PDF processing private and rejects EICAR", async ({
       baseURL: required("STAGING_E2E_BASE_URL"),
       ...accessHeaders(),
     });
+    await enterAlphaGateContext(anonymous);
     const anonymousDownload = await anonymous.request.get(
       `/v1/media/${cleanAssetId}/download`,
       { maxRedirects: 0 },
@@ -269,22 +272,14 @@ function minimalPdf(comment = "synthetic clean alpha fixture"): Uint8Array {
 
 function accessHeaders(): Readonly<{
   extraHTTPHeaders?: Record<string, string>;
-  httpCredentials?: { username: string; password: string; origin: string };
 }> {
   const clientId = process.env.STAGING_E2E_CF_ACCESS_CLIENT_ID;
   const clientSecret = process.env.STAGING_E2E_CF_ACCESS_CLIENT_SECRET;
-  const username = process.env.STAGING_E2E_BASIC_AUTH_USERNAME;
-  const password = process.env.STAGING_E2E_BASIC_AUTH_PASSWORD;
   if (
     (clientId === undefined) !== (clientSecret === undefined) ||
     (clientId !== undefined && (!clientId || !clientSecret))
   )
     throw new Error("Cloudflare Access credentials are incomplete");
-  if (
-    (username === undefined) !== (password === undefined) ||
-    (username !== undefined && (!username || !password))
-  )
-    throw new Error("Temporary alpha Basic Auth credentials are incomplete");
   return {
     ...(clientId === undefined || clientSecret === undefined
       ? {}
@@ -292,15 +287,6 @@ function accessHeaders(): Readonly<{
           extraHTTPHeaders: {
             "CF-Access-Client-Id": clientId,
             "CF-Access-Client-Secret": clientSecret,
-          },
-        }),
-    ...(username === undefined || password === undefined
-      ? {}
-      : {
-          httpCredentials: {
-            username,
-            password,
-            origin: required("STAGING_E2E_BASE_URL"),
           },
         }),
   };

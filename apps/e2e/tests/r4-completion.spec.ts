@@ -543,11 +543,6 @@ async function authenticated(
         ? "STAGING_E2E_CUSTOMER_AUTH_STATE"
         : `STAGING_E2E_${role}_AUTH_STATE`,
     ),
-    httpCredentials: {
-      origin: baseURL,
-      username: requiredEnv("STAGING_E2E_BASIC_AUTH_USERNAME"),
-      password: requiredEnv("STAGING_E2E_BASIC_AUTH_PASSWORD"),
-    },
   });
   const session = await get({ context, csrfToken: "" }, "/v1/auth/session");
   return { context, csrfToken: requiredString(session.csrfToken) };

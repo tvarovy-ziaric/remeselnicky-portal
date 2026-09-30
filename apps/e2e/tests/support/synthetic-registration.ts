@@ -4,6 +4,8 @@ import { readFile } from "node:fs/promises";
 import type { APIResponse, Browser, BrowserContext } from "@playwright/test";
 import { request as playwrightRequest } from "@playwright/test";
 
+import { enterAlphaGateContext } from "./alpha-gate.js";
+
 const registrationDomain = "portal.invalid";
 const registrationPrefix = "synthetic.e2e";
 const signatureDomain = "portal-synthetic-registration-v1\0";
@@ -72,6 +74,7 @@ export async function registerVerifiedSyntheticCustomer(
   });
 
   try {
+    await enterAlphaGateContext(context);
     const email = signedSyntheticEmail(configuration.registrationKey);
     const password = `D30!${randomUUID()}-${randomUUID()}`;
     const anonymousCsrf = requiredString(
@@ -283,8 +286,8 @@ function syntheticPhone(): string {
 
 function accessHeaders(baseURL: string): Readonly<{
   extraHTTPHeaders?: Record<string, string>;
-  httpCredentials?: { origin: string; password: string; username: string };
 }> {
+  void baseURL;
   const clientId = process.env["STAGING_E2E_CF_ACCESS_CLIENT_ID"];
   const clientSecret = process.env["STAGING_E2E_CF_ACCESS_CLIENT_SECRET"];
   if ((clientId === undefined) !== (clientSecret === undefined)) {
@@ -298,16 +301,7 @@ function accessHeaders(baseURL: string): Readonly<{
       },
     };
   }
-  const username = process.env["STAGING_E2E_BASIC_AUTH_USERNAME"];
-  const password = process.env["STAGING_E2E_BASIC_AUTH_PASSWORD"];
-  if ((username === undefined) !== (password === undefined)) {
-    throw new Error(
-      "Temporary Basic Auth credentials must be supplied as a pair",
-    );
-  }
-  return username === undefined || password === undefined
-    ? {}
-    : { httpCredentials: { origin: baseURL, password, username } };
+  return {};
 }
 
 async function json(

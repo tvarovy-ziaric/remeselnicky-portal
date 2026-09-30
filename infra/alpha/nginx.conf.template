@@ -3,6 +3,11 @@ map $http_upgrade $connection_upgrade {
   '' close;
 }
 
+map $http_cf_connecting_ip $alpha_gate_client_ip {
+  '' $remote_addr;
+  default $http_cf_connecting_ip;
+}
+
 server_names_hash_bucket_size 256;
 
 server {
@@ -14,15 +19,46 @@ server {
   error_log /dev/stderr crit;
   client_max_body_size 25m;
 
-  auth_basic "Temporary alpha";
-  auth_basic_user_file /run/secrets/quick_gate_htpasswd;
   proxy_hide_header Cache-Control;
   add_header Cache-Control "no-store" always;
   add_header X-Robots-Tag "noindex, nofollow, noarchive" always;
   add_header X-Content-Type-Options nosniff always;
   add_header Referrer-Policy same-origin always;
 
+  location = /_alpha-gate/verify {
+    internal;
+    proxy_pass http://alpha-gate:3002/verify;
+    proxy_pass_request_body off;
+    proxy_set_header Content-Length "";
+    proxy_set_header Cookie $http_cookie;
+    proxy_set_header X-Alpha-Gate-Client-IP $alpha_gate_client_ip;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header X-Original-URI $request_uri;
+  }
+
+  location ^~ /_alpha-gate/ {
+    proxy_pass http://alpha-gate:3002/;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Alpha-Gate-Client-IP $alpha_gate_client_ip;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+  }
+
+  location @alpha_gate_login {
+    return 303 $alpha_gate_login;
+  }
+
+  location @alpha_gate_api_denied {
+    default_type application/json;
+    return 401 '{"code":"ALPHA_GATE_REQUIRED"}';
+  }
+
   location /v1/ {
+    auth_request /_alpha-gate/verify;
+    auth_request_set $alpha_gate_login $upstream_http_x_alpha_gate_login;
+    error_page 401 = @alpha_gate_api_denied;
     proxy_pass http://api:3001;
     proxy_http_version 1.1;
     proxy_set_header Host $host;
@@ -33,13 +69,15 @@ server {
   }
 
   location /health/ {
-    auth_basic off;
     proxy_pass http://api:3001;
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-Proto https;
   }
 
   location / {
+    auth_request /_alpha-gate/verify;
+    auth_request_set $alpha_gate_login $upstream_http_x_alpha_gate_login;
+    error_page 401 = @alpha_gate_login;
     proxy_pass http://web:3000;
     proxy_http_version 1.1;
     proxy_set_header Host $host;

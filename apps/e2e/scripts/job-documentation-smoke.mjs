@@ -8,9 +8,6 @@ const root = new URL("../../../", import.meta.url);
 const fixture = JSON.parse(
   await readFile(new URL(".alpha/r3-e2e-fixture.json", root), "utf8"),
 );
-const password = (
-  await readFile(new URL(".alpha/secrets/quick_gate_password", root), "utf8")
-).trim();
 if (!/^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/u.test(fixture.baseURL))
   throw new Error("Unexpected Quick Tunnel origin");
 
@@ -41,7 +38,6 @@ const browser = await chromium.launch({ headless: true });
 const contextFor = (id) =>
   browser.newContext({
     baseURL: fixture.baseURL,
-    httpCredentials: { origin: fixture.baseURL, username: "alpha", password },
     storageState: fileURLToPath(new URL(`.alpha/r3-e2e-auth-${id}.json`, root)),
   });
 async function read(context, path) {

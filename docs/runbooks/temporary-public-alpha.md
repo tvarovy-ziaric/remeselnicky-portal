@@ -2,10 +2,11 @@
 
 This runbook operates a **temporary public alpha/staging target for internal
 testers** on one Windows laptop. It is not production, has no SLA and contains
-synthetic data only. A named tunnel uses Cloudflare Access plus a high-entropy
-Nginx Basic Auth gate; a domainless Quick Tunnel has only the Basic Auth gate.
-Both still require the portal's own invite-only authentication. Quick Tunnel is
-not an Access replacement or a real-user launch route.
+synthetic data only. The app origin has a local session-based Alpha gate. A
+named tunnel additionally uses Cloudflare Access in front of that origin; a
+domainless Quick Tunnel cannot use Access and relies on the Alpha gate alone.
+Both still require the portal's own invite-only authentication. Quick Tunnel
+is not an Access replacement or a real-user launch route.
 
 ## Components, accounts and cost
 
@@ -17,7 +18,8 @@ not an Access replacement or a real-user launch route.
 | MinIO S3-compatible server    | Private object store, built from the final open-source security release `RELEASE.2025-10-15T17-29-55Z` | Local access/secret key                                                       | EUR 0; AGPLv3 obligations and the archived/unmaintained status apply                           |
 | MinIO `mc` CLI                | Bucket initialization and isolated backup/restore, built from `RELEASE.2025-08-13T08-35-41Z`           | Reuses the local MinIO credentials                                            | EUR 0; source-built because the published Docker image is unavailable                          |
 | ClamAV 1.5.4                  | PDF malware verdict, loopback sidecar to worker                                                        | None                                                                          | EUR 0                                                                                          |
-| Nginx 1.28                    | Tunnel origin, Basic Auth gate and localhost diagnostic endpoint                                       | Local generated gate password                                                 | EUR 0                                                                                          |
+| Nginx 1.28                    | Tunnel origin, Alpha-gate enforcement and localhost diagnostic endpoint                                | None                                                                          | EUR 0                                                                                          |
+| `alpha-gate`                  | One-time outer login and opaque 12-hour browser sessions                                               | Local generated gate password                                                 | EUR 0                                                                                          |
 | `cloudflared` 2026.9.1        | Outbound-only named tunnel or two domainless Quick Tunnels                                             | Named: Cloudflare token; Quick: none                                          | EUR 0                                                                                          |
 | Cloudflare Access             | Tester allowlist and E2E Service Auth                                                                  | Cloudflare account, an active DNS zone, tester identities, service token pair | EUR 0 for the Free plan up to 50 users                                                         |
 
@@ -42,8 +44,9 @@ must be revisited before D30 production approval. The corresponding source is
 
 ```text
 tester / E2E
-  -> named tunnel + Cloudflare Access + Basic Auth, or Quick Tunnel + Basic Auth
+  -> named tunnel + Cloudflare Access, or domainless Quick Tunnel without Access
   -> alpha-edge network -> Nginx
+       -> Alpha gate :3002 (internal only; app/API boundary)
        -> web :3000
        -> API :3001
        -> exact signed GET/HEAD only -> MinIO :9000
@@ -65,13 +68,31 @@ responses. Nginx access logs are disabled so signed URL query strings are
 not retained in proxy logs; API/worker structured logs remain enabled.
 
 Quick mode has two separate random `trycloudflare.com` names. The app tunnel
-reaches only Nginx port 8082 and requires Basic Auth for app/API paths. The
-object tunnel reaches only port 8081, which serves exact signed private object
-paths with GET/HEAD only; it cannot route to the app even with a forged Host
-header. Neither port is published on the host. Cloudflare Access policies are
-not available for these random names. A shared gate password is suitable only
-for a small trusted synthetic-data test, never as a substitute for individual
-tester identity or a real-user release decision.
+reaches only Nginx port 8082. Nginx checks an opaque Alpha gate session before
+proxying app or API traffic. A successful one-time form login issues a
+host-only `__Host-` cookie with `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`
+and a 12-hour maximum lifetime. Session identifiers are random and are held
+only in the gate service's memory; the cookie contains no password or portal
+identity, and restarting the gate invalidates all sessions. Login and logout
+use same-origin, one-time CSRF tokens. Failed login attempts are bounded per
+hashed client address, return paths accept only local relative paths, and the
+gate does not log credentials.
+
+The object tunnel reaches only port 8081, which serves exact signed private
+object paths with GET/HEAD only; it cannot route to the app even with a forged
+Host header. The app gate cookie is host-only and is never sent to this
+separate object hostname, so opening authorized signed media does not trigger
+another Alpha prompt. Neither port is published on the host. Cloudflare Access
+policies are not available for these random names. A shared gate password is
+suitable only for a small trusted synthetic-data test, never as a substitute
+for individual tester identity or a real-user release decision.
+
+The Alpha gate replaces the original server-level HTTP Basic Auth boundary.
+Basic Auth challenged every document, API, React Server Component and asset
+request, leaving prompt reuse to each browser's protection-space cache. A
+recreated Quick Tunnel also has a new hostname, for which the browser has no
+cached credentials. Those two properties caused the repeated prompts; the
+portal and Next.js were not redirecting requests to a different origin.
 
 `portal-alpha-private` is private. The media lifecycle is logical and audited:
 an `ORIGINAL_UPLOAD` object is quarantined while the asset is `PROCESSING`; a
@@ -158,17 +179,34 @@ pwsh ./infra/alpha/Alpha.ps1 -Action quick-start
 ```
 
 The command prints the app and signed-object URLs and updates the ignored
-`.env.alpha` origins. Open the app URL in a browser. The first gate asks for
-username `alpha` and the generated password stored only in
-`.alpha/secrets/quick_gate_password`. Read that file locally; do not paste the
-password into a ticket or chat. The portal still requires its own synthetic
-account login. On `/prihlasenie`, replace any browser-autofilled `alpha` in
-the E-mail field with `synthetic.account.101@portal.invalid` (synthetic
-customer). Its separate password is in
-`.alpha/secrets/synthetic_seed_password`; read it locally and do not paste it
-into a ticket or chat. The `.invalid` address has no mailbox and is used only
-for this synthetic staging fixture. Use only approved internal testers and
-synthetic data.
+`.env.alpha` origins. Tester procedure:
+
+1. Open the newly printed **app URL**. Do not reuse an older Quick URL after a
+   connector restart.
+2. On **Testovacia Alpha**, keep username `alpha` and enter the generated
+   password stored only in `.alpha/secrets/quick_gate_password`. Read that file
+   locally; do not paste the password into a ticket, chat or URL.
+3. Select **Vstúpiť do testovacej verzie** once. A safe app deep link and its
+   query string are restored after login. Refresh, back/forward navigation and
+   a new tab on the same app hostname reuse the gate session without another
+   prompt for up to 12 hours.
+4. Sign in to the portal separately when the product asks. On
+   `/prihlasenie`, use `synthetic.account.101@portal.invalid` for the synthetic
+   customer. Its different password is in
+   `.alpha/secrets/synthetic_seed_password`. The `.invalid` address has no
+   mailbox and exists only for this staging fixture.
+5. Authorized signed media opens on the separately printed object hostname.
+   It must not ask for the Alpha password and does not receive the app gate
+   cookie.
+
+Use only approved internal testers and synthetic data. The outer Alpha gate is
+not a portal account: signing into or out of one does not sign into or out of
+the other. To end only the outer browser session, open
+`/_alpha-gate/logout` on the current app hostname and confirm the form. Expiry,
+explicit gate logout, gate restart, cookie removal/tampering or a new Quick
+hostname requires one new Alpha login. Repeated wrong attempts are temporarily
+rate-limited; wait for the limit window instead of changing or weakening the
+boundary.
 
 If Quick Tunnel assigns a different hostname while an R3 browser fixture
 already exists, rerun `provision-r3-quick.mjs` before the browser suite. It
@@ -186,13 +224,15 @@ the new app URL; old signed URLs are invalid. To remove public reachability:
 pwsh ./infra/alpha/Alpha.ps1 -Action quick-stop
 ```
 
-For local browser E2E against the current Quick app URL, additionally set
-`STAGING_E2E_BASIC_AUTH_USERNAME=alpha` and load
-`STAGING_E2E_BASIC_AUTH_PASSWORD` from the ignored password file into the
-current process. Do not set the Cloudflare Access client-ID/secret variables
-in Quick mode. A passing Quick run is useful public-network evidence but does
-not verify a named Access-protected staging deployment or satisfy D30's
-real-user launch gates.
+For browser E2E against the current Quick app URL, set
+`STAGING_E2E_ALPHA_GATE_PASSWORD` from the ignored password file in the current
+process. The username is the fixed value `alpha`; there is no Basic Auth
+username/password pair and the Playwright configuration no longer uses
+`httpCredentials`. The fixture provisioner enters the HTML gate once and saves
+the resulting host-only cookie alongside each ignored portal storage state.
+Do not set the Cloudflare Access client-ID/secret variables in Quick mode. A
+passing Quick run is useful public-network evidence but does not verify a named
+Access-protected staging deployment or satisfy D30's real-user launch gates.
 
 Verify the exact signed-object route without exposing a signed URL or leaving
 the probe object behind:
@@ -202,9 +242,11 @@ docker compose --env-file .env.alpha -f compose.alpha.yaml --profile ops run --r
 pnpm --filter @portal/e2e exec node scripts/quick-smoke.mjs
 ```
 
-The second command opens the authenticated Quick app in headless Chromium. Run
-`pnpm --filter @portal/e2e exec playwright install chromium` once if its
-browser runtime is not installed.
+The second command opens a fresh Quick browser in headless Chromium, completes
+the Alpha form once, exercises same-host navigation/session reuse and confirms
+that browser Basic Auth challenges are absent. Run
+`pnpm --filter @portal/e2e exec playwright install chromium` once if its browser
+runtime is not installed.
 
 Cloudflare documents the no-account URL, 200-request cap, lack of SSE and
 testing-only status in its [Quick Tunnel guide](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/trycloudflare/).
@@ -255,13 +297,19 @@ $env:STAGING_E2E_ENABLED = "true"
 $env:STAGING_E2E_BASE_URL = "https://alpha.example.sk"
 $env:STAGING_E2E_CF_ACCESS_CLIENT_ID = Get-Content .alpha/secrets/cf_access_client_id -Raw
 $env:STAGING_E2E_CF_ACCESS_CLIENT_SECRET = Get-Content .alpha/secrets/cf_access_client_secret -Raw
-$env:STAGING_E2E_BASIC_AUTH_USERNAME = "alpha"
-$env:STAGING_E2E_BASIC_AUTH_PASSWORD = Get-Content .alpha/secrets/quick_gate_password -Raw
+$env:STAGING_E2E_ALPHA_GATE_PASSWORD = Get-Content .alpha/secrets/quick_gate_password -Raw
 $env:STAGING_E2E_LOCAL_COMPOSE_CONTROL = "true"
 pnpm --filter @portal/e2e test
 ```
 
-The committed suites verify real HTTPS/session/CSRF competitor isolation and,
+The Cloudflare pair above is only for a named provider-backed staging target;
+do not configure it for Quick Tunnel. The Alpha password is consumed locally
+by the browser automation to establish the same session a tester gets from the
+form. It is not added as an HTTP Basic credential or written into a URL.
+
+The committed suites verify a fresh-browser Alpha login, safe deep-link return,
+session reuse across refresh/back/forward/new tab, portal-auth independence,
+expiry/tamper/logout denial, real HTTPS/session/CSRF competitor isolation and,
 once the referenced synthetic R3 IDs are supplied, clean PDF quarantine ->
 READY -> authorized signed download, competitor/anonymous denial, EICAR ->
 REJECTED, and durable processing across a worker stop/start. E2E is not green

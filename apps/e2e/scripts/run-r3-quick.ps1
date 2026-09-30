@@ -9,8 +9,7 @@ $accountPassword = (Get-Content -LiteralPath (Join-Path $repo '.alpha/secrets/sy
 $gatePassword = (Get-Content -LiteralPath (Join-Path $repo '.alpha/secrets/quick_gate_password') -Raw).Trim()
 $env:STAGING_E2E_ENABLED = 'true'
 $env:STAGING_E2E_BASE_URL = $fixture.baseURL
-$env:STAGING_E2E_BASIC_AUTH_USERNAME = 'alpha'
-$env:STAGING_E2E_BASIC_AUTH_PASSWORD = $gatePassword
+$env:STAGING_E2E_ALPHA_GATE_PASSWORD = $gatePassword
 $env:STAGING_E2E_LOCAL_COMPOSE_CONTROL = 'true'
 $env:STAGING_E2E_CUSTOMER_EMAIL = 'synthetic.account.101@portal.invalid'
 $env:STAGING_E2E_CUSTOMER_PASSWORD = $accountPassword
@@ -44,6 +43,8 @@ if (Test-Path -LiteralPath $firefoxExecutable -PathType Leaf) {
 foreach ($statePath in @($env:STAGING_E2E_CUSTOMER_AUTH_STATE, $env:STAGING_E2E_CUSTOMER_B_AUTH_STATE, $env:STAGING_E2E_PROVIDER_A_AUTH_STATE, $env:STAGING_E2E_PROVIDER_B_AUTH_STATE)) {
   if (-not (Test-Path -LiteralPath $statePath -PathType Leaf)) { throw 'Synthetic browser auth state is unavailable; run the fixture provisioner first' }
 }
+& node (Join-Path $PSScriptRoot 'refresh-alpha-gate-states.mjs')
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Push-Location $repo
 try {
   corepack pnpm --filter @portal/e2e exec playwright test @PlaywrightArgs

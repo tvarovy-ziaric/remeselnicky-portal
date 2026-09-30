@@ -45,7 +45,7 @@ function Remove-ObsoleteApplicationImages([string[]]$ProtectedReleases) {
   }
 
   $repositories = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-  foreach ($service in @("api", "worker", "web")) {
+  foreach ($service in @("alpha-gate", "api", "worker", "web")) {
     [void]$repositories.Add("remeselnicky-alpha-$service")
   }
 
@@ -144,7 +144,7 @@ switch ($Action) {
     Build-IfMissing "postgres" "remeselnicky-alpha-postgres:latest"
     Build-IfMissing "minio" "remeselnicky-alpha-minio:RELEASE.2025-10-15T17-29-55Z"
     Build-IfMissing "minio-init" "remeselnicky-alpha-mc:RELEASE.2025-08-13T08-35-41Z"
-    Build-Images -Services @("synthetic-verification-sink", "api", "worker", "web")
+    Build-Images -Services @("synthetic-verification-sink", "alpha-gate", "api", "worker", "web")
     Invoke-Compose @("up", "--detach", "--no-build")
     Invoke-Compose @("ps")
     break
@@ -172,7 +172,7 @@ switch ($Action) {
   }
   "restart" {
     Assert-Initialized
-    Invoke-Compose @("restart", "api", "worker", "web", "reverse-proxy")
+    Invoke-Compose @("restart", "alpha-gate", "api", "worker", "web", "reverse-proxy")
     break
   }
   "update" {
@@ -189,7 +189,7 @@ switch ($Action) {
     [IO.File]::WriteAllText((Join-Path $state "previous-release"), $previous, [Text.UTF8Encoding]::new($false))
     Set-Release $next
     try {
-      Build-Images -Services @("synthetic-verification-sink", "api", "worker", "web")
+      Build-Images -Services @("synthetic-verification-sink", "alpha-gate", "api", "worker", "web")
       Invoke-Compose @("up", "--detach", "--no-build")
       # Nginx resolves upstream service addresses at startup; Compose may replace
       # web/API containers without recreating the proxy, leaving stale addresses.
@@ -206,7 +206,7 @@ switch ($Action) {
     $previousPath = Join-Path $state "previous-release"
     if (-not (Test-Path -LiteralPath $previousPath)) { throw "No previous alpha image revision is recorded." }
     $previous = (Get-Content -LiteralPath $previousPath -Raw).Trim()
-    foreach ($image in @("api","worker","web")) {
+    foreach ($image in @("alpha-gate","api","worker","web")) {
       & docker image inspect "remeselnicky-alpha-$image`:$previous" *> $null
       if ($LASTEXITCODE -ne 0) { throw "Rollback image remeselnicky-alpha-$image`:$previous is unavailable." }
     }
@@ -240,14 +240,14 @@ switch ($Action) {
       $objectHost = Wait-QuickHostname "quick-object"
       if ($appHost -eq $objectHost) { throw "Cloudflare returned duplicate Quick Tunnel hostnames." }
       Set-AlphaHostnames $appHost $objectHost
-      Invoke-Compose @("up", "--detach", "--no-build", "--no-deps", "--force-recreate", "api", "worker", "reverse-proxy")
+      Invoke-Compose @("up", "--detach", "--no-build", "--no-deps", "--force-recreate", "alpha-gate", "api", "worker", "reverse-proxy")
       Write-Host "Temporary app: https://$appHost"
       Write-Host "Temporary signed-object origin: https://$objectHost"
-      Write-Host "The app requires username alpha and the password in .alpha/secrets/quick_gate_password. Quick Tunnel URLs change on restart."
+      Write-Host "Open the app, sign in once to the Alpha gate as alpha with .alpha/secrets/quick_gate_password, then use the 12-hour browser session. Quick Tunnel URLs change on restart."
     } catch {
       [IO.File]::WriteAllText($environment, $previousEnvironment, [Text.UTF8Encoding]::new($false))
       Invoke-Compose @("--profile", "quick", "stop", "quick-app", "quick-object") -AllowFailure
-      Invoke-Compose @("up", "--detach", "--no-build", "--no-deps", "--force-recreate", "api", "worker", "reverse-proxy") -AllowFailure
+      Invoke-Compose @("up", "--detach", "--no-build", "--no-deps", "--force-recreate", "alpha-gate", "api", "worker", "reverse-proxy") -AllowFailure
       throw
     }
     break

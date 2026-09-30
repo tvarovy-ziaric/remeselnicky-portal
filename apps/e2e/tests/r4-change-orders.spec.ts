@@ -533,11 +533,6 @@ async function authenticated(browser: Browser, role: Role): Promise<Actor> {
         ? "STAGING_E2E_CUSTOMER_AUTH_STATE"
         : `STAGING_E2E_${role}_AUTH_STATE`,
     ),
-    httpCredentials: {
-      origin: baseURL,
-      username: requiredEnv("STAGING_E2E_BASIC_AUTH_USERNAME"),
-      password: requiredEnv("STAGING_E2E_BASIC_AUTH_PASSWORD"),
-    },
   });
   const session = await checked(
     await context.request.get("/v1/auth/session"),

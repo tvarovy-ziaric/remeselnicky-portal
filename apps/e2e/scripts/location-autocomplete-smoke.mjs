@@ -2,6 +2,8 @@ import { readFile } from "node:fs/promises";
 
 import { chromium, expect } from "@playwright/test";
 
+import { ensureAlphaGateSession } from "./alpha-gate-session.mjs";
+
 const environment = await readFile(
   new URL("../../../.env.alpha", import.meta.url),
   "utf8",
@@ -10,7 +12,7 @@ const hostname = /^ALPHA_APP_HOSTNAME=([a-z0-9-]+\.trycloudflare\.com)$/mu.exec(
   environment,
 )?.[1];
 if (hostname === undefined) throw new Error("Quick app hostname is missing");
-const origin = `http://${hostname}:8080`;
+const origin = `https://${hostname}`;
 
 const password = (
   await readFile(
@@ -22,16 +24,14 @@ if (!/^[0-9a-f]{48}$/u.test(password)) {
   throw new Error("Quick gate password is invalid");
 }
 
-const browser = await chromium.launch({
-  args: [
-    `--host-resolver-rules=MAP ${hostname} 127.0.0.1`,
-    "--no-proxy-server",
-  ],
-  headless: true,
-});
+const browser = await chromium.launch({ headless: true });
 try {
-  const context = await browser.newContext({
-    httpCredentials: { origin, password, username: "alpha" },
+  const context = await browser.newContext({ baseURL: origin });
+  await ensureAlphaGateSession({
+    baseURL: origin,
+    context,
+    password,
+    returnTo: "/remeselnici",
   });
   const page = await context.newPage();
   const response = await page.goto(`${origin}/remeselnici`);

@@ -8,12 +8,14 @@ import {
   type BrowserContext,
 } from "@playwright/test";
 
+import { enterAlphaGateContext } from "./support/alpha-gate.js";
+
 test.skip(
   process.env.STAGING_E2E_ENABLED !== "true",
   "Synthetic public alpha fixture is not provisioned",
 );
 
-test("acceptQuote never admits a Basic-Auth visitor without a portal session", async ({
+test("acceptQuote never admits an outer-gate visitor without a portal session", async ({
   browser,
 }) => {
   const baseURL = requiredEnv("STAGING_E2E_BASE_URL");
@@ -22,6 +24,7 @@ test("acceptQuote never admits a Basic-Auth visitor without a portal session", a
     ...accessHeaders(baseURL),
   });
   try {
+    await enterAlphaGateContext(context);
     const csrf = await context.request.get("/v1/auth/csrf");
     expect(csrf.status()).toBe(200);
     const token = requiredString(
@@ -371,8 +374,8 @@ async function authenticated(
 
 function accessHeaders(baseURL: string): Readonly<{
   extraHTTPHeaders?: Record<string, string>;
-  httpCredentials?: { origin: string; password: string; username: string };
 }> {
+  void baseURL;
   const clientId = process.env.STAGING_E2E_CF_ACCESS_CLIENT_ID;
   const clientSecret = process.env.STAGING_E2E_CF_ACCESS_CLIENT_SECRET;
   if (clientId !== undefined && clientSecret !== undefined)
@@ -382,10 +385,6 @@ function accessHeaders(baseURL: string): Readonly<{
         "CF-Access-Client-Secret": clientSecret,
       },
     };
-  const username = process.env.STAGING_E2E_BASIC_AUTH_USERNAME;
-  const password = process.env.STAGING_E2E_BASIC_AUTH_PASSWORD;
-  if (username !== undefined && password !== undefined)
-    return { httpCredentials: { origin: baseURL, password, username } };
   return {};
 }
 

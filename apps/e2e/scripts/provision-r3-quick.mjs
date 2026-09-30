@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 
 import { chromium } from "@playwright/test";
 
+import { ensureAlphaGateSession } from "./alpha-gate-session.mjs";
+
 const root = new URL("../../../", import.meta.url);
 const stateUrl = new URL(".alpha/r3-e2e-fixture.json", root);
 const environment = await readFile(new URL(".env.alpha", root), "utf8");
@@ -13,7 +15,7 @@ const hostname = /^ALPHA_APP_HOSTNAME=([a-z0-9-]+\.trycloudflare\.com)$/mu.exec(
 if (!hostname)
   throw new Error("Only the isolated Quick Tunnel staging origin is supported");
 const baseURL = `https://${hostname}`;
-const basicPassword = (
+const gatePassword = (
   await readFile(new URL(".alpha/secrets/quick_gate_password", root), "utf8")
 ).trim();
 const accountPassword = (
@@ -231,16 +233,17 @@ async function login(number) {
   }
   const context = await browser.newContext({
     baseURL,
-    httpCredentials: {
-      origin: baseURL,
-      username: "alpha",
-      password: basicPassword,
-    },
     ...(storedState === undefined ? {} : { storageState: storedState }),
+  });
+  await ensureAlphaGateSession({
+    baseURL,
+    context,
+    password: gatePassword,
   });
   const session = await context.request.get("/v1/auth/session");
   if (session.status() === 200) {
     const body = await session.json();
+    await context.storageState({ path: fileURLToPath(authStateUrl) });
     return { context, csrf: body.csrfToken };
   }
   if (session.status() !== 401)

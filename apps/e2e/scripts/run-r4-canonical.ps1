@@ -21,8 +21,7 @@ foreach ($path in @($gatePasswordPath, $accountPasswordPath, $registrationKeyPat
 
 $env:STAGING_E2E_CANONICAL_ENABLED = 'true'
 $env:STAGING_E2E_BASE_URL = $fixture.baseURL
-$env:STAGING_E2E_BASIC_AUTH_USERNAME = 'alpha'
-$env:STAGING_E2E_BASIC_AUTH_PASSWORD = (Get-Content -LiteralPath $gatePasswordPath -Raw).Trim()
+$env:STAGING_E2E_ALPHA_GATE_PASSWORD = (Get-Content -LiteralPath $gatePasswordPath -Raw).Trim()
 $env:STAGING_E2E_PROVIDER_B_EMAIL = 'synthetic.account.103@portal.invalid'
 $env:STAGING_E2E_PROVIDER_B_PASSWORD = (Get-Content -LiteralPath $accountPasswordPath -Raw).Trim()
 $env:STAGING_E2E_PROVIDER_B_AUTH_STATE = $providerStatePath
@@ -31,6 +30,8 @@ $env:STAGING_E2E_SYNTHETIC_REGISTRATION_KEY_FILE = $registrationKeyPath
 $env:STAGING_E2E_SYNTHETIC_CLAIM_KEY_FILE = $claimKeyPath
 $env:STAGING_E2E_SYNTHETIC_SINK_ORIGIN = "http://127.0.0.1:$sinkPort"
 
+& node (Join-Path $PSScriptRoot 'refresh-alpha-gate-states.mjs')
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Push-Location $repo
 try {
   corepack pnpm --filter @portal/e2e test tests/r4-browser-onboarding.spec.ts tests/r4-canonical-loop.spec.ts --project=chromium @PlaywrightArgs

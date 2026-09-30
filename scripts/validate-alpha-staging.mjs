@@ -40,6 +40,7 @@ for (const service of [
   "api",
   "worker",
   "web",
+  "alpha-gate",
   "reverse-proxy",
   "cloudflared",
   "quick-app",
@@ -66,9 +67,13 @@ assert.match(compose, /security_opt: \[no-new-privileges:true\]/u);
 assert.match(compose, /OBJECT_STORAGE_SIGNING_ENDPOINT:/u);
 assert.match(nginx, /limit_except GET HEAD \{ deny all; \}/u);
 assert.equal((nginx.match(/access_log off;/gu) ?? []).length, 3);
+assert.doesNotMatch(nginx, /auth_basic|WWW-Authenticate/iu);
+assert.match(nginx, /auth_request \/_alpha-gate\/verify/u);
+assert.match(nginx, /proxy_pass http:\/\/alpha-gate:3002\/verify/u);
+assert.match(compose, /ALPHA_GATE_SESSION_TTL_SECONDS: "43200"/u);
 assert.match(
-  nginx,
-  /auth_basic_user_file \/run\/secrets\/quick_gate_htpasswd/u,
+  compose,
+  /quick_gate_password:\s*[\s\S]*?\.\/\.alpha\/secrets\/quick_gate_password/u,
 );
 assert.match(nginx, /listen 8081 default_server/u);
 assert.match(nginx, /listen 8082 default_server/u);

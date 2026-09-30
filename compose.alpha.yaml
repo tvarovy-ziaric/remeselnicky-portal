@@ -398,6 +398,34 @@ services:
     mem_limit: 512m
     cpus: 0.75
 
+  alpha-gate:
+    image: remeselnicky-alpha-gate:${ALPHA_RELEASE_REVISION}
+    build:
+      context: .
+      dockerfile: infra/alpha/alpha-gate.Dockerfile
+    environment:
+      ALPHA_GATE_PASSWORD_FILE: /run/secrets/quick_gate_password
+      ALPHA_GATE_SESSION_TTL_SECONDS: "43200"
+      PORT: "3002"
+    secrets: [quick_gate_password]
+    networks: [alpha-internal]
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://127.0.0.1:3002/health/live').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+    restart: unless-stopped
+    <<: *app-security
+    mem_limit: 128m
+    cpus: 0.25
+
   reverse-proxy:
     image: nginx:1.28.0-alpine
     environment:
@@ -408,11 +436,11 @@ services:
     volumes:
       - ./infra/alpha/nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
       - ./.alpha/tls:/run/alpha-tls:ro
-    secrets: [quick_gate_htpasswd]
     ports:
       - 127.0.0.1:${ALPHA_DIAGNOSTIC_PORT:-8080}:8080
     networks: [alpha-internal, alpha-edge]
     depends_on:
+      alpha-gate: { condition: service_healthy }
       api: { condition: service_healthy }
       web: { condition: service_healthy }
       minio: { condition: service_healthy }
@@ -580,5 +608,5 @@ secrets:
     file: ./.alpha/secrets/synthetic_verification_ingest_key
   cloudflare_tunnel_token:
     file: ./.alpha/secrets/cloudflare_tunnel_token
-  quick_gate_htpasswd:
-    file: ./.alpha/secrets/quick_gate_htpasswd
+  quick_gate_password:
+    file: ./.alpha/secrets/quick_gate_password
