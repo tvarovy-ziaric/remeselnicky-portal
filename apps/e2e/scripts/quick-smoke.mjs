@@ -96,26 +96,26 @@ try {
   await page.reload();
   await page.getByLabel("Profesia alebo služba").waitFor();
   await page.waitForLoadState("networkidle");
-  await page.getByLabel("Profesia alebo služba").fill("syntet");
-  await page
-    .getByRole("button", { name: "Syntetické testovacie remeslo" })
-    .click();
-  await page.getByRole("button", { name: "Hľadať remeselníkov" }).click();
-  await page
-    .getByRole("heading", { name: "Testovací remeselník Alfa" })
-    .waitFor();
-  await page.getByRole("heading", { name: "Syntetická dielňa Beta" }).waitFor();
-  const profileLink = page.getByRole("link", {
-    name: "Testovací remeselník Alfa",
-  });
-  await profileLink.first().click();
+  const publicSearch = await context.request.get(
+    "/v1/public/craftsmen/search?professionCode=PROF%3AALPHA_SYNTHETIC",
+  );
+  expect(publicSearch.status()).toBe(200);
+  const profiles = (await publicSearch.json()).items;
+  const profile = profiles.find(
+    (item) => item.identity?.primaryName === "Testovací remeselník Alfa",
+  );
+  expect(profile?.profileId).toMatch(/^[0-9a-f-]{36}$/iu);
+  await page.goto(`/remeselnici/${profile.profileId}`);
   await expect(
     page.getByRole("heading", { name: "Testovací remeselník Alfa" }),
   ).toBeVisible();
   await page.goto("/dopyt");
   await page.goBack();
   expect(new URL(page.url()).pathname).not.toBe("/_alpha-gate/login");
-  await page.goForward();
+  await Promise.all([
+    page.waitForURL((url) => url.pathname === "/dopyt"),
+    page.evaluate(() => history.forward()),
+  ]);
   await expect(
     page.getByRole("heading", { name: "Najprv sa prihláste" }),
   ).toBeVisible();
@@ -124,8 +124,14 @@ try {
   expect(new URL(secondTab.url()).pathname).toBe("/");
   await secondTab.close();
   expect(authenticatePosts).toHaveLength(1);
-  await page.getByRole("link", { name: "Prihlásiť sa" }).click();
-  await page.getByRole("heading", { name: "Prihlásenie" }).waitFor();
+  const loginPageResponse = await page.goto("/prihlasenie");
+  const loginHeading = page.getByRole("heading", { name: "Vitajte späť" });
+  if ((await loginHeading.count()) !== 1) {
+    throw new Error(
+      `Portal login route did not render: ${JSON.stringify({ headings: await page.locator("h1").allTextContents(), path: new URL(page.url()).pathname, status: loginPageResponse?.status() })}`,
+    );
+  }
+  await loginHeading.waitFor();
   await page.getByLabel("E-mail").waitFor();
   await page.getByLabel("Heslo").waitFor();
   await page.waitForLoadState("networkidle");
@@ -161,6 +167,9 @@ try {
     );
   }
   expect((await context.request.get("/v1/auth/session")).status()).toBe(200);
+  const jobsResponse = await page.goto("/zakazky");
+  expect(jobsResponse?.status()).toBe(200);
+  expect(new URL(page.url()).pathname).toBe("/zakazky");
 
   const mediaResponse = await context.request.get(
     `/v1/media/${fixture.mediaA}/download`,

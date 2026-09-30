@@ -17,13 +17,15 @@ test("an unauthenticated customer can reach sign-in from the request form", asyn
   await expect(
     page.getByRole("heading", { name: "Najprv sa prihláste" }),
   ).toBeVisible();
-  const signIn = page.getByRole("link", { name: "Prihlásiť sa" });
+  const signIn = page
+    .locator("#main-content")
+    .getByRole("link", { name: "Prihlásiť sa" });
   await expect(signIn).toBeVisible();
   await expect(signIn).toHaveAttribute("href", "/prihlasenie");
 
   await signIn.click();
   await expect(page).toHaveURL(/\/prihlasenie$/u);
   await expect(
-    page.getByRole("heading", { name: "Prihlásenie" }),
+    page.getByRole("heading", { name: "Vitajte späť" }),
   ).toBeVisible();
 });
