@@ -64,6 +64,7 @@ type MutationResult<Success extends string> = Readonly<
 export interface AuthOnboardingClient {
   confirmEmail(token: string): Promise<MutationResult<"VERIFIED">>;
   loadSession(): Promise<SessionResult>;
+  logout(csrfToken: string): Promise<MutationResult<"SIGNED_OUT">>;
   login(input: {
     readonly email: string;
     readonly password: string;
@@ -184,6 +185,21 @@ export function createAuthOnboardingClient(
       }
     },
     loadSession,
+    async logout(csrfToken) {
+      if (!csrf(csrfToken))
+        return Object.freeze({ status: "UNAVAILABLE" as const });
+      try {
+        const response = await fetcher(
+          AUTH_API_PATHS.logout,
+          writeOptions(csrfToken),
+        );
+        return response.status === 204
+          ? Object.freeze({ status: "SIGNED_OUT" as const })
+          : mutationFailure(await errorCode(response));
+      } catch {
+        return Object.freeze({ status: "UNAVAILABLE" as const });
+      }
+    },
     async login(credentials) {
       if (!validCredentials(credentials))
         return Object.freeze({ status: "UNAVAILABLE" as const });

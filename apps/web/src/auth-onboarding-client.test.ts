@@ -82,6 +82,29 @@ describe("auth onboarding client", () => {
     expect(fetcher.mock.calls[2]?.[0]).toBe("/v1/auth/session");
   });
 
+  it("logs out with the current CSRF token and same-origin credentials", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    const client = createAuthOnboardingClient({ fetch: fetcher });
+
+    await expect(client.logout(session.csrfToken)).resolves.toEqual({
+      status: "SIGNED_OUT",
+    });
+    expect(fetcher).toHaveBeenCalledWith("/v1/auth/logout", {
+      cache: "no-store",
+      credentials: "same-origin",
+      headers: {
+        accept: "application/json",
+        "x-csrf-token": session.csrfToken,
+      },
+      method: "POST",
+    });
+    await expect(client.logout("short")).resolves.toEqual({
+      status: "UNAVAILABLE",
+    });
+  });
+
   it("keeps token and OTP in exact request bodies and rejects malformed secrets locally", async () => {
     const fetcher = vi
       .fn<typeof fetch>()

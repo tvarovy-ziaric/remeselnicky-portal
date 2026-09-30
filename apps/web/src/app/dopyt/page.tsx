@@ -3,7 +3,7 @@ import React from "react";
 
 import { AppShell } from "../../design-system";
 import { JobRequestForm } from "../../job-request-form";
-import { PublicHeader, SiteFooter } from "../../site-shell";
+import { SessionAwareHeader, SiteFooter } from "../../site-shell";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 export default function JobRequestPage() {
   return (
     <AppShell>
-      <PublicHeader />
+      <SessionAwareHeader current="Dopyty" />
       <JobRequestForm />
       <SiteFooter />
     </AppShell>

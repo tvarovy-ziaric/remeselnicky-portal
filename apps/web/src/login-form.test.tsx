@@ -3,7 +3,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import type { AuthOnboardingSession } from "./auth-onboarding-client";
-import { LoginForm, loginDestination } from "./login-form";
+import {
+  LoginForm,
+  loginDestination,
+  requestedLoginReturn,
+} from "./login-form";
 
 const session = {
   csrfToken: "csrf-token-with-safe-length",
@@ -33,12 +37,23 @@ describe("login form", () => {
   });
 
   it("routes incomplete verification to onboarding", () => {
-    expect(loginDestination(session)).toBe("/dopyt");
+    expect(loginDestination(session)).toBe("/ucet");
+    expect(loginDestination(session, "/dopyt")).toBe("/dopyt");
     expect(
       loginDestination({
         ...session,
         user: { ...session.user, phoneVerified: false },
       }),
     ).toBe("/overenie");
+  });
+
+  it("accepts only safe same-origin return paths", () => {
+    expect(requestedLoginReturn("?return=%2Fdopyt")).toBe("/dopyt");
+    expect(
+      requestedLoginReturn("?return=https%3A%2F%2Fevil.example"),
+    ).toBeNull();
+    expect(requestedLoginReturn("?return=%2F%2Fevil.example")).toBeNull();
+    expect(requestedLoginReturn("?return=%2Fprihlasenie")).toBeNull();
+    expect(requestedLoginReturn("?return=%2F_alpha-gate%2Flogout")).toBeNull();
   });
 });

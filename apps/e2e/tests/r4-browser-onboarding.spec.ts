@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { enterAlphaGate } from "./support/alpha-gate.js";
 import { createSyntheticRegistrationFixture } from "./support/synthetic-registration.js";
 
 test.skip(
@@ -13,29 +14,39 @@ test("a fresh user completes provider-neutral browser onboarding without exposin
 }) => {
   test.setTimeout(180_000);
   test.skip(browserName !== "chromium", "One synthetic mutation is sufficient");
+  page.setDefaultTimeout(10_000);
 
   const synthetic = await createSyntheticRegistrationFixture();
   const browserRequestUrls: string[] = [];
   page.on("request", (request) => browserRequestUrls.push(request.url()));
 
-  await page.goto("/registracia");
+  await enterAlphaGate(page, "/registracia");
   await expect(
-    page.getByRole("heading", { level: 1, name: /Registrácia/u }),
+    page.getByRole("heading", { level: 1, name: "Vytvorte si účet" }),
   ).toBeVisible();
-  await page.getByLabel(/^E-mail$/u).fill(synthetic.email);
-  await page.getByLabel(/^Heslo$/u).fill(synthetic.password);
-  await page
-    .getByLabel(/^(?:Zopakujte heslo|Potvrdenie hesla)$/u)
-    .fill(synthetic.password);
-  await page.getByRole("checkbox", { name: /18 rokov/u }).check();
-  await page.getByRole("button", { name: /^Vytvoriť účet$/u }).click();
+  await expect(
+    page.getByRole("link", { name: "Prihlásiť sa" }).first(),
+  ).toBeVisible();
+  const registrationSubmit = page.getByRole("button", {
+    name: /^Vytvoriť účet$/u,
+  });
+  await expect(registrationSubmit).toBeEnabled();
+  await page.getByLabel(/^E-mail z pozvánky$/u).fill(synthetic.email);
+  await page.locator("#registration-password").fill(synthetic.password);
+  await page.locator("#registration-confirmation").fill(synthetic.password);
+  const adultAttestation = page.getByRole("checkbox", { name: /18 rokov/u });
+  await adultAttestation.check();
+  await expect(adultAttestation).toBeChecked();
+  await registrationSubmit.click();
 
   await expect(page).toHaveURL(/\/overenie$/u);
   await expect(
-    page.getByRole("heading", { level: 1, name: /^Overenie účtu$/u }),
+    page.getByRole("heading", {
+      level: 1,
+      name: /^Dokončite overenie účtu$/u,
+    }),
   ).toBeVisible();
-  await expect(page.getByText(/E-mail ešte nie je overený\./u)).toBeVisible();
-  await expect(page.getByText(/Telefón ešte nie je overený\./u)).toBeVisible();
+  await expect(page.getByText(/^Čaká na overenie$/u)).toHaveCount(2);
 
   const emailToken = await synthetic.claimEmailToken();
   await page.goto(`/overenie-emailu#token=${encodeURIComponent(emailToken)}`);
@@ -59,25 +70,23 @@ test("a fresh user completes provider-neutral browser onboarding without exposin
 
   await page.goto("/overenie");
   await expect(page.getByText(/^E-mail je overený\.$/u)).toBeVisible();
-  await page.getByLabel(/^Telefónne číslo$/u).fill(synthetic.phone);
+  await page.locator("#verification-phone").fill(synthetic.phone);
   await page.getByRole("button", { name: /^Poslať overovací kód$/u }).click();
 
   const phoneOtp = await synthetic.claimPhoneOtp();
   const invalidOtp = differentOtp(phoneOtp);
-  const otpInput = page.getByLabel(/^(?:Šesťmiestny|Overovací) kód$/u);
+  const otpInput = page.locator("#verification-otp");
   await otpInput.fill(invalidOtp);
   await page.getByRole("button", { name: /^Overiť telefón$/u }).click();
   await expect(
-    page.getByRole("alert").filter({ hasText: /neplatný|vypršal/iu }),
+    page.getByRole("status").filter({ hasText: /neplatný|vypršal/iu }),
   ).toBeVisible();
 
   await otpInput.fill(phoneOtp);
   await page.getByRole("button", { name: /^Overiť telefón$/u }).click();
   await expect(page.getByText(/^E-mail je overený\.$/u)).toBeVisible();
   await expect(page.getByText(/^Telefón je overený\.$/u)).toBeVisible();
-  await expect(
-    page.getByRole("heading", { level: 2, name: /^Účet je pripravený$/u }),
-  ).toBeVisible();
+  await expect(page.getByText(/^Účet je pripravený$/u)).toBeVisible();
   await expectSecretAbsent(page, emailToken);
   await expectSecretAbsent(page, phoneOtp);
 
@@ -89,12 +98,44 @@ test("a fresh user completes provider-neutral browser onboarding without exposin
   );
   expect(browserRequestUrls.some((url) => url.includes(phoneOtp))).toBe(false);
 
-  const requestCta = page.getByRole("link", {
-    name: /Pokračovať.*(?:vytvorenie )?dopytu/iu,
+  const accountCta = page.getByRole("link", {
+    name: /Vybrať, ako pokračovať/iu,
   });
-  await expect(requestCta).toHaveAttribute("href", "/dopyt");
-  await requestCta.click();
+  await expect(accountCta).toHaveAttribute("href", "/ucet");
+  await accountCta.click();
+  await expect(page).toHaveURL(/\/ucet$/u);
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Kam chcete pokračovať?" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Pokračovať ako zákazník" }),
+  ).toHaveAttribute("href", "/dopyt");
+  const craftsmanCta = page.getByRole("link", {
+    name: "Pokračovať ako remeselník",
+  });
+  await expect(craftsmanCta).toHaveAttribute(
+    "href",
+    "/ucet/profil-remeselnika",
+  );
+  await expect(page.getByRole("link", { name: "Prihlásiť sa" })).toHaveCount(0);
+
+  await craftsmanCta.click();
+  await expect(page).toHaveURL(/\/ucet\/profil-remeselnika$/u);
+  await expect(
+    page.getByRole("heading", { level: 1, name: /profil remeselníka/iu }),
+  ).toBeVisible();
+  const contextSwitch = page.getByRole("navigation", {
+    name: "Prepnúť spôsob používania účtu",
+  });
+  await expect(
+    contextSwitch.getByRole("link", { name: "Remeselník" }),
+  ).toHaveAttribute("aria-current", "page");
+  await contextSwitch.getByRole("link", { name: "Zákazník" }).click();
   await expect(page).toHaveURL(/\/dopyt$/u);
+  await expect(page.getByRole("link", { name: "Prihlásiť sa" })).toHaveCount(0);
+
+  await page.goto("/prihlasenie");
+  await expect(page).toHaveURL(/\/ucet$/u);
 });
 
 async function expectSecretAbsent(page: Page, secret: string): Promise<void> {

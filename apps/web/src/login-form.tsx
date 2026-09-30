@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, type FormEvent } from "react";
+import React, { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import {
   createAuthOnboardingClient,
@@ -21,6 +21,22 @@ export function LoginForm({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
 
+  useEffect(() => {
+    let active = true;
+    void auth.loadSession().then((result) => {
+      if (!active || result.status !== "READY") return;
+      window.location.assign(
+        loginDestination(
+          result.session,
+          requestedLoginReturn(window.location.search),
+        ),
+      );
+    });
+    return () => {
+      active = false;
+    };
+  }, [auth]);
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy) return;
@@ -29,7 +45,12 @@ export function LoginForm({
     try {
       const result = await auth.login({ email, password });
       if (result.status === "AUTHENTICATED") {
-        window.location.assign(loginDestination(result.session));
+        window.location.assign(
+          loginDestination(
+            result.session,
+            requestedLoginReturn(window.location.search),
+          ),
+        );
         return;
       }
       setMessage(
@@ -95,8 +116,27 @@ export function LoginForm({
   );
 }
 
-export function loginDestination(session: AuthOnboardingSession): string {
-  return session.user.emailVerified && session.user.phoneVerified
-    ? "/dopyt"
-    : "/overenie";
+export function loginDestination(
+  session: AuthOnboardingSession,
+  requestedReturn: string | null = null,
+): string {
+  if (!session.user.emailVerified || !session.user.phoneVerified) {
+    return "/overenie";
+  }
+  return requestedReturn ?? "/ucet";
+}
+
+export function requestedLoginReturn(search: string): string | null {
+  const candidate = new URLSearchParams(search).get("return");
+  if (
+    candidate === null ||
+    !candidate.startsWith("/") ||
+    candidate.startsWith("//") ||
+    candidate.startsWith("/prihlasenie") ||
+    candidate.startsWith("/_alpha-gate/") ||
+    /[\\\r\n\0]/u.test(candidate)
+  ) {
+    return null;
+  }
+  return candidate;
 }

@@ -1,7 +1,7 @@
 import React, { type ReactNode } from "react";
 
 import { AppShell, Card, PageHeader } from "./design-system";
-import { PublicHeader, SiteFooter } from "./site-shell";
+import { SessionAwareHeader, SiteFooter } from "./site-shell";
 
 export function AuthPageShell({
   children,
@@ -16,7 +16,7 @@ export function AuthPageShell({
 }>) {
   return (
     <AppShell>
-      <PublicHeader />
+      <SessionAwareHeader />
       <main className="login-page" id="main-content">
         <Card className="login-shell auth-shell">
           <PageHeader eyebrow={eyebrow} lead={lead} title={title} />

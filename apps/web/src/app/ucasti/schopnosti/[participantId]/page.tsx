@@ -23,7 +23,7 @@ export default async function ParticipantCapabilitiesPage({
   const { participantId } = await params;
   return (
     <AppShell>
-      <AuthenticatedHeader current="Zákazky" />
+      <AuthenticatedHeader context="CRAFTSMAN" current="Zákazky" />
       <main className="site-main" id="main-content">
         <section>
           <PageContainer>
@@ -40,7 +40,7 @@ export default async function ParticipantCapabilitiesPage({
           </PageContainer>
         </section>
       </main>
-      <MobileBottomNavigation current="Zákazky" />
+      <MobileBottomNavigation context="CRAFTSMAN" current="Zákazky" />
     </AppShell>
   );
 }

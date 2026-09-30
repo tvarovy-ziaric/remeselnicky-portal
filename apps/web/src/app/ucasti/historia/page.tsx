@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 export default function ParticipationHistoryPage() {
   return (
     <AppShell>
-      <AuthenticatedHeader current="Zákazky" />
+      <AuthenticatedHeader context="CRAFTSMAN" current="Zákazky" />
       <main className="site-main" id="main-content">
         <section>
           <PageContainer>
@@ -41,7 +41,7 @@ export default function ParticipationHistoryPage() {
           </PageContainer>
         </section>
       </main>
-      <MobileBottomNavigation current="Zákazky" />
+      <MobileBottomNavigation context="CRAFTSMAN" current="Zákazky" />
     </AppShell>
   );
 }

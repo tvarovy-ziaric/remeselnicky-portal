@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 export default function InvitationsPage() {
   return (
     <AppShell>
-      <AuthenticatedHeader current="Dopyty" />
+      <AuthenticatedHeader context="CRAFTSMAN" current="Pozvánky" />
       <main className="site-main" id="main-content">
         <section>
           <PageContainer>
@@ -28,7 +28,7 @@ export default function InvitationsPage() {
           </PageContainer>
         </section>
       </main>
-      <MobileBottomNavigation current="Dopyty" />
+      <MobileBottomNavigation context="CRAFTSMAN" current="Pozvánky" />
     </AppShell>
   );
 }

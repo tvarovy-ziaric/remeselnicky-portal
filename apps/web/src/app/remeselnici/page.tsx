@@ -12,7 +12,7 @@ import { loadPublicSearchCards } from "../../public-search-card-client";
 import { PublicSearchCardList } from "../../public-search-card-view";
 import { parsePublicSearchContext } from "../../public-search-context";
 import { PublicSearchForm } from "../../public-search-form";
-import { PublicHeader, SiteFooter } from "../../site-shell";
+import { SessionAwareHeader, SiteFooter } from "../../site-shell";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -38,7 +38,7 @@ export default async function CraftsmanSearchPage({
       : null;
   return (
     <AppShell>
-      <PublicHeader />
+      <SessionAwareHeader current="Remeselníci" />
       <main className="site-main public-search-page" id="main-content">
         <PageContainer className="public-search-shell">
           <PageHeader

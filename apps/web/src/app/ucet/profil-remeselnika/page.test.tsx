@@ -15,7 +15,7 @@ describe("craftsman profile account page", () => {
     expect(html).toContain('href="/ucet/portfolio"');
     expect(html).toContain('href="/ucet/doklady"');
     expect(html).toMatch(
-      /aria-current="page" href="\/ucet\/profil-remeselnika">Profil a účet<\/a>/,
+      /aria-current="page" href="\/ucet\/profil-remeselnika">Profil<\/a>/,
     );
   });
 });

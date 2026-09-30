@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, type FormEvent } from "react";
+import React, { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import {
   createAuthOnboardingClient,
@@ -20,7 +20,10 @@ export function RegistrationForm({
   const [confirmation, setConfirmation] = useState("");
   const [adultAttested, setAdultAttested] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
   const [message, setMessage] = useState("");
+
+  useEffect(() => setHydrated(true), []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -112,7 +115,7 @@ export function RegistrationForm({
             <p role="alert">{message}</p>
           </Notice>
         )}
-        <Button disabled={busy} type="submit">
+        <Button disabled={busy || !hydrated} type="submit">
           {busy ? "Vytváram účet…" : "Vytvoriť účet"}
         </Button>
       </form>

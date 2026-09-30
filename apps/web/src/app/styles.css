@@ -3755,6 +3755,57 @@ textarea.ui-control {
   gap: 0.35rem;
 }
 
+.account-context-switch {
+  display: inline-flex;
+  gap: 0.2rem;
+  padding: 0.2rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-soft-background);
+}
+
+.account-context-switch a {
+  padding: 0.45rem 0.7rem;
+  border-radius: 999px;
+  color: var(--color-muted-text);
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.account-context-switch a[aria-current="page"] {
+  color: #fff;
+  background: var(--color-primary);
+}
+
+.account-context-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.account-context-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.8rem;
+}
+
+.account-context-card h2,
+.account-context-card p {
+  margin: 0;
+}
+
+.account-context-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: auto;
+  padding-top: 0.5rem;
+}
+
 .mobile-bottom-nav {
   position: fixed;
   z-index: 25;
@@ -4195,9 +4246,26 @@ textarea.ui-control {
 }
 
 @media (max-width: 48rem) {
-  .site-header--authenticated .site-header__actions,
-  .site-header--authenticated .site-header__utility {
+  .site-header--authenticated .site-header__actions {
     display: none;
+  }
+
+  .site-header--authenticated .site-header__utility {
+    display: flex;
+  }
+
+  .site-header--authenticated .notification-badge,
+  .site-header--authenticated .session-logout {
+    display: none;
+  }
+
+  .account-context-switch a {
+    padding-inline: 0.55rem;
+    font-size: 0.7rem;
+  }
+
+  .account-context-cards {
+    grid-template-columns: 1fr;
   }
 
   .mobile-bottom-nav {

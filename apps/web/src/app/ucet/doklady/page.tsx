@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 export default function CraftsmanCredentialsPage() {
   return (
     <AppShell>
-      <AuthenticatedHeader current="Profil a účet" />
+      <AuthenticatedHeader context="CRAFTSMAN" current="Profil" />
       <main className="site-main" id="main-content">
         <section>
           <PageContainer>
@@ -23,7 +23,7 @@ export default function CraftsmanCredentialsPage() {
           </PageContainer>
         </section>
       </main>
-      <MobileBottomNavigation current="Profil a účet" />
+      <MobileBottomNavigation context="CRAFTSMAN" current="Profil" />
     </AppShell>
   );
 }

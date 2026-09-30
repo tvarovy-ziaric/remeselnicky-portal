@@ -256,10 +256,10 @@ export function AccountVerification({
         {ready ? (
           <Notice title="Účet je pripravený" tone="success">
             <p>
-              Overenie je dokončené. Teraz môžete pokračovať v rozpracovanom
-              dopyte.
+              Overenie je dokončené. Jeden účet môžete používať ako zákazník aj
+              ako remeselník.
             </p>
-            <ActionLink href="/dopyt">Pokračovať v dopyte</ActionLink>
+            <ActionLink href="/ucet">Vybrať, ako pokračovať</ActionLink>
           </Notice>
         ) : null}
       </div>

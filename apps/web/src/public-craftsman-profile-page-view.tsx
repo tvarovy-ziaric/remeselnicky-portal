@@ -26,7 +26,7 @@ import {
   proficiencyLabel,
   publicPortfolioMediaPath,
 } from "./public-craftsman-profile-view";
-import { PublicHeader, SiteFooter } from "./site-shell";
+import { SessionAwareHeader, SiteFooter } from "./site-shell";
 
 export function PublicCraftsmanProfileView({
   profile,
@@ -41,7 +41,7 @@ export function PublicCraftsmanProfileView({
 
   return (
     <AppShell>
-      <PublicHeader />
+      <SessionAwareHeader current="Remeselníci" />
       <main className="public-profile" id="main-content">
         <PageContainer className="public-profile-card">
           <div className="public-profile__hero">

@@ -8,7 +8,7 @@ import {
   SectionHeader,
   TrustBadge,
 } from "../design-system";
-import { PublicHeader, SiteFooter } from "../site-shell";
+import { SessionAwareHeader, SiteFooter } from "../site-shell";
 
 const customerSteps = [
   {
@@ -32,7 +32,7 @@ const customerSteps = [
 export default function HomePage() {
   return (
     <AppShell>
-      <PublicHeader />
+      <SessionAwareHeader />
       <main className="site-main home-page" id="main-content">
         <section className="home-hero" aria-labelledby="home-title">
           <PageContainer>

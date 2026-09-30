@@ -38,7 +38,7 @@ export default async function InvitationVersionPage({
   }
   return (
     <AppShell>
-      <AuthenticatedHeader current="Dopyty" />
+      <AuthenticatedHeader context="CRAFTSMAN" current="Pozvánky" />
       <main className="site-main" id="main-content">
         <section>
           <PageContainer>
@@ -49,7 +49,7 @@ export default async function InvitationVersionPage({
           </PageContainer>
         </section>
       </main>
-      <MobileBottomNavigation current="Dopyty" />
+      <MobileBottomNavigation context="CRAFTSMAN" current="Pozvánky" />
     </AppShell>
   );
 }

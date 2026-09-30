@@ -448,7 +448,7 @@ export function JobRequestForm({
   if (status === "AUTHENTICATION_REQUIRED")
     return (
       <FormMessage
-        action="/prihlasenie"
+        action="/prihlasenie?return=%2Fdopyt"
         actionLabel="Prihlásiť sa"
         secondaryAction="/registracia"
         secondaryActionLabel="Zaregistrovať sa"
