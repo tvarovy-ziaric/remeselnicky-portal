@@ -70,6 +70,8 @@ assert.equal((nginx.match(/access_log off;/gu) ?? []).length, 3);
 assert.doesNotMatch(nginx, /auth_basic|WWW-Authenticate/iu);
 assert.match(nginx, /auth_request \/_alpha-gate\/verify/u);
 assert.match(nginx, /proxy_pass http:\/\/alpha-gate:3002\/verify/u);
+assert.match(nginx, /absolute_redirect off;/u);
+assert.match(nginx, /port_in_redirect off;/u);
 assert.match(compose, /ALPHA_GATE_SESSION_TTL_SECONDS: "43200"/u);
 assert.match(
   compose,

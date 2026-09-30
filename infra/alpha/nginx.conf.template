@@ -15,6 +15,8 @@ server {
   listen 8082 default_server;
   server_name ${ALPHA_APP_HOSTNAME};
   server_tokens off;
+  absolute_redirect off;
+  port_in_redirect off;
   access_log off;
   error_log /dev/stderr crit;
   client_max_body_size 25m;
