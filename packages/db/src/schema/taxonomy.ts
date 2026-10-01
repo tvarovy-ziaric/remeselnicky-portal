@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   bigint,
+  boolean,
   char,
   check,
   foreignKey,
@@ -44,7 +45,7 @@ export const taxonomyAliasKindEnum = pgEnum(
 );
 export const taxonomyAliasTargetKindEnum = pgEnum(
   "taxonomy_alias_target_kind",
-  ["PROFESSION", "SPECIALIZATION"],
+  ["PROFESSION", "SERVICE", "SPECIALIZATION"],
 );
 
 export const professionTaxonomyReleases = pgTable(
@@ -93,6 +94,7 @@ export const taxonomyProfessions = pgTable(
     professionCode: text("profession_code").notNull(),
     slug: text("slug").notNull(),
     labelSk: text("label_sk").notNull(),
+    descriptionSk: text("description_sk"),
     state: taxonomyEntryStateEnum("state").notNull(),
     replacedByCode: text("replaced_by_code"),
   },
@@ -102,6 +104,59 @@ export const taxonomyProfessions = pgTable(
       table.releaseId,
       table.slug,
     ),
+  ],
+);
+
+export const taxonomyServices = pgTable(
+  "taxonomy_services",
+  {
+    releaseId: uuid("release_id")
+      .notNull()
+      .references(() => professionTaxonomyReleases.releaseId),
+    serviceCode: text("service_code").notNull(),
+    slug: text("slug").notNull(),
+    labelSk: text("label_sk").notNull(),
+    descriptionSk: text("description_sk"),
+    state: taxonomyEntryStateEnum("state").notNull(),
+    replacedByCode: text("replaced_by_code"),
+  },
+  (table) => [
+    primaryKey({ columns: [table.releaseId, table.serviceCode] }),
+    unique("taxonomy_services_release_id_slug_key").on(
+      table.releaseId,
+      table.slug,
+    ),
+  ],
+);
+
+export const taxonomyServiceProfessions = pgTable(
+  "taxonomy_service_professions",
+  {
+    releaseId: uuid("release_id").notNull(),
+    serviceCode: text("service_code").notNull(),
+    professionCode: text("profession_code").notNull(),
+    isPrimary: boolean("is_primary").notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.releaseId, table.serviceCode, table.professionCode],
+    }),
+    foreignKey({
+      columns: [table.releaseId, table.serviceCode],
+      foreignColumns: [
+        taxonomyServices.releaseId,
+        taxonomyServices.serviceCode,
+      ],
+      name: "taxonomy_service_professions_service_fkey",
+    }),
+    foreignKey({
+      columns: [table.releaseId, table.professionCode],
+      foreignColumns: [
+        taxonomyProfessions.releaseId,
+        taxonomyProfessions.professionCode,
+      ],
+      name: "taxonomy_service_professions_profession_fkey",
+    }),
   ],
 );
 
@@ -202,5 +257,6 @@ export const professionTaxonomyActivationEvents = pgTable(
 export type ProfessionTaxonomyReleaseRecord =
   typeof professionTaxonomyReleases.$inferSelect;
 export type TaxonomyProfessionRecord = typeof taxonomyProfessions.$inferSelect;
+export type TaxonomyServiceRecord = typeof taxonomyServices.$inferSelect;
 export type TaxonomySpecializationRecord =
   typeof taxonomySpecializations.$inferSelect;

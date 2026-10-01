@@ -68,6 +68,7 @@ export interface DatabasePublicSearchCardQuery {
   readonly limit: number;
   readonly municipalityCode: string | null;
   readonly professionCode: string;
+  readonly serviceCode: string | null;
   readonly skillCodes: readonly string[];
   readonly sort: "BEST_RATED" | "NEAREST" | "RECOMMENDED";
   readonly specializationCode: string | null;
@@ -151,6 +152,14 @@ async function loadCandidateCohort(
       OR profile.identity_search_document @@ plainto_tsquery(
         'simple'::regconfig,
         craftsman_search_normalize_text(${query.identityQuery}::text)
+      )
+    )
+    AND (
+      ${query.serviceCode}::text IS NULL OR EXISTS (
+        SELECT 1 FROM current_searchable_craftsman_services offered
+        WHERE offered.craftsman_profile_id = profile.craftsman_profile_id
+          AND offered.service_code = ${query.serviceCode}::text
+          AND ${query.professionCode} = ANY(offered.profession_codes)
       )
     )
     ORDER BY profile.craftsman_profile_id
@@ -416,10 +425,11 @@ async function governedSuggestion(
       reviewState: "HUMAN_REVIEW_APPROVED",
     },
     matchedBy: "EXACT_CANONICAL",
+    memberCount: 0,
   };
   const result = await createTaxonomyAutocompleteService({
     findCandidates: () => Promise.resolve([candidate]),
-  }).autocomplete({ limit: 1, query: row.label });
+  }).autocomplete({ limit: 1, query: row.label, scope: "CAPABILITY" });
   const suggestion = result.status === "OK" ? result.suggestions[0] : undefined;
   if (suggestion === undefined || suggestion.code !== row.code) {
     throw new Error("Governed taxonomy target failed validation.");

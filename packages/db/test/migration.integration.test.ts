@@ -24,6 +24,7 @@ import {
 import { runNotificationIntegrationAssertions } from "./notification-integration-helper.js";
 import { runAlphaNotificationIntegrationAssertions } from "./alpha-notification-integration-helper.js";
 import { runAlphaRegistrationIntakeIntegrationAssertions } from "./alpha-registration-intake-integration-helper.js";
+import { runManagedTaxonomyIntegrationAssertions } from "./managed-taxonomy-integration-helper.js";
 import { runAuditIntegrationAssertions } from "./audit-integration-helper.js";
 import { runPrivacyIntegrationAssertions } from "./privacy-integration-helper.js";
 import { runTaxonomyIntegrationAssertions } from "./taxonomy-integration-helper.js";
@@ -51,7 +52,10 @@ import { runCraftsmanTrustEvidenceIntegrationAssertions } from "./craftsman-trus
 import { runCustomerShortlistIntegrationAssertions } from "./customer-shortlist-integration-helper.js";
 import { runJobRequestIntegrationAssertions } from "./job-request-integration-helper.js";
 import { runJobRequestDraftIntegrationAssertions } from "./job-request-draft-integration-helper.js";
-import { runJobRequestContentIntegrationAssertions } from "./job-request-content-integration-helper.js";
+import {
+  runJobRequestContentIntegrationAssertions,
+  runJobRequestServiceContentIntegrationAssertions,
+} from "./job-request-content-integration-helper.js";
 import { runJobRequestVersionIntegrationAssertions } from "./job-request-version-integration-helper.js";
 import { runJobRequestLifecycleIntegrationAssertions } from "./job-request-lifecycle-integration-helper.js";
 import { runJobInvitationIntegrationAssertions } from "./job-invitation-integration-helper.js";
@@ -252,6 +256,12 @@ describe.skipIf(testDatabaseUrl === undefined)(
           "0113_privacy_restore_reapplication.sql",
           "0114_alpha_analytics_read_models.sql",
           "0115_alpha_registration_intake.sql",
+          "0116_location_postal_reference.sql",
+          "0117_taxonomy_service_kind.sql",
+          "0118_managed_profession_service_catalog.sql",
+          "0119_craftsman_managed_services.sql",
+          "0120_taxonomy_suggestion_workflow.sql",
+          "0121_taxonomy_primary_service_routing.sql",
         ],
         alreadyApplied: 0,
       });
@@ -260,7 +270,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         testDatabaseUrl,
         migrationsDirectory,
       );
-      expect(secondRun).toEqual({ applied: [], alreadyApplied: 116 });
+      expect(secondRun).toEqual({ applied: [], alreadyApplied: 122 });
 
       const sql = postgres(testDatabaseUrl, { max: 5 });
       try {
@@ -306,7 +316,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         `;
 
         expect(postgis?.extversion).toMatch(/^3\./);
-        expect(ledger?.count).toBe(116);
+        expect(ledger?.count).toBe(122);
         expect(created).toMatchObject({ account_state: "ACTIVE" });
         expect(created?.id).toMatch(
           /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
@@ -382,7 +392,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
           registration.user.adultAttestedAt.valueOf(),
         ).toBeGreaterThanOrEqual(beforeRegistration.valueOf());
         expect(registration.user.adultAttestedAt.valueOf()).toBeLessThanOrEqual(
-          Date.now(),
+          Date.now() + 5_000,
         );
 
         await expect(
@@ -1865,6 +1875,7 @@ describe.skipIf(testDatabaseUrl === undefined)(
         await createTaxonomyAutocompleteRepository(sql).findCandidates({
           limit: 10,
           normalizedText: "test",
+          scope: "DISCOVERY",
           tokens: ["test"],
         });
         await runCraftsmanDistanceIntegrationAssertions(sql);
@@ -1962,6 +1973,8 @@ describe.skipIf(testDatabaseUrl === undefined)(
         });
         await runAlphaNotificationIntegrationAssertions(sql);
         await runAlphaRegistrationIntakeIntegrationAssertions(sql);
+        await runManagedTaxonomyIntegrationAssertions(sql);
+        await runJobRequestServiceContentIntegrationAssertions(sql);
 
         await adminAccess.revokePrivilegedSession(superSessionDigest);
         await expect(

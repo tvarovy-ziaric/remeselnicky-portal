@@ -309,7 +309,10 @@ async function governSuggestion(
         },
       ]),
   });
-  const result = await autocomplete.autocomplete({ query: "test" });
+  const result = await autocomplete.autocomplete({
+    query: "test",
+    scope: "CAPABILITY",
+  });
   if (result.status !== "OK" || result.suggestions[0] === undefined) {
     throw new Error("Test autocomplete did not produce a governed suggestion.");
   }
@@ -323,6 +326,7 @@ function professionSuggestion(
     code,
     kind: "PROFESSION",
     label: "Obkladač",
+    memberCount: 0,
     matchedBy: "EXACT_CANONICAL",
     professionCodes: [code],
   };
@@ -333,6 +337,7 @@ function specializationSuggestion(): TaxonomyAutocompleteSuggestion {
     code: "SPEC:TILING",
     kind: "SPECIALIZATION",
     label: "Obkladanie",
+    memberCount: 0,
     matchedBy: "EXACT_CANONICAL",
     professionCodes: ["PROF:TILER"],
   };
@@ -346,6 +351,7 @@ function skillSuggestion(
     code,
     kind: "SKILL",
     label: "Veľkoformátové obklady",
+    memberCount: 0,
     matchedBy: "EXACT_CANONICAL",
     professionCodes,
   };

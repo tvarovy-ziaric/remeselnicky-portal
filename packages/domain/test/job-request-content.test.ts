@@ -68,6 +68,46 @@ describe("job request content", () => {
     ).toEqual([]);
   });
 
+  it("accepts authoritative service selection in core v2 and keeps v1 readable", () => {
+    const service = normalizeJobRequestContentSection({
+      ...core(),
+      payload: {
+        ...core().payload,
+        primaryProfessionCode: "PROF:TILER",
+        primaryServiceCode: "SERV:BATHROOM_TILING",
+      },
+      schemaVersion: 2,
+    });
+    expect(service).toMatchObject({
+      payload: {
+        primaryProfessionCode: "PROF:TILER",
+        primaryServiceCode: "SERV:BATHROOM_TILING",
+      },
+      schemaVersion: 2,
+    });
+
+    const historical = normalizeJobRequestContentSection(core());
+    expect(historical).toMatchObject({ schemaVersion: 1 });
+    expect(historical.payload).not.toHaveProperty("primaryServiceCode");
+    expect(() =>
+      normalizeJobRequestContentSection({
+        ...core(),
+        payload: { ...core().payload, primaryServiceCode: null },
+      }),
+    ).toThrow(JobRequestContentValidationError);
+    expect(() =>
+      normalizeJobRequestContentSection({
+        ...core(),
+        payload: {
+          ...core().payload,
+          primaryProfessionCode: null,
+          primaryServiceCode: "SERV:BATHROOM_TILING",
+        },
+        schemaVersion: 2,
+      }),
+    ).toThrow(JobRequestContentValidationError);
+  });
+
   it("preserves private exact location only inside the private location section", () => {
     const section = normalizeJobRequestContentSection(location());
     expect(section.payload).toMatchObject({

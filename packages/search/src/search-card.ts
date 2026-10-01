@@ -41,6 +41,7 @@ export interface PublicSearchCardQuery {
   readonly limit: number;
   readonly municipalityCode: string | null;
   readonly professionCode: string;
+  readonly serviceCode: string | null;
   readonly skillCodes: readonly string[];
   readonly sort: PublicSearchSortMode;
   readonly specializationCode: string | null;
@@ -251,6 +252,7 @@ export function parsePublicSearchCardQuery(
     "limit",
     "municipalityCode",
     "professionCode",
+    "serviceCode",
     "skillCodes",
     "sort",
     "specializationCode",
@@ -258,6 +260,7 @@ export function parsePublicSearchCardQuery(
   ]);
   if (Object.keys(input).some((key) => !allowed.has(key))) return null;
   const professionCode = singleString(input["professionCode"]);
+  const serviceCode = nullableSingleString(input["serviceCode"]);
   const municipalityCode = nullableSingleString(input["municipalityCode"]);
   const afterProfileId = nullableSingleString(input["afterProfileId"]);
   const sort = singleString(input["sort"] ?? "RECOMMENDED");
@@ -277,6 +280,8 @@ export function parsePublicSearchCardQuery(
   if (
     professionCode === null ||
     !isProfessionCode(professionCode) ||
+    serviceCode === undefined ||
+    (serviceCode !== null && !isServiceCode(serviceCode)) ||
     municipalityCode === undefined ||
     (municipalityCode !== null && !isMunicipalityCode(municipalityCode)) ||
     afterProfileId === undefined ||
@@ -305,6 +310,7 @@ export function parsePublicSearchCardQuery(
     limit,
     municipalityCode,
     professionCode,
+    serviceCode,
     skillCodes,
     sort: normalizedSort,
     specializationCode,
@@ -900,6 +906,10 @@ function parseIdentityQuery(value: unknown): string | null | undefined {
 
 function isProfessionCode(value: string): boolean {
   return /^(?:PROF|TEST):[A-Z0-9][A-Z0-9_]{1,62}$/u.test(value);
+}
+
+function isServiceCode(value: string): boolean {
+  return /^SERV:[A-Z0-9][A-Z0-9_]{1,62}$/u.test(value);
 }
 
 function isSpecializationCode(value: string): boolean {

@@ -112,12 +112,36 @@ async function insertReleaseContent(
   for (const profession of release.professions) {
     await transaction`
       INSERT INTO taxonomy_professions (
-        release_id, profession_code, slug, label_sk, state, replaced_by_code
+        release_id, profession_code, slug, label_sk, description_sk,
+        state, replaced_by_code
       ) VALUES (
         ${release.releaseId}, ${profession.code}, ${profession.slug},
-        ${profession.labelSk}, ${profession.state}, ${profession.replacedByCode}
+        ${profession.labelSk}, ${profession.descriptionSk ?? null},
+        ${profession.state}, ${profession.replacedByCode}
       )
     `;
+  }
+  for (const service of release.services ?? []) {
+    await transaction`
+      INSERT INTO taxonomy_services (
+        release_id, service_code, slug, label_sk, description_sk,
+        state, replaced_by_code
+      ) VALUES (
+        ${release.releaseId}, ${service.code}, ${service.slug},
+        ${service.labelSk}, ${service.descriptionSk ?? null},
+        ${service.state}, ${service.replacedByCode}
+      )
+    `;
+    for (const professionCode of service.professionCodes) {
+      await transaction`
+        INSERT INTO taxonomy_service_professions (
+          release_id, service_code, profession_code, is_primary
+        ) VALUES (
+          ${release.releaseId}, ${service.code}, ${professionCode},
+          ${professionCode === service.primaryProfessionCode}
+        )
+      `;
+    }
   }
   for (const specialization of release.specializations) {
     await transaction`

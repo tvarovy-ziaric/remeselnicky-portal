@@ -6,5 +6,6 @@ AGENTS.md
 IMPLEMENTATION_BACKLOG.md
 ROADMAP.md
 docs/_source
+docs/design/handoff
 pnpm-lock.yaml
 apps/e2e/test-results

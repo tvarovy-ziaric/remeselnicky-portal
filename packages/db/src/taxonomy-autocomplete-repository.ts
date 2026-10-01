@@ -298,7 +298,8 @@ function assertParsedQuery(query: ParsedTaxonomyAutocompleteQuery): void {
   if (
     !Number.isSafeInteger(query.limit) ||
     query.limit < 1 ||
-    query.limit > 20 ||
+    query.limit > 10 ||
+    (query.scope !== "DISCOVERY" && query.scope !== "CAPABILITY") ||
     !/^[a-z0-9]+(?: [a-z0-9]+)*$/u.test(query.normalizedText) ||
     query.tokens.length < 1 ||
     query.tokens.length > 8 ||
@@ -325,6 +326,7 @@ function toCandidate(row: CandidateRow): TaxonomyAutocompleteCandidate {
     kind: row.kind as TaxonomyAutocompleteCandidate["kind"],
     label: row.label,
     matchedBy: row.matchedBy as TaxonomyAutocompleteCandidate["matchedBy"],
+    memberCount: 0,
     professionCodes: Object.freeze([...row.professionCodes]),
   };
 }

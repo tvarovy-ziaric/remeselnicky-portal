@@ -16,6 +16,7 @@ export const ADMIN_CAPABILITY_VALUES = Object.freeze([
   "admin.privacy.manage",
   "admin.reviews.moderate",
   "admin.sensitive.read",
+  "admin.taxonomy.manage",
   "admin.users.manage",
   "admin.roles.manage",
 ] as const);
@@ -42,6 +43,7 @@ const adminCapabilities = Object.freeze<readonly AdminCapability[]>([
   "admin.profiles.moderate",
   "admin.privacy.manage",
   "admin.reviews.moderate",
+  "admin.taxonomy.manage",
   "admin.users.manage",
 ]);
 const superAdminCapabilities = ADMIN_CAPABILITY_VALUES;

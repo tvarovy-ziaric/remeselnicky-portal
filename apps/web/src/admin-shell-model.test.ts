@@ -44,9 +44,15 @@ describe("admin shell response boundary", () => {
             id: "dashboard",
             label: "Prehľad",
           },
+          {
+            description:
+              "Spravovaný katalóg profesií, služieb a vyhľadávacích aliasov.",
+            id: "taxonomy",
+            label: "Katalóg",
+          },
         ],
       }),
-    ).toHaveLength(1);
+    ).toHaveLength(2);
     expect(
       parseAdminModules({
         modules: [
@@ -120,5 +126,28 @@ describe("admin shell response boundary", () => {
     expect(
       parseAdminModule({ ...response, id: "disputes" }, "disputes"),
     ).toBeUndefined();
+    expect(
+      parseAdminModule(
+        {
+          description:
+            "Spravovaný katalóg profesií, služieb a vyhľadávacích aliasov.",
+          id: "taxonomy",
+          label: "Katalóg",
+          state: "OPERATIONAL",
+        },
+        "taxonomy",
+      )?.id,
+    ).toBe("taxonomy");
+    expect(
+      parseAdminModule(
+        {
+          description: "Žiadosti dotknutých osôb a uzavretie účtov.",
+          id: "privacy",
+          label: "Súkromie",
+          state: "OPERATIONAL",
+        },
+        "privacy",
+      )?.id,
+    ).toBe("privacy");
   });
 });

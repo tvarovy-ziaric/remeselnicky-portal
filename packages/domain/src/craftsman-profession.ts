@@ -32,6 +32,8 @@ export interface CraftsmanProfession {
   readonly craftsmanProfileId: CraftsmanProfileId;
   readonly taxonomyReleaseId: string;
   readonly professionCode: string;
+  /** Read-time label resolved from the pinned taxonomy release; never owner-authored. */
+  readonly taxonomyLabel?: string;
   readonly state: CraftsmanProfessionState;
   readonly declaredLevel: ProfessionProficiencyLevel;
   readonly declaredLevelRevision: number;

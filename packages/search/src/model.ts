@@ -1,10 +1,11 @@
 export const TAXONOMY_AUTOCOMPLETE_DEFAULT_LIMIT = 10;
-export const TAXONOMY_AUTOCOMPLETE_MAX_LIMIT = 20;
+export const TAXONOMY_AUTOCOMPLETE_MAX_LIMIT = 10;
 export const TAXONOMY_AUTOCOMPLETE_MAX_QUERY_LENGTH = 120;
 export const TAXONOMY_AUTOCOMPLETE_MAX_TOKENS = 8;
 
 export const TAXONOMY_SUGGESTION_KINDS = Object.freeze([
   "PROFESSION",
+  "SERVICE",
   "SPECIALIZATION",
   "SKILL",
 ] as const);
@@ -15,7 +16,16 @@ export const TAXONOMY_MATCH_KINDS = Object.freeze([
   "PREFIX_ALIAS",
   "KEYWORD_CANONICAL",
   "KEYWORD_ALIAS",
+  "FUZZY_CANONICAL",
+  "FUZZY_ALIAS",
 ] as const);
+
+export const TAXONOMY_AUTOCOMPLETE_SCOPES = Object.freeze([
+  "DISCOVERY",
+  "CAPABILITY",
+] as const);
+export type TaxonomyAutocompleteScope =
+  (typeof TAXONOMY_AUTOCOMPLETE_SCOPES)[number];
 
 export type TaxonomySuggestionKind = (typeof TAXONOMY_SUGGESTION_KINDS)[number];
 export type TaxonomyMatchKind = (typeof TAXONOMY_MATCH_KINDS)[number];
@@ -23,6 +33,7 @@ export type TaxonomyMatchKind = (typeof TAXONOMY_MATCH_KINDS)[number];
 export interface ParsedTaxonomyAutocompleteQuery {
   readonly limit: number;
   readonly normalizedText: string;
+  readonly scope: TaxonomyAutocompleteScope;
   readonly tokens: readonly string[];
 }
 
@@ -38,8 +49,11 @@ export interface TaxonomyAutocompleteSuggestion {
   readonly code: string;
   readonly kind: TaxonomySuggestionKind;
   readonly label: string;
+  readonly memberCount: number;
   readonly matchedBy: TaxonomyMatchKind;
   readonly professionCodes: readonly string[];
+  /** Canonical server-selected profession used when this discovery item is chosen. */
+  readonly routingProfessionCode?: string;
 }
 
 export interface TaxonomyAutocompleteCandidate extends TaxonomyAutocompleteSuggestion {
@@ -69,5 +83,6 @@ export interface TaxonomyAutocomplete {
   autocomplete(input: {
     readonly limit?: unknown;
     readonly query: unknown;
+    readonly scope?: unknown;
   }): Promise<TaxonomyAutocompleteResult>;
 }

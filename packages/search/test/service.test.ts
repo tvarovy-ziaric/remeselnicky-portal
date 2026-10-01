@@ -8,7 +8,7 @@ import {
 } from "../src/index.js";
 
 describe("taxonomy autocomplete service", () => {
-  it("keeps exact professions strongest and deterministically deduplicates aliases", async () => {
+  it("orders canonical matches before aliases and deterministically deduplicates", async () => {
     const persistence = repository([
       candidate({
         code: "SPEC:TILING",
@@ -45,7 +45,11 @@ describe("taxonomy autocomplete service", () => {
     const service = createTaxonomyAutocompleteService(persistence);
 
     await expect(
-      service.autocomplete({ limit: 3, query: "OBKLADAČ" }),
+      service.autocomplete({
+        limit: 3,
+        query: "OBKLADAČ",
+        scope: "CAPABILITY",
+      }),
     ).resolves.toEqual({
       status: "OK",
       suggestions: [
@@ -53,21 +57,25 @@ describe("taxonomy autocomplete service", () => {
           code: "PROF:TILER",
           kind: "PROFESSION",
           label: "Obkladač",
+          memberCount: 0,
           matchedBy: "EXACT_CANONICAL",
           professionCodes: ["PROF:TILER"],
-        },
-        {
-          code: "PROF:MASON",
-          kind: "PROFESSION",
-          label: "Murár",
-          matchedBy: "EXACT_ALIAS",
-          professionCodes: ["PROF:MASON"],
+          routingProfessionCode: "PROF:TILER",
         },
         {
           code: "SPEC:TILING",
           kind: "SPECIALIZATION",
           label: "Obkladanie",
+          memberCount: 0,
           matchedBy: "EXACT_CANONICAL",
+          professionCodes: ["PROF:TILER"],
+        },
+        {
+          code: "SKILL:LARGE_FORMAT",
+          kind: "SKILL",
+          label: "Veľkoformátové obklady",
+          memberCount: 0,
+          matchedBy: "PREFIX_CANONICAL",
           professionCodes: ["PROF:TILER"],
         },
       ],
@@ -77,6 +85,7 @@ describe("taxonomy autocomplete service", () => {
         {
           limit: 3,
           normalizedText: "obkladac",
+          scope: "CAPABILITY",
           tokens: ["obkladac"],
         },
       ],
@@ -138,6 +147,7 @@ describe("taxonomy autocomplete service", () => {
     await expect(
       createTaxonomyAutocompleteService(repository([invalid])).autocomplete({
         query: "obklad",
+        scope: "CAPABILITY",
       }),
     ).rejects.toThrow(TaxonomyAutocompleteIntegrityError);
   });
@@ -198,6 +208,36 @@ describe("taxonomy autocomplete service", () => {
       /tajny|popular|oprava kupelne/iu,
     );
   });
+
+  it("uses an explicit routing profession for a multi-profession service", async () => {
+    const service = candidate({
+      code: "SERV:RENOVATION",
+      kind: "SERVICE",
+      label: "Rekonštrukcia kúpeľne",
+      professionCodes: ["PROF:MASON", "PROF:TILER"],
+      routingProfessionCode: "PROF:TILER",
+    });
+    await expect(
+      createTaxonomyAutocompleteService(repository([service])).autocomplete({
+        query: "rekonstrukcia",
+        scope: "DISCOVERY",
+      }),
+    ).resolves.toMatchObject({
+      suggestions: [
+        {
+          code: "SERV:RENOVATION",
+          routingProfessionCode: "PROF:TILER",
+        },
+      ],
+    });
+    const withoutRouting = { ...service };
+    delete withoutRouting.routingProfessionCode;
+    await expect(
+      createTaxonomyAutocompleteService(
+        repository([withoutRouting]),
+      ).autocomplete({ query: "rekonstrukcia", scope: "DISCOVERY" }),
+    ).rejects.toThrow(TaxonomyAutocompleteIntegrityError);
+  });
 });
 
 const activeGovernance = Object.freeze({
@@ -215,6 +255,7 @@ function candidate(
     governance: activeGovernance,
     kind: "PROFESSION",
     label: "Obkladač",
+    memberCount: 0,
     matchedBy: "EXACT_CANONICAL",
     professionCodes: ["PROF:TILER"],
     ...changes,

@@ -113,6 +113,9 @@ importers:
       '@portal/storage':
         specifier: workspace:*
         version: link:../../packages/storage
+      '@portal/taxonomy':
+        specifier: workspace:*
+        version: link:../../packages/taxonomy
       argon2:
         specifier: 0.45.1
         version: 0.45.1

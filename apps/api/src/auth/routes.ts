@@ -42,9 +42,17 @@ import {
   type AdminCredentialReviewRouteDependencies,
 } from "../admin-credential-review/index.js";
 import {
+  registerAdminTaxonomyRoutes,
+  type AdminTaxonomyRouteDependencies,
+} from "../admin-taxonomy/index.js";
+import {
   registerCraftsmanAuthoringRoutes,
   type CraftsmanAuthoringRouteDependencies,
 } from "../craftsman-authoring/index.js";
+import {
+  registerTaxonomySuggestionRoutes,
+  type TaxonomySuggestionRouteDependencies,
+} from "../taxonomy-suggestions/index.js";
 import {
   registerCraftsmanPortfolioRoutes,
   type CraftsmanPortfolioRouteDependencies,
@@ -336,9 +344,22 @@ export interface AuthModuleDependencies {
     AdminCredentialReviewRouteDependencies,
     "credentialReview" | "evidenceDelivery" | "reviews"
   >;
+  readonly adminTaxonomy?: Pick<
+    AdminTaxonomyRouteDependencies,
+    "catalog" | "persistence"
+  >;
   readonly craftsmanAuthoring?: Pick<
     CraftsmanAuthoringRouteDependencies,
-    "context" | "profiles" | "professions" | "publication" | "serviceAreas"
+    | "context"
+    | "profiles"
+    | "professions"
+    | "publication"
+    | "serviceAreas"
+    | "services"
+  >;
+  readonly taxonomySuggestions?: Pick<
+    TaxonomySuggestionRouteDependencies,
+    "persistence"
   >;
   readonly craftsmanPortfolio?: Pick<
     CraftsmanPortfolioRouteDependencies,
@@ -1042,6 +1063,17 @@ async function configureAuthModule(
       ...dependencies.craftsmanAuthoring,
     });
   }
+  if (dependencies.taxonomySuggestions !== undefined) {
+    registerTaxonomySuggestionRoutes(app, {
+      csrfProtection: csrfProtection(app),
+      guard,
+      rateLimit: {
+        max: config.rateLimitMax,
+        timeWindowMs: config.rateLimitWindowMs,
+      },
+      ...dependencies.taxonomySuggestions,
+    });
+  }
   if (dependencies.craftsmanPortfolio !== undefined) {
     registerCraftsmanPortfolioRoutes(app, {
       csrfProtection: csrfProtection(app),
@@ -1174,6 +1206,18 @@ async function configureAuthModule(
           timeWindowMs: config.rateLimitWindowMs,
         },
         ...dependencies.adminCredentialReview,
+      });
+    }
+    if (dependencies.adminTaxonomy !== undefined) {
+      registerAdminTaxonomyRoutes(app, {
+        adminAccess: dependencies.adminAccess.service,
+        csrfProtection: csrfProtection(app),
+        guard,
+        rateLimit: {
+          max: config.rateLimitMax,
+          timeWindowMs: config.rateLimitWindowMs,
+        },
+        ...dependencies.adminTaxonomy,
       });
     }
   }

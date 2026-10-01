@@ -37,6 +37,7 @@ export const PLACEHOLDER_ALPHA_TAXONOMY = prepareProfessionTaxonomyRelease({
   releaseId: "00000000-0000-4000-8000-000000001301",
   reviewReference: null,
   reviewState: "HUMAN_REVIEW_PENDING",
+  services: [],
   specializations: [
     {
       code: "TEST:SPECIALIZATION_A",

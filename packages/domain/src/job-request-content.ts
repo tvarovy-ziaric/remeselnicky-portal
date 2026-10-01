@@ -17,7 +17,7 @@ export const JOB_REQUEST_CONTENT_SECTION_KEYS = Object.freeze([
 
 export const JOB_REQUEST_CONTENT_SECTION_VERSIONS = Object.freeze({
   "request.budget": 1,
-  "request.core": 1,
+  "request.core": 2,
   "request.details": 1,
   "request.location": 1,
   "request.media": 1,
@@ -64,6 +64,8 @@ export type JobRequestSiteInspectionPreference =
 export interface JobRequestCoreContent {
   readonly description: string | null;
   readonly primaryProfessionCode: string | null;
+  /** Selected managed service; null when the customer selected a profession. */
+  readonly primaryServiceCode?: string | null;
   readonly relatedProfessionCodes: readonly string[];
   readonly skillCodes: readonly string[];
   readonly specializationCode: string | null;
@@ -124,7 +126,7 @@ export interface JobRequestContentSection {
   readonly canonicalPayload: string;
   readonly key: JobRequestDraftSectionKey;
   readonly payload: JobRequestContentPayload;
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 1 | 2;
 }
 
 export class JobRequestContentValidationError extends TypeError {
@@ -136,10 +138,17 @@ export function normalizeJobRequestContentSection(
 ): JobRequestContentSection {
   assertRecord(input, "section");
   if (!isSectionKey(input.key)) throw invalid("section.key");
-  if (input.schemaVersion !== JOB_REQUEST_CONTENT_SECTION_VERSIONS[input.key]) {
+  if (
+    input.schemaVersion !== JOB_REQUEST_CONTENT_SECTION_VERSIONS[input.key] &&
+    !(input.key === "request.core" && input.schemaVersion === 1)
+  ) {
     throw invalid("section.schemaVersion");
   }
-  const payload = normalizePayload(input.key, input.payload);
+  const payload = normalizePayload(
+    input.key,
+    input.payload,
+    input.schemaVersion,
+  );
   const canonical = normalizeJobRequestDraftSection({
     key: input.key,
     payload,
@@ -149,7 +158,7 @@ export function normalizeJobRequestContentSection(
     canonicalPayload: canonical.canonicalPayload,
     key: canonical.key,
     payload: canonical.payload,
-    schemaVersion: 1,
+    schemaVersion: input.schemaVersion,
   }) as unknown as JobRequestContentSection;
 }
 
@@ -206,10 +215,11 @@ export function jobRequestContentMissingSubmissionRequirements(
 function normalizePayload(
   key: JobRequestContentSectionKey,
   payload: unknown,
+  schemaVersion: number,
 ): JobRequestContentPayloadByKey[JobRequestContentSectionKey] {
   switch (key) {
     case "request.core":
-      return normalizeCore(payload);
+      return normalizeCore(payload, schemaVersion);
     case "request.location":
       return normalizeLocation(payload);
     case "request.timing":
@@ -223,17 +233,30 @@ function normalizePayload(
   }
 }
 
-function normalizeCore(payload: unknown): JobRequestCoreContent {
+function normalizeCore(
+  payload: unknown,
+  schemaVersion: number,
+): JobRequestCoreContent {
   const value = exactRecord(
     payload,
-    [
-      "description",
-      "primaryProfessionCode",
-      "relatedProfessionCodes",
-      "skillCodes",
-      "specializationCode",
-      "title",
-    ],
+    schemaVersion === 1
+      ? [
+          "description",
+          "primaryProfessionCode",
+          "relatedProfessionCodes",
+          "skillCodes",
+          "specializationCode",
+          "title",
+        ]
+      : [
+          "description",
+          "primaryProfessionCode",
+          "primaryServiceCode",
+          "relatedProfessionCodes",
+          "skillCodes",
+          "specializationCode",
+          "title",
+        ],
     "core",
   );
   const primaryProfessionCode = optionalCode(
@@ -247,11 +270,22 @@ function normalizeCore(payload: unknown): JobRequestCoreContent {
     JOB_REQUEST_RELATED_PROFESSION_TECHNICAL_LIMIT,
     "core.relatedProfessionCodes",
   );
+  const primaryServiceCode =
+    schemaVersion === 1
+      ? null
+      : optionalCode(
+          value.primaryServiceCode,
+          /^(?:SERV|TEST):[A-Z0-9][A-Z0-9_]{1,62}$/u,
+          "core.primaryServiceCode",
+        );
   if (
     primaryProfessionCode !== null &&
     relatedProfessionCodes.includes(primaryProfessionCode)
   ) {
     throw invalid("core.relatedProfessionCodes");
+  }
+  if (primaryServiceCode !== null && primaryProfessionCode === null) {
+    throw invalid("core.primaryServiceCode");
   }
   return Object.freeze({
     description: optionalSafeText(
@@ -261,6 +295,7 @@ function normalizeCore(payload: unknown): JobRequestCoreContent {
       "core.description",
     ),
     primaryProfessionCode,
+    ...(schemaVersion === 1 ? {} : { primaryServiceCode }),
     relatedProfessionCodes,
     skillCodes: codeArray(
       value.skillCodes,

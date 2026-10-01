@@ -46,11 +46,17 @@ describe("admin shell loader", () => {
             id: "dashboard",
             label: "Prehľad",
           },
+          {
+            description: "Spravovaný katalóg.",
+            id: "taxonomy",
+            label: "Katalóg",
+          },
         ],
       }),
     );
     expect(markup).toContain("Prevádzkové fronty");
     expect(markup).toContain('href="/admin/reports"');
+    expect(markup).toContain('href="/admin/taxonomy"');
     expect(markup).toContain("Hlásenie je signál, nie verdikt");
     expect(markup).not.toContain("Agregovaný prehľad");
   });

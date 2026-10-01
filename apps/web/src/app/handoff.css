@@ -337,6 +337,7 @@ h2,
 }
 
 .public-search-form__field > input,
+.public-search-form__field .taxonomy-autocomplete > input,
 .public-search-form__field .location-autocomplete > input {
   min-height: 2.75rem;
   border-radius: 0.55rem;

@@ -72,6 +72,10 @@ export {
   mapJobSupervisorEvaluationNotificationEvent,
 } from "./supervisor-evaluation.js";
 export type { JobSupervisorEvaluationNotificationCopy } from "./supervisor-evaluation.js";
+export {
+  mapTaxonomySuggestionNotificationEvent,
+  TAXONOMY_SUGGESTION_NOTIFICATION_EVENT_NAMES,
+} from "./taxonomy-suggestion.js";
 export type {
   ClaimEmailDeliveryOptions,
   EmailDelivery,

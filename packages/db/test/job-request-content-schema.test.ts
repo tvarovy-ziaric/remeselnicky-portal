@@ -6,6 +6,10 @@ const migrationUrl = new URL(
   "../migrations/0038_job_request_content_validation.sql",
   import.meta.url,
 );
+const serviceRoutingMigrationUrl = new URL(
+  "../migrations/0121_taxonomy_primary_service_routing.sql",
+  import.meta.url,
+);
 
 describe("job request content schema", () => {
   it("allowlists the six versioned sections and rejects unknown content", async () => {
@@ -67,5 +71,17 @@ describe("job request content schema", () => {
     expect(migration).toContain("'DESCRIPTION'");
     expect(migration).toContain("'MUNICIPALITY'");
     expect(migration).not.toMatch(/readiness_token|client_eligibility/iu);
+  });
+
+  it("keeps v1 readable and validates v2 service routing authoritatively", async () => {
+    const migration = await readFile(serviceRoutingMigrationUrl, "utf8");
+
+    expect(migration).toContain("job_request_content_section_valid_v1");
+    expect(migration).toContain("candidate_schema_version <> 2");
+    expect(migration).toContain("primaryServiceCode");
+    expect(migration).toContain(
+      "service.primary_profession_code = primary_profession",
+    );
+    expect(migration).toContain("section_schema_version IN (1, 2)");
   });
 });

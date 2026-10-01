@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  createManagedCatalogV1Release,
   PLACEHOLDER_ALPHA_TAXONOMY,
   createProfessionTaxonomyService,
   prepareProfessionTaxonomyRelease,
@@ -9,6 +10,83 @@ import {
   type PreparedProfessionTaxonomyRelease,
   type TaxonomyActivationInput,
 } from "../src/index.js";
+
+describe("managed profession/service catalog v1", () => {
+  it("ships a bounded deterministic Slovak catalog with a richer alias layer", () => {
+    const identity = {
+      releaseId: "10000000-0000-4000-8000-000000000001",
+      supersedesReleaseId: null,
+      version: 1,
+    } as const;
+    const first = prepareProfessionTaxonomyRelease(
+      createManagedCatalogV1Release(identity),
+    );
+    const second = prepareProfessionTaxonomyRelease(
+      createManagedCatalogV1Release(identity),
+    );
+
+    expect(first.professions).toHaveLength(45);
+    expect(first.services).toHaveLength(180);
+    expect(first.aliases.length).toBeGreaterThan(450);
+    expect(first.checksumSha256).toBe(second.checksumSha256);
+    expect(first.professions).toContainEqual(
+      expect.objectContaining({
+        code: "PROF:ELECTRICIAN",
+        labelSk: "Elektrikár",
+      }),
+    );
+    expect(first.services).toContainEqual(
+      expect.objectContaining({
+        code: "SERV:VINYL_FLOOR",
+        labelSk: "Pokládka vinylovej podlahy",
+      }),
+    );
+    expect(first.aliases).toContainEqual(
+      expect.objectContaining({
+        alias: "elektro",
+        targetCode: "PROF:ELECTRICIAN",
+        targetKind: "PROFESSION",
+      }),
+    );
+  });
+
+  it("keeps staging-only synthetic content out unless explicitly requested", () => {
+    const base = {
+      releaseId: "10000000-0000-4000-8000-000000000001",
+      supersedesReleaseId: null,
+      version: 1,
+    } as const;
+    expect(
+      createManagedCatalogV1Release(base).professions.some(
+        ({ code }) => code === "PROF:ALPHA_SYNTHETIC",
+      ),
+    ).toBe(false);
+    expect(
+      createManagedCatalogV1Release({
+        ...base,
+        includeSyntheticFixture: true,
+      }).professions.some(({ code }) => code === "PROF:ALPHA_SYNTHETIC"),
+    ).toBe(true);
+  });
+
+  it("requires every service routing profession to be an explicit service link", () => {
+    const release = createManagedCatalogV1Release({
+      releaseId: "10000000-0000-4000-8000-000000000001",
+      supersedesReleaseId: null,
+      version: 1,
+    });
+    expect(() =>
+      prepareProfessionTaxonomyRelease({
+        ...release,
+        services: release.services.map((service, index) =>
+          index === 0
+            ? { ...service, primaryProfessionCode: "PROF:NOT_LINKED" }
+            : service,
+        ),
+      }),
+    ).toThrow(/Service profession links are invalid/u);
+  });
+});
 
 describe("profession taxonomy release governance", () => {
   it("produces a deterministic, immutable placeholder seed", () => {
@@ -174,6 +252,7 @@ function baseSeed(): ProfessionTaxonomyReleaseSeed {
     releaseId: source.releaseId,
     reviewReference: source.reviewReference,
     reviewState: source.reviewState,
+    services: source.services,
     specializations: source.specializations,
     supersedesReleaseId: source.supersedesReleaseId,
     version: source.version,

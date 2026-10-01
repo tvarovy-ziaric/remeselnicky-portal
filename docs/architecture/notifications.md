@@ -16,6 +16,15 @@ Unknown events are ignored without taking a consumer claim; an unknown
 notification type or invalid mapped data fails closed before a partial record
 can be created.
 
+Managed-taxonomy suggestions use the same pipeline. Submission creates one
+actionable in-app notice for each currently active admin role grant. A final
+`APPROVED_AS_NEW`, `MAPPED_TO_EXISTING`, or `REJECTED` decision always creates
+the requester's in-app notification and required transactional email delivery.
+The general notification payload contains only recipient, suggestion identity,
+bounded outcome and resolved canonical code. The proposed description and the
+administrator's personal explanation remain in the authorization-checked
+suggestion detail rather than being copied into outbox or notification rows.
+
 ## Stored model
 
 `notifications` is the canonical in-app inbox and stores:

@@ -6,6 +6,13 @@ const migration = readFileSync(
   new URL("../migrations/0013_profession_taxonomy.sql", import.meta.url),
   "utf8",
 );
+const serviceRoutingMigration = readFileSync(
+  new URL(
+    "../migrations/0121_taxonomy_primary_service_routing.sql",
+    import.meta.url,
+  ),
+  "utf8",
+);
 
 describe("profession taxonomy migration", () => {
   it("defines governed snapshot content and current projections", () => {
@@ -44,5 +51,16 @@ describe("profession taxonomy migration", () => {
 
   it("keeps credentials and ratings outside taxonomy schema", () => {
     expect(migration).not.toMatch(/credential_requirement|rating|reputation/iu);
+  });
+
+  it("requires one explicit primary routing profession per service release", () => {
+    expect(serviceRoutingMigration).toContain("is_primary");
+    expect(serviceRoutingMigration).toContain(
+      "taxonomy_service_professions_one_primary_idx",
+    );
+    expect(serviceRoutingMigration).toContain(
+      "taxonomy service must have exactly one primary profession",
+    );
+    expect(serviceRoutingMigration).toContain("primary_profession_code");
   });
 });

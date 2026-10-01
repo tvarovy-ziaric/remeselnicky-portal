@@ -291,6 +291,26 @@ const CATALOG: Readonly<Record<string, CatalogEntry>> = Object.freeze({
     "Kontrola profilu skončila zamietnutím. Bezpečný dôvod nájdete v detaile profilu.",
     SECURITY_OPTIONAL,
   ),
+  "taxonomy.suggestion.submitted": entry(
+    "Nový návrh taxonómie",
+    "Remeselník odoslal návrh profesie alebo služby na posúdenie.",
+    MARKETPLACE_OPTIONAL,
+  ),
+  "taxonomy.suggestion.approved": entry(
+    "Návrh bol schválený",
+    "Váš návrh sme pridali ako novú spravovanú položku katalógu. Podrobnosti nájdete v detaile návrhu.",
+    MARKETPLACE_REQUIRED,
+  ),
+  "taxonomy.suggestion.mapped": entry(
+    "Návrh sme priradili k existujúcej položke",
+    "Váš návrh sme priradili k existujúcej položke katalógu. Výsledok a vysvetlenie nájdete v detaile návrhu.",
+    MARKETPLACE_REQUIRED,
+  ),
+  "taxonomy.suggestion.rejected": entry(
+    "Návrh nebol zaradený",
+    "Váš návrh sme do katalógu nezaradili. Vysvetlenie nájdete v detaile návrhu.",
+    MARKETPLACE_REQUIRED,
+  ),
   "quote.expired": entry(
     "Ponuka vypršala",
     "Platnosť ponuky sa skončila.",

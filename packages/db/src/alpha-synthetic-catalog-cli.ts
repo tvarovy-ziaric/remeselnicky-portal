@@ -1,32 +1,5 @@
 import postgres from "postgres";
 
-import { prepareProfessionTaxonomyRelease } from "@portal/taxonomy";
-
-import { createProfessionTaxonomyRepository } from "./taxonomy-repository.js";
-
-const release = prepareProfessionTaxonomyRelease({
-  aliases: [],
-  capabilityCriteria: [],
-  contentClass: "CANONICAL",
-  professions: [
-    {
-      code: "PROF:ALPHA_SYNTHETIC",
-      labelSk: "Syntetické testovacie remeslo",
-      replacedByCode: null,
-      slug: "synteticke-testovacie-remeslo",
-      state: "ACTIVE",
-    },
-  ],
-  releaseId: "00000000-0000-4000-8000-000000003301",
-  // This is an isolated non-production fixture of the approved-state branch,
-  // never a review or activation of the real marketplace taxonomy.
-  reviewReference: "test-fixture:alpha/r3-022",
-  reviewState: "HUMAN_REVIEW_APPROVED",
-  specializations: [],
-  supersedesReleaseId: null,
-  version: 1,
-});
-
 const location = Object.freeze({
   districtCode: "TEST:DISTRICT_ALPHA",
   municipalityCode: "TEST:MUNICIPALITY_ALPHA",
@@ -71,28 +44,25 @@ async function main(): Promise<void> {
       );
     }
 
-    const [current] = await sql<{ releaseId: string }[]>`
-      SELECT release_id AS "releaseId"
-      FROM profession_taxonomy_activation_events
-      ORDER BY activation_sequence DESC
+    const [current] = await sql<
+      { professionCode: string; releaseId: string }[]
+    >`
+      SELECT activation.release_id AS "releaseId",
+        profession.profession_code AS "professionCode"
+      FROM profession_taxonomy_activation_events activation
+      JOIN profession_taxonomy_releases release
+        ON release.release_id = activation.release_id
+      JOIN taxonomy_professions profession
+        ON profession.release_id = activation.release_id
+       AND profession.profession_code = 'PROF:ELECTRICIAN'
+       AND profession.state = 'ACTIVE'
+      WHERE release.content_class = 'CANONICAL'
+        AND release.review_state = 'HUMAN_REVIEW_APPROVED'
+      ORDER BY activation.activation_sequence DESC
       LIMIT 1
     `;
-    if (current !== undefined && current.releaseId !== release.releaseId) {
-      throw new Error(
-        "Synthetic alpha catalog cannot replace an existing taxonomy.",
-      );
-    }
-
-    const taxonomy = createProfessionTaxonomyRepository(sql);
-    const installed = await taxonomy.installRelease(release);
     if (current === undefined) {
-      await taxonomy.activateRelease({
-        activationId: "00000000-0000-4000-8000-000000003302",
-        actorReference: "test-fixture:alpha/r3-022",
-        previousReleaseId: null,
-        releaseId: release.releaseId,
-        reviewReference: release.reviewReference!,
-      });
+      throw new Error("Synthetic alpha catalog requires the managed catalog.");
     }
 
     await sql.begin(async (transaction) => {
@@ -197,7 +167,7 @@ async function main(): Promise<void> {
       }
     });
     process.stdout.write(
-      `${JSON.stringify({ credentialTypeCodes: credentialTypes.map(({ code }) => code), dataClass: "synthetic", installed, municipalityCode: location.municipalityCode, professionCode: release.professions[0]?.code })}\n`,
+      `${JSON.stringify({ credentialTypeCodes: credentialTypes.map(({ code }) => code), dataClass: "synthetic", installed: "MANAGED_CATALOG_CURRENT", municipalityCode: location.municipalityCode, professionCode: current.professionCode, taxonomyReleaseId: current.releaseId })}\n`,
     );
   } finally {
     await sql.end({ timeout: 5 });

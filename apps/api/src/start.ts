@@ -181,8 +181,12 @@ const app = buildApi({
       context: database.craftsmanAuthoringContext,
       profiles: database.craftsmanProfiles,
       professions: database.craftsmanProfessions,
+      services: database.craftsmanServices,
       publication: database.craftsmanPublication,
       serviceAreas: database.craftsmanServiceAreas,
+    },
+    taxonomySuggestions: {
+      persistence: database.taxonomySuggestions,
     },
     craftsmanPortfolio: {
       context: database.craftsmanAuthoringContext,

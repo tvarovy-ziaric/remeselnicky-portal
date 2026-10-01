@@ -25,10 +25,17 @@ export type TaxonomyAliasKind = (typeof TAXONOMY_ALIAS_KINDS)[number];
 
 export interface ProfessionSeed {
   readonly code: string;
+  readonly descriptionSk?: string | null;
   readonly labelSk: string;
   readonly replacedByCode: string | null;
   readonly slug: string;
   readonly state: TaxonomyEntryState;
+}
+
+export interface ServiceSeed extends ProfessionSeed {
+  /** Server-authoritative profession used to route a service selection. */
+  readonly primaryProfessionCode: string;
+  readonly professionCodes: readonly string[];
 }
 
 export interface SpecializationSeed extends ProfessionSeed {
@@ -48,7 +55,7 @@ export interface TaxonomyAliasSeed {
   readonly alias: string;
   readonly kind: TaxonomyAliasKind;
   readonly targetCode: string;
-  readonly targetKind: "PROFESSION" | "SPECIALIZATION";
+  readonly targetKind: "PROFESSION" | "SERVICE" | "SPECIALIZATION";
 }
 
 export interface ProfessionTaxonomyReleaseSeed {
@@ -59,6 +66,7 @@ export interface ProfessionTaxonomyReleaseSeed {
   readonly releaseId: string;
   readonly reviewReference: string | null;
   readonly reviewState: TaxonomyReviewState;
+  readonly services: readonly ServiceSeed[];
   readonly specializations: readonly SpecializationSeed[];
   readonly supersedesReleaseId: string | null;
   readonly version: number;

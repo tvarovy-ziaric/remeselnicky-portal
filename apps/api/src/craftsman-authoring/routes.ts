@@ -7,6 +7,9 @@ import {
   type CraftsmanProfession,
   type CraftsmanProfessionId,
   type CraftsmanProfessionPersistence,
+  type CraftsmanService,
+  type CraftsmanServiceId,
+  type CraftsmanServicePersistence,
   type CraftsmanPublicationPersistence,
   type CraftsmanPublicationState,
   type CraftsmanServiceArea,
@@ -26,6 +29,9 @@ export const CRAFTSMAN_AUTHORING_PATHS = Object.freeze({
   profile: "/v1/me/craftsman-profile",
   profileById: "/v1/me/craftsman-profile/:profileId",
   professions: "/v1/me/craftsman-profile/:profileId/professions",
+  services: "/v1/me/craftsman-profile/:profileId/services",
+  serviceDeactivate:
+    "/v1/me/craftsman-profile/:profileId/services/:craftsmanServiceId/deactivate",
   professionLevel:
     "/v1/me/craftsman-profile/:profileId/professions/:craftsmanProfessionId/level",
   professionDeactivate:
@@ -54,6 +60,11 @@ export interface CraftsmanAuthoringContext {
     readonly professionCode: string;
     readonly taxonomyReleaseId: string;
   } | null>;
+  resolveCurrentService(serviceCode: string): Promise<{
+    readonly professionCodes: readonly string[];
+    readonly serviceCode: string;
+    readonly taxonomyReleaseId: string;
+  } | null>;
 }
 
 export interface CraftsmanAuthoringRouteDependencies {
@@ -62,6 +73,7 @@ export interface CraftsmanAuthoringRouteDependencies {
   readonly guard: Guard;
   readonly profiles: CraftsmanProfilePersistence;
   readonly professions: CraftsmanProfessionPersistence;
+  readonly services: CraftsmanServicePersistence;
   readonly publication: CraftsmanPublicationPersistence;
   readonly rateLimit: { readonly max: number; readonly timeWindowMs: number };
   readonly serviceAreas: CraftsmanServiceAreaPersistence;
@@ -73,6 +85,9 @@ interface ProfileParams {
 
 interface ProfessionParams extends ProfileParams {
   readonly craftsmanProfessionId: string;
+}
+interface ServiceParams extends ProfileParams {
+  readonly craftsmanServiceId: string;
 }
 
 interface CreateIndividualBody {
@@ -116,6 +131,12 @@ interface AssignProfessionBody {
   readonly craftsmanProfessionId: string;
   readonly declaredLevel: "BEGINNER" | "ADVANCED" | "MASTER";
   readonly professionCode: string;
+}
+interface AddServiceBody {
+  readonly commandId: string;
+  readonly craftsmanProfessionIds: readonly string[];
+  readonly craftsmanServiceId: string;
+  readonly serviceCode: string;
 }
 
 interface ServiceAreaBody {
@@ -294,6 +315,117 @@ export function registerCraftsmanAuthoringRoutes(
         }
         return reply.code(result.status === "APPLIED" ? 201 : 200).send({
           profession: serializeProfession(result.profession),
+          status: result.status,
+        });
+      } catch (error: unknown) {
+        return commandError(reply, error);
+      }
+    },
+  );
+
+  app.get<{ Params: ProfileParams }>(
+    CRAFTSMAN_AUTHORING_PATHS.services,
+    {
+      ...common,
+      schema: { params: profileParamsSchema, querystring: emptyQuerySchema },
+    },
+    async (request, reply) => {
+      const actor = await ownedActor(request, reply, dependencies, false);
+      if (actor === null) return;
+      try {
+        const services = await dependencies.services.listOwned({
+          actorUserId: actor,
+          craftsmanProfileId: request.params.profileId as CraftsmanProfileId,
+        });
+        return reply.send({ services: services.map(serializeService) });
+      } catch {
+        return unavailable(reply);
+      }
+    },
+  );
+
+  app.post<{ Body: AddServiceBody; Params: ProfileParams }>(
+    CRAFTSMAN_AUTHORING_PATHS.services,
+    {
+      ...write,
+      preValidation: [
+        rejectQuery,
+        exactBody([
+          "commandId",
+          "craftsmanProfessionIds",
+          "craftsmanServiceId",
+          "serviceCode",
+        ]),
+      ],
+      schema: {
+        body: addServiceSchema,
+        params: profileParamsSchema,
+        querystring: emptyQuerySchema,
+      },
+    },
+    async (request, reply) => {
+      const actor = await ownedActor(request, reply, dependencies, true);
+      if (actor === null) return;
+      try {
+        const governed = await dependencies.context.resolveCurrentService(
+          request.body.serviceCode,
+        );
+        if (governed === null) return conflict(reply, "SERVICE_NOT_AVAILABLE");
+        const result = await dependencies.services.add({
+          actorUserId: actor,
+          commandId: request.body.commandId,
+          craftsmanProfessionIds: request.body
+            .craftsmanProfessionIds as CraftsmanProfessionId[],
+          craftsmanProfileId: request.params.profileId as CraftsmanProfileId,
+          craftsmanServiceId: request.body
+            .craftsmanServiceId as CraftsmanServiceId,
+          serviceCode: governed.serviceCode,
+          taxonomyReleaseId: governed.taxonomyReleaseId,
+        });
+        if (!("service" in result)) {
+          return result.status === "PROFILE_UNAVAILABLE"
+            ? notFound(reply)
+            : conflict(reply, result.status);
+        }
+        return reply.code(result.status === "APPLIED" ? 201 : 200).send({
+          service: serializeService(result.service),
+          status: result.status,
+        });
+      } catch (error: unknown) {
+        return commandError(reply, error);
+      }
+    },
+  );
+
+  app.post<{ Body: { readonly commandId: string }; Params: ServiceParams }>(
+    CRAFTSMAN_AUTHORING_PATHS.serviceDeactivate,
+    {
+      ...write,
+      preValidation: [rejectQuery, exactBody(["commandId"])],
+      schema: {
+        body: commandOnlySchema,
+        params: serviceParamsSchema,
+        querystring: emptyQuerySchema,
+      },
+    },
+    async (request, reply) => {
+      const actor = await ownedActor(request, reply, dependencies, true);
+      if (actor === null) return;
+      try {
+        const result = await dependencies.services.deactivate({
+          actorUserId: actor,
+          commandId: request.body.commandId,
+          craftsmanProfileId: request.params.profileId as CraftsmanProfileId,
+          craftsmanServiceId: request.params
+            .craftsmanServiceId as CraftsmanServiceId,
+        });
+        if (!("service" in result)) {
+          return result.status === "PROFILE_UNAVAILABLE"
+            ? notFound(reply)
+            : conflict(reply, result.status);
+        }
+        return reply.send({
+          service: serializeService(result.service),
           status: result.status,
         });
       } catch (error: unknown) {
@@ -576,25 +708,31 @@ async function loadAggregate(
   const profileId = await dependencies.context.findOwnedProfileId(actorUserId);
   if (profileId === null) return null;
   const service = createCraftsmanProfileService(dependencies.profiles);
-  const [profile, professions, serviceArea, publication] = await Promise.all([
-    service.getPrivateDraft({ actorUserId, profileId }),
-    dependencies.professions.listOwned({
-      actorUserId,
-      craftsmanProfileId: profileId,
-    }),
-    dependencies.serviceAreas.findOwned({
-      actorUserId,
-      craftsmanProfileId: profileId,
-    }),
-    dependencies.publication.findOwned({
-      actorUserId,
-      craftsmanProfileId: profileId,
-    }),
-  ]);
+  const [profile, professions, services, serviceArea, publication] =
+    await Promise.all([
+      service.getPrivateDraft({ actorUserId, profileId }),
+      dependencies.professions.listOwned({
+        actorUserId,
+        craftsmanProfileId: profileId,
+      }),
+      dependencies.services.listOwned({
+        actorUserId,
+        craftsmanProfileId: profileId,
+      }),
+      dependencies.serviceAreas.findOwned({
+        actorUserId,
+        craftsmanProfileId: profileId,
+      }),
+      dependencies.publication.findOwned({
+        actorUserId,
+        craftsmanProfileId: profileId,
+      }),
+    ]);
   if (profile === null) return null;
   return {
     profile: serializeProfile(profile),
     professions: professions.map(serializeProfession),
+    services: services.map(serializeService),
     publication: serializePublication(publication),
     serviceArea: serializeServiceArea(serviceArea),
   };
@@ -682,7 +820,20 @@ function serializeProfession(profession: CraftsmanProfession) {
     evidenceSupportedLevel: profession.evidenceSupportedLevel,
     id: profession.id,
     professionCode: profession.professionCode,
+    taxonomyLabel: profession.taxonomyLabel ?? profession.professionCode,
     state: profession.state,
+  };
+}
+
+function serializeService(service: CraftsmanService) {
+  return {
+    craftsmanProfessionIds: service.craftsmanProfessionIds,
+    createdAt: service.createdAt.toISOString(),
+    deactivatedAt: service.deactivatedAt?.toISOString() ?? null,
+    id: service.id,
+    serviceCode: service.serviceCode,
+    taxonomyLabel: service.taxonomyLabel ?? service.serviceCode,
+    state: service.state,
   };
 }
 
@@ -912,6 +1063,12 @@ const professionParamsSchema = {
   required: ["profileId", "craftsmanProfessionId"],
   type: "object",
 } as const;
+const serviceParamsSchema = {
+  additionalProperties: false,
+  properties: { craftsmanServiceId: uuid, profileId: uuid },
+  required: ["profileId", "craftsmanServiceId"],
+  type: "object",
+} as const;
 const createProfileSchema = {
   additionalProperties: false,
   properties: {
@@ -956,6 +1113,31 @@ const assignProfessionSchema = {
     "craftsmanProfessionId",
     "declaredLevel",
     "professionCode",
+  ],
+  type: "object",
+} as const;
+const addServiceSchema = {
+  additionalProperties: false,
+  properties: {
+    commandId: uuid,
+    craftsmanProfessionIds: {
+      items: uuid,
+      maxItems: 8,
+      minItems: 1,
+      type: "array",
+      uniqueItems: true,
+    },
+    craftsmanServiceId: uuid,
+    serviceCode: {
+      pattern: "^SERV:[A-Z0-9][A-Z0-9_]{1,62}$",
+      type: "string",
+    },
+  },
+  required: [
+    "commandId",
+    "craftsmanProfessionIds",
+    "craftsmanServiceId",
+    "serviceCode",
   ],
   type: "object",
 } as const;

@@ -25,14 +25,25 @@ export function registerTaxonomyAutocompleteRoutes(
       }
 
       try {
+        const scope = request.query.scope;
         const result = await dependencies.autocomplete.autocomplete({
           limit: request.query.limit,
           query: request.query.q,
+          scope: typeof scope === "string" ? scope.toUpperCase() : undefined,
         });
         if (result.status === "INVALID_QUERY") {
           return reply.code(400).send({ code: "INVALID_TAXONOMY_QUERY" });
         }
-        return reply.send({ suggestions: result.suggestions });
+        return reply.send({
+          suggestions: result.suggestions.map((suggestion) => ({
+            code: suggestion.code,
+            kind: suggestion.kind,
+            label: suggestion.label,
+            memberCount: suggestion.memberCount,
+            professionCodes: suggestion.professionCodes,
+            routingProfessionCode: suggestion.routingProfessionCode,
+          })),
+        });
       } catch {
         return reply
           .code(503)
@@ -46,10 +57,14 @@ function hasOnlyKnownScalarParameters(query: QueryString): boolean {
   const keys = Object.keys(query);
   return (
     keys.length >= 1 &&
-    keys.length <= 2 &&
+    keys.length <= 3 &&
     keys.includes("q") &&
-    keys.every((key) => key === "q" || key === "limit") &&
+    keys.every((key) => key === "q" || key === "limit" || key === "scope") &&
     typeof query.q === "string" &&
-    (query.limit === undefined || typeof query.limit === "string")
+    (query.limit === undefined || typeof query.limit === "string") &&
+    (query.scope === undefined ||
+      (typeof query.scope === "string" &&
+        (query.scope.toUpperCase() === "DISCOVERY" ||
+          query.scope.toUpperCase() === "CAPABILITY")))
   );
 }

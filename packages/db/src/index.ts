@@ -20,6 +20,10 @@ import {
   type AdminCredentialReviewRepository,
 } from "./admin-credential-review-repository.js";
 export {
+  ensureManagedCatalogV1,
+  type ManagedCatalogProvisionResult,
+} from "./managed-catalog-provisioner.js";
+export {
   createAdminCredentialReviewRepository,
   createCredentialReviewerMediaAccessResolver,
 } from "./admin-credential-review-repository.js";
@@ -84,8 +88,16 @@ import {
 } from "./notification-repository.js";
 import { createProfessionTaxonomyRepository } from "./taxonomy-repository.js";
 import type { ProfessionTaxonomyPersistence } from "@portal/taxonomy";
+import {
+  createTaxonomySuggestionRepository,
+  type TaxonomyAdminCatalogRepository,
+  type TaxonomySuggestionReadRepository,
+} from "./taxonomy-suggestion-repository.js";
+import type { TaxonomySuggestionPersistence } from "@portal/taxonomy";
 import { createCraftsmanProfessionRepository } from "./craftsman-profession-repository.js";
 import type { CraftsmanProfessionPersistence } from "@portal/domain";
+import { createCraftsmanServiceRepository } from "./craftsman-service-repository.js";
+import type { CraftsmanServicePersistence } from "@portal/domain";
 import {
   createCraftsmanAuthoringContextRepository,
   type CraftsmanAuthoringContextRepository,
@@ -94,6 +106,7 @@ export { createCraftsmanAuthoringContextRepository } from "./craftsman-authoring
 export type {
   CraftsmanAuthoringContextRepository,
   CurrentGovernedProfession,
+  CurrentGovernedService,
 } from "./craftsman-authoring-context-repository.js";
 import { createCraftsmanServiceAreaRepository } from "./craftsman-service-area-repository.js";
 import type { CraftsmanServiceAreaPersistence } from "@portal/domain";
@@ -136,7 +149,7 @@ import type {
   CraftsmanTrustEvidencePersistence,
   PublicCraftsmanProfilePersistence,
 } from "@portal/domain";
-import { createTaxonomyAutocompleteRepository } from "./taxonomy-autocomplete-repository.js";
+import { createManagedTaxonomyAutocompleteRepository as createTaxonomyAutocompleteRepository } from "./managed-taxonomy-autocomplete-repository.js";
 import {
   createMunicipalityAutocompleteRepository,
   type MunicipalityAutocompletePersistence,
@@ -841,11 +854,14 @@ export {
   taxonomyEntryStateEnum,
   taxonomyProfessions,
   taxonomyReviewStateEnum,
+  taxonomyServiceProfessions,
+  taxonomyServices,
   taxonomySpecializations,
 } from "./schema/index.js";
 export type {
   ProfessionTaxonomyReleaseRecord,
   TaxonomyProfessionRecord,
+  TaxonomyServiceRecord,
   TaxonomySpecializationRecord,
 } from "./schema/index.js";
 export {
@@ -1064,7 +1080,7 @@ export type {
   CraftsmanServiceAreaMatchPersistence,
   CraftsmanTrustEvidencePersistence,
 } from "@portal/domain";
-export { createTaxonomyAutocompleteRepository } from "./taxonomy-autocomplete-repository.js";
+export { createManagedTaxonomyAutocompleteRepository as createTaxonomyAutocompleteRepository } from "./managed-taxonomy-autocomplete-repository.js";
 export { createCredentialQualificationRepository } from "./credential-qualification-repository.js";
 export type {
   CredentialQualificationPolicyPersistence,
@@ -1193,6 +1209,18 @@ export type {
 } from "./notification-repository.js";
 export { createProfessionTaxonomyRepository } from "./taxonomy-repository.js";
 export type { ProfessionTaxonomyPersistence } from "@portal/taxonomy";
+export {
+  createTaxonomySuggestionRepository,
+  TaxonomySuggestionIdempotencyError,
+} from "./taxonomy-suggestion-repository.js";
+export type {
+  TaxonomyAdminAliasConflict,
+  TaxonomyAdminCatalogItem,
+  TaxonomyAdminCatalogKind,
+  TaxonomyAdminCatalogRepository,
+  TaxonomyAdminCatalogState,
+  TaxonomySuggestionReadRepository,
+} from "./taxonomy-suggestion-repository.js";
 export { createCustomerProfileRepository } from "./customer-profile-repository.js";
 export type { CustomerProfilePersistence } from "@portal/domain";
 export {
@@ -1245,6 +1273,11 @@ export {
   CraftsmanProfessionIdempotencyError,
 } from "./craftsman-profession-repository.js";
 export type { CraftsmanProfessionPersistence } from "@portal/domain";
+export {
+  createCraftsmanServiceRepository,
+  CraftsmanServiceIdempotencyError,
+} from "./craftsman-service-repository.js";
+export type { CraftsmanServicePersistence } from "@portal/domain";
 export {
   createIndicativePricingRepository,
   IndicativePricingIdempotencyError,
@@ -1376,6 +1409,7 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly craftsmanProfiles: CraftsmanProfilePersistence;
   readonly craftsmanAuthoringContext: CraftsmanAuthoringContextRepository;
   readonly craftsmanProfessions: CraftsmanProfessionPersistence;
+  readonly craftsmanServices: CraftsmanServicePersistence;
   readonly craftsmanCapabilities: CraftsmanCapabilityPersistence;
   readonly craftsmanServiceAreas: CraftsmanServiceAreaPersistence;
   readonly indicativePricing: IndicativePricingPersistence;
@@ -1513,6 +1547,9 @@ export interface DatabaseClient extends DatabaseHealthProbe {
   readonly outbox: OutboxRepository;
   readonly phoneVerification: PhoneVerificationRepository;
   readonly professionTaxonomy: ProfessionTaxonomyPersistence;
+  readonly taxonomySuggestions: TaxonomySuggestionPersistence &
+    TaxonomySuggestionReadRepository &
+    TaxonomyAdminCatalogRepository;
   readonly skillCatalog: SkillCatalogRepository;
   readonly privacy: PrivacyRepository;
   readonly privacyOperations: ReturnType<
@@ -1577,6 +1614,7 @@ export function createDatabase(
   const craftsmanAuthoringContext =
     createCraftsmanAuthoringContextRepository(sql);
   const craftsmanProfessions = createCraftsmanProfessionRepository(sql);
+  const craftsmanServices = createCraftsmanServiceRepository(sql);
   const craftsmanCapabilities = createCraftsmanCapabilityRepository(sql);
   const craftsmanServiceAreas = createCraftsmanServiceAreaRepository(sql);
   const indicativePricing = createIndicativePricingRepository(sql);
@@ -1694,6 +1732,7 @@ export function createDatabase(
   const outbox = createOutboxRepository(sql);
   const phoneVerification = createPhoneVerificationRepository(sql);
   const professionTaxonomy = createProfessionTaxonomyRepository(sql);
+  const taxonomySuggestions = createTaxonomySuggestionRepository(sql);
   const skillCatalog = createSkillCatalogRepository(sql);
   const privacy = createPrivacyRepository(sql);
   const privacyOperations = createPrivacyOperationsRepository(sql);
@@ -1717,6 +1756,7 @@ export function createDatabase(
     craftsmanAuthoringContext,
     craftsmanProfiles,
     craftsmanProfessions,
+    craftsmanServices,
     craftsmanCapabilities,
     craftsmanServiceAreas,
     indicativePricing,
@@ -1814,6 +1854,7 @@ export function createDatabase(
     outbox,
     phoneVerification,
     professionTaxonomy,
+    taxonomySuggestions,
     skillCatalog,
     privacy,
     privacyDispositionQueue,

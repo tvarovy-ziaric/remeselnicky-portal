@@ -35,6 +35,17 @@ export interface OwnedProfession {
   readonly id: string;
   readonly professionCode: string;
   readonly state: "ACTIVE" | "INACTIVE";
+  readonly taxonomyLabel: string;
+}
+
+export interface OwnedService {
+  readonly craftsmanProfessionIds: readonly string[];
+  readonly createdAt: string;
+  readonly deactivatedAt: string | null;
+  readonly id: string;
+  readonly serviceCode: string;
+  readonly state: "ACTIVE" | "INACTIVE";
+  readonly taxonomyLabel: string;
 }
 
 export interface OwnedServiceArea {
@@ -79,6 +90,7 @@ export interface CraftsmanAuthoringAggregate {
   readonly professions: readonly OwnedProfession[];
   readonly publication: OwnedPublication | null;
   readonly serviceArea: OwnedServiceArea | null;
+  readonly services: readonly OwnedService[];
 }
 
 export type AuthoringLoadResult =
@@ -106,6 +118,13 @@ export type AuthoringMutationResult = Readonly<{
 }>;
 
 export interface CraftsmanProfileAuthoringClient {
+  addService(input: {
+    commandId: string;
+    craftsmanProfessionIds: readonly string[];
+    craftsmanServiceId: string;
+    profileId: string;
+    serviceCode: string;
+  }): Promise<AuthoringMutationResult>;
   assignProfession(input: {
     commandId: string;
     craftsmanProfessionId: string;
@@ -129,6 +148,11 @@ export interface CraftsmanProfileAuthoringClient {
           profileType: "COMPANY";
         },
   ): Promise<AuthoringMutationResult>;
+  deactivateService(input: {
+    commandId: string;
+    craftsmanServiceId: string;
+    profileId: string;
+  }): Promise<AuthoringMutationResult>;
   load(): Promise<AuthoringLoadResult>;
   replaceProfile(
     input:
@@ -206,6 +230,27 @@ export function createCraftsmanProfileAuthoringClient(
   }
 
   return Object.freeze({
+    addService(
+      input: Parameters<CraftsmanProfileAuthoringClient["addService"]>[0],
+    ) {
+      return write(
+        basePath + "/" + encodeURIComponent(input.profileId) + "/services",
+        "POST",
+        {
+          commandId: input.commandId,
+          craftsmanProfessionIds: input.craftsmanProfessionIds,
+          craftsmanServiceId: input.craftsmanServiceId,
+          serviceCode: input.serviceCode,
+        },
+        (value) =>
+          entityCommandResponse(
+            value,
+            "service",
+            ["APPLIED", "DEDUPLICATED"],
+            parseService,
+          ),
+      );
+    },
     assignProfession(
       input: Parameters<CraftsmanProfileAuthoringClient["assignProfession"]>[0],
     ) {
@@ -237,6 +282,29 @@ export function createCraftsmanProfileAuthoringClient(
         (value) =>
           exactRecord(value, ["profile"]) &&
           parseProfile(value.profile) !== null,
+      );
+    },
+    deactivateService(
+      input: Parameters<
+        CraftsmanProfileAuthoringClient["deactivateService"]
+      >[0],
+    ) {
+      return write(
+        basePath +
+          "/" +
+          encodeURIComponent(input.profileId) +
+          "/services/" +
+          encodeURIComponent(input.craftsmanServiceId) +
+          "/deactivate",
+        "POST",
+        { commandId: input.commandId },
+        (value) =>
+          entityCommandResponse(
+            value,
+            "service",
+            ["APPLIED", "DEDUPLICATED"],
+            parseService,
+          ),
       );
     },
     async load() {
@@ -360,6 +428,7 @@ export function parseCraftsmanAuthoringAggregate(
     !exactRecord(value, [
       "profile",
       "professions",
+      "services",
       "serviceArea",
       "publication",
     ])
@@ -369,14 +438,19 @@ export function parseCraftsmanAuthoringAggregate(
   if (
     profile === null ||
     !Array.isArray(value.professions) ||
-    value.professions.length > 64
+    value.professions.length > 64 ||
+    !Array.isArray(value.services) ||
+    value.services.length > 256
   )
     return null;
   const professions = value.professions.map(parseProfession);
+  const services = value.services.map(parseService);
   if (
     professions.some((profession) => profession === null) ||
     new Set(professions.map((profession) => profession?.id)).size !==
-      professions.length
+      professions.length ||
+    services.some((service) => service === null) ||
+    new Set(services.map((service) => service?.id)).size !== services.length
   )
     return null;
   const serviceArea =
@@ -393,6 +467,7 @@ export function parseCraftsmanAuthoringAggregate(
     professions: Object.freeze(professions as OwnedProfession[]),
     publication,
     serviceArea,
+    services: Object.freeze(services as OwnedService[]),
   });
 }
 
@@ -454,6 +529,7 @@ function parseProfession(value: unknown): OwnedProfession | null {
     !exactRecord(value, [
       "id",
       "professionCode",
+      "taxonomyLabel",
       "state",
       "declaredLevel",
       "declaredLevelRevision",
@@ -463,6 +539,7 @@ function parseProfession(value: unknown): OwnedProfession | null {
     ]) ||
     !uuid(value.id) ||
     !professionCode(value.professionCode) ||
+    !safeText(value.taxonomyLabel) ||
     !["ACTIVE", "INACTIVE"].includes(String(value.state)) ||
     !declaredLevel(value.declaredLevel) ||
     !positiveInteger(value.declaredLevelRevision) ||
@@ -475,6 +552,37 @@ function parseProfession(value: unknown): OwnedProfession | null {
   )
     return null;
   return Object.freeze(value) as unknown as OwnedProfession;
+}
+
+function parseService(value: unknown): OwnedService | null {
+  if (
+    !exactRecord(value, [
+      "craftsmanProfessionIds",
+      "createdAt",
+      "deactivatedAt",
+      "id",
+      "serviceCode",
+      "state",
+      "taxonomyLabel",
+    ]) ||
+    !uuid(value.id) ||
+    !serviceCode(value.serviceCode) ||
+    !safeText(value.taxonomyLabel) ||
+    !["ACTIVE", "INACTIVE"].includes(String(value.state)) ||
+    !Array.isArray(value.craftsmanProfessionIds) ||
+    value.craftsmanProfessionIds.length < 1 ||
+    value.craftsmanProfessionIds.length > 8 ||
+    !value.craftsmanProfessionIds.every(uuid) ||
+    new Set(value.craftsmanProfessionIds).size !==
+      value.craftsmanProfessionIds.length ||
+    !isoDate(value.createdAt) ||
+    !(value.deactivatedAt === null || isoDate(value.deactivatedAt))
+  )
+    return null;
+  return Object.freeze({
+    ...value,
+    craftsmanProfessionIds: Object.freeze([...value.craftsmanProfessionIds]),
+  }) as unknown as OwnedService;
 }
 
 function parseServiceArea(value: unknown): OwnedServiceArea | null {
@@ -668,6 +776,11 @@ function professionCode(value: unknown): value is string {
   return (
     typeof value === "string" &&
     /^(?:PROF|TEST):[A-Z0-9][A-Z0-9_]{1,62}$/u.test(value)
+  );
+}
+function serviceCode(value: unknown): value is string {
+  return (
+    typeof value === "string" && /^SERV:[A-Z0-9][A-Z0-9_]{1,62}$/u.test(value)
   );
 }
 function municipalityCode(value: unknown): value is string {

@@ -79,6 +79,7 @@ function query() {
     limit: 20,
     municipalityCode: null,
     professionCode: "PROF:TILER",
+    serviceCode: null,
     skillCodes: [],
     sort: "RECOMMENDED" as const,
     specializationCode: null,

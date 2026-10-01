@@ -58,14 +58,15 @@ at `NO-GO`.
 Default status for a new candidate is `NOT_EVALUATED`, even when an older run
 passed.
 
-| Gate                                                               | Current status  | Required evidence                                                              |
-| ------------------------------------------------------------------ | --------------- | ------------------------------------------------------------------------------ |
-| Lockfile install, format, typecheck, lint, tests and builds        | `NOT_EVALUATED` | Successful CI/local evidence for the exact revision.                           |
-| Clean migration apply/replay and critical constraints              | `NOT_EVALUATED` | Exact migration version and clean PostgreSQL/PostGIS evidence.                 |
-| Canonical full marketplace loop                                    | `NOT_EVALUATED` | R4-030 automated run for the exact candidate and environment.                  |
-| Negative authorization/race/upload/sealed-review suite             | `NOT_EVALUATED` | R4-031 result with zero unexplained skipped critical probes.                   |
-| Synthetic registration TEST classification and analytics exclusion | `NOT_EVALUATED` | Server-owned classification evidence; no matching non-TEST account.            |
-| Release smoke and revision correlation                             | `NOT_EVALUATED` | Public web, API liveness/readiness, auth entry point and exact release marker. |
+| Gate                                                               | Current status  | Required evidence                                                                                                         |
+| ------------------------------------------------------------------ | --------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Lockfile install, format, typecheck, lint, tests and builds        | `NOT_EVALUATED` | Successful CI/local evidence for the exact revision.                                                                      |
+| Clean migration apply/replay and critical constraints              | `NOT_EVALUATED` | Exact migration version and clean PostgreSQL/PostGIS evidence.                                                            |
+| Canonical full marketplace loop                                    | `NOT_EVALUATED` | R4-030 automated run for the exact candidate and environment.                                                             |
+| Negative authorization/race/upload/sealed-review suite             | `NOT_EVALUATED` | R4-031 result with zero unexplained skipped critical probes.                                                              |
+| Synthetic registration TEST classification and analytics exclusion | `NOT_EVALUATED` | Server-owned classification evidence; no matching non-TEST account.                                                       |
+| Managed profession/service catalog and suggestion workflow         | `NOT_EVALUATED` | Clean catalog/replay tests plus customer/craftsman browser evidence; admin browser decision remains gated by genuine MFA. |
+| Release smoke and revision correlation                             | `NOT_EVALUATED` | Public web, API liveness/readiness, auth entry point and exact release marker.                                            |
 
 Automated results remain `AUTOMATED_SYNTHETIC`; they do not satisfy section B.
 
@@ -84,6 +85,7 @@ per bounded run.
 | Notifications/dispute/privacy-request UX                    | `NOT_EVALUATED`      | Named manual evidence without overpromising unsupported legal completion.                                                                                                                                                             |
 | Browser registration + email/phone verification             | `NOT_EVALUATED`      | UI and automated synthetic flow pass; named manual browser/device onboarding evidence is still missing.                                                                                                                               |
 | Craftsman onboarding/profile/credential/portfolio authoring | `NOT_EVALUATED`      | Publication-minimum owner, private self-declared portfolio and private pending credential/evidence authoring are implemented locally; genuine admin approval, deployed staging verification and named manual evidence remain missing. |
+| Managed taxonomy autocomplete and craftsman proposal        | `NOT_EVALUATED`      | Verify no-diacritic top-10 profession/service results, public counts, canonical selection and the owner-only pending proposal flow; admin decision requires genuine recent MFA.                                                       |
 | Admin operational perspective                               | `NOT_EVALUATED`      | A provider-neutral browser TOTP entry exists locally and fails closed without a real adapter/enrolled factor. Provider-backed admin operation and named manual evidence remain missing.                                               |
 | Real provider-backed admin MFA                              | `BLOCKED_HUMAN_GATE` | Approved provider, named enrollment, replay/rate/expiry and emergency recovery evidence.                                                                                                                                              |
 

@@ -19,6 +19,7 @@ describe("taxonomy autocomplete query parser", () => {
       query: {
         limit: TAXONOMY_AUTOCOMPLETE_DEFAULT_LIMIT,
         normalizedText: "stukater stukater",
+        scope: "DISCOVERY",
         tokens: ["stukater"],
       },
       status: "VALID",
@@ -57,13 +58,22 @@ describe("taxonomy autocomplete query parser", () => {
     expect(parseTaxonomyAutocompleteQuery({ query: tooManyTokens })).toEqual({
       status: "INVALID_QUERY",
     });
-    for (const limit of [0, 21, 1.5, "02", "x", ["2", "3"]]) {
+    for (const limit of [0, 11, 1.5, "02", "x", ["2", "3"]]) {
       expect(parseTaxonomyAutocompleteQuery({ limit, query: "murár" })).toEqual(
         { status: "INVALID_QUERY" },
       );
     }
     expect(
-      parseTaxonomyAutocompleteQuery({ limit: "20", query: "murár" }),
-    ).toMatchObject({ query: { limit: 20 }, status: "VALID" });
+      parseTaxonomyAutocompleteQuery({ limit: "10", query: "murár" }),
+    ).toMatchObject({ query: { limit: 10 }, status: "VALID" });
+  });
+
+  it("accepts only the two explicit autocomplete scopes", () => {
+    expect(
+      parseTaxonomyAutocompleteQuery({ query: "murár", scope: "CAPABILITY" }),
+    ).toMatchObject({ query: { scope: "CAPABILITY" }, status: "VALID" });
+    expect(
+      parseTaxonomyAutocompleteQuery({ query: "murár", scope: "ADMIN" }),
+    ).toEqual({ status: "INVALID_QUERY" });
   });
 });

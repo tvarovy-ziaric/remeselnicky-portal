@@ -3,6 +3,7 @@ export {
   TAXONOMY_AUTOCOMPLETE_MAX_LIMIT,
   TAXONOMY_AUTOCOMPLETE_MAX_QUERY_LENGTH,
   TAXONOMY_AUTOCOMPLETE_MAX_TOKENS,
+  TAXONOMY_AUTOCOMPLETE_SCOPES,
   TAXONOMY_MATCH_KINDS,
   TAXONOMY_SUGGESTION_KINDS,
 } from "./model.js";
@@ -13,6 +14,7 @@ export type {
   TaxonomyAutocompleteParseResult,
   TaxonomyAutocompletePersistence,
   TaxonomyAutocompleteResult,
+  TaxonomyAutocompleteScope,
   TaxonomyAutocompleteSuggestion,
   TaxonomyMatchKind,
   TaxonomySuggestionKind,

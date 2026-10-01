@@ -350,11 +350,24 @@ describe("public search cards", () => {
       limit: 20,
       municipalityCode: null,
       professionCode: "PROF:TILER",
+      serviceCode: null,
       skillCodes: [],
       sort: "RECOMMENDED",
       specializationCode: null,
       timing: null,
     });
+    expect(
+      parsePublicSearchCardQuery({
+        professionCode: "PROF:TILER",
+        serviceCode: "SERV:BATHROOM_TILING",
+      }),
+    ).toMatchObject({ serviceCode: "SERV:BATHROOM_TILING" });
+    expect(
+      parsePublicSearchCardQuery({
+        professionCode: "PROF:TILER",
+        serviceCode: "PROF:TILER",
+      }),
+    ).toBeNull();
     expect(
       parsePublicSearchCardQuery({ professionCode: "TEST:PROFESSION_A" }),
     ).toMatchObject({ professionCode: "TEST:PROFESSION_A" });
@@ -404,6 +417,7 @@ async function governedQuery() {
     code: "PROF:TILER",
     kind: "PROFESSION",
     label: "Obkladač",
+    memberCount: 0,
     matchedBy: "EXACT_CANONICAL",
     professionCodes: ["PROF:TILER"],
   });

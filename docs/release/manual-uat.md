@@ -333,6 +333,41 @@ evidence stays private and purpose-bound; a role/session/MFA revocation during
 delivery cannot return the redirect. Until the real MFA/provider gate is
 resolved, record this whole case `NOT_EVALUATED`.
 
+### UAT-12 — managed profession/service autocomplete and taxonomy suggestion
+
+1. As a synthetic customer, open `/dopyt` and enter a managed query without
+   diacritics, for example `elektrikar`. Confirm the panel contains canonical
+   Slovak labels, shows a textual `Profesia` or `Služba` badge plus the current
+   public member count, explains the distinction, and renders at most ten
+   options. Select a service and confirm refresh/recovery keeps the canonical
+   service and its server-authoritative routing profession.
+2. In public search, repeat a profession selection and a service selection.
+   Confirm both produce a bounded result set and a service filter matches only
+   profiles that actively offer that service; hidden/draft profiles must not
+   affect the displayed count.
+3. As a synthetic craftsman, open `/ucet/profil-remeselnika`, add a governed
+   profession and a compatible governed service using keyboard-only selection.
+   Confirm arbitrary free text cannot become an assigned canonical item.
+4. Search for a deliberately missing synthetic term. Only after the completed
+   zero-result search, open `Navrhnúť novú profesiu alebo službu`, edit the
+   proposed name, enter a synthetic description and optional suggested type,
+   and submit once followed by an identical retry. Confirm one pending proposal
+   is shown and the UI clearly states that it is not yet in the catalog.
+5. Run the admin part only with a genuine ACTIVE admin, recent MFA and
+   `admin.taxonomy.manage`. Confirm the review shows similar canonical items;
+   exercise approve-as-new, map-to-existing and reject on separate synthetic
+   proposals, including a personal explanation for map/reject and an explicit
+   alias choice. Confirm the requester receives every final outcome through the
+   normal notification center and can read the authorized detail. Without that
+   genuine admin environment, record only this step `NOT_EVALUATED`; never
+   bypass MFA or edit the database by hand.
+
+Expected: customer, public search and craftsman authoring share one governed
+catalog; alias text never appears as a canonical result; counts reveal only
+public supply; user proposals remain non-canonical until an audited admin
+decision; admin edits activate a new immutable release and immediately affect
+autocomplete.
+
 ## Exploratory and compatibility matrix
 
 For the core customer and craftsman paths, record separate results for:

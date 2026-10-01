@@ -145,6 +145,17 @@ function canonicalRelease(input: {
     releaseId: input.releaseId,
     reviewReference: `review:integration/approved-${input.version}`,
     reviewState: "HUMAN_REVIEW_APPROVED",
+    services: [
+      {
+        code: "SERV:INTEGRATION_SAFE",
+        labelSk: "Integračná testovacia služba",
+        primaryProfessionCode: "PROF:INTEGRATION_SAFE",
+        professionCodes: ["PROF:INTEGRATION_SAFE"],
+        replacedByCode: null,
+        slug: "integracna-testovacia-sluzba",
+        state: "ACTIVE",
+      },
+    ],
     specializations: [],
     supersedesReleaseId: input.supersedesReleaseId,
     version: input.version,

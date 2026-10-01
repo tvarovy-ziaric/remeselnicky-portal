@@ -80,7 +80,8 @@ export function registerAdminConsoleRoutes(
           moduleId === "jobs" ||
           moduleId === "profiles" ||
           moduleId === "reports" ||
-          moduleId === "privacy"
+          moduleId === "privacy" ||
+          moduleId === "taxonomy"
             ? "OPERATIONAL"
             : "PLACEHOLDER",
       });

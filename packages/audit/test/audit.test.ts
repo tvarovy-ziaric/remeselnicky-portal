@@ -54,6 +54,24 @@ describe("audit writer", () => {
     ).toThrow(/does not hold/u);
   });
 
+  it("accepts the dedicated managed-taxonomy capability as audit provenance", () => {
+    const taxonomyActor = {
+      ...privilegedActor,
+      capabilities: new Set([
+        ...privilegedActor.capabilities,
+        "admin.taxonomy.manage" as const,
+      ]),
+    };
+
+    expect(
+      auditActorFromPrivilegedActor(taxonomyActor, "admin.taxonomy.manage"),
+    ).toEqual({
+      capability: "admin.taxonomy.manage",
+      kind: "AUTHENTICATED_USER",
+      userId: actor.userId,
+    });
+  });
+
   it("records a minimized sensitive-access event with purpose and context", async () => {
     const { append, repository } = repositorySpy();
     const writer = createAuditWriter(repository);

@@ -12,7 +12,7 @@ import {
 
 const uuid =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
-const code = /^(?:PROF|SPEC|CAP|TEST):[A-Z0-9][A-Z0-9_]{1,62}$/u;
+const code = /^(?:PROF|SERV|SPEC|CAP|TEST):[A-Z0-9][A-Z0-9_]{1,62}$/u;
 const slug = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 const reviewReference = /^[A-Za-z0-9][A-Za-z0-9._:/#-]{7,199}$/u;
 
@@ -43,6 +43,24 @@ export function prepareProfessionTaxonomyRelease(
   validateReplacements(specializations, specializationCodes, "specialization");
   validateNoReplacementCycle(specializations, "specialization");
 
+  const services = sortedCopies(input.services, "service", (entry) => {
+    validateEntry(entry, "service");
+    if (
+      entry.professionCodes.length === 0 ||
+      new Set(entry.professionCodes).size !== entry.professionCodes.length ||
+      entry.professionCodes.some(
+        (professionCode) => !professionCodes.has(professionCode),
+      ) ||
+      !entry.professionCodes.includes(entry.primaryProfessionCode)
+    ) {
+      throw new TypeError("Service profession links are invalid.");
+    }
+  });
+  const serviceCodes = new Set(services.map(({ code }) => code));
+  const serviceSlugs = uniqueSlugs(services, "service");
+  validateReplacements(services, serviceCodes, "service");
+  validateNoReplacementCycle(services, "service");
+
   const capabilityCriteria = sortedCopies(
     input.capabilityCriteria,
     "capability criterion",
@@ -63,7 +81,11 @@ export function prepareProfessionTaxonomyRelease(
     },
   );
 
-  const canonicalSlugs = new Set([...professionSlugs, ...specializationSlugs]);
+  const canonicalSlugs = new Set([
+    ...professionSlugs,
+    ...serviceSlugs,
+    ...specializationSlugs,
+  ]);
   const aliases = sortedCopies(
     input.aliases,
     "alias",
@@ -75,19 +97,24 @@ export function prepareProfessionTaxonomyRelease(
         throw new TypeError("Taxonomy alias is invalid.");
       }
       if (canonicalSlugs.has(entry.alias)) {
-        throw new TypeError("Taxonomy alias conflicts with a canonical slug.");
+        throw new TypeError(
+          `Taxonomy alias conflicts with a canonical slug: ${entry.alias}.`,
+        );
       }
       const targets =
         entry.targetKind === "PROFESSION"
           ? professionCodes
-          : entry.targetKind === "SPECIALIZATION"
-            ? specializationCodes
-            : undefined;
+          : entry.targetKind === "SERVICE"
+            ? serviceCodes
+            : entry.targetKind === "SPECIALIZATION"
+              ? specializationCodes
+              : undefined;
       if (targets === undefined || !targets.has(entry.targetCode)) {
         throw new TypeError("Taxonomy alias target is invalid.");
       }
     },
-    (entry) => `${entry.kind}:${entry.alias}`,
+    (entry) =>
+      `${entry.kind}:${entry.alias}:${entry.targetKind}:${entry.targetCode}`,
   );
 
   const release = {
@@ -98,6 +125,7 @@ export function prepareProfessionTaxonomyRelease(
     releaseId: input.releaseId,
     reviewReference: input.reviewReference,
     reviewState: input.reviewState,
+    services,
     specializations,
     supersedesReleaseId: input.supersedesReleaseId,
     version: input.version,
@@ -148,6 +176,7 @@ function validateReleaseHeader(input: ProfessionTaxonomyReleaseSeed): void {
 function validateEntry(
   entry: {
     readonly code: string;
+    readonly descriptionSk?: string | null;
     readonly labelSk: string;
     readonly replacedByCode: string | null;
     readonly slug: string;
@@ -156,6 +185,9 @@ function validateEntry(
   label: string,
 ): void {
   validateCodeAndLabel(entry.code, entry.labelSk);
+  if (entry.descriptionSk !== undefined && entry.descriptionSk !== null) {
+    validateText(entry.descriptionSk, 4, 500, `${label} description`);
+  }
   if (!slug.test(entry.slug) || entry.slug.length > 100) {
     throw new TypeError(`${label} slug is invalid.`);
   }

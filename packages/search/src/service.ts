@@ -16,20 +16,33 @@ import { markGovernedSuggestion } from "./governed-suggestion.js";
 
 const resultOrder: readonly string[] = Object.freeze([
   "EXACT_CANONICAL:PROFESSION",
-  "EXACT_ALIAS:PROFESSION",
+  "EXACT_CANONICAL:SERVICE",
   "EXACT_CANONICAL:SPECIALIZATION",
-  "EXACT_ALIAS:SPECIALIZATION",
   "EXACT_CANONICAL:SKILL",
   "PREFIX_CANONICAL:PROFESSION",
-  "PREFIX_ALIAS:PROFESSION",
+  "PREFIX_CANONICAL:SERVICE",
   "PREFIX_CANONICAL:SPECIALIZATION",
-  "PREFIX_ALIAS:SPECIALIZATION",
   "PREFIX_CANONICAL:SKILL",
+  "EXACT_ALIAS:PROFESSION",
+  "EXACT_ALIAS:SERVICE",
+  "EXACT_ALIAS:SPECIALIZATION",
+  "PREFIX_ALIAS:PROFESSION",
+  "PREFIX_ALIAS:SERVICE",
+  "PREFIX_ALIAS:SPECIALIZATION",
   "KEYWORD_CANONICAL:PROFESSION",
-  "KEYWORD_ALIAS:PROFESSION",
+  "KEYWORD_CANONICAL:SERVICE",
   "KEYWORD_CANONICAL:SPECIALIZATION",
-  "KEYWORD_ALIAS:SPECIALIZATION",
   "KEYWORD_CANONICAL:SKILL",
+  "KEYWORD_ALIAS:PROFESSION",
+  "KEYWORD_ALIAS:SERVICE",
+  "KEYWORD_ALIAS:SPECIALIZATION",
+  "FUZZY_CANONICAL:PROFESSION",
+  "FUZZY_CANONICAL:SERVICE",
+  "FUZZY_CANONICAL:SPECIALIZATION",
+  "FUZZY_CANONICAL:SKILL",
+  "FUZZY_ALIAS:PROFESSION",
+  "FUZZY_ALIAS:SERVICE",
+  "FUZZY_ALIAS:SPECIALIZATION",
 ] as const);
 
 export class TaxonomyAutocompleteIntegrityError extends Error {
@@ -43,6 +56,7 @@ export function createTaxonomyAutocompleteService(
     async autocomplete(input: {
       readonly limit?: unknown;
       readonly query: unknown;
+      readonly scope?: unknown;
     }): Promise<TaxonomyAutocompleteResult> {
       const parsed = parseTaxonomyAutocompleteQuery(input);
       if (parsed.status === "INVALID_QUERY") return parsed;
@@ -93,8 +107,13 @@ function assertCandidate(
   value: TaxonomyAutocompleteCandidate,
   query: ParsedTaxonomyAutocompleteQuery,
 ): void {
+  const routingProfessionCode = resolveRoutingProfessionCode(value);
   if (
     !TAXONOMY_SUGGESTION_KINDS.includes(value.kind) ||
+    (query.scope === "DISCOVERY" &&
+      value.kind !== "PROFESSION" &&
+      value.kind !== "SERVICE") ||
+    (query.scope === "CAPABILITY" && value.kind === "SERVICE") ||
     !TAXONOMY_MATCH_KINDS.includes(value.matchedBy) ||
     !resultOrder.includes(`${value.matchedBy}:${value.kind}`) ||
     !value.governance.activated ||
@@ -107,6 +126,8 @@ function assertCandidate(
     /[\r\n\p{Cc}]/u.test(value.label) ||
     !isSafePublicLabel(value.label) ||
     !validCode(value.kind, value.code) ||
+    !Number.isSafeInteger(value.memberCount) ||
+    value.memberCount < 0 ||
     value.professionCodes.length < 1 ||
     (value.kind === "PROFESSION" &&
       (value.professionCodes.length !== 1 ||
@@ -115,6 +136,9 @@ function assertCandidate(
     value.professionCodes.some(
       (code) => !/^(?:PROF|TEST):[A-Z0-9][A-Z0-9_]{1,62}$/u.test(code),
     ) ||
+    ((value.kind === "PROFESSION" || value.kind === "SERVICE") &&
+      (routingProfessionCode === null ||
+        !value.professionCodes.includes(routingProfessionCode))) ||
     query.normalizedText.length === 0
   ) {
     throw new TaxonomyAutocompleteIntegrityError(
@@ -150,7 +174,9 @@ function validCode(
       ? "PROF"
       : kind === "SPECIALIZATION"
         ? "SPEC"
-        : "SKILL";
+        : kind === "SERVICE"
+          ? "SERV"
+          : "SKILL";
   return new RegExp(`^(?:${prefix}|TEST):[A-Z0-9][A-Z0-9_]{1,62}$`, "u").test(
     code,
   );
@@ -159,13 +185,28 @@ function validCode(
 function publicSuggestion(
   value: TaxonomyAutocompleteCandidate,
 ): TaxonomyAutocompleteSuggestion {
+  const routingProfessionCode = resolveRoutingProfessionCode(value);
   return markGovernedSuggestion(
     Object.freeze({
       code: value.code,
       kind: value.kind,
       label: value.label,
+      memberCount: value.memberCount,
       matchedBy: value.matchedBy,
       professionCodes: Object.freeze([...value.professionCodes]),
+      ...(routingProfessionCode === null ? {} : { routingProfessionCode }),
     }),
   );
+}
+
+function resolveRoutingProfessionCode(
+  value: TaxonomyAutocompleteCandidate,
+): string | null {
+  if (value.routingProfessionCode !== undefined) {
+    return value.routingProfessionCode;
+  }
+  if (value.kind === "PROFESSION") return value.code;
+  return value.kind === "SERVICE" && value.professionCodes.length === 1
+    ? (value.professionCodes[0] ?? null)
+    : null;
 }

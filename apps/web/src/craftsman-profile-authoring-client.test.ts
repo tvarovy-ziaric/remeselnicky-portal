@@ -4,7 +4,10 @@ import {
   createCraftsmanProfileAuthoringClient,
   parseCraftsmanAuthoringAggregate,
 } from "./craftsman-profile-authoring-client";
-import { deriveReadiness } from "./craftsman-profile-authoring";
+import {
+  deriveReadiness,
+  serviceProfessionIdsForSuggestion,
+} from "./craftsman-profile-authoring";
 
 const profileId = "93000000-0000-4000-8000-000000000001";
 const professionId = "93000000-0000-4000-8000-000000000002";
@@ -27,12 +30,24 @@ const aggregate = {
     {
       id: professionId,
       professionCode: "PROF:ELECTRICIAN",
+      taxonomyLabel: "Elektrikár",
       state: "ACTIVE",
       declaredLevel: "ADVANCED",
       declaredLevelRevision: 1,
       evidenceSupportedLevel: null,
       createdAt: "2026-09-28T08:05:00.000Z",
       deactivatedAt: null,
+    },
+  ],
+  services: [
+    {
+      craftsmanProfessionIds: [professionId],
+      createdAt: "2026-09-28T08:06:00.000Z",
+      deactivatedAt: null,
+      id: "93000000-0000-4000-8000-000000000004",
+      serviceCode: "SERV:SOCKET_INSTALLATION",
+      taxonomyLabel: "Montáž zásuviek",
+      state: "ACTIVE",
     },
   ],
   serviceArea: {
@@ -194,6 +209,62 @@ describe("craftsman profile authoring client", () => {
       declaredLevel: "ADVANCED",
       professionCode: "PROF:ELECTRICIAN",
     });
+  });
+
+  it("writes explicit managed service-to-profession assignments", async () => {
+    const service = aggregate.services[0]!;
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(Response.json({ csrfToken: "csrf-safe-token" }))
+      .mockResolvedValueOnce(Response.json({ service, status: "APPLIED" }));
+
+    await expect(
+      createCraftsmanProfileAuthoringClient(fetcher).addService({
+        commandId,
+        craftsmanProfessionIds: [professionId],
+        craftsmanServiceId: service.id,
+        profileId,
+        serviceCode: service.serviceCode,
+      }),
+    ).resolves.toEqual({ status: "APPLIED" });
+    const [, options] = fetcher.mock.calls[1] ?? [];
+    expect(JSON.parse(options?.body as string)).toEqual({
+      commandId,
+      craftsmanProfessionIds: [professionId],
+      craftsmanServiceId: service.id,
+      serviceCode: "SERV:SOCKET_INSTALLATION",
+    });
+  });
+
+  it("links a service only to matching active owned professions", () => {
+    const parsed = parseCraftsmanAuthoringAggregate(aggregate);
+    expect(parsed).not.toBeNull();
+    expect(
+      serviceProfessionIdsForSuggestion(
+        {
+          code: "SERV:SOCKET_INSTALLATION",
+          kind: "SERVICE",
+          label: "Montáž zásuvky",
+          memberCount: 2,
+          professionCodes: ["PROF:ELECTRICIAN"],
+          routingProfessionCode: "PROF:ELECTRICIAN",
+        },
+        parsed!,
+      ),
+    ).toEqual([professionId]);
+    expect(
+      serviceProfessionIdsForSuggestion(
+        {
+          code: "SERV:TILE_INSTALLATION",
+          kind: "SERVICE",
+          label: "Pokládka dlažby",
+          memberCount: 3,
+          professionCodes: ["PROF:TILER"],
+          routingProfessionCode: "PROF:TILER",
+        },
+        parsed!,
+      ),
+    ).toEqual([]);
   });
 
   it("fails closed on leaked CSRF responses and stale commands", async () => {

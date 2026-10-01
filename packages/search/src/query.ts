@@ -3,12 +3,14 @@ import {
   TAXONOMY_AUTOCOMPLETE_MAX_LIMIT,
   TAXONOMY_AUTOCOMPLETE_MAX_QUERY_LENGTH,
   TAXONOMY_AUTOCOMPLETE_MAX_TOKENS,
+  TAXONOMY_AUTOCOMPLETE_SCOPES,
   type TaxonomyAutocompleteParseResult,
 } from "./model.js";
 
 export function parseTaxonomyAutocompleteQuery(input: {
   readonly limit?: unknown;
   readonly query: unknown;
+  readonly scope?: unknown;
 }): TaxonomyAutocompleteParseResult {
   if (typeof input.query !== "string") return { status: "INVALID_QUERY" };
   const rawLength = Array.from(input.query).length;
@@ -29,12 +31,20 @@ export function parseTaxonomyAutocompleteQuery(input: {
     return { status: "INVALID_QUERY" };
   }
   const limit = parseLimit(input.limit);
+  const scope = input.scope ?? "DISCOVERY";
+  if (
+    typeof scope !== "string" ||
+    !TAXONOMY_AUTOCOMPLETE_SCOPES.includes(scope as never)
+  ) {
+    return { status: "INVALID_QUERY" };
+  }
   return limit === null
     ? { status: "INVALID_QUERY" }
     : {
         query: Object.freeze({
           limit,
           normalizedText,
+          scope: scope as "CAPABILITY" | "DISCOVERY",
           tokens: Object.freeze(tokens),
         }),
         status: "VALID",

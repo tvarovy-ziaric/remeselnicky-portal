@@ -39,7 +39,7 @@ export interface JobRequestActiveContentVersion {
 export interface JobRequestActiveContentSection {
   readonly key: JobRequestContentSectionKey;
   readonly payload: JobRequestContentSection["payload"];
-  readonly schemaVersion: 1;
+  readonly schemaVersion: JobRequestContentSection["schemaVersion"];
 }
 
 export interface JobRequestActiveContentSnapshot {
@@ -225,6 +225,10 @@ function categoriesFor(
         different(
           before["primaryProfessionCode"],
           after["primaryProfessionCode"],
+        ) ||
+        different(
+          before["primaryServiceCode"] ?? null,
+          after["primaryServiceCode"] ?? null,
         )
       ) {
         categories.push("PROFESSION");

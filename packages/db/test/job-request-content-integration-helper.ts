@@ -46,6 +46,7 @@ export async function runJobRequestContentIntegrationAssertions(
 
   const drafts = createJobRequestDraftRepository(sql);
   const requests = createJobRequestRepository(sql);
+  // Historical schema v1 stays writable/readable during additive migration.
   const core = normalizeJobRequestDraftSection({
     key: "request.core",
     payload: {
@@ -148,6 +149,94 @@ export async function runJobRequestContentIntegrationAssertions(
     ownerUserId: owner.id,
     requests,
   });
+}
+
+/** Runs after the managed v1 release is active, without disturbing older fixtures. */
+export async function runJobRequestServiceContentIntegrationAssertions(
+  sql: Sql,
+): Promise<void> {
+  const [service] = await sql<
+    {
+      readonly code: string;
+      readonly primaryProfessionCode: string;
+    }[]
+  >`
+    SELECT service_code AS code,
+      primary_profession_code AS "primaryProfessionCode"
+    FROM current_service_taxonomy
+    WHERE state = 'ACTIVE'
+    ORDER BY service_code
+    LIMIT 1
+  `;
+  if (service === undefined) {
+    throw new Error("Managed taxonomy service fixture is required.");
+  }
+  const [owner] = await sql<{ readonly id: UserId }[]>`
+    INSERT INTO users DEFAULT VALUES RETURNING id
+  `;
+  if (owner === undefined) throw new Error("Expected service-content owner.");
+  const [customer] = await sql<{ readonly id: CustomerProfileId }[]>`
+    INSERT INTO customer_profiles (owner_user_id)
+    VALUES (${owner.id}) RETURNING id
+  `;
+  if (customer === undefined)
+    throw new Error("Expected service-content profile.");
+  await verifyFixtureUser(sql, owner.id);
+
+  const drafts = createJobRequestDraftRepository(sql);
+  const serviceCore = normalizeJobRequestDraftSection({
+    key: "request.core",
+    payload: {
+      description: "Montáž integračnej testovacej služby",
+      primaryProfessionCode: service.primaryProfessionCode,
+      primaryServiceCode: service.code,
+      relatedProfessionCodes: [],
+      skillCodes: [],
+      specializationCode: null,
+      title: "Integračná služba",
+    },
+    schemaVersion: 2,
+  });
+  const serviceDraft = await drafts.createDraftWithInitialSectionOwned({
+    actorUserId: owner.id,
+    commandId: randomUUID(),
+    customerProfileId: customer.id,
+    section: serviceCore,
+  });
+  if (!("jobRequestId" in serviceDraft)) {
+    throw new Error("Expected v2 service draft.");
+  }
+  await expect(
+    drafts.recoverOwned({
+      actorUserId: owner.id,
+      jobRequestId: serviceDraft.jobRequestId,
+    }),
+  ).resolves.toMatchObject({
+    draft: {
+      sections: [
+        {
+          payload: {
+            primaryProfessionCode: service.primaryProfessionCode,
+            primaryServiceCode: service.code,
+          },
+          schemaVersion: 2,
+        },
+      ],
+    },
+    status: "OK",
+  });
+  await expect(
+    drafts.autosaveOwned({
+      actorUserId: owner.id,
+      commandId: randomUUID(),
+      expectedRevision: serviceDraft.revision,
+      jobRequestId: serviceDraft.jobRequestId,
+      section: normalizeJobRequestDraftSection({
+        ...serviceCore,
+        payload: { ...serviceCore.payload, primaryServiceCode: "SERV:UNKNOWN" },
+      }),
+    }),
+  ).rejects.toThrow(/section content is invalid/u);
 }
 
 async function verifyFixtureUser(sql: Sql, userId: UserId): Promise<void> {

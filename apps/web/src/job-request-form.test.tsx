@@ -33,9 +33,10 @@ describe("JobRequestForm", () => {
         jobRequestId: "9d300000-0000-4000-8000-000000000001",
         municipalityCode: "SK:BA:BA",
         professionCode: "PROF:TILER",
+        serviceCode: "SERV:BATHROOM_TILING",
       }),
     ).toBe(
-      "/remeselnici?jobRequestId=9d300000-0000-4000-8000-000000000001&professionCode=PROF%3ATILER&municipalityCode=SK%3ABA%3ABA",
+      "/remeselnici?jobRequestId=9d300000-0000-4000-8000-000000000001&professionCode=PROF%3ATILER&serviceCode=SERV%3ABATHROOM_TILING&municipalityCode=SK%3ABA%3ABA",
     );
     expect(
       buildCraftsmanCandidateSearchHref({

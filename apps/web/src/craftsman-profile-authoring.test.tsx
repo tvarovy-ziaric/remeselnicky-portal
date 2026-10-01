@@ -5,6 +5,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   CraftsmanProfileWorkspace,
   deriveReadiness,
+  TaxonomySuggestionDialog,
+  taxonomySuggestionDialogKeyAction,
 } from "./craftsman-profile-authoring";
 import type { CraftsmanAuthoringAggregate } from "./craftsman-profile-authoring-client";
 
@@ -30,6 +32,7 @@ const aggregate = {
       evidenceSupportedLevel: "MASTER",
       id: "93000000-0000-4000-8000-000000000002",
       professionCode: "PROF:ELECTRICIAN",
+      taxonomyLabel: "Elektrikár",
       state: "ACTIVE",
     },
   ],
@@ -44,6 +47,17 @@ const aggregate = {
     reviewState: "APPROVED",
     revision: 2,
   },
+  services: [
+    {
+      craftsmanProfessionIds: ["93000000-0000-4000-8000-000000000002"],
+      createdAt: "2026-09-28T08:06:00.000Z",
+      deactivatedAt: null,
+      id: "93000000-0000-4000-8000-000000000003",
+      serviceCode: "SERV:SOCKET_INSTALLATION",
+      taxonomyLabel: "Montáž zásuviek",
+      state: "ACTIVE",
+    },
+  ],
   serviceArea: {
     baseMunicipalityCode: "SK0101528595",
     createdAt: "2026-09-28T08:10:00.000Z",
@@ -64,7 +78,9 @@ function renderWorkspace(value: CraftsmanAuthoringAggregate = aggregate) {
       aggregate={value}
       busy={false}
       message={null}
+      onAddService={noop}
       onAssignProfession={noop}
+      onDeactivateService={noop}
       onSaveProfile={noop}
       onSaveServiceArea={noop}
       onSubmit={noop}
@@ -83,8 +99,31 @@ describe("private craftsman profile workspace", () => {
     expect(html).toContain("podporené dôkazmi");
     expect(html).toContain("pokročilý");
     expect(html).toContain("majster");
+    expect(html).toContain("Profesia alebo služba");
+    expect(html).toContain("Odobrať službu");
     expect(html).not.toContain("PROF:ELECTRICIAN");
     expect(html).not.toContain("SK0101528595");
+  });
+
+  it("closes the suggestion modal with Escape without treating other keys as close", () => {
+    expect(taxonomySuggestionDialogKeyAction("Escape")).toBe("CLOSE");
+    expect(taxonomySuggestionDialogKeyAction("Enter")).toBe("NONE");
+  });
+
+  it("gives the suggestion name initial focus and exposes a modal boundary", () => {
+    const html = renderToStaticMarkup(
+      <TaxonomySuggestionDialog
+        client={{ load: vi.fn(), submit: vi.fn() }}
+        initialName="Chýbajúca služba"
+        onClose={vi.fn()}
+        onConfirmed={vi.fn()}
+        profileId="93000000-0000-4000-8000-000000000001"
+      />,
+    );
+    expect(html).toContain('role="dialog"');
+    expect(html).toContain('aria-modal="true"');
+    expect(html).toContain('id="taxonomy-suggestion-name"');
+    expect(html).toContain('autofocus=""');
   });
 
   it("shows a private requirement checklist without a public completeness percentage", () => {
@@ -98,6 +137,7 @@ describe("private craftsman profile workspace", () => {
       professions: [],
       publication: null,
       serviceArea: null,
+      services: [],
     } satisfies CraftsmanAuthoringAggregate;
     expect(deriveReadiness(incomplete)).toHaveLength(5);
 

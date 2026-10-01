@@ -463,7 +463,12 @@ export function ParticipantCapabilities({
     }
     let active = true;
     const timer = setTimeout(() => {
-      void loadJobRequestTaxonomySuggestions(query).then((result) => {
+      void loadJobRequestTaxonomySuggestions(
+        query,
+        fetch,
+        undefined,
+        "CAPABILITY",
+      ).then((result) => {
         if (active)
           setSuggestions(
             result.filter((entry) =>

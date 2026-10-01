@@ -32,10 +32,13 @@ import {
 } from "./craftsman-profile-authoring-client";
 import { type JobRequestMunicipalitySuggestion } from "./job-request-municipality-client";
 import { MunicipalityAutocomplete } from "./municipality-autocomplete";
+import { type JobRequestTaxonomySuggestion } from "./job-request-taxonomy-client";
+import { TaxonomyAutocomplete } from "./taxonomy-autocomplete";
 import {
-  loadJobRequestTaxonomySuggestions,
-  type JobRequestTaxonomySuggestion,
-} from "./job-request-taxonomy-client";
+  createTaxonomySuggestionClient,
+  type TaxonomySuggestionClient,
+  type TaxonomySuggestionKind,
+} from "./taxonomy-suggestion-client";
 
 type PageState =
   | { readonly kind: "LOADING" }
@@ -187,6 +190,20 @@ export function CraftsmanProfileAuthoring({
           "Profesia bola uložená.",
         )
       }
+      onAddService={(input) =>
+        mutate(
+          "service:" + input.serviceCode,
+          (commandId) => authoring.addService({ ...input, commandId }),
+          "Služba bola pridaná do profilu.",
+        )
+      }
+      onDeactivateService={(input) =>
+        mutate(
+          "service-deactivate:" + input.craftsmanServiceId,
+          (commandId) => authoring.deactivateService({ ...input, commandId }),
+          "Služba bola z profilu odobratá.",
+        )
+      }
       onSaveProfile={(input) =>
         mutate(
           null,
@@ -245,6 +262,14 @@ type AssignProfessionInput = Omit<
   Parameters<CraftsmanProfileAuthoringClient["assignProfession"]>[0],
   "commandId"
 >;
+type AddServiceInput = Omit<
+  Parameters<CraftsmanProfileAuthoringClient["addService"]>[0],
+  "commandId"
+>;
+type DeactivateServiceInput = Omit<
+  Parameters<CraftsmanProfileAuthoringClient["deactivateService"]>[0],
+  "commandId"
+>;
 type ServiceAreaInput = Omit<
   Parameters<CraftsmanProfileAuthoringClient["replaceServiceArea"]>[0],
   "commandId"
@@ -254,7 +279,9 @@ export function CraftsmanProfileWorkspace({
   aggregate,
   busy,
   message,
+  onAddService,
   onAssignProfession,
+  onDeactivateService,
   onSaveProfile,
   onSaveServiceArea,
   onSubmit,
@@ -263,8 +290,12 @@ export function CraftsmanProfileWorkspace({
   readonly aggregate: CraftsmanAuthoringAggregate;
   readonly busy: boolean;
   readonly message: string | null;
+  readonly onAddService: (input: AddServiceInput) => Promise<boolean>;
   readonly onAssignProfession: (
     input: AssignProfessionInput,
+  ) => Promise<boolean>;
+  readonly onDeactivateService: (
+    input: DeactivateServiceInput,
   ) => Promise<boolean>;
   readonly onSaveProfile: (input: ReplaceInput) => Promise<boolean>;
   readonly onSaveServiceArea: (input: ServiceAreaInput) => Promise<boolean>;
@@ -295,10 +326,12 @@ export function CraftsmanProfileWorkspace({
         key={aggregate.profile.id + ":" + aggregate.profile.revision}
         onSave={onSaveProfile}
       />
-      <ProfessionForm
+      <CapabilityForm
         aggregate={aggregate}
         busy={busy}
+        onAddService={onAddService}
         onAssign={onAssignProfession}
+        onDeactivateService={onDeactivateService}
       />
       <ServiceAreaForm
         aggregate={aggregate}
@@ -570,58 +603,63 @@ function ProfileDetailsForm({
   );
 }
 
-function ProfessionForm({
+function CapabilityForm({
   aggregate,
   busy,
+  onAddService,
   onAssign,
+  onDeactivateService,
 }: {
   readonly aggregate: CraftsmanAuthoringAggregate;
   readonly busy: boolean;
+  readonly onAddService: (input: AddServiceInput) => Promise<boolean>;
   readonly onAssign: (input: {
     craftsmanProfessionId: string;
     declaredLevel: DeclaredLevel;
     professionCode: string;
     profileId: string;
   }) => Promise<boolean>;
+  readonly onDeactivateService: (
+    input: DeactivateServiceInput,
+  ) => Promise<boolean>;
 }) {
   const [query, setQuery] = useState("");
-  const [suggestions, setSuggestions] = useState<
-    readonly JobRequestTaxonomySuggestion[]
-  >([]);
   const [selected, setSelected] = useState<JobRequestTaxonomySuggestion | null>(
     null,
   );
   const [level, setLevel] = useState<DeclaredLevel>("BEGINNER");
-  const professionAttemptId = useRef<string | null>(null);
-  useEffect(() => {
-    if (query.trim().length < 2 || selected !== null) {
-      setSuggestions([]);
-      return;
-    }
-    let active = true;
-    const timer = setTimeout(() => {
-      void loadJobRequestTaxonomySuggestions(query).then((items) => {
-        if (active)
-          setSuggestions(items.filter((item) => item.kind === "PROFESSION"));
-      });
-    }, 250);
-    return () => {
-      active = false;
-      clearTimeout(timer);
-    };
-  }, [query, selected]);
+  const capabilityAttemptId = useRef<string | null>(null);
+  const [suggestionOpen, setSuggestionOpen] = useState(false);
+  const suggestionTrigger = useRef<HTMLSpanElement | null>(null);
+  const [suggestionConfirmation, setSuggestionConfirmation] = useState<
+    string | null
+  >(null);
+  const linkedProfessionIds = serviceProfessionIdsForSuggestion(
+    selected,
+    aggregate,
+  );
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (selected === null || selected.kind !== "PROFESSION") return;
-    professionAttemptId.current ??= crypto.randomUUID();
-    const applied = await onAssign({
-      craftsmanProfessionId: professionAttemptId.current,
-      declaredLevel: level,
-      professionCode: selected.code,
-      profileId: aggregate.profile.id,
-    });
+    if (selected === null) return;
+    capabilityAttemptId.current ??= crypto.randomUUID();
+    const applied =
+      selected.kind === "PROFESSION"
+        ? await onAssign({
+            craftsmanProfessionId: capabilityAttemptId.current,
+            declaredLevel: level,
+            professionCode: selected.code,
+            profileId: aggregate.profile.id,
+          })
+        : linkedProfessionIds.length === 0
+          ? false
+          : await onAddService({
+              craftsmanProfessionIds: linkedProfessionIds,
+              craftsmanServiceId: capabilityAttemptId.current,
+              profileId: aggregate.profile.id,
+              serviceCode: selected.code,
+            });
     if (applied) {
-      professionAttemptId.current = null;
+      capabilityAttemptId.current = null;
       setQuery("");
       setSelected(null);
     }
@@ -632,18 +670,18 @@ function ProfessionForm({
         className="profile-authoring-form"
         onSubmit={(event) => void submit(event)}
       >
-        <h2>Profesie a úroveň</h2>
+        <h2>Profesie a služby</h2>
         <p>
-          Vami zvolená úroveň je vlastné vyhlásenie. Podpora dôkazmi sa
-          zobrazuje oddelene a vzniká iba z dokladov alebo histórie práce.
+          Vyberte spravovanú profesiu alebo konkrétnu službu. Služba sa vždy
+          priradí k jednej z vašich aktívnych profesií.
         </p>
         {aggregate.professions.length === 0 ? (
           <p>Zatiaľ nemáte pridanú profesiu.</p>
         ) : (
           <ul className="profile-authoring-list" aria-label="Pridané profesie">
-            {aggregate.professions.map((profession, index) => (
+            {aggregate.professions.map((profession) => (
               <li key={profession.id}>
-                <strong>Profesia {index + 1}</strong>{" "}
+                <strong>{profession.taxonomyLabel}</strong>{" "}
                 <StatusBadge
                   tone={profession.state === "ACTIVE" ? "success" : "default"}
                 >
@@ -662,52 +700,333 @@ function ProfessionForm({
             ))}
           </ul>
         )}
-        <FormField
-          description="Vyberte profesiu zo zoznamu návrhov."
-          label="Vyhľadať profesiu"
-        >
-          <Input
-            autoComplete="off"
-            id="profession-query"
-            maxLength={120}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              setSelected(null);
-              professionAttemptId.current = null;
-            }}
-            placeholder="Napríklad elektrikár"
-            value={query}
-          />
-        </FormField>
-        <SuggestionList
-          items={suggestions}
-          label={(item) => item.label}
+        {aggregate.services.length === 0 ? (
+          <p>Zatiaľ nemáte pridanú konkrétnu službu.</p>
+        ) : (
+          <ul className="profile-authoring-list" aria-label="Pridané služby">
+            {aggregate.services.map((service) => (
+              <li key={service.id}>
+                <strong>{service.taxonomyLabel}</strong>{" "}
+                <StatusBadge
+                  tone={service.state === "ACTIVE" ? "success" : "default"}
+                >
+                  {service.state === "ACTIVE" ? "Aktívna" : "Neaktívna"}
+                </StatusBadge>{" "}
+                {service.state === "ACTIVE" ? (
+                  <Button
+                    disabled={busy}
+                    onClick={() =>
+                      void onDeactivateService({
+                        craftsmanServiceId: service.id,
+                        profileId: aggregate.profile.id,
+                      })
+                    }
+                    type="button"
+                    variant="quiet"
+                  >
+                    Odobrať službu
+                  </Button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+        <TaxonomyAutocomplete
+          emptyAction={
+            <span ref={suggestionTrigger}>
+              <Button
+                className="taxonomy-suggestion-trigger"
+                onClick={() => setSuggestionOpen(true)}
+                type="button"
+                variant="quiet"
+              >
+                Navrhnúť chýbajúcu profesiu alebo službu
+              </Button>
+            </span>
+          }
+          helperText="Vyhľadajte profesiu alebo službu, ktorú chcete uviesť v profile."
+          id="capability-query"
+          label="Profesia alebo služba"
+          onChange={(value) => {
+            setQuery(value);
+            setSelected(null);
+            capabilityAttemptId.current = null;
+          }}
           onSelect={(suggestion) => {
             setSelected(suggestion);
             setQuery(suggestion.label);
-            setSuggestions([]);
           }}
+          placeholder="Napríklad elektrikár alebo montáž zásuvky"
+          scope="DISCOVERY"
+          selectedCode={selected?.code ?? ""}
+          value={query}
         />
-        <FormField
-          description="Táto úroveň je označená ako údaj, ktorý uvádzate vy."
-          label="Vaša deklarovaná úroveň"
-        >
-          <Select
-            id="profession-level"
-            onChange={(event) => setLevel(event.target.value as DeclaredLevel)}
-            value={level}
+        {selected?.kind === "PROFESSION" ? (
+          <FormField
+            description="Táto úroveň je označená ako údaj, ktorý uvádzate vy."
+            label="Vaša deklarovaná úroveň"
           >
-            <option value="BEGINNER">Začiatočník</option>
-            <option value="ADVANCED">Pokročilý</option>
-            <option value="MASTER">Majster</option>
-          </Select>
-        </FormField>
-        <Button disabled={busy || selected === null} type="submit">
-          Pridať profesiu
+            <Select
+              id="profession-level"
+              onChange={(event) =>
+                setLevel(event.target.value as DeclaredLevel)
+              }
+              value={level}
+            >
+              <option value="BEGINNER">Začiatočník</option>
+              <option value="ADVANCED">Pokročilý</option>
+              <option value="MASTER">Majster</option>
+            </Select>
+          </FormField>
+        ) : null}
+        {selected?.kind === "SERVICE" && linkedProfessionIds.length === 0 ? (
+          <Notice title="Najprv pridajte súvisiacu profesiu" tone="warning">
+            <p>
+              Túto službu možno pridať až po výbere jednej z profesií, ku ktorým
+              patrí.
+            </p>
+          </Notice>
+        ) : null}
+        <Button
+          disabled={
+            busy ||
+            selected === null ||
+            (selected.kind === "SERVICE" && linkedProfessionIds.length === 0)
+          }
+          type="submit"
+        >
+          {selected?.kind === "SERVICE" ? "Pridať službu" : "Pridať profesiu"}
         </Button>
       </form>
+      {suggestionConfirmation === null ? null : (
+        <Notice title="Návrh sme prijali" tone="success">
+          <p role="status">{suggestionConfirmation}</p>
+        </Notice>
+      )}
+      {suggestionOpen ? (
+        <TaxonomySuggestionDialog
+          initialName={query.trim()}
+          onClose={() => {
+            setSuggestionOpen(false);
+            window.setTimeout(
+              () => suggestionTrigger.current?.querySelector("button")?.focus(),
+              0,
+            );
+          }}
+          onConfirmed={(confirmation) => {
+            setSuggestionOpen(false);
+            setSuggestionConfirmation(confirmation);
+          }}
+          profileId={aggregate.profile.id}
+        />
+      ) : null}
     </Card>
   );
+}
+
+export function serviceProfessionIdsForSuggestion(
+  suggestion: JobRequestTaxonomySuggestion | null,
+  aggregate: CraftsmanAuthoringAggregate,
+): readonly string[] {
+  if (suggestion?.kind !== "SERVICE") return Object.freeze([]);
+  const allowed = new Set(suggestion.professionCodes);
+  return Object.freeze(
+    aggregate.professions
+      .filter(
+        (profession) =>
+          profession.state === "ACTIVE" &&
+          allowed.has(profession.professionCode),
+      )
+      .map((profession) => profession.id)
+      .sort(),
+  );
+}
+
+export function TaxonomySuggestionDialog({
+  client,
+  initialName,
+  onClose,
+  onConfirmed,
+  profileId,
+}: {
+  readonly client?: TaxonomySuggestionClient;
+  readonly initialName: string;
+  readonly onClose: () => void;
+  readonly onConfirmed: (message: string) => void;
+  readonly profileId: string;
+}) {
+  const suggestions = useMemo(
+    () => client ?? createTaxonomySuggestionClient(),
+    [client],
+  );
+  const [name, setName] = useState(initialName);
+  const [description, setDescription] = useState("");
+  const [kind, setKind] = useState<TaxonomySuggestionKind | "">("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const attempt = useRef<{ commandId: string; suggestionId: string } | null>(
+    null,
+  );
+  const panel = useRef<HTMLDivElement | null>(null);
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (submitting) return;
+    attempt.current ??= {
+      commandId: crypto.randomUUID(),
+      suggestionId: crypto.randomUUID(),
+    };
+    setSubmitting(true);
+    setError(null);
+    const result = await suggestions.submit({
+      ...attempt.current,
+      profileId,
+      proposedDescription: description,
+      proposedName: name,
+      suggestedKind: kind === "" ? null : kind,
+    });
+    setSubmitting(false);
+    if (result.status === "APPLIED") {
+      attempt.current = null;
+      onConfirmed(
+        "Návrh čaká na kontrolu administrátorom. O výsledku vás budeme informovať.",
+      );
+      return;
+    }
+    if (result.status === "DUPLICATE_PENDING") {
+      attempt.current = null;
+      onConfirmed(
+        "Rovnaký návrh už čaká na kontrolu administrátorom. Nie je potrebné ho posielať znova.",
+      );
+      return;
+    }
+    if (result.status !== "UNAVAILABLE") attempt.current = null;
+    setError(taxonomySuggestionError(result.status));
+  };
+  return (
+    <div
+      aria-labelledby="taxonomy-suggestion-title"
+      aria-modal="true"
+      className="taxonomy-suggestion-dialog"
+      onKeyDown={(event) => {
+        if (taxonomySuggestionDialogKeyAction(event.key) === "CLOSE") {
+          event.preventDefault();
+          onClose();
+          return;
+        }
+        if (event.key !== "Tab" || panel.current === null) return;
+        const focusable = Array.from(
+          panel.current.querySelectorAll<HTMLElement>(
+            "input:not([disabled]), textarea:not([disabled]), select:not([disabled]), button:not([disabled])",
+          ),
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0]!;
+        const last = focusable.at(-1)!;
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }}
+      role="dialog"
+    >
+      <div className="taxonomy-suggestion-dialog__panel" ref={panel}>
+        <p className="ui-eyebrow">Spravovaný katalóg</p>
+        <h3 id="taxonomy-suggestion-title">Navrhnite chýbajúcu položku</h3>
+        <p>
+          Návrh sa nepridá do profilu automaticky. Najprv ho skontroluje
+          administrátor a výsledok dostanete v oznámení.
+        </p>
+        <form
+          className="profile-authoring-form"
+          onSubmit={(event) => void submit(event)}
+        >
+          <TextInput
+            autoFocus
+            id="taxonomy-suggestion-name"
+            label="Názov profesie alebo služby"
+            maxLength={100}
+            onChange={(value) => {
+              setName(value);
+              attempt.current = null;
+            }}
+            value={name}
+          />
+          <FormField
+            description="Pomôže nám odlíšiť podobné názvy a správne návrh zaradiť."
+            label="Krátky opis"
+          >
+            <Textarea
+              id="taxonomy-suggestion-description"
+              maxLength={1_000}
+              minLength={10}
+              onChange={(event) => {
+                setDescription(event.target.value);
+                attempt.current = null;
+              }}
+              required
+              rows={4}
+              value={description}
+            />
+          </FormField>
+          <FormField
+            description="Ak si nie ste istí, nechajte voľbu prázdnu."
+            label="Typ (voliteľné)"
+          >
+            <Select
+              id="taxonomy-suggestion-kind"
+              onChange={(event) => {
+                setKind(event.target.value as TaxonomySuggestionKind | "");
+                attempt.current = null;
+              }}
+              value={kind}
+            >
+              <option value="">Neviem / nechám posúdiť</option>
+              <option value="PROFESSION">Profesia</option>
+              <option value="SERVICE">Služba</option>
+            </Select>
+          </FormField>
+          {error === null ? null : <p role="alert">{error}</p>}
+          <div className="taxonomy-suggestion-dialog__actions">
+            <Button disabled={submitting} type="submit">
+              {submitting ? "Odosielam návrh…" : "Odoslať návrh"}
+            </Button>
+            <Button
+              disabled={submitting}
+              onClick={onClose}
+              type="button"
+              variant="quiet"
+            >
+              Zrušiť
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+export function taxonomySuggestionDialogKeyAction(
+  key: string,
+): "CLOSE" | "NONE" {
+  return key === "Escape" ? "CLOSE" : "NONE";
+}
+
+function taxonomySuggestionError(
+  status: Exclude<
+    Awaited<ReturnType<TaxonomySuggestionClient["submit"]>>["status"],
+    "APPLIED"
+  >,
+): string {
+  if (status === "DENIED")
+    return "Prihlásenie vypršalo alebo na odoslanie návrhu nemáte oprávnenie.";
+  if (status === "INVALID_REQUEST")
+    return "Skontrolujte názov a doplňte aspoň krátky opis návrhu.";
+  if (status === "PROFILE_UNAVAILABLE")
+    return "Profil sa nenašiel alebo k nemu nemáte prístup.";
+  return "Návrh sa teraz nepodarilo odoslať. Skúste to znova.";
 }
 
 function ServiceAreaForm({
@@ -912,48 +1231,30 @@ function PublicationBadge({
 }
 
 function TextInput({
+  autoFocus = false,
   id,
   label,
+  maxLength = 160,
   onChange,
   value,
 }: {
+  readonly autoFocus?: boolean;
   readonly id: string;
   readonly label: string;
+  readonly maxLength?: number;
   readonly onChange: (value: string) => void;
   readonly value: string;
 }) {
   return (
     <FormField label={label}>
       <Input
+        autoFocus={autoFocus}
         id={id}
-        maxLength={160}
+        maxLength={maxLength}
         onChange={(event) => onChange(event.target.value)}
         value={value}
       />
     </FormField>
-  );
-}
-
-function SuggestionList<T extends { readonly code: string }>({
-  items,
-  label,
-  onSelect,
-}: {
-  readonly items: readonly T[];
-  readonly label: (item: T) => string;
-  readonly onSelect: (item: T) => void;
-}) {
-  if (items.length === 0) return null;
-  return (
-    <ul className="profile-authoring-suggestions">
-      {items.map((item) => (
-        <li key={item.code}>
-          <Button type="button" variant="quiet" onClick={() => onSelect(item)}>
-            {label(item)}
-          </Button>
-        </li>
-      ))}
-    </ul>
   );
 }
 

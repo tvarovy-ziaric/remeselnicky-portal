@@ -76,6 +76,7 @@ describe("admin console routes", () => {
       .modules.map(({ id }) => id);
     expect(ids).toContain("dashboard");
     expect(ids).toContain("profiles");
+    expect(ids).toContain("taxonomy");
     expect(ids).not.toContain("audit");
     expect(response.body).not.toMatch(/password|sql|impersonat/iu);
   });
@@ -97,6 +98,48 @@ describe("admin console routes", () => {
     expect(fixture.authorize).toHaveBeenCalledWith(
       expect.objectContaining({ capability: "admin.sensitive.read" }),
     );
+  });
+
+  it("protects the managed taxonomy module with its dedicated capability", async () => {
+    const fixture = createFixture("ACTIVE", adminActor());
+    const response = await fixture.app.inject({
+      method: "GET",
+      url: `${ADMIN_CONSOLE_BASE_PATH}/modules/taxonomy`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      description:
+        "Spravovaný katalóg profesií, služieb a vyhľadávacích aliasov.",
+      id: "taxonomy",
+      label: "Katalóg",
+      state: "OPERATIONAL",
+    });
+    expect(fixture.authorize).toHaveBeenCalledWith(
+      expect.objectContaining({
+        capability: "admin.taxonomy.manage",
+        requireRecentMfa: false,
+      }),
+    );
+  });
+
+  it("denies a taxonomy deep link without the dedicated capability", async () => {
+    const actor = adminActor();
+    const fixture = createFixture("ACTIVE", {
+      ...actor,
+      capabilities: new Set(
+        [...actor.capabilities].filter(
+          (capability) => capability !== "admin.taxonomy.manage",
+        ),
+      ),
+    });
+    const response = await fixture.app.inject({
+      method: "GET",
+      url: `${ADMIN_CONSOLE_BASE_PATH}/modules/taxonomy`,
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({ code: "PRIVILEGED_ACCESS_DENIED" });
   });
 
   it("denies an ADMIN audit deep link at the backend", async () => {
@@ -230,6 +273,7 @@ function adminActor(): PrivilegedActor {
       "admin.jobs.correct",
       "admin.profiles.review",
       "admin.reviews.moderate",
+      "admin.taxonomy.manage",
       "admin.users.manage",
     ]),
     mfaAuthenticatedAt: new Date("2026-09-14T10:00:00.000Z"),

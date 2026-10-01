@@ -43,6 +43,12 @@ export const ADMIN_CONSOLE_MODULES = Object.freeze({
     description: "Nahlásený obsah pripravený na posúdenie.",
     label: "Hlásenia",
   }),
+  taxonomy: Object.freeze({
+    capability: "admin.taxonomy.manage" as const,
+    description:
+      "Spravovaný katalóg profesií, služieb a vyhľadávacích aliasov.",
+    label: "Katalóg",
+  }),
   users: Object.freeze({
     capability: "admin.users.manage" as const,
     description: "Obmedzené a pozastavené účty.",

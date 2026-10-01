@@ -61,6 +61,26 @@ export {
 } from "./taxonomy-autocomplete/routes.js";
 export type { TaxonomyAutocompleteRouteDependencies } from "./taxonomy-autocomplete/routes.js";
 export {
+  registerTaxonomySuggestionRoutes,
+  TAXONOMY_SUGGESTION_PATHS,
+} from "./taxonomy-suggestions/routes.js";
+export type { TaxonomySuggestionRouteDependencies } from "./taxonomy-suggestions/routes.js";
+export {
+  ADMIN_TAXONOMY_PATHS,
+  registerAdminTaxonomyRoutes,
+} from "./admin-taxonomy/routes.js";
+export type { AdminTaxonomyRouteDependencies } from "./admin-taxonomy/routes.js";
+export { ADMIN_TAXONOMY_CATALOG_PATHS } from "./admin-taxonomy/catalog-routes.js";
+export type {
+  AdminTaxonomyAliasConflict,
+  AdminTaxonomyCatalogItem,
+  AdminTaxonomyCatalogRepository,
+  AdminTaxonomyKind,
+  AdminTaxonomyState,
+  EditAdminTaxonomyItemInput,
+  EditAdminTaxonomyItemResult,
+} from "./admin-taxonomy/catalog-routes.js";
+export {
   CUSTOMER_SHORTLIST_PATHS,
   registerCustomerShortlistRoutes,
 } from "./customer-shortlist/routes.js";

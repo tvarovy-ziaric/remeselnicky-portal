@@ -1,6 +1,7 @@
 import type {
   CraftsmanProfileId,
   CraftsmanProfessionId,
+  CraftsmanServiceId,
   UserId,
 } from "@portal/domain";
 import Fastify from "fastify";
@@ -21,6 +22,7 @@ const foreignProfileId =
   "9d330000-0000-4000-8000-000000000003" as CraftsmanProfileId;
 const professionId =
   "9d330000-0000-4000-8000-000000000004" as CraftsmanProfessionId;
+const serviceId = "9d330000-0000-4000-8000-000000000008" as CraftsmanServiceId;
 const commandId = "9d330000-0000-4000-8000-000000000005";
 const taxonomyReleaseId = "9d330000-0000-4000-8000-000000000006";
 const now = new Date("2026-09-28T12:00:00.000Z");
@@ -53,6 +55,17 @@ const profession = {
   evidenceSupportedLevel: null,
   id: professionId,
   professionCode: "PROF:TILER",
+  state: "ACTIVE" as const,
+  taxonomyReleaseId,
+};
+
+const craftsmanService = {
+  craftsmanProfessionIds: [professionId],
+  craftsmanProfileId: profileId,
+  createdAt: now,
+  deactivatedAt: null,
+  id: serviceId,
+  serviceCode: "SERV:TILE_INSTALLATION",
   state: "ACTIVE" as const,
   taxonomyReleaseId,
 };
@@ -113,6 +126,13 @@ describe("craftsman authoring routes", () => {
           declaredLevel: "ADVANCED",
           id: professionId,
           professionCode: "PROF:TILER",
+        },
+      ],
+      services: [
+        {
+          craftsmanProfessionIds: [professionId],
+          id: serviceId,
+          serviceCode: "SERV:TILE_INSTALLATION",
         },
       ],
       publication: { readiness: { isReady: true }, revision: 0 },
@@ -297,6 +317,59 @@ describe("craftsman authoring routes", () => {
     expect(inactive.json()).toEqual({ code: "ASSIGNMENT_NOT_ACTIVE" });
   });
 
+  it("adds and deactivates only a governed service owned by the profile", async () => {
+    const { app, dependencies } = apiWith();
+    const added = await app.inject({
+      method: "POST",
+      payload: {
+        commandId,
+        craftsmanProfessionIds: [professionId],
+        craftsmanServiceId: serviceId,
+        serviceCode: "SERV:TILE_INSTALLATION",
+      },
+      url: `/v1/me/craftsman-profile/${profileId}/services`,
+    });
+    expect(added.statusCode).toBe(201);
+    expect(dependencies.context.resolveCurrentService).toHaveBeenCalledWith(
+      "SERV:TILE_INSTALLATION",
+    );
+    expect(dependencies.services.add).toHaveBeenCalledWith({
+      actorUserId,
+      commandId,
+      craftsmanProfessionIds: [professionId],
+      craftsmanProfileId: profileId,
+      craftsmanServiceId: serviceId,
+      serviceCode: "SERV:TILE_INSTALLATION",
+      taxonomyReleaseId,
+    });
+
+    const deactivated = await app.inject({
+      method: "POST",
+      payload: { commandId },
+      url: `/v1/me/craftsman-profile/${profileId}/services/${serviceId}/deactivate`,
+    });
+    expect(deactivated.statusCode).toBe(200);
+    expect(dependencies.services.deactivate).toHaveBeenCalledWith({
+      actorUserId,
+      commandId,
+      craftsmanProfileId: profileId,
+      craftsmanServiceId: serviceId,
+    });
+
+    const injectedRelease = await app.inject({
+      method: "POST",
+      payload: {
+        commandId,
+        craftsmanProfessionIds: [professionId],
+        craftsmanServiceId: serviceId,
+        serviceCode: "SERV:TILE_INSTALLATION",
+        taxonomyReleaseId,
+      },
+      url: `/v1/me/craftsman-profile/${profileId}/services`,
+    });
+    expect(injectedRelease.statusCode).toBe(400);
+  });
+
   it("replaces the service area and preserves server ownership and revisions", async () => {
     const { app, dependencies } = apiWith();
     const payload = {
@@ -436,6 +509,13 @@ function apiWith(overrides: Partial<CraftsmanAuthoringRouteDependencies> = {}) {
           taxonomyReleaseId,
         }),
       ),
+      resolveCurrentService: vi.fn(() =>
+        Promise.resolve({
+          professionCodes: ["PROF:TILER"],
+          serviceCode: "SERV:TILE_INSTALLATION",
+          taxonomyReleaseId,
+        }),
+      ),
     },
     csrfProtection: csrf,
     guard: {
@@ -483,6 +563,25 @@ function apiWith(overrides: Partial<CraftsmanAuthoringRouteDependencies> = {}) {
       ),
       listOwned: vi.fn(() => Promise.resolve([profession])),
     },
+    services: {
+      add: vi.fn(() =>
+        Promise.resolve({
+          service: craftsmanService,
+          status: "APPLIED" as const,
+        }),
+      ),
+      deactivate: vi.fn(() =>
+        Promise.resolve({
+          service: {
+            ...craftsmanService,
+            deactivatedAt: now,
+            state: "INACTIVE" as const,
+          },
+          status: "APPLIED" as const,
+        }),
+      ),
+      listOwned: vi.fn(() => Promise.resolve([craftsmanService])),
+    },
     publication: {
       approve: vi.fn(),
       findOwned: vi.fn(() => Promise.resolve(publication)),
@@ -518,6 +617,7 @@ function apiWith(overrides: Partial<CraftsmanAuthoringRouteDependencies> = {}) {
     readonly context: {
       readonly findOwnedProfileId: ReturnType<typeof vi.fn>;
       readonly resolveCurrentProfession: ReturnType<typeof vi.fn>;
+      readonly resolveCurrentService: ReturnType<typeof vi.fn>;
     };
     readonly guard: { readonly evaluate: ReturnType<typeof vi.fn> };
     readonly profiles: {
@@ -528,6 +628,11 @@ function apiWith(overrides: Partial<CraftsmanAuthoringRouteDependencies> = {}) {
     readonly professions: {
       readonly assign: ReturnType<typeof vi.fn>;
       readonly changeDeclaredLevel: ReturnType<typeof vi.fn>;
+      readonly deactivate: ReturnType<typeof vi.fn>;
+      readonly listOwned: ReturnType<typeof vi.fn>;
+    };
+    readonly services: {
+      readonly add: ReturnType<typeof vi.fn>;
       readonly deactivate: ReturnType<typeof vi.fn>;
       readonly listOwned: ReturnType<typeof vi.fn>;
     };

@@ -55,6 +55,7 @@ interface CurrentProfessionRow {
   readonly professionCode: string;
   readonly state: CraftsmanProfessionState;
   readonly taxonomyReleaseId: string;
+  readonly taxonomyLabel: string;
 }
 
 interface TaxonomyCurrentRow {
@@ -456,6 +457,7 @@ async function getProfessionOrThrow(
       current.craftsman_profile_id AS "craftsmanProfileId",
       current.taxonomy_release_id AS "taxonomyReleaseId",
       current.profession_code AS "professionCode",
+      taxonomy.label_sk AS "taxonomyLabel",
       current.state,
       current.declared_level AS "declaredLevel",
       current.declared_level_revision AS "declaredLevelRevision",
@@ -465,6 +467,9 @@ async function getProfessionOrThrow(
       current.created_at AS "createdAt",
       current.deactivated_at AS "deactivatedAt"
     FROM current_craftsman_professions current
+    JOIN taxonomy_professions taxonomy
+      ON taxonomy.release_id = current.taxonomy_release_id
+     AND taxonomy.profession_code = current.profession_code
     WHERE current.id = ${id}
   `;
   if (row === undefined) {
@@ -484,6 +489,7 @@ async function selectCurrentProfessions(
       current.craftsman_profile_id AS "craftsmanProfileId",
       current.taxonomy_release_id AS "taxonomyReleaseId",
       current.profession_code AS "professionCode",
+      taxonomy.label_sk AS "taxonomyLabel",
       current.state,
       current.declared_level AS "declaredLevel",
       current.declared_level_revision AS "declaredLevelRevision",
@@ -493,6 +499,9 @@ async function selectCurrentProfessions(
       current.created_at AS "createdAt",
       current.deactivated_at AS "deactivatedAt"
     FROM current_craftsman_professions current
+    JOIN taxonomy_professions taxonomy
+      ON taxonomy.release_id = current.taxonomy_release_id
+     AND taxonomy.profession_code = current.profession_code
     JOIN craftsman_profiles profile
       ON profile.id = current.craftsman_profile_id
     JOIN users owner ON owner.id = profile.owner_user_id

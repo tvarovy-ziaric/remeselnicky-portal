@@ -2,7 +2,7 @@ import { createTaxonomyAutocompleteService } from "@portal/search";
 import type { Sql } from "postgres";
 import { describe, expect, it } from "vitest";
 
-import { createTaxonomyAutocompleteRepository } from "../src/taxonomy-autocomplete-repository.js";
+import { createManagedTaxonomyAutocompleteRepository } from "../src/managed-taxonomy-autocomplete-repository.js";
 
 describe("taxonomy autocomplete repository", () => {
   it("queries only activated, approved canonical catalogs with governed aliases", async () => {
@@ -16,14 +16,16 @@ describe("taxonomy autocomplete repository", () => {
           kind: "PROFESSION",
           label: "Obkladač",
           matchedBy: "EXACT_ALIAS",
+          memberCount: 4,
           professionCodes: ["PROF:TILER"],
           rawAlias: "never-return-this-alias",
           reviewState: "HUMAN_REVIEW_APPROVED",
+          routingProfessionCode: "PROF:TILER",
         },
       ],
     ]);
     const autocomplete = createTaxonomyAutocompleteService(
-      createTaxonomyAutocompleteRepository(sql),
+      createManagedTaxonomyAutocompleteRepository(sql),
     );
 
     const result = await autocomplete.autocomplete({
@@ -38,7 +40,9 @@ describe("taxonomy autocomplete repository", () => {
           kind: "PROFESSION",
           label: "Obkladač",
           matchedBy: "EXACT_ALIAS",
+          memberCount: 4,
           professionCodes: ["PROF:TILER"],
+          routingProfessionCode: "PROF:TILER",
         },
       ],
     });
@@ -49,7 +53,9 @@ describe("taxonomy autocomplete repository", () => {
     expect(query).toContain("content_class = 'CANONICAL'");
     expect(query).toContain("review_state = 'HUMAN_REVIEW_APPROVED'");
     expect(query).toContain("taxonomy_aliases");
-    expect(query).toContain("'LEGACY_CODE', 'LEGACY_SLUG', 'SEARCH_TERM'");
+    expect(query).toContain("taxonomy_services");
+    expect(query).toContain("link.is_primary");
+    expect(query).toContain("current_searchable_craftsman_services");
     expect(query).toContain("skill_catalog_skill_professions");
     expect(query).toContain("profession.state = 'ACTIVE'");
     expect(query).toContain("skill.state = 'ACTIVE'");
@@ -73,25 +79,28 @@ describe("taxonomy autocomplete repository", () => {
           kind: "PROFESSION",
           label: "Obkladač",
           matchedBy: "EXACT_CANONICAL",
+          memberCount: 0,
           professionCodes: ["PROF:TILER"],
           reviewState: "HUMAN_REVIEW_APPROVED",
+          routingProfessionCode: "PROF:TILER",
         },
       ],
     ]);
     await expect(
       createTaxonomyAutocompleteService(
-        createTaxonomyAutocompleteRepository(sql),
+        createManagedTaxonomyAutocompleteRepository(sql),
       ).autocomplete({ query: "obkladac" }),
     ).rejects.toThrow(/governed output invariants/u);
   });
 
   it("rejects malformed internal queries before opening SQL", async () => {
     const sql = scriptedSql([]);
-    const repository = createTaxonomyAutocompleteRepository(sql);
+    const repository = createManagedTaxonomyAutocompleteRepository(sql);
     await expect(
       repository.findCandidates({
         limit: 10,
         normalizedText: "unsafe@example.test",
+        scope: "DISCOVERY",
         tokens: ["unsafe@example.test"],
       }),
     ).rejects.toThrow(TypeError);

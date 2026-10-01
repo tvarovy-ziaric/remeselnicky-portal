@@ -65,6 +65,20 @@ export {
   PROFESSION_PROFICIENCY_LEVELS,
 } from "./craftsman-profession.js";
 export {
+  assertAddCraftsmanServiceInput,
+  assertCraftsmanServiceListInput,
+  assertDeactivateCraftsmanServiceInput,
+  CraftsmanServiceValidationError,
+} from "./craftsman-service.js";
+export type {
+  AddCraftsmanServiceInput,
+  CraftsmanService,
+  CraftsmanServiceCommandResult,
+  CraftsmanServiceId,
+  CraftsmanServicePersistence,
+  DeactivateCraftsmanServiceInput,
+} from "./craftsman-service.js";
+export {
   ALPHA_EXTRA_SERVICE_AREA_UI_LIMIT,
   assertCraftsmanServiceAreaReadInput,
   assertReplaceCraftsmanServiceAreaInput,

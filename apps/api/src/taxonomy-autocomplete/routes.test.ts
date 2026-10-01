@@ -31,7 +31,18 @@ describe("taxonomy autocomplete route", () => {
     expect(response.statusCode).toBe(200);
     expect(response.headers["cache-control"]).toBe("no-store");
     expect(response.headers["x-robots-tag"]).toBe("noindex, nofollow");
-    expect(response.json()).toEqual({ suggestions: [suggestion()] });
+    expect(response.json()).toEqual({
+      suggestions: [
+        {
+          code: "PROF:TILER",
+          kind: "PROFESSION",
+          label: "Obkladač",
+          memberCount: 0,
+          professionCodes: ["PROF:TILER"],
+          routingProfessionCode: "PROF:TILER",
+        },
+      ],
+    });
     expect(response.body).not.toMatch(/kachlickar|query/iu);
     expect(autocomplete.autocomplete.mock.calls).toEqual([
       [{ limit: "5", query: "kachlickar" }],
@@ -116,7 +127,9 @@ function suggestion(): TaxonomyAutocompleteSuggestion {
     code: "PROF:TILER",
     kind: "PROFESSION",
     label: "Obkladač",
+    memberCount: 0,
     matchedBy: "EXACT_CANONICAL",
     professionCodes: ["PROF:TILER"],
+    routingProfessionCode: "PROF:TILER",
   };
 }

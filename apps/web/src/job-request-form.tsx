@@ -22,12 +22,10 @@ import {
   type JobRequestEditableDraft,
   type JobRequestMediaStatus,
 } from "./job-request-draft-client";
-import {
-  loadJobRequestTaxonomySuggestions,
-  type JobRequestTaxonomySuggestion,
-} from "./job-request-taxonomy-client";
+import { type JobRequestTaxonomySuggestion } from "./job-request-taxonomy-client";
 import { type JobRequestMunicipalitySuggestion } from "./job-request-municipality-client";
 import { MunicipalityAutocomplete } from "./municipality-autocomplete";
+import { TaxonomyAutocomplete } from "./taxonomy-autocomplete";
 
 const STEPS = Object.freeze([
   { key: "request.core", label: "Čo potrebujete" },
@@ -68,6 +66,7 @@ interface EditorValues {
   photoMediaAssetIds: readonly string[];
   primaryProfessionCode: string;
   primaryProfessionLabel: string;
+  primaryServiceCode: string;
   skillCodes: readonly string[];
   siteInspection: "" | "LIKELY" | "MAYBE" | "UNKNOWN";
   specializationCode: string;
@@ -476,6 +475,7 @@ export function JobRequestForm({
                 jobRequestId: draft.id,
                 municipalityCode: values.municipalityCode,
                 professionCode: values.primaryProfessionCode,
+                serviceCode: values.primaryServiceCode,
               })
         }
         actionLabel="Vybrať remeselníkov"
@@ -615,20 +615,21 @@ function renderStep(
                 ...current,
                 primaryProfessionCode: "",
                 primaryProfessionLabel: "",
+                primaryServiceCode: "",
                 skillCodes: [],
                 specializationCode: "",
               }))
             }
-            selectedCode={values.primaryProfessionCode}
+            selectedCode={
+              values.primaryServiceCode || values.primaryProfessionCode
+            }
             onSelect={(suggestion) =>
               setValues((current) => ({
                 ...current,
-                primaryProfessionCode:
-                  suggestion.kind === "PROFESSION"
-                    ? suggestion.code
-                    : (suggestion.professionCodes[0] ?? ""),
-                primaryProfessionLabel:
-                  suggestion.kind === "PROFESSION" ? suggestion.label : "",
+                primaryProfessionCode: suggestion.routingProfessionCode ?? "",
+                primaryProfessionLabel: suggestion.label,
+                primaryServiceCode:
+                  suggestion.kind === "SERVICE" ? suggestion.code : "",
                 skillCodes:
                   suggestion.kind === "SKILL"
                     ? [suggestion.code]
@@ -904,67 +905,30 @@ function ProfessionPicker({
   readonly selectedCode: string;
 }) {
   const [query, setQuery] = useState(selectedCode);
-  const [suggestions, setSuggestions] = useState<
-    readonly JobRequestTaxonomySuggestion[]
-  >([]);
   useEffect(() => {
     if (selectedCode !== "") {
       setQuery((current) => current || selectedCode);
     }
   }, [selectedCode]);
-  useEffect(() => {
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => {
-      void loadJobRequestTaxonomySuggestions(
-        query,
-        fetch,
-        controller.signal,
-      ).then(setSuggestions);
-    }, 180);
-    return () => {
-      window.clearTimeout(timer);
-      controller.abort();
-    };
-  }, [query]);
   return (
     <div className="profession-picker">
-      <label>
-        Profesia alebo služba
-        <input
-          aria-describedby="profession-help"
-          autoComplete="off"
-          maxLength={120}
-          onChange={(event) => {
-            onClear();
-            setQuery(event.target.value);
-            setSuggestions([]);
-          }}
-          placeholder="napr. oprava strechy alebo maľovanie"
-          required
-          value={query}
-        />
-      </label>
-      <p className="field-help" id="profession-help">
-        Začnite písať bežnými slovami a vyberte spravovaný návrh.
-      </p>
-      {suggestions.length > 0 ? (
-        <ul className="profession-suggestions">
-          {suggestions.map((suggestion) => (
-            <li key={`${suggestion.kind}:${suggestion.code}`}>
-              <button
-                onClick={() => {
-                  onSelect(suggestion);
-                  setQuery(suggestion.label);
-                  setSuggestions([]);
-                }}
-                type="button"
-              >
-                {suggestion.label}
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      <TaxonomyAutocomplete
+        helperText="Začnite písať bežnými slovami a vyberte spravovaný návrh."
+        id="job-request-taxonomy"
+        label="Profesia alebo služba"
+        onChange={(value) => {
+          onClear();
+          setQuery(value);
+        }}
+        onSelect={(suggestion) => {
+          onSelect(suggestion);
+          setQuery(suggestion.label);
+        }}
+        placeholder="napr. oprava strechy alebo maľovanie"
+        required
+        selectedCode={selectedCode}
+        value={query}
+      />
       {selectedCode === "" ? (
         <p className="selection-state">Zatiaľ nie je vybraná žiadna služba.</p>
       ) : (
@@ -1039,7 +1003,7 @@ function Review({
       <h2>Skontrolujte dopyt</h2>
       <ReviewRow label="Práca" value={summary.work} onEdit={() => onEdit(0)} />
       <ReviewRow
-        label="Profesia"
+        label="Profesia alebo služba"
         value={summary.profession}
         onEdit={() => onEdit(0)}
       />
@@ -1146,6 +1110,7 @@ export function buildCraftsmanCandidateSearchHref(input: {
   readonly jobRequestId: string;
   readonly municipalityCode: string;
   readonly professionCode: string;
+  readonly serviceCode?: string;
 }): string | null {
   if (
     !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(
@@ -1159,6 +1124,11 @@ export function buildCraftsmanCandidateSearchHref(input: {
     jobRequestId: input.jobRequestId,
     professionCode: input.professionCode,
   });
+  if (
+    /^(?:SERV|TEST):[A-Z0-9][A-Z0-9_]{1,62}$/u.test(input.serviceCode ?? "")
+  ) {
+    parameters.set("serviceCode", input.serviceCode ?? "");
+  }
   if (input.municipalityCode !== "") {
     parameters.set("municipalityCode", input.municipalityCode);
   }
@@ -1174,6 +1144,7 @@ function sectionFromValues(
       ? {
           description: nullIfEmpty(values.description),
           primaryProfessionCode: nullIfEmpty(values.primaryProfessionCode),
+          primaryServiceCode: nullIfEmpty(values.primaryServiceCode),
           relatedProfessionCodes: [],
           skillCodes: values.skillCodes,
           specializationCode: nullIfEmpty(values.specializationCode),
@@ -1208,7 +1179,11 @@ function sectionFromValues(
                   documentMediaAssetIds: values.documentMediaAssetIds,
                   photoMediaAssetIds: values.photoMediaAssetIds,
                 };
-  return normalizeJobRequestContentSection({ key, payload, schemaVersion: 1 });
+  return normalizeJobRequestContentSection({
+    key,
+    payload,
+    schemaVersion: key === "request.core" ? 2 : 1,
+  });
 }
 
 function budgetPayload(values: EditorValues) {
@@ -1266,6 +1241,7 @@ function valuesFromDraft(draft: JobRequestEditableDraft | null): EditorValues {
     municipalityLabel: "",
     primaryProfessionCode: stringValue(core?.["primaryProfessionCode"]),
     primaryProfessionLabel: "",
+    primaryServiceCode: stringValue(core?.["primaryServiceCode"]),
     photoMediaAssetIds: arrayOfStrings(media?.["photoMediaAssetIds"]),
     skillCodes: arrayOfStrings(core?.["skillCodes"]),
     siteInspection: enumValue(details?.["siteInspection"], [
@@ -1428,6 +1404,7 @@ function hasMeaningfulCoreInput(section: JobRequestContentSection): boolean {
   return [
     payload["description"],
     payload["primaryProfessionCode"],
+    payload["primaryServiceCode"],
     payload["title"],
   ].some((value) => typeof value === "string" && value.length > 0);
 }
@@ -1448,6 +1425,7 @@ const emptyValues: EditorValues = {
   municipalityLabel: "",
   primaryProfessionCode: "",
   primaryProfessionLabel: "",
+  primaryServiceCode: "",
   photoMediaAssetIds: [],
   skillCodes: [],
   siteInspection: "",

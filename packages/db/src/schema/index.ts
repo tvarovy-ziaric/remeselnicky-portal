@@ -174,11 +174,14 @@ export {
   taxonomyEntryStateEnum,
   taxonomyProfessions,
   taxonomyReviewStateEnum,
+  taxonomyServiceProfessions,
+  taxonomyServices,
   taxonomySpecializations,
 } from "./taxonomy.js";
 export type {
   ProfessionTaxonomyReleaseRecord,
   TaxonomyProfessionRecord,
+  TaxonomyServiceRecord,
   TaxonomySpecializationRecord,
 } from "./taxonomy.js";
 export {
@@ -212,6 +215,20 @@ export type {
   CraftsmanProfessionDeclaredLevelEventRecord,
   CraftsmanProfessionRecord,
 } from "./craftsman-profession.js";
+export {
+  craftsmanServiceCommandKindEnum,
+  craftsmanServiceCommands,
+  craftsmanServiceProfessionLinks,
+  craftsmanServices,
+  craftsmanServiceStateEnum,
+} from "./craftsman-service.js";
+export type { CraftsmanServiceRecord } from "./craftsman-service.js";
+export {
+  taxonomySuggestionDecisionEnum,
+  taxonomySuggestionDecisions,
+  taxonomySuggestionKindEnum,
+  taxonomySuggestions,
+} from "./taxonomy-suggestion.js";
 export {
   CRAFTSMAN_SKILL_COMMAND_KINDS,
   CRAFTSMAN_SPECIALIZATION_COMMAND_KINDS,

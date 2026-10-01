@@ -5,12 +5,20 @@ export interface CurrentGovernedProfession {
   readonly professionCode: string;
   readonly taxonomyReleaseId: string;
 }
+export interface CurrentGovernedService {
+  readonly professionCodes: readonly string[];
+  readonly serviceCode: string;
+  readonly taxonomyReleaseId: string;
+}
 
 export interface CraftsmanAuthoringContextRepository {
   findOwnedProfileId(actorUserId: UserId): Promise<CraftsmanProfileId | null>;
   resolveCurrentProfession(
     professionCode: string,
   ): Promise<CurrentGovernedProfession | null>;
+  resolveCurrentService(
+    serviceCode: string,
+  ): Promise<CurrentGovernedService | null>;
 }
 
 /**
@@ -60,6 +68,34 @@ export function createCraftsmanAuthoringContextRepository(
         LIMIT 1
       `;
       return row === undefined ? null : Object.freeze({ ...row });
+    },
+
+    async resolveCurrentService(
+      serviceCode: string,
+    ): Promise<CurrentGovernedService | null> {
+      if (!/^SERV:[A-Z0-9][A-Z0-9_]{1,62}$/u.test(serviceCode)) {
+        throw new TypeError(
+          "Invalid craftsman authoring context: serviceCode.",
+        );
+      }
+      const [row] = await sql<CurrentGovernedService[]>`
+        SELECT service.service_code AS "serviceCode",
+          service.release_id AS "taxonomyReleaseId",
+          array_agg(relation.profession_code ORDER BY relation.profession_code)
+            AS "professionCodes"
+        FROM current_service_taxonomy service
+        JOIN taxonomy_service_professions relation
+          ON relation.release_id = service.release_id
+         AND relation.service_code = service.service_code
+        WHERE service.service_code = ${serviceCode} AND service.state = 'ACTIVE'
+        GROUP BY service.service_code, service.release_id
+      `;
+      return row === undefined
+        ? null
+        : Object.freeze({
+            ...row,
+            professionCodes: Object.freeze([...row.professionCodes]),
+          });
     },
   });
 }

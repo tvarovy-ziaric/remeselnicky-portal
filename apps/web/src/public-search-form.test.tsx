@@ -65,6 +65,7 @@ describe("PublicSearchForm", () => {
             code: "PROF:TILER",
             kind: "PROFESSION",
             label: "Obkladač",
+            memberCount: 0,
             professionCodes: ["PROF:TILER"],
           },
         ],

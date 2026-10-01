@@ -648,6 +648,58 @@ section {
   font-weight: 500;
 }
 
+.taxonomy-autocomplete {
+  position: relative;
+  display: grid;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.taxonomy-autocomplete > label {
+  display: block;
+}
+
+.taxonomy-autocomplete > input {
+  width: 100%;
+  min-height: 2.75rem;
+}
+
+.taxonomy-autocomplete__option-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.taxonomy-autocomplete__badge {
+  flex: none;
+  padding: 0.16rem 0.45rem;
+  border: 1px solid var(--color-border, #d8d3c8);
+  border-radius: 999px;
+  color: var(--color-muted-text, #5e6864);
+  background: var(--color-background, #f7f5f0);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.profession-suggestions .taxonomy-autocomplete__legend {
+  margin: 0.2rem 0 0;
+  padding: 0.5rem 0.75rem 0.3rem;
+  border-top: 1px solid var(--color-border, #d8d3c8);
+  color: var(--color-muted-text, #5e6864);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.taxonomy-autocomplete__status {
+  margin: 0;
+}
+
+.taxonomy-autocomplete__status--error {
+  color: #8b2b20;
+}
+
 .profession-suggestions button:hover,
 .profession-suggestions button:focus-visible {
   background: #edf3ed;
@@ -1527,6 +1579,43 @@ p {
   box-shadow: var(--shadow-card);
 }
 
+.taxonomy-suggestion-trigger {
+  justify-self: start;
+}
+
+.taxonomy-suggestion-dialog {
+  position: fixed;
+  z-index: 80;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgb(24 35 29 / 48%);
+}
+
+.taxonomy-suggestion-dialog__panel {
+  display: grid;
+  gap: 1rem;
+  width: min(100%, 38rem);
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  padding: clamp(1.25rem, 4vw, 2rem);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.taxonomy-suggestion-dialog__panel > :where(h3, p) {
+  margin: 0;
+}
+
+.taxonomy-suggestion-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
 .credential-list {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 21rem), 1fr));
 }
@@ -2038,6 +2127,7 @@ p {
 }
 
 .public-search-form__field > input,
+.public-search-form__field .taxonomy-autocomplete > input,
 .public-search-form__field .location-autocomplete > input {
   width: 100%;
   min-height: 2.75rem;
@@ -3071,6 +3161,75 @@ p {
   display: grid;
   grid-template-columns: minmax(14rem, 0.7fr) minmax(18rem, 1.3fr);
   gap: 1rem;
+}
+
+.admin-taxonomy-tabs,
+.admin-taxonomy-actions,
+.admin-taxonomy-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.admin-taxonomy-tabs {
+  margin-block: 1.25rem;
+}
+
+.admin-taxonomy-heading {
+  justify-content: space-between;
+}
+
+.admin-taxonomy-layout {
+  display: grid;
+  grid-template-columns: minmax(14rem, 20rem) minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.admin-taxonomy-list,
+.admin-taxonomy-similar {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.admin-taxonomy-list .ui-button {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.admin-taxonomy-list .ui-button[aria-current="true"] {
+  background: #eef5ed;
+  box-shadow: inset 3px 0 0 #355b43;
+}
+
+.admin-taxonomy-editor,
+.admin-taxonomy-form-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.admin-taxonomy-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.admin-taxonomy-form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 800px) {
+  .admin-taxonomy-layout,
+  .admin-taxonomy-form-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .admin-profile-review-queue {

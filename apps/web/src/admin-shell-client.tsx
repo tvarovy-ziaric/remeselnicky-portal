@@ -24,6 +24,7 @@ import { AdminModerationWorkspace } from "./admin-moderation";
 import { AdminProfileReviewWorkspace } from "./admin-profile-review";
 import { AdminCredentialReviewWorkspace } from "./admin-credential-review";
 import { AdminMfaEntry } from "./admin-mfa-client";
+import { AdminTaxonomyWorkspace } from "./admin-taxonomy";
 
 export type AdminShellState =
   | { readonly status: "LOADING" }
@@ -105,6 +106,8 @@ export function AdminShellClient({
             <AdminProfileReviewWorkspace />
           ) : selected.id === "credentials" ? (
             <AdminCredentialReviewWorkspace />
+          ) : selected.id === "taxonomy" ? (
+            <AdminTaxonomyWorkspace />
           ) : selected.id === "dashboard" ? (
             <AdminOperationsOverview modules={state.modules} />
           ) : (

@@ -1,16 +1,14 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 
-import {
-  loadJobRequestTaxonomySuggestions,
-  type JobRequestTaxonomySuggestion,
-} from "./job-request-taxonomy-client";
+import { type JobRequestTaxonomySuggestion } from "./job-request-taxonomy-client";
 import { type JobRequestMunicipalitySuggestion } from "./job-request-municipality-client";
 import {
   MunicipalityAutocomplete,
   municipalityAutocompleteMessage,
 } from "./municipality-autocomplete";
+import { TaxonomyAutocomplete } from "./taxonomy-autocomplete";
 
 interface SuggestionLookup {
   readonly query: string;
@@ -56,97 +54,30 @@ export function PublicSearchForm({
   const [selected, setSelected] = useState<JobRequestTaxonomySuggestion | null>(
     null,
   );
-  const [lookup, setLookup] = useState<SuggestionLookup | null>(null);
   const [municipalityQuery, setMunicipalityQuery] = useState("");
   const [selectedMunicipality, setSelectedMunicipality] =
     useState<JobRequestMunicipalitySuggestion | null>(null);
 
-  useEffect(() => {
-    const normalized = query.trim();
-    if (selected !== null || normalized.length < 2) return;
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => {
-      void loadJobRequestTaxonomySuggestions(
-        normalized,
-        fetch,
-        controller.signal,
-      ).then((items) => {
-        if (controller.signal.aborted) return;
-        setLookup((current) =>
-          current?.query === normalized && current.status === "loading"
-            ? { query: normalized, status: "ready", items }
-            : current,
-        );
-      });
-    }, 180);
-    return () => {
-      window.clearTimeout(timer);
-      controller.abort();
-    };
-  }, [query, selected]);
-
-  const currentLookup =
-    selected === null && lookup?.query === query.trim() ? lookup : null;
-  const suggestions = currentLookup?.items ?? [];
-  const lookupMessage = publicSearchLookupMessage(currentLookup);
   const professionCode = selected?.professionCodes[0];
   return (
     <form action="/remeselnici" className="public-search-form" method="get">
       <div className="public-search-form__field">
-        <label htmlFor="public-search-query">Profesia alebo služba</label>
-        <input
-          aria-autocomplete="list"
-          aria-controls="public-search-profession-options"
-          aria-expanded={suggestions.length > 0}
-          autoComplete="off"
+        <TaxonomyAutocomplete
           id="public-search-query"
-          maxLength={120}
-          onChange={(event) => {
-            setQuery(event.target.value);
+          label="Profesia alebo služba"
+          onChange={(value) => {
+            setQuery(value);
             setSelected(null);
-            const normalized = event.target.value.trim();
-            setLookup(
-              normalized.length < 2
-                ? null
-                : { query: normalized, status: "loading", items: [] },
-            );
+          }}
+          onSelect={(suggestion) => {
+            setSelected(suggestion);
+            setQuery(suggestion.label);
           }}
           placeholder="Napríklad obkladač alebo oprava strechy"
           required
-          role="combobox"
+          selectedCode={selected?.code ?? ""}
           value={query}
         />
-        <p className="field-help">Začnite písať a vyberte návrh zo zoznamu.</p>
-        {lookupMessage === null ? null : (
-          <p aria-live="polite" className="field-help" role="status">
-            {lookupMessage}
-          </p>
-        )}
-        {suggestions.length === 0 ? null : (
-          <ul
-            aria-label="Návrhy profesií a služieb"
-            className="profession-suggestions"
-            id="public-search-profession-options"
-            role="listbox"
-          >
-            {suggestions.map((suggestion) => (
-              <li key={`${suggestion.kind}:${suggestion.code}`} role="none">
-                <button
-                  aria-selected="false"
-                  onClick={() => {
-                    setSelected(suggestion);
-                    setQuery(suggestion.label);
-                    setLookup(null);
-                  }}
-                  role="option"
-                  type="button"
-                >
-                  {suggestion.label}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
       </div>
       <div className="public-search-form__field">
         <MunicipalityAutocomplete
@@ -167,6 +98,9 @@ export function PublicSearchForm({
       {professionCode === undefined ? null : (
         <input name="professionCode" type="hidden" value={professionCode} />
       )}
+      {selected?.kind === "SERVICE" ? (
+        <input name="serviceCode" type="hidden" value={selected.code} />
+      ) : null}
       {selected?.kind === "SPECIALIZATION" ? (
         <input name="specializationCode" type="hidden" value={selected.code} />
       ) : null}

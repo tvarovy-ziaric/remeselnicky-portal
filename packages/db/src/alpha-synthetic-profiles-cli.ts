@@ -12,8 +12,7 @@ import { createCraftsmanProfileRepository } from "./craftsman-profile-repository
 import { createCraftsmanPublicationRepository } from "./craftsman-publication-repository.js";
 import { createCraftsmanServiceAreaRepository } from "./craftsman-service-area-repository.js";
 
-const professionCode = "PROF:ALPHA_SYNTHETIC";
-const releaseId = "00000000-0000-4000-8000-000000003301";
+const professionCode = "PROF:ELECTRICIAN";
 const municipalityCode = "TEST:MUNICIPALITY_ALPHA" as MunicipalityCode;
 const adminId = "00000000-0000-4000-8000-000000000105" as UserId;
 const providers = [
@@ -58,14 +57,16 @@ async function main(): Promise<void> {
       );
     }
     const [taxonomy] = await sql<{ releaseId: string }[]>`
-      SELECT release_id AS "releaseId"
-      FROM profession_taxonomy_activation_events
-      ORDER BY activation_sequence DESC LIMIT 1
+      SELECT activation.release_id AS "releaseId"
+      FROM profession_taxonomy_activation_events activation
+      JOIN taxonomy_professions profession
+        ON profession.release_id = activation.release_id
+       AND profession.profession_code = ${professionCode}
+       AND profession.state = 'ACTIVE'
+      ORDER BY activation.activation_sequence DESC LIMIT 1
     `;
-    if (taxonomy?.releaseId !== releaseId) {
-      throw new Error(
-        "Synthetic alpha profiles require the isolated test taxonomy.",
-      );
+    if (taxonomy === undefined) {
+      throw new Error("Synthetic alpha profiles require the managed taxonomy.");
     }
     const [admin] = await sql<{ factorId: string }[]>`
       SELECT factor.id AS "factorId"
@@ -137,13 +138,11 @@ async function main(): Promise<void> {
           craftsmanProfileId: profileId,
           declaredLevel: "BEGINNER",
           professionCode,
-          taxonomyReleaseId: releaseId,
+          taxonomyReleaseId: taxonomy.releaseId,
         });
         if (assigned.status !== "APPLIED") {
           throw new Error("Synthetic alpha profession assignment failed.");
         }
-      } else if (existingProfession.taxonomyReleaseId !== releaseId) {
-        throw new Error("Synthetic alpha profession history conflicts.");
       }
 
       const area = await serviceAreas.findOwned({

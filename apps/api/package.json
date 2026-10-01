@@ -37,6 +37,7 @@
     "@portal/privacy": "workspace:*",
     "@portal/search": "workspace:*",
     "@portal/storage": "workspace:*",
+    "@portal/taxonomy": "workspace:*",
     "argon2": "0.45.1",
     "fastify": "5.12.4"
   },

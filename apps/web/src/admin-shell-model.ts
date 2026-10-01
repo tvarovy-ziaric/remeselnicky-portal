@@ -5,7 +5,9 @@ export const ADMIN_MODULE_PRESENTATION = Object.freeze({
   disputes: { icon: "SP", label: "Spory" },
   jobs: { icon: "ZÁ", label: "Zákazky" },
   profiles: { icon: "PF", label: "Profily" },
+  privacy: { icon: "SÚ", label: "Súkromie" },
   reports: { icon: "HL", label: "Hlásenia" },
+  taxonomy: { icon: "KA", label: "Katalóg" },
   users: { icon: "PO", label: "Používatelia" },
 } as const);
 
@@ -39,7 +41,9 @@ export function parseAdminModule(
       value.id === "credentials" ||
       value.id === "jobs" ||
       value.id === "profiles" ||
-      value.id === "reports") !==
+      value.id === "privacy" ||
+      value.id === "reports" ||
+      value.id === "taxonomy") !==
     (value.state === "OPERATIONAL")
   )
     return undefined;

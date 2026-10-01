@@ -67,6 +67,7 @@ Add rows as needed. One row is one tester-observed case on one browser/device.
 | Browser registration + email/phone verification | New customer                  |                | `NOT_EVALUATED`      | UI exists; record named manual browser/device result. |                       |           |                    |
 | Craftsman onboarding/profile/portfolio          | New craftsman                 |                | `NOT_EVALUATED`      | Record named profile and private portfolio authoring. |                       |           |                    |
 | UAT-10 private credential claim/evidence        | New craftsman                 |                | `NOT_EVALUATED`      | Pending is not verified; private READY evidence only. |                       |           |                    |
+| UAT-12 managed taxonomy and suggestion          | Customer/craftsman/admin      |                | `NOT_EVALUATED`      | Shared top-10 catalog; admin step needs genuine MFA.  |                       |           |                    |
 | Admin operational UI with provider-backed MFA   | Admin                         |                | `BLOCKED_HUMAN_GATE` | Real TOTP/WebAuthn enrollment and privileged session. |                       |           |                    |
 
 ## Exploratory and failure results
