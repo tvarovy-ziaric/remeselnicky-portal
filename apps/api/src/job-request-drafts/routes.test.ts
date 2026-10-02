@@ -147,6 +147,61 @@ describe("job request draft routes", () => {
     await app.close();
   });
 
+  it("accepts managed-taxonomy core v2 while rejecting v2 for other sections", async () => {
+    const fixture = createFixture();
+    const app = Fastify();
+    registerJobRequestDraftRoutes(app, fixture.dependencies);
+
+    const managedCore = await app.inject({
+      method: "POST",
+      payload: {
+        commandId,
+        expectedRevision: 1,
+        section: {
+          key: "request.core",
+          payload: {
+            description: "Potrebujem vykopať rigol",
+            primaryProfessionCode: "PROF:EARTHWORK_OPERATOR",
+            primaryServiceCode: null,
+            relatedProfessionCodes: [],
+            skillCodes: [],
+            specializationCode: null,
+            title: "Výkop",
+          },
+          schemaVersion: 2,
+        },
+      },
+      url: `/v1/me/job-request-drafts/${requestId}/sections`,
+    });
+    expect(managedCore.statusCode).toBe(200);
+    const managedInput = fixture.autosave.mock.calls[0]?.[0];
+    expect(managedInput?.section.key).toBe("request.core");
+    expect(managedInput?.section.schemaVersion).toBe(2);
+
+    const invalidLocation = await app.inject({
+      method: "POST",
+      payload: {
+        commandId: "91000000-0000-4000-8000-000000000005",
+        expectedRevision: 2,
+        section: {
+          key: "request.location",
+          payload: {
+            exactAddress: null,
+            mapPin: null,
+            municipalityCode: "513881",
+            textClarification: null,
+          },
+          schemaVersion: 2,
+        },
+      },
+      url: `/v1/me/job-request-drafts/${requestId}/sections`,
+    });
+    expect(invalidLocation.statusCode).toBe(400);
+    expect(invalidLocation.json()).toEqual({ code: "INVALID_REQUEST" });
+    expect(fixture.autosave).toHaveBeenCalledTimes(1);
+    await app.close();
+  });
+
   it("uses one non-eligible denial for unverified and inactive activation", async () => {
     const fixture = createFixture();
     fixture.activate.mockResolvedValueOnce({

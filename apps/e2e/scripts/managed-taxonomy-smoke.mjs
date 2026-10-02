@@ -69,6 +69,13 @@ async function customerSmoke() {
     await expect(
       page.getByText(/Vybraná služba: Montáž zásuviek/u),
     ).toBeVisible();
+    await page
+      .getByLabel("Stručne opíšte prácu")
+      .fill("Syntetická kontrola uloženia spravovanej služby.");
+    await page.getByRole("button", { name: "Uložiť a pokračovať" }).click();
+    await expect(
+      page.getByRole("group", { name: "Kde je práca" }),
+    ).toBeVisible();
     await page.close();
   } finally {
     await context.close();

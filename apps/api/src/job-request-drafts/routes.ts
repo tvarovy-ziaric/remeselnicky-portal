@@ -497,7 +497,7 @@ const sectionSchema = {
       ],
     },
     payload: { type: "object" },
-    schemaVersion: { const: 1 },
+    schemaVersion: { enum: [1, 2], type: "integer" },
   },
   required: ["key", "payload", "schemaVersion"],
   type: "object",
