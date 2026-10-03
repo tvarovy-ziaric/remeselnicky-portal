@@ -4,7 +4,8 @@ const MAX_SUGGESTIONS = 10;
 
 export interface MunicipalitySuggestion {
   readonly code: string;
-  readonly districtName: string;
+  readonly districtName: string | null;
+  readonly kind: "CITY_AREA" | "MUNICIPALITY";
   readonly name: string;
   readonly postalCodes: readonly string[];
   readonly regionName: string;
@@ -16,7 +17,8 @@ export interface MunicipalityAutocompletePersistence {
 
 interface MunicipalityRow {
   readonly code: string;
-  readonly districtName: string;
+  readonly districtName: string | null;
+  readonly kind: "CITY_AREA" | "MUNICIPALITY";
   readonly name: string;
   readonly postalCodes: readonly string[];
   readonly regionName: string;
@@ -54,7 +56,10 @@ async function findByName(
       SELECT
         municipality.code,
         municipality.name_sk AS "name",
-        district.name_sk AS "districtName",
+        CASE WHEN city_area.municipality_code IS NULL
+          THEN district.name_sk ELSE NULL END AS "districtName",
+        CASE WHEN city_area.municipality_code IS NULL
+          THEN 'MUNICIPALITY' ELSE 'CITY_AREA' END AS kind,
         region.name_sk AS "regionName",
         btrim(regexp_replace(
           translate(
@@ -65,6 +70,8 @@ async function findByName(
           '[^a-z0-9]+', ' ', 'g'
         )) AS normalized_name
       FROM location_municipalities municipality
+      LEFT JOIN location_city_areas city_area
+        ON city_area.municipality_code = municipality.code
       JOIN location_districts district
         ON district.code = municipality.district_code
        AND district.is_active
@@ -80,13 +87,16 @@ async function findByName(
           ),
           '[^a-z0-9]+', ' ', 'g'
         )) LIKE ${`${normalizedName}%`}
-      ORDER BY normalized_name, municipality.code
+      ORDER BY normalized_name,
+        CASE WHEN city_area.municipality_code IS NULL THEN 1 ELSE 0 END,
+        municipality.code
       LIMIT ${MAX_SUGGESTIONS}
     )
     SELECT
       candidates.code,
       candidates."name",
       candidates."districtName",
+      candidates.kind,
       candidates."regionName",
       COALESCE(
         array_agg(DISTINCT postal.code ORDER BY postal.code)
@@ -110,8 +120,11 @@ async function findByName(
       candidates."name",
       candidates."districtName",
       candidates."regionName",
+      candidates.kind,
       candidates.normalized_name
-    ORDER BY candidates.normalized_name, candidates.code
+    ORDER BY candidates.normalized_name,
+      CASE WHEN candidates.kind = 'CITY_AREA' THEN 0 ELSE 1 END,
+      candidates.code
   `;
 }
 
@@ -124,6 +137,7 @@ async function findByPostalCode(
       municipality.code,
       municipality.name_sk AS "name",
       district.name_sk AS "districtName",
+      'MUNICIPALITY'::text AS kind,
       region.name_sk AS "regionName",
       array_agg(DISTINCT postal.code ORDER BY postal.code) AS "postalCodes"
     FROM location_postal_codes postal
@@ -197,7 +211,10 @@ function assertRow(row: MunicipalityRow): MunicipalitySuggestion {
   if (
     !code(row.code) ||
     !safeText(row.name) ||
-    !safeText(row.districtName) ||
+    !["CITY_AREA", "MUNICIPALITY"].includes(row.kind) ||
+    (row.kind === "CITY_AREA"
+      ? row.districtName !== null || row.postalCodes.length !== 0
+      : !safeText(row.districtName) || row.postalCodes.length === 0) ||
     !safeText(row.regionName) ||
     !validPostalCodes(row.postalCodes)
   )
@@ -205,6 +222,7 @@ function assertRow(row: MunicipalityRow): MunicipalitySuggestion {
   return Object.freeze({
     code: row.code,
     districtName: row.districtName,
+    kind: row.kind,
     name: row.name,
     postalCodes: Object.freeze([...row.postalCodes]),
     regionName: row.regionName,

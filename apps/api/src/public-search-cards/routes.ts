@@ -19,6 +19,11 @@ interface SafeSearchCard {
   readonly location: Readonly<{
     approximateDistanceKm: number | null;
     municipalityName: string;
+    serviceAreaMatch:
+      | "IN_SERVICE_AREA"
+      | "FARTHER_BY_AGREEMENT"
+      | "OUTSIDE_DECLARED_AREA"
+      | "DISTANCE_UNAVAILABLE";
   }>;
   readonly professions: readonly Readonly<{ code: string; label: string }>[];
   readonly profileId: string;
@@ -151,6 +156,7 @@ function serializePage(page: SafeSearchPage): SafeSearchPage {
       location: {
         approximateDistanceKm: card.location.approximateDistanceKm,
         municipalityName: card.location.municipalityName,
+        serviceAreaMatch: card.location.serviceAreaMatch,
       },
       professions: card.professions.map(({ code, label }) => ({ code, label })),
       profileId: card.profileId,

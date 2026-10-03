@@ -117,6 +117,29 @@ export function formatRegionName(regionName: string): string {
     : `${regionName} kraj`;
 }
 
+export function municipalitySuggestionMetadata(
+  suggestion: JobRequestMunicipalitySuggestion,
+  query: string,
+): string {
+  const regionName = formatRegionName(suggestion.regionName);
+  if (suggestion.kind === "CITY_AREA") {
+    return `celé mesto · ${regionName}`;
+  }
+  const postalCodes = relevantPostalCodes(suggestion, query);
+  const shownPostalCodes = postalCodes.slice(0, 3);
+  const remainingCount = postalCodes.length - shownPostalCodes.length;
+  return [
+    shownPostalCodes.map(formatPostalCode).join(", ") +
+      (remainingCount > 0 ? ` + ${remainingCount} ďalších PSČ` : ""),
+    suggestion.districtName === null
+      ? null
+      : `okres ${suggestion.districtName}`,
+    regionName,
+  ]
+    .filter((part): part is string => part !== null && part !== "")
+    .join(" · ");
+}
+
 export function MunicipalityAutocomplete({
   id,
   onChange,
@@ -268,15 +291,12 @@ export function MunicipalityAutocomplete({
           role="listbox"
         >
           {suggestions.map((suggestion, index) => {
-            const postalCodes = relevantPostalCodes(suggestion, value);
-            const shownPostalCodes = postalCodes.slice(0, 3);
-            const remainingCount = postalCodes.length - shownPostalCodes.length;
             const active = index === activeIndex;
-            const displayRegionName = formatRegionName(suggestion.regionName);
+            const metadata = municipalitySuggestionMetadata(suggestion, value);
             return (
               <li key={suggestion.code} role="none">
                 <button
-                  aria-label={`${shownPostalCodes.map(formatPostalCode).join(", ")} · ${suggestion.name} · okres ${suggestion.districtName} · ${displayRegionName}${remainingCount > 0 ? ` · ďalších ${remainingCount} PSČ` : ""}`}
+                  aria-label={`${suggestion.name} · ${metadata}`}
                   aria-selected={active}
                   className={active ? "is-active" : undefined}
                   id={`${id}-option-${index}`}
@@ -285,18 +305,12 @@ export function MunicipalityAutocomplete({
                   role="option"
                   type="button"
                 >
-                  <span>{suggestion.name}</span>
-                  <small>
-                    {shownPostalCodes.map(formatPostalCode).join(", ")}
-                    {remainingCount > 0
-                      ? ` + ${remainingCount} ďalších PSČ`
-                      : ""}
-                    {` · okres ${suggestion.districtName} · ${displayRegionName}`}
-                  </small>
+                  <span className="location-autocomplete__option-name">
+                    {suggestion.name}
+                  </span>
+                  <small>{metadata}</small>
                   {active ? (
-                    <span className="location-autocomplete__active-marker">
-                      Aktívny návrh
-                    </span>
+                    <span className="visually-hidden">Aktívny návrh</span>
                   ) : null}
                 </button>
               </li>

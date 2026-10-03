@@ -27,6 +27,10 @@ describe("public search pagination", () => {
 
   it("replaces the cursor while preserving governed filters and request context", () => {
     const href = publicSearchNextPageHref({
+      formDefaults: {
+        municipalityLabel: "Bratislava",
+        professionLabel: "Obkladač",
+      },
       jobRequestId: "99000000-0000-4000-8000-000000000010",
       nextCursor,
       searchParameters: {
@@ -48,6 +52,8 @@ describe("public search pagination", () => {
       "SKILL:GROUT",
     ]);
     expect(url.searchParams.get("sort")).toBe("RECOMMENDED");
+    expect(url.searchParams.get("professionLabel")).toBe("Obkladač");
+    expect(url.searchParams.get("municipalityLabel")).toBe("Bratislava");
     expect(url.searchParams.get("jobRequestId")).toBe(
       "99000000-0000-4000-8000-000000000010",
     );

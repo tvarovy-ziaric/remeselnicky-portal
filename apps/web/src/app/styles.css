@@ -2204,6 +2204,23 @@ p {
   font-weight: 400;
 }
 
+.location-autocomplete__options button {
+  gap: 0.1rem;
+  padding: 0.48rem 0.65rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.location-autocomplete__option-name {
+  font-weight: 650;
+}
+
+.location-autocomplete__options small {
+  font-size: 0.78rem;
+  line-height: 1.25;
+}
+
 .public-search-results,
 .search-result-card__badges > ul {
   margin: 0;

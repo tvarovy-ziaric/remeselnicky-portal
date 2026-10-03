@@ -9,6 +9,7 @@ import {
   municipalityAutocompleteMessage,
   municipalityKeyboardAction,
   municipalitySelectionAfterEdit,
+  municipalitySuggestionMetadata,
   nextMunicipalityActiveIndex,
   relevantPostalCodes,
   shouldApplyMunicipalityResponse,
@@ -17,9 +18,19 @@ import {
 const prievidza: JobRequestMunicipalitySuggestion = {
   code: "SK022D513881",
   districtName: "Prievidza",
+  kind: "MUNICIPALITY",
   name: "Prievidza",
   postalCodes: ["97101", "97102", "97103"],
   regionName: "Trenčiansky kraj",
+};
+
+const bratislava: JobRequestMunicipalitySuggestion = {
+  code: "CITY_AREA:BRATISLAVA",
+  districtName: null,
+  kind: "CITY_AREA",
+  name: "Bratislava",
+  postalCodes: [],
+  regionName: "Bratislavský kraj",
 };
 
 describe("MunicipalityAutocomplete", () => {
@@ -108,5 +119,20 @@ describe("MunicipalityAutocomplete", () => {
     expect(formatRegionName("Trenčiansky")).toBe("Trenčiansky kraj");
     expect(formatRegionName("Bratislavský kraj")).toBe("Bratislavský kraj");
     expect(formatRegionName("Testovací KRAJ")).toBe("Testovací KRAJ");
+  });
+
+  it("labels a whole-city area without inventing a postal code or district", () => {
+    const metadata = municipalitySuggestionMetadata(bratislava, "Brat");
+
+    expect(metadata).toBe("celé mesto · Bratislavský kraj");
+    expect(metadata).not.toContain("PSČ");
+    expect(metadata).not.toContain("okres");
+    expect(metadata).not.toMatch(/^\s*·/u);
+  });
+
+  it("keeps compact municipality metadata with relevant postal codes", () => {
+    expect(municipalitySuggestionMetadata(prievidza, "971 0")).toBe(
+      "971 01, 971 02, 971 03 · okres Prievidza · Trenčiansky kraj",
+    );
   });
 });

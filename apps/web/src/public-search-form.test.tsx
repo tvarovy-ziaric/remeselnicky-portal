@@ -22,6 +22,40 @@ describe("PublicSearchForm", () => {
     expect(html).toContain(
       "Vyhľadajte lokalitu podľa názvu obce alebo poštového smerovacieho čísla.",
     );
+    expect(html).toContain("Zoradiť výsledky");
+    expect(html).toContain("Najbližší");
+    expect(html).toContain("Zobraziť aj remeselníkov mimo ich bežného dosahu");
+    expect(html).toContain(
+      "Výsledky automaticky rešpektujú dojazd nastavený remeselníkmi.",
+    );
+  });
+
+  it("restores a submitted service, municipality and geo controls", () => {
+    const html = renderToStaticMarkup(
+      <PublicSearchForm
+        initialValues={{
+          includeOutsideDeclaredArea: true,
+          municipalityCode: "SK:BA:BRATISLAVA",
+          municipalityLabel: "Bratislava",
+          professionCode: "PROF:TILER",
+          professionLabel: "Pokládka dlažby",
+          serviceCode: "SERV:TILING",
+          sort: "NEAREST",
+        }}
+      />,
+    );
+
+    expect(html).toContain('name="professionCode"');
+    expect(html).toContain('value="PROF:TILER"');
+    expect(html).toContain('name="serviceCode"');
+    expect(html).toContain('value="SERV:TILING"');
+    expect(html).toContain('name="municipalityCode"');
+    expect(html).toContain('value="SK:BA:BRATISLAVA"');
+    expect(html).toContain('name="professionLabel"');
+    expect(html).toContain('name="municipalityLabel"');
+    expect(html).toContain('value="NEAREST" selected=""');
+    expect(html).toContain('name="includeOutsideDeclaredArea"');
+    expect(html).toContain('checked=""');
   });
 
   it("preserves only the opaque Job identifier across profession searches", () => {

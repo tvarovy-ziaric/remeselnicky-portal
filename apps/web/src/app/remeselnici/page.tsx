@@ -10,7 +10,10 @@ import {
 } from "../../design-system";
 import { loadPublicSearchCards } from "../../public-search-card-client";
 import { PublicSearchCardList } from "../../public-search-card-view";
-import { parsePublicSearchContext } from "../../public-search-context";
+import {
+  parsePublicSearchContext,
+  parsePublicSearchFormDefaults,
+} from "../../public-search-context";
 import { PublicSearchForm } from "../../public-search-form";
 import { SessionAwareHeader, SiteFooter } from "../../site-shell";
 
@@ -28,9 +31,10 @@ interface PageProperties {
 export default async function CraftsmanSearchPage({
   searchParams,
 }: PageProperties) {
-  const { jobId, jobRequestId, searchParameters } = parsePublicSearchContext(
-    await searchParams,
-  );
+  const rawSearchParameters = await searchParams;
+  const { jobId, jobRequestId, searchParameters } =
+    parsePublicSearchContext(rawSearchParameters);
+  const initialValues = parsePublicSearchFormDefaults(rawSearchParameters);
   const professionCode = searchParameters["professionCode"];
   const page =
     typeof professionCode === "string"
@@ -55,6 +59,7 @@ export default async function CraftsmanSearchPage({
             className="public-search-page__filters"
           >
             <PublicSearchForm
+              initialValues={initialValues}
               {...(jobRequestId === undefined ? {} : { jobRequestId })}
               {...(jobId === undefined ? {} : { jobId })}
             />
@@ -96,6 +101,7 @@ export default async function CraftsmanSearchPage({
                   >
                     <ActionLink
                       href={publicSearchNextPageHref({
+                        formDefaults: initialValues,
                         nextCursor: page.nextCursor,
                         searchParameters,
                         ...(jobRequestId === undefined ? {} : { jobRequestId }),
@@ -118,6 +124,10 @@ export default async function CraftsmanSearchPage({
 }
 
 export function publicSearchNextPageHref(input: {
+  readonly formDefaults?: Readonly<{
+    readonly municipalityLabel: string;
+    readonly professionLabel: string;
+  }>;
   readonly jobId?: string;
   readonly jobRequestId?: string;
   readonly nextCursor: string;
@@ -132,6 +142,12 @@ export function publicSearchNextPageHref(input: {
     }
   }
   parameters.set("afterProfileId", input.nextCursor);
+  if (input.formDefaults?.professionLabel) {
+    parameters.set("professionLabel", input.formDefaults.professionLabel);
+  }
+  if (input.formDefaults?.municipalityLabel) {
+    parameters.set("municipalityLabel", input.formDefaults.municipalityLabel);
+  }
   if (input.jobId !== undefined && input.jobRequestId === undefined) {
     parameters.set("jobId", input.jobId);
   } else if (input.jobRequestId !== undefined && input.jobId === undefined) {

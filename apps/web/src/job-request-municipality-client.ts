@@ -1,6 +1,7 @@
 export interface JobRequestMunicipalitySuggestion {
   readonly code: string;
-  readonly districtName: string;
+  readonly districtName: string | null;
+  readonly kind: "CITY_AREA" | "MUNICIPALITY";
   readonly name: string;
   readonly postalCodes: readonly string[];
   readonly regionName: string;
@@ -82,21 +83,27 @@ export function formatPostalCode(postalCode: string): string {
 function parseSuggestion(
   value: unknown,
 ): JobRequestMunicipalitySuggestion | null {
+  const kind = valueKind(value);
   if (
     !record(value) ||
     !code(value["code"]) ||
+    kind === null ||
     !label(value["name"]) ||
-    !label(value["districtName"]) ||
+    !nullableLabel(value["districtName"]) ||
     !label(value["regionName"]) ||
     !Array.isArray(value["postalCodes"]) ||
-    value["postalCodes"].length === 0 ||
     value["postalCodes"].length > 100 ||
-    !value["postalCodes"].every(postalCode)
+    !value["postalCodes"].every(postalCode) ||
+    (kind === "CITY_AREA" &&
+      (value["districtName"] !== null || value["postalCodes"].length !== 0)) ||
+    (kind === "MUNICIPALITY" &&
+      (value["districtName"] === null || value["postalCodes"].length === 0))
   )
     return null;
   return Object.freeze({
     code: value["code"],
     districtName: value["districtName"],
+    kind,
     name: value["name"],
     postalCodes: Object.freeze([...value["postalCodes"]]),
     regionName: value["regionName"],
@@ -123,8 +130,19 @@ function label(value: unknown): value is string {
     !/[\r\n\p{Cc}]/u.test(value)
   );
 }
+function nullableLabel(value: unknown): value is string | null {
+  return value === null || label(value);
+}
 function postalCode(value: unknown): value is string {
   return typeof value === "string" && /^\d{5}$/u.test(value);
+}
+function valueKind(
+  value: unknown,
+): JobRequestMunicipalitySuggestion["kind"] | null {
+  if (!record(value)) return null;
+  return value["kind"] === "CITY_AREA" || value["kind"] === "MUNICIPALITY"
+    ? value["kind"]
+    : null;
 }
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

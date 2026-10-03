@@ -35,6 +35,11 @@ export interface PublicSearchCardViewModel {
   readonly location: Readonly<{
     approximateDistanceKm: number | null;
     municipalityName: string;
+    serviceAreaMatch:
+      | "IN_SERVICE_AREA"
+      | "FARTHER_BY_AGREEMENT"
+      | "OUTSIDE_DECLARED_AREA"
+      | "DISTANCE_UNAVAILABLE";
   }>;
   readonly professions: readonly Readonly<{ kind: string; label: string }>[];
   readonly profileId: string;
@@ -133,6 +138,7 @@ export function PublicSearchCardList({
                     {card.location.approximateDistanceKm === null
                       ? ""
                       : ` · približne ${card.location.approximateDistanceKm} km`}
+                    {serviceAreaLabel(card.location.serviceAreaMatch)}
                   </span>
                 </div>
                 <div className="search-result-card__trust-facts">
@@ -188,6 +194,21 @@ export function PublicSearchCardList({
       ))}
     </ol>
   );
+}
+
+function serviceAreaLabel(
+  match: PublicSearchCardViewModel["location"]["serviceAreaMatch"],
+): string {
+  switch (match) {
+    case "IN_SERVICE_AREA":
+      return " · v bežnom dosahu";
+    case "FARTHER_BY_AGREEMENT":
+      return " · ďalej po dohode";
+    case "OUTSIDE_DECLARED_AREA":
+      return " · mimo bežného dosahu";
+    case "DISTANCE_UNAVAILABLE":
+      return "";
+  }
 }
 
 function badgeProvenance(

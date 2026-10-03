@@ -73,6 +73,37 @@ monthly. It is recorded as a supplementary audit source, but the committed
 snapshot is derived from the MV SR files above and never substitutes a postal
 label for the MV SR canonical municipality code.
 
+## Whole-city selectable areas
+
+The Register of Addresses snapshot represents Bratislava through 17 city
+district municipalities and Košice through 22 city district municipalities.
+For customer-facing coarse location selection the importer derives two
+governed whole-city areas from those official members:
+
+- Bratislava, official municipality code `582000`, 17 members;
+- Košice, official municipality code `599981`, 22 members.
+
+The codes are the official whole-city codes published by the Statistical
+Office of the Slovak Republic and reflected in the statutory territorial
+register. The membership is derived fail-closed from the pinned MV SR names
+and canonical member codes: an unexpected member count aborts the import and
+requires a new reference-data review. An internal `SCOPE:<city-code>` hierarchy
+carrier keeps the existing non-null region/district/municipality database
+invariants; it is never exposed as an administrative district to users.
+
+Whole-city areas deliberately have no fabricated PSČ. Their representative
+point is deterministically derived from member centroids and is used only for
+approximate ranking. Service-area eligibility first expands the whole-city
+membership, so a craftsman based in any member city district is not excluded
+merely because the customer selected the whole city.
+
+Authoritative code references:
+
+- Statistical Office municipality list:
+  <https://volby.statistics.sk/oso/oso2010/info/obce.jsp@lang=en.htm>
+- Slov-Lex territorial-code regulation:
+  <https://static.slov-lex.sk/static/SK/ZZ/2004/668/20250101.print.html>
+
 ## Safety and update policy
 
 `snapshot.json` is accepted only when the validator confirms all of the
@@ -87,8 +118,10 @@ following:
 - canonical Prievidza (`513881`) maps to `971 01`, while `513792` remains
   correctly assigned to Malá Tŕňa.
 
-The committed snapshot contains 8 regions, 79 districts, 2,924 selectable
+The committed raw snapshot contains 8 regions, 79 districts, 2,924
 municipalities/city districts, 1,415 postal codes and 3,283 many-to-many links.
+The importer adds the two documented whole-city selectable areas without
+altering the raw snapshot checksum or inventing postal-code links.
 
 The database import is explicit, transactional, advisory-lock protected and
 idempotent. Conflicting rows fail closed and roll the whole import back. It

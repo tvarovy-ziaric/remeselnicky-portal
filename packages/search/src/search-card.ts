@@ -65,6 +65,11 @@ export interface PublicSearchCard {
   readonly location: Readonly<{
     readonly municipalityName: string;
     readonly approximateDistanceKm: number | null;
+    readonly serviceAreaMatch:
+      | "IN_SERVICE_AREA"
+      | "FARTHER_BY_AGREEMENT"
+      | "OUTSIDE_DECLARED_AREA"
+      | "DISTANCE_UNAVAILABLE";
   }>;
   readonly rating: Readonly<{
     readonly score: number | null;
@@ -445,6 +450,7 @@ function projectCardChecked(
     location: Object.freeze({
       approximateDistanceKm: ranking.geo.approximateDistanceKm,
       municipalityName: candidate.location.baseMunicipalityName,
+      serviceAreaMatch: publicServiceAreaMatch(ranking.geo.band),
     }),
     professions: Object.freeze([
       Object.freeze({ code: profession.code, label: profession.label }),
@@ -464,6 +470,21 @@ function projectCardChecked(
     verifiedWorkCount: candidate.signals.trust.verifiedWorkCount,
     whyMatched,
   });
+}
+
+function publicServiceAreaMatch(
+  band: RecommendedRankingResult["geo"]["band"],
+): PublicSearchCard["location"]["serviceAreaMatch"] {
+  switch (band) {
+    case "STRONG_SERVICE_AREA":
+      return "IN_SERVICE_AREA";
+    case "FARTHER_BY_AGREEMENT":
+      return "FARTHER_BY_AGREEMENT";
+    case "OUTSIDE_DECLARED_AREA":
+      return "OUTSIDE_DECLARED_AREA";
+    case "DISTANCE_UNAVAILABLE":
+      return "DISTANCE_UNAVAILABLE";
+  }
 }
 
 function makeBadges(

@@ -12,6 +12,7 @@ describe("municipality autocomplete repository", () => {
         {
           code: "SK:BA:BRATISLAVA",
           districtName: "Bratislava I",
+          kind: "MUNICIPALITY",
           name: "Bratislava",
           postalCodes: ["81101", "81102"],
           regionName: "Bratislavský kraj",
@@ -24,6 +25,7 @@ describe("municipality autocomplete repository", () => {
       {
         code: "SK:BA:BRATISLAVA",
         districtName: "Bratislava I",
+        kind: "MUNICIPALITY",
         name: "Bratislava",
         postalCodes: ["81101", "81102"],
         regionName: "Bratislavský kraj",
@@ -33,7 +35,7 @@ describe("municipality autocomplete repository", () => {
       /location_municipalities|location_postal_codes|is_active|LIMIT/u,
     );
     expect(query).toMatch(
-      /ORDER BY candidates\.normalized_name, candidates\.code/u,
+      /ORDER BY candidates\.normalized_name,[\s\S]*candidates\.code/u,
     );
     expect(query).toMatch(/municipality_postal\.is_active/u);
     expect(query).not.toMatch(/centroid|owner_user|exact_address/iu);
@@ -52,6 +54,38 @@ describe("municipality autocomplete repository", () => {
     expect(interpolations[0]).toContain("prie%");
   });
 
+  it("returns a governed whole-city result first without inventing a district or postal code", async () => {
+    let query = "";
+    const sql = vi.fn((strings: TemplateStringsArray) => {
+      query = strings.join("?");
+      return Promise.resolve([
+        {
+          code: "582000",
+          districtName: null,
+          kind: "CITY_AREA",
+          name: "Bratislava",
+          postalCodes: [],
+          regionName: "Bratislavský kraj",
+        },
+      ]);
+    }) as unknown as Sql;
+
+    await expect(
+      createMunicipalityAutocompleteRepository(sql).suggest("Brat"),
+    ).resolves.toEqual([
+      {
+        code: "582000",
+        districtName: null,
+        kind: "CITY_AREA",
+        name: "Bratislava",
+        postalCodes: [],
+        regionName: "Bratislavský kraj",
+      },
+    ]);
+    expect(query).toMatch(/location_city_areas/u);
+    expect(query).toMatch(/CITY_AREA/u);
+  });
+
   it.each(["971", "9710", "97101", "971 01", "01001"])(
     "searches canonical postal prefix for %s",
     async (input) => {
@@ -65,6 +99,7 @@ describe("municipality autocomplete repository", () => {
             {
               code: "SK:PD:PRIEVIDZA",
               districtName: "Prievidza",
+              kind: "MUNICIPALITY",
               name: "Prievidza",
               postalCodes: ["97101"],
               regionName: "Trenčiansky kraj",
@@ -94,6 +129,7 @@ describe("municipality autocomplete repository", () => {
         {
           code: "SK:PD:PRIEVIDZA",
           districtName: "Prievidza",
+          kind: "MUNICIPALITY",
           name: "Prievidza",
           postalCodes: ["97101", "97103"],
           regionName: "Trenčiansky kraj",
@@ -101,6 +137,7 @@ describe("municipality autocomplete repository", () => {
         {
           code: "SK:PD:OTHER",
           districtName: "Prievidza",
+          kind: "MUNICIPALITY",
           name: "Iná obec",
           postalCodes: ["97101"],
           regionName: "Trenčiansky kraj",
@@ -140,6 +177,7 @@ describe("municipality autocomplete repository", () => {
         {
           code: "bad code",
           districtName: "D",
+          kind: "MUNICIPALITY",
           name: "N",
           postalCodes: ["97101"],
           regionName: "R",
@@ -157,6 +195,7 @@ describe("municipality autocomplete repository", () => {
         {
           code: "SK:PD:PRIEVIDZA",
           districtName: "Prievidza",
+          kind: "MUNICIPALITY",
           name: "Prievidza",
           postalCodes: ["97103", "97101"],
           regionName: "Trenčiansky kraj",

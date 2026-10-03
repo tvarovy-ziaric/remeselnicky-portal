@@ -75,7 +75,11 @@ describe("public search cards", () => {
         secondaryName: "Ján Remeselný",
       },
       indicativePrice: null,
-      location: { approximateDistanceKm: 18, municipalityName: "Bratislava" },
+      location: {
+        approximateDistanceKm: 18,
+        municipalityName: "Bratislava",
+        serviceAreaMatch: "IN_SERVICE_AREA",
+      },
       rating: { reviewCount: 0, score: null },
       verifiedWorkCount: 0,
     });
@@ -193,6 +197,20 @@ describe("public search cards", () => {
       verifiedWorkCount: 0,
       whyMatched: [{ kind: "PROFESSION" }],
     });
+    expect(card?.location.serviceAreaMatch).toBe("DISTANCE_UNAVAILABLE");
+  });
+
+  it.each([
+    ["STRONG_SERVICE_AREA", "IN_SERVICE_AREA"],
+    ["FARTHER_BY_AGREEMENT", "FARTHER_BY_AGREEMENT"],
+    ["OUTSIDE_DECLARED_AREA", "OUTSIDE_DECLARED_AREA"],
+  ] as const)("publishes the safe %s geo band as %s", (geoBand, expected) => {
+    const [card] = composePublicSearchCards({
+      candidates: [publicCandidate(firstId)],
+      professionCode: "PROF:TILER",
+      ranked: [ranking(firstId, { geoBand })],
+    });
+    expect(card?.location.serviceAreaMatch).toBe(expected);
   });
 
   it("does not badge verified portfolio evidence from an unrelated profession", () => {

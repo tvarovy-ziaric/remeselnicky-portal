@@ -15,6 +15,7 @@ describe("municipality autocomplete route", () => {
           {
             code: "SK:BA:BRATISLAVA",
             districtName: "Bratislava I",
+            kind: "MUNICIPALITY",
             name: "Bratislava",
             postalCodes: ["81101", "81102"],
             regionName: "Bratislavský kraj",
@@ -39,6 +40,7 @@ describe("municipality autocomplete route", () => {
         {
           code: "SK:BA:BRATISLAVA",
           districtName: "Bratislava I",
+          kind: "MUNICIPALITY",
           name: "Bratislava",
           postalCodes: ["81101", "81102"],
           regionName: "Bratislavský kraj",

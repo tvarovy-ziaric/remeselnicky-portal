@@ -20,9 +20,36 @@ describe("public search cards web boundary", () => {
     expect(html).toContain("Prečo sa hodí?");
     expect(html).toContain("Zobraziť profil");
     expect(html).toContain(`/remeselnici/${profileId}`);
+    expect(html).toContain("Bratislava · približne 8 km · v bežnom dosahu");
     expect(html).toContain("Uvedené remeselníkom:");
     expect(html).not.toMatch(/Hodnotenie|Overené realizácie|email|telefón/iu);
     expect(html).not.toContain("Pozvať k zákazke");
+  });
+
+  it("clearly distinguishes farther and explicitly broadened matches", () => {
+    const html = renderToStaticMarkup(
+      <PublicSearchCardList
+        cards={[
+          {
+            ...card(),
+            location: {
+              ...card().location,
+              serviceAreaMatch: "FARTHER_BY_AGREEMENT",
+            },
+          },
+          {
+            ...card(),
+            profileId: "99000000-0000-4000-8000-000000000003",
+            location: {
+              ...card().location,
+              serviceAreaMatch: "OUTSIDE_DECLARED_AREA",
+            },
+          },
+        ]}
+      />,
+    );
+    expect(html).toContain("ďalej po dohode");
+    expect(html).toContain("mimo bežného dosahu");
   });
 
   it("renders only factual trust provenance and labels the portfolio image neutrally", () => {
@@ -151,6 +178,17 @@ describe("public search cards web boundary", () => {
           {
             ...card(),
             identity: { ...card().identity, profileType: "UNKNOWN" },
+          },
+        ],
+        nextCursor: null,
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      loadResponse({
+        items: [
+          {
+            ...card(),
+            location: { ...card().location, serviceAreaMatch: "INTERNAL" },
           },
         ],
         nextCursor: null,
@@ -313,7 +351,11 @@ function card(): PublicSearchCardViewModel & {
       secondaryName: "Ján Remeselný",
     },
     indicativePrice: null,
-    location: { approximateDistanceKm: 8, municipalityName: "Bratislava" },
+    location: {
+      approximateDistanceKm: 8,
+      municipalityName: "Bratislava",
+      serviceAreaMatch: "IN_SERVICE_AREA",
+    },
     professions: [{ kind: "PROF:TILER", label: "Obkladač" }],
     profileId,
     rating: { reviewCount: 0, score: null },

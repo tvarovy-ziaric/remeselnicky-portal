@@ -40,12 +40,33 @@ try {
   const location = page.getByRole("combobox", { name: "Obec alebo PSČ" });
   await expect(location).toBeVisible();
 
+  await location.fill("Košice");
+  const wholeKosice = page.getByRole("option", {
+    name: /Košice · celé mesto · Košický kraj/u,
+  });
+  await expect(wholeKosice).toBeVisible();
+  await expect(wholeKosice).not.toContainText(/PSČ|okres/u);
+
+  await location.fill("Bratislava");
+  const wholeBratislava = page.getByRole("option", {
+    name: /Bratislava · celé mesto · Bratislavský kraj/u,
+  });
+  await expect(wholeBratislava).toBeVisible();
+  await expect(wholeBratislava).not.toContainText(/PSČ|okres/u);
+  await wholeBratislava.click();
+  await expect(page.locator('input[name="municipalityCode"]')).toHaveValue(
+    "582000",
+  );
+  await expect(location).toHaveValue("Bratislava");
+
   await location.fill("Prievidza");
   await expect(
-    page.getByRole("option", { name: /971 01 · Prievidza/u }),
+    page.getByRole("option", { name: /Prievidza · 971 01/u }),
   ).toBeVisible();
   await location.press("ArrowDown");
-  await expect(page.getByText("Aktívny návrh")).toBeVisible();
+  await expect(
+    page.getByRole("option", { name: /971 01 · okres Prievidza/u }),
+  ).toHaveAttribute("aria-selected", "true");
   await location.press("Enter");
   await expect(page.locator('input[name="municipalityCode"]')).toHaveValue(
     "513881",
@@ -55,16 +76,16 @@ try {
   await location.fill("971 01");
   await expect(page.locator('input[name="municipalityCode"]')).toHaveCount(0);
   await expect(
-    page.getByRole("option", { name: /971 01 · Prievidza/u }),
+    page.getByRole("option", { name: /Prievidza · 971 01/u }),
   ).toBeVisible();
-  await page.getByRole("option", { name: /971 01 · Prievidza/u }).click();
+  await page.getByRole("option", { name: /Prievidza · 971 01/u }).click();
   await expect(page.locator('input[name="municipalityCode"]')).toHaveValue(
     "513881",
   );
   await expect(page.getByText("Vybraná lokalita: Prievidza")).toBeVisible();
 
   process.stdout.write(
-    "Local Alpha municipality name and postal-code browser smoke passed.\n",
+    "Local Alpha whole-city, municipality and postal-code browser smoke passed.\n",
   );
 } finally {
   await browser.close();

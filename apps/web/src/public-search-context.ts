@@ -9,11 +9,60 @@ const publicSearchKeys = new Set([
   "limit",
   "municipalityCode",
   "professionCode",
+  "serviceCode",
   "skillCodes",
   "sort",
   "specializationCode",
   "startsAt",
 ]);
+
+export interface PublicSearchFormDefaults {
+  readonly includeOutsideDeclaredArea: boolean;
+  readonly municipalityCode: string | null;
+  readonly municipalityLabel: string;
+  readonly professionCode: string | null;
+  readonly professionLabel: string;
+  readonly serviceCode: string | null;
+  readonly sort: "BEST_RATED" | "NEAREST" | "RECOMMENDED";
+}
+
+export function parsePublicSearchFormDefaults(
+  parameters: Readonly<Record<string, string | readonly string[] | undefined>>,
+): PublicSearchFormDefaults {
+  const professionCode = single(parameters.professionCode);
+  const serviceCode = single(parameters.serviceCode);
+  const municipalityCode = single(parameters.municipalityCode);
+  const sort = single(parameters.sort);
+  const validMunicipalityCode =
+    municipalityCode !== null &&
+    municipalityCode.length <= 64 &&
+    /^[A-Z0-9][A-Z0-9._:-]*$/u.test(municipalityCode)
+      ? municipalityCode
+      : null;
+  return Object.freeze({
+    includeOutsideDeclaredArea:
+      validMunicipalityCode !== null &&
+      single(parameters.includeOutsideDeclaredArea) === "true",
+    municipalityCode: validMunicipalityCode,
+    municipalityLabel: safeLabel(single(parameters.municipalityLabel), 80),
+    professionCode:
+      professionCode !== null &&
+      /^(?:PROF|TEST):[A-Z0-9][A-Z0-9_]{1,62}$/u.test(professionCode)
+        ? professionCode
+        : null,
+    professionLabel: safeLabel(single(parameters.professionLabel), 120),
+    serviceCode:
+      serviceCode !== null &&
+      /^SERV:[A-Z0-9][A-Z0-9_]{1,62}$/u.test(serviceCode)
+        ? serviceCode
+        : null,
+    sort:
+      sort === "BEST_RATED" ||
+      (sort === "NEAREST" && validMunicipalityCode !== null)
+        ? sort
+        : "RECOMMENDED",
+  });
+}
 
 export function parsePublicSearchContext(
   parameters: Readonly<Record<string, string | readonly string[] | undefined>>,
@@ -46,4 +95,17 @@ export function parsePublicSearchContext(
     ...(jobId === undefined ? {} : { jobId }),
     searchParameters,
   };
+}
+
+function single(value: string | readonly string[] | undefined): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function safeLabel(value: string | null, maximum: number): string {
+  return value !== null &&
+    value === value.trim() &&
+    value.length <= maximum &&
+    !/[\r\n\p{Cc}]/u.test(value)
+    ? value
+    : "";
 }

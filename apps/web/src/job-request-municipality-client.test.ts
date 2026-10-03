@@ -14,6 +14,7 @@ describe("job request municipality suggestions", () => {
           {
             code: "SK:BA:BRATISLAVA",
             districtName: "Bratislava I",
+            kind: "MUNICIPALITY",
             latitude: 48.1,
             name: "Bratislava",
             postalCodes: ["81101", "85101"],
@@ -30,12 +31,86 @@ describe("job request municipality suggestions", () => {
         {
           code: "SK:BA:BRATISLAVA",
           districtName: "Bratislava I",
+          kind: "MUNICIPALITY",
           name: "Bratislava",
           postalCodes: ["81101", "85101"],
           regionName: "Bratislavský kraj",
         },
       ],
     });
+  });
+
+  it("accepts a governed whole-city area without a fake district or postal code", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json({
+        suggestions: [
+          {
+            code: "CITY_AREA:BRATISLAVA",
+            districtName: null,
+            kind: "CITY_AREA",
+            name: "Bratislava",
+            postalCodes: [],
+            regionName: "Bratislavský kraj",
+          },
+        ],
+      }),
+    );
+
+    await expect(
+      loadJobRequestMunicipalitySuggestions("Brat", fetcher),
+    ).resolves.toEqual({
+      status: "OK",
+      suggestions: [
+        {
+          code: "CITY_AREA:BRATISLAVA",
+          districtName: null,
+          kind: "CITY_AREA",
+          name: "Bratislava",
+          postalCodes: [],
+          regionName: "Bratislavský kraj",
+        },
+      ],
+    });
+  });
+
+  it("rejects inconsistent whole-city and municipality metadata", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        Response.json({
+          suggestions: [
+            {
+              code: "CITY_AREA:BRATISLAVA",
+              districtName: "Bratislava I",
+              kind: "CITY_AREA",
+              name: "Bratislava",
+              postalCodes: ["81101"],
+              regionName: "Bratislavský kraj",
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          suggestions: [
+            {
+              code: "528595",
+              districtName: null,
+              kind: "MUNICIPALITY",
+              name: "Bratislava-Staré Mesto",
+              postalCodes: [],
+              regionName: "Bratislavský kraj",
+            },
+          ],
+        }),
+      );
+
+    await expect(
+      loadJobRequestMunicipalitySuggestions("Brat", fetcher),
+    ).resolves.toEqual({ status: "ERROR", suggestions: [] });
+    await expect(
+      loadJobRequestMunicipalitySuggestions("Brati", fetcher),
+    ).resolves.toEqual({ status: "ERROR", suggestions: [] });
   });
 
   it("distinguishes an invalid payload from a valid zero result", async () => {

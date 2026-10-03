@@ -102,9 +102,12 @@ function parseCard(value: unknown): PublicSearchCardViewModel | null {
     (identity["secondaryName"] !== null && !text(identity["secondaryName"])) ||
     !record(location) ||
     !text(location["municipalityName"]) ||
+    !serviceAreaMatch(location["serviceAreaMatch"]) ||
     (location["approximateDistanceKm"] !== null &&
       (!integer(location["approximateDistanceKm"]) ||
         location["approximateDistanceKm"] > 20_040)) ||
+    (location["serviceAreaMatch"] === "DISTANCE_UNAVAILABLE") !==
+      (location["approximateDistanceKm"] === null) ||
     !record(rating) ||
     !ratingAggregate(rating["score"], rating["reviewCount"]) ||
     !integer(value["verifiedWorkCount"]) ||
@@ -155,6 +158,7 @@ function parseCard(value: unknown): PublicSearchCardViewModel | null {
           ? location["approximateDistanceKm"]
           : null,
       municipalityName: location["municipalityName"],
+      serviceAreaMatch: location["serviceAreaMatch"],
     },
     professions: professions as PublicSearchCardViewModel["professions"],
     profileId: value["profileId"],
@@ -209,6 +213,19 @@ function text(value: unknown): value is string {
       /\b(?:adresa|ulica|číslo domu|číslo bytu)\b/iu,
       /\b(?:heslo|password|api[ _-]?key|access[ _-]?token|secret)\b/iu,
     ].every((pattern) => !pattern.test(value))
+  );
+}
+function serviceAreaMatch(
+  value: unknown,
+): value is PublicSearchCardViewModel["location"]["serviceAreaMatch"] {
+  return (
+    typeof value === "string" &&
+    [
+      "IN_SERVICE_AREA",
+      "FARTHER_BY_AGREEMENT",
+      "OUTSIDE_DECLARED_AREA",
+      "DISTANCE_UNAVAILABLE",
+    ].includes(value)
   );
 }
 function integer(value: unknown): value is number {

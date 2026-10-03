@@ -1,8 +1,9 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import postgres from "postgres";
+import postgres, { type TransactionSql } from "postgres";
 
+import { deriveGovernedCityAreas } from "./governed-city-areas.js";
 import { loadSlovakiaLocationReferenceSnapshot } from "./slovakia-location-reference.js";
 
 const DEFAULT_SNAPSHOT = fileURLToPath(
@@ -46,6 +47,7 @@ async function main(): Promise<void> {
             "Existing location reference revision has another checksum.",
           );
         }
+        await installGovernedCityAreas(transaction, snapshot);
         return { alreadyApplied: true } as const;
       }
 
@@ -169,6 +171,7 @@ async function main(): Promise<void> {
           "Location reference import conflicts with existing governed catalog rows.",
         );
       }
+      await installGovernedCityAreas(transaction, snapshot);
       return { alreadyApplied: false } as const;
     });
 
@@ -177,6 +180,85 @@ async function main(): Promise<void> {
     );
   } finally {
     await sql.end({ timeout: 5 });
+  }
+}
+
+async function installGovernedCityAreas(
+  transaction: TransactionSql,
+  snapshot: Awaited<ReturnType<typeof loadSlovakiaLocationReferenceSnapshot>>,
+): Promise<void> {
+  const areas = deriveGovernedCityAreas(snapshot);
+  for (const area of areas) {
+    await transaction`
+      INSERT INTO location_districts (
+        code, region_code, name_sk, source_reference, source_revision, is_active
+      ) VALUES (
+        ${area.districtCode}, ${area.regionCode}, ${area.name},
+        ${snapshot.source.catalogUrl}, ${area.sourceRevision}, true
+      )
+      ON CONFLICT (code) DO NOTHING
+    `;
+    await transaction`
+      INSERT INTO location_municipalities (
+        code, district_code, name_sk, centroid,
+        source_reference, source_revision, is_active
+      )
+      SELECT
+        ${area.code}, ${area.districtCode}, ${area.name},
+        ST_Centroid(ST_Collect(member.centroid::geometry))::geography,
+        ${snapshot.source.catalogUrl}, ${area.sourceRevision}, true
+      FROM location_municipalities member
+      WHERE member.code = ANY(${area.memberCodes}::text[])
+      HAVING count(*) = ${area.memberCodes.length}
+      ON CONFLICT (code) DO NOTHING
+    `;
+    await transaction`
+      INSERT INTO location_city_areas (
+        municipality_code, member_count, source_reference, source_revision
+      ) VALUES (
+        ${area.code}, ${area.memberCodes.length},
+        ${snapshot.source.catalogUrl}, ${area.sourceRevision}
+      )
+      ON CONFLICT (municipality_code) DO NOTHING
+    `;
+    await transaction`
+      INSERT INTO location_city_area_members (city_area_code, municipality_code)
+      SELECT ${area.code}, member_code
+      FROM unnest(${area.memberCodes}::text[]) member_code
+      ON CONFLICT (city_area_code, municipality_code) DO NOTHING
+    `;
+    const [stored] = await transaction<
+      {
+        districtCode: string;
+        memberCount: number;
+        name: string;
+        regionCode: string;
+      }[]
+    >`
+      SELECT municipality.name_sk AS name,
+        municipality.district_code AS "districtCode",
+        district.region_code AS "regionCode",
+        count(member.municipality_code)::integer AS "memberCount"
+      FROM location_city_areas area
+      JOIN location_municipalities municipality
+        ON municipality.code = area.municipality_code
+      JOIN location_districts district
+        ON district.code = municipality.district_code
+      JOIN location_city_area_members member
+        ON member.city_area_code = area.municipality_code
+      WHERE area.municipality_code = ${area.code}
+      GROUP BY municipality.name_sk, municipality.district_code, district.region_code
+    `;
+    if (
+      stored?.name !== area.name ||
+      stored.districtCode !== area.districtCode ||
+      stored.regionCode !== area.regionCode ||
+      stored.memberCount !== area.memberCodes.length
+    ) {
+      throw new Error(
+        "Governed city area import conflicts with existing rows.",
+      );
+    }
   }
 }
 

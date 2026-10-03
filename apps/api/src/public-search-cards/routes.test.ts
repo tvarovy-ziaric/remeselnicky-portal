@@ -214,7 +214,11 @@ function card() {
       secondaryName: "Ján Remeselný",
     },
     indicativePrice: null,
-    location: { approximateDistanceKm: 8, municipalityName: "Bratislava" },
+    location: {
+      approximateDistanceKm: 8,
+      municipalityName: "Bratislava",
+      serviceAreaMatch: "IN_SERVICE_AREA" as const,
+    },
     professions: [{ code: "PROF:TILER", label: "Obkladač" }],
     profileId: "99000000-0000-4000-8000-000000000001",
     rating: { reviewCount: 0, score: null },
