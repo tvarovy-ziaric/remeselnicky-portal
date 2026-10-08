@@ -5,6 +5,8 @@
 **Typ:** pracovná, nekanonická roadmapa / analytický overlay. Nenahrádza uzamknuté `ROADMAP.md` a `IMPLEMENTATION_BACKLOG.md`.  
 **Stupnica:** IMPLEMENTOVANÉ V KÓDE ≠ AUTOMATIZOVANE OVERENÉ ≠ MANUÁLNE UAT ≠ PRODUKČNE SCHVÁLENÉ.
 
+**Krátky zrozumiteľný koncept:** [Remeselnícky portál — myšlienka na jednej strane](concepts/remeselnicky-portal-v-skratke.md). Realitní makléri/správcovia nehnuteľností sú zatiaľ **možné pilotné distribučné partnerstvo**, nie schválený produktový modul alebo blocker vydania.
+
 ## 0. Dodatok schválených produktových zámerov (2026-10-09): povinné vs. voliteľné
 
 **Povaha dodatku:** pracovné plánovanie, nie zmena hash-uzamknutých D01–D30 ani automatické schválenie vydania. Kanonické `ROADMAP.md` a `IMPLEMENTATION_BACKLOG.md` majú prednosť. Pri konflikte je potrebné výslovné ľudské rozhodnutie podľa `AGENTS.md`. Odhady sú orientačné a **nevytvárajú nové release blokery pre webovú alfu**.
