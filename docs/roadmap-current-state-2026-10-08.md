@@ -5,6 +5,49 @@
 **Typ:** pracovná, nekanonická roadmapa / analytický overlay. Nenahrádza uzamknuté `ROADMAP.md` a `IMPLEMENTATION_BACKLOG.md`.  
 **Stupnica:** IMPLEMENTOVANÉ V KÓDE ≠ AUTOMATIZOVANE OVERENÉ ≠ MANUÁLNE UAT ≠ PRODUKČNE SCHVÁLENÉ.
 
+## 0. Dodatok schválených produktových zámerov (2026-10-09): povinné vs. voliteľné
+
+**Povaha dodatku:** pracovné plánovanie, nie zmena hash-uzamknutých D01–D30 ani automatické schválenie vydania. Kanonické `ROADMAP.md` a `IMPLEMENTATION_BACKLOG.md` majú prednosť. Pri konflikte je potrebné výslovné ľudské rozhodnutie podľa `AGENTS.md`. Odhady sú orientačné a **nevytvárajú nové release blokery pre webovú alfu**.
+
+### Povinné pre dokončenie existujúcej webovej alfy / pilotu (MUST, R4)
+
+- Overiť a opraviť existujúcu zákaznícku a remeselnícku cestu: registrácia, katalóg, dopyt, komunikácia, ponuka, realizácia, potvrdenie, hodnotenie, dokumentácia.
+- Reálny admin MFA, správna autorizácia, manuálne UAT, bezpečný staging/produkcia, monitoring, zálohy, privacy/legal a výslovné GO; **nikdy neobchádzať ochrany kvôli testovaniu**.
+- Dokončené a ohodnotené portálové zákazky zostávajú jediným základom overených zákazkových hodnotení; finančné plnenie medzi stranami nie je povinná súčasť procesu.
+- Súčasné existujúce riešenie reputácie nesmie oslabiť transparentné rozlíšenie medzi portálovou zákazkou a externou portfóliovou realizáciou.
+
+### Povinné pre plánovanú mobilnú beta verziu (MUST pre mobil, NIE gate webovej alfy)
+
+- Jediná aplikácia s odlišnými kontextmi zákazník/remeselník; rýchly prehľad a archív zákaziek, chat, fotografie a súbory, notifikácie s priamym prechodom na akciu, jednoduché zmeny stavu, zákaznícke prevzatie a hodnotenie.
+- Cenové ponuky v mobile prezerať, nie vytvárať či upravovať; komplexná tvorba zostáva na webe.
+- Automatické roztriedenie súborov podľa typu a dohľadateľná nemenná história odoslaných dokumentov/verzií, so zákonnými výnimkami a prístupmi podľa oprávnení.
+- Offline režim cez jednoduchý prepínač „synchronizovať“: údaje a prístupné súbory vlastných aktívnych zákaziek, správy a fotografie, následná obojsmerná synchronizácia a obnova po výmene telefónu; navrhnúť kapacitné, bezpečnostné a retenčné hranice, lebo úplný offline archív môže byť veľký.
+- Katalóg online, offline iba ľahké textové kontakty a relevantné uložené výsledky (meno/názov, profesia, lokalita, kontakt ak je oprávnene dostupný, hodnotenie); bez sťahovania cudzích portfólií. Bežné prezeranie verejného katalógu bez registrácie.
+- Pohodlné prihlásenie Google/Apple s účtom na serveri a bezpečným obnovením prístupu; rešpektovať existujúci model oprávnení.
+- Žiadny verejný príznak „dostupný“ ani zobrazenie kalendára remeselníka. Preveriť, či existujúci search model nevytvára dojem garantovanej dostupnosti.
+- Financie zákazníka voči remeselníkovi zostávajú mimo povinného pracovného toku. Prípadná osobná značka „úhrada označená“ je budúca samostatná súkromná funkcia.
+
+### Priorita po stabilizácii webovej bety / podľa výsledkov pilotu (NEXT, nie blokery alfy)
+
+- **Základné odporúčania / palce hore:** len prihlásený používateľ s overeným účtom, bez druhého overovania pri kliknutí; najviac jedno aktívne odporúčanie remeselníka na účet; viditeľný počet, **bez vplyvu na organické poradie, oficiálne hodnotenie a progres**.
+- **Mimoportálové realizácie:** oddelené označenie a prezentácia s fotografiami, môže byť potvrdenie protistranou, ale **nezapočítať do overených zákaziek, hodnotení, rankingu, odznakov ani progresu**. Limit a UX ešte podrobne rozhodnúť. Nezamieňať s oficiálnym audítovateľným workflow.
+- **Regionálny vstup na trh:** najprv jediný región; osobne získaní remeselníci, pomoc s vytvorením prvého profilu, technické SEO bez garancie pozícií, QR/pozývacie odkazy a postupné šírenie cez ich zákazníkov. Zakladajúci klub a časovo obmedzené benefity sú návrhy na obchodnú validáciu, nie záväzky.
+- **Základná reklama:** inzercia môže byť otvorená aj samotným remeselníkom a právnickým osobám; jasné označenie platených plôch, žiadny predaj organickej reputácie alebo poradia, žiadne invazívne reklamy v kritických procesoch či cielenie podľa súkromných správ. Začať jednoduchými priamymi regionálnymi partnermi.
+
+### Voliteľný rozvoj (OPTIONAL; nespomaľovať alfu ani štart základnej bety)
+
+- **Kontextový hlasový „škriatok“** na vyžiadanie v oboch rolách: nenápadné UI, nikdy nezačne hovoriť sám; zákazníkovi pomôže pomenovať problém, pri havárii stručne s bezpečnosťou a odporučením profesie, potom môže s potvrdením pripraviť hovor; remeselníkovi naviguje zákazky a vykonáva len povolené akcie. Fázovanie: prototyp → zákazník → remeselník → kontakty/integrácie → stabilizácia. WhatsApp automatické volanie je závislé od možnosti integrácie; podporovať klasický telefón a nepredstierať schopnosti.
+- **Cenový AI pomocník z PDF** pre remeselníka: kontrola položiek/chýb a orientačné cenové porovnanie; neskôr len z dostatočne kvalitných agregovaných dát podľa profesie/oblasti. Neprezrádzať súkromné ponuky, neprepisovať originál, priznávať neistotu.
+- **Gamifikácia a úrovne:** pracovný koncept šiestich úrovní podľa počtu potvrdených a zákazníkom hodnotených portálových zákaziek. Limity obrázkov/videí a prahy nie sú prijaté pre V1; rozlišovať profesionálnu kvalitu od aktivity.
+- **Prémiové nástroje/balíky a zrýchlené odomknutie prezentácie:** odomknuté prezentačné možnosti musia byť dosiahnuteľné aj aktivitou; platenie nikdy nekupuje overené zákazky, hviezdičky, odznaky dôvery alebo organické poradie. Hlavná zamýšľaná monetizácia je reklama, platené nástroje sú doplnkové.
+- **Rozšírená samoobslužná reklamná platforma, analytika a individuálna súkromná evidencia úhrad:** až po overení dopytu, obchodného modelu a súladu s pravidlami ochrany údajov.
+
+### Odhad dodatočnej práce a pravidlo realizácie
+
+Orientačný **rozsah všetkých nových schválených zámerov pred odloženými doplnkami: 97–195 vývojárskych dní** (z toho hlasový asistent 32–60, offline synchronizácia 25–50); intervaly sú hrubé, môžu sa prekrývať s mobilnou implementáciou a nie sú pevnou cenovou ponukou. Nevkladať všetky tieto dni na kritickú cestu webovej alfy. Technické rozhodnutia, poskytovatelia AI, platené služby, právne hranice a významné zmeny pravidiel vyžadujú samostatné gate rozhodnutia.
+
+**Prvý realizačný krok ostáva nezmenený:** presný repo/CI/UAT audit, bezpečné admin MFA a opravy pre webovú alfu. Až po PASS rozhodnúť o termínoch NEXT/OPTIONAL. Každá zmena sa plánuje ako samostatný ticket s akceptačnými kritériami a regresnými testami.
+
 ## 1. Východiská a metodika
 
 Podkladom je aktuálna štruktúra monorepa (Next.js web, Fastify API, worker, zdieľané doménové balíky, PostgreSQL/PostGIS), zdrojové súbory, `docs/execution-checkpoint.md`, `docs/release/go-no-go-checklist.md`, existujúce testovacie cesty a posledné commity. Nevykonalo sa lokálne spustenie systému, živý prechod všetkých obrazoviek ani kompletný nezávislý test; priechodnosť celej používateľskej cesty preto zostáva predmetom UAT. Pôvodný checkpoint má dátum 2026-10-01; neskoršie commity dokumentujú spravovanú taxonómiu a celomestské vyhľadávanie.
